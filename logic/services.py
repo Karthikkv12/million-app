@@ -12,27 +12,14 @@ Session = sessionmaker(bind=engine)
 
 try:
     from passlib.context import CryptContext
-    # Use passlib CryptContext with bcrypt
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-except Exception:
-    # Fallback simple salted sha256 context if passlib not available (dev/test only)
-    import hashlib, secrets
+except Exception as e:
+    raise ImportError(
+        "passlib is required for secure password hashing. Install with: `pip install passlib[bcrypt]`"
+    ) from e
 
-    class SimpleCtx:
-        def hash(self, password):
-            salt = secrets.token_hex(16)
-            d = hashlib.sha256(salt.encode('utf-8') + str(password).encode('utf-8')).hexdigest()
-            return f"{salt}${d}"
-
-        def verify(self, password, stored):
-            try:
-                salt, digest = stored.split('$', 1)
-            except Exception:
-                return False
-            check = hashlib.sha256(salt.encode('utf-8') + str(password).encode('utf-8')).hexdigest()
-            return check == digest
-
-    pwd_context = SimpleCtx()
+# Use passlib CryptContext. Use PBKDF2-SHA256 to avoid system bcrypt backend issues
+# (still secure and avoids the bcrypt 72-byte limitation and native backend compatibility).
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def create_user(username, password):
