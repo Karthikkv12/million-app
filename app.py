@@ -6,9 +6,6 @@ except AttributeError:
 
 import streamlit as st
 import pandas as pd
-# ... rest of your imports
-# import streamlit as st
-import pandas as pd
 import plotly.express as px
 from datetime import datetime
 from database.models import init_db
@@ -18,8 +15,7 @@ from logic.services import (
 from ui.auth import sidebar_auth, login_page
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
-import pandas as pd
-import streamlit as st
+from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
 
 # --- CONSTANTS ---
 @st.cache_data(ttl=24*3600)
@@ -60,6 +56,13 @@ def get_ticker_details():
 
 # Load Data (Returns two values: the List and the Dictionary)
 TICKERS, TICKER_MAP = get_ticker_details()
+
+# Ensure DB and tables exist at app startup
+try:
+    init_db()
+except Exception:
+    # Non-fatal: init_db may be a no-op if DB already exists
+    pass
 
 # --- CSS STYLING ---
 st.markdown("""
@@ -187,30 +190,12 @@ def on_grid_change(key, trade_id, field):
     elif field == 'date': data['date'] = new_val
     # canonicalize action and symbol before calling update_trade
     data['symbol'] = str(data['symbol']).upper()
-    data['action'] = _canonical_action_str(data['action'])
+    data['action'] = canonical_action(data['action'])
     update_trade(trade_id, data['symbol'], data['strategy'], data['action'], data['qty'], data['price'], data['date'], user_id=st.session_state.get('user_id'))
     st.toast(f"Updated {field}!", icon="💾")
 
 
-# Helpers: canonicalize UI inputs before calling services
-def _canonical_action_str(val):
-    s = str(val).strip()
-    return 'Buy' if s.upper().startswith('B') else 'Sell'
-
-
-def _canonical_instrument_str(val):
-    s = str(val).strip()
-    return 'Option' if s.upper().startswith('OPT') else 'Stock'
-
-
-def _canonical_budget_type_str(val):
-    s = str(val).strip()
-    up = s.upper()
-    if 'INCOM' in up:
-        return 'Income'
-    if 'ASSET' in up:
-        return 'Asset'
-    return 'Expense'
+# (canonical helpers moved to `ui.utils`)
 
 tab1, tab2 = st.tabs(["Investing", "Budget & Cash Flow"])
 

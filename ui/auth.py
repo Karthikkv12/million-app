@@ -10,7 +10,19 @@ def sidebar_auth():
             del st.session_state['user']
             if 'user_id' in st.session_state:
                 del st.session_state['user_id']
-            st.experimental_rerun()
+            # Attempt to rerun; different Streamlit versions expose different APIs.
+            if hasattr(st, 'experimental_rerun'):
+                try:
+                    st.experimental_rerun()
+                except Exception:
+                    st.stop()
+            elif hasattr(st, 'rerun'):
+                try:
+                    st.rerun()
+                except Exception:
+                    st.stop()
+            else:
+                st.stop()
 
 
 def login_page():
@@ -44,7 +56,19 @@ def login_page():
                         st.session_state['user'] = username
                         st.session_state['user_id'] = int(uid)
                         st.toast(f'Welcome {username}', icon='🔐')
-                        st.experimental_rerun()
+                        # Prefer experimental_rerun where available, otherwise stop to let Streamlit reload.
+                        if hasattr(st, 'experimental_rerun'):
+                            try:
+                                st.experimental_rerun()
+                            except Exception:
+                                st.stop()
+                        elif hasattr(st, 'rerun'):
+                            try:
+                                st.rerun()
+                            except Exception:
+                                st.stop()
+                        else:
+                            st.stop()
                     else:
                         st.error('Invalid username or password')
 
@@ -59,7 +83,19 @@ def login_page():
                         st.success('Account created — signing you in...')
                         st.session_state['user'] = username
                         st.session_state['user_id'] = int(uid)
-                        st.experimental_rerun()
+                        # Prefer experimental_rerun where available, otherwise stop to let Streamlit reload.
+                        if hasattr(st, 'experimental_rerun'):
+                            try:
+                                st.experimental_rerun()
+                            except Exception:
+                                st.stop()
+                        elif hasattr(st, 'rerun'):
+                            try:
+                                st.rerun()
+                            except Exception:
+                                st.stop()
+                        else:
+                            st.stop()
                     except Exception as e:
                         st.error(f'Registration error: {e}')
 
