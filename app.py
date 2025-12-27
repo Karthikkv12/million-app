@@ -15,7 +15,7 @@ from database.models import init_db
 from logic.services import (
     save_trade, save_cash, save_budget, load_data, delete_trade, update_trade
 )
-from ui.auth import sidebar_auth
+from ui.auth import sidebar_auth, login_page
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
 import pandas as pd
@@ -123,7 +123,12 @@ st.markdown("""
 
 # --- SIDEBAR LOGIC ---
 st.sidebar.title("Million")
-# Render authentication controls from ui.auth
+# If not signed in, show the login page (blocking). After login the page will rerun.
+if 'user' not in st.session_state:
+    login_page()
+    st.stop()
+
+# Render authentication controls (shows signed-in state + logout)
 sidebar_auth()
 
 # Menu selection for UI
