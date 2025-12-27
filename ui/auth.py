@@ -1,6 +1,7 @@
 import streamlit as st
 
 from frontend_client import APIError
+from frontend_client import api_base_url, api_health
 from frontend_client import login as api_login
 from frontend_client import signup as api_signup
 
@@ -98,6 +99,16 @@ def login_page():
     </style>
     <div class="top-band"><div class="brand">Million</div></div>
     """, unsafe_allow_html=True)
+
+    # Backend status hint (common setup issue when running split frontend/backend).
+    if not api_health():
+        st.warning(
+            "Backend API is not reachable at "
+            f"`{api_base_url()}`. Start the backend in a separate terminal:\n\n"
+            "`PYTHONPATH=/Users/karthikkondajjividyaranya/Desktop/million-app/million-app `"
+            "`/Users/karthikkondajjividyaranya/Desktop/million-app/.venv/bin/python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000`\n\n"
+            "Then refresh this page.",
+        )
 
     # track whether user clicked Sign up to navigate to the signup page
     if 'show_signup' not in st.session_state:

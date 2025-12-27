@@ -23,13 +23,31 @@ PYTHONPATH=. pytest -q
 ```bash
 export DATABASE_URL="sqlite:///trading_journal.db"  # or your Postgres URL
 export JWT_SECRET="change-me"                       # required for production
-uvicorn backend_api.main:app --reload --port 8000
+PYTHONPATH=$PWD python -m uvicorn backend_api.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+## Phase 1: Postgres + migrations (recommended)
+
+1. Point `DATABASE_URL` at Postgres (example):
+
+```bash
+export DATABASE_URL="postgresql+psycopg://USER:PASSWORD@HOST:5432/million"
+```
+
+2. Run migrations with Alembic:
+
+```bash
+alembic upgrade head
+```
+
+Notes:
+- By default, the app auto-creates tables only for SQLite. For Postgres, run Alembic migrations.
+- Optional pooling knobs for the backend: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`.
 
 4. Run the frontend (Streamlit):
 
 ```bash
-export API_BASE_URL="http://localhost:8000"
+export API_BASE_URL="http://127.0.0.1:8000"
 streamlit run app.py
 ```
 

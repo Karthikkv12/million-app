@@ -4,7 +4,8 @@ sqlalchemy
 plotly
 pytest
 passlib[bcrypt]
+alembic
+psycopg[binary]
 fastapi
 uvicorn
-httpx
 PyJWT

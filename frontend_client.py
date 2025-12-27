@@ -78,7 +78,13 @@ def _base_url() -> str:
     except Exception:
         pass
 
-    return os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+    # Use 127.0.0.1 by default (instead of localhost) to avoid IPv6 resolution issues
+    # when the backend is bound only on IPv4.
+    return os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+
+
+def api_base_url() -> str:
+    return _base_url()
 
 
 def _headers(token: Optional[str]) -> Dict[str, str]:
