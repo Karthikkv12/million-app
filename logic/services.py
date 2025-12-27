@@ -1,0 +1,264 @@
+import pandas as pd
+from sqlalchemy.orm import sessionmaker
+from database.models import (
+    Trade, CashFlow, Budget,
+    InstrumentType, OptionType, Action, CashAction, BudgetType,
+    get_engine
+)
+
+# Engine and session factory
+engine = get_engine()
+Session = sessionmaker(bind=engine)
+
+try:
+    from passlib.context import CryptContext
+    # Use passlib CryptContext with bcrypt
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+except Exception:
+    # Fallback simple salted sha256 context if passlib not available (dev/test only)
+    import hashlib, secrets
+
+    class SimpleCtx:
+        def hash(self, password):
+            salt = secrets.token_hex(16)
+            d = hashlib.sha256(salt.encode('utf-8') + str(password).encode('utf-8')).hexdigest()
+            return f"{salt}${d}"
+
+        def verify(self, password, stored):
+            try:
+                salt, digest = stored.split('$', 1)
+            except Exception:
+                return False
+            check = hashlib.sha256(salt.encode('utf-8') + str(password).encode('utf-8')).hexdigest()
+            return check == digest
+
+    pwd_context = SimpleCtx()
+
+
+def create_user(username, password):
+    session = Session()
+    try:
+        username = str(username).strip()
+        if not username:
+            raise ValueError('username required')
+        from database.models import User
+        existing = session.query(User).filter(User.username == username).first()
+        if existing:
+            raise ValueError('username already exists')
+        # Hash using passlib
+        ph = pwd_context.hash(password)
+        user = User(username=username, password_hash=ph, salt=None)
+        session.add(user)
+        session.commit()
+        # return created user id
+        return user.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _normalize_str(x):
+    """Return a stripped string or empty string for None/empty input."""
+    if x is None:
+        return ''
+    return str(x).strip()
+
+
+def authenticate_user(username, password):
+    session = Session()
+    try:
+        from database.models import User
+        u = session.query(User).filter(User.username == str(username)).first()
+        if not u:
+            return None
+        # verify hash
+        ok = pwd_context.verify(password, u.password_hash)
+        return u.id if ok else None
+    finally:
+        session.close()
+
+
+def normalize_instrument(instrument):
+    """Normalize instrument input to InstrumentType enum.
+
+    Accepts variants like: 'Stock', 'stock', 'Option', 'option'.
+    Returns an `InstrumentType` member.
+    """
+    s = _normalize_str(instrument)
+    if not s:
+        return InstrumentType.STOCK
+    s_up = s.upper()
+    return InstrumentType.OPTION if s_up.startswith('OPT') else InstrumentType.STOCK
+
+
+def normalize_action(action):
+    """Normalize action input to Action enum.
+
+    Accepts: 'Buy', 'BUY', 'buy', 'Sell', 'SELL', etc.
+    """
+    s = _normalize_str(action)
+    if not s:
+        return Action.BUY
+    s_up = s.upper()
+    return Action.BUY if s_up.startswith('B') else Action.SELL
+
+
+def normalize_option_type(o_type):
+    """Normalize option type to OptionType enum or None.
+
+    Accepts: 'Call', 'CALL', 'Put', 'PUT', or None.
+    """
+    s = _normalize_str(o_type)
+    if not s:
+        return None
+    s_up = s.upper()
+    return OptionType.CALL if s_up.startswith('C') else OptionType.PUT
+
+
+def normalize_cash_action(action):
+    s = _normalize_str(action)
+    if not s:
+        return CashAction.DEPOSIT
+    s_up = s.upper()
+    return CashAction.DEPOSIT if s_up.startswith('D') else CashAction.WITHDRAW
+
+
+def normalize_budget_type(b_type):
+    s = _normalize_str(b_type)
+    if not s:
+        return BudgetType.EXPENSE
+    s_up = s.upper()
+    # Map common words to enums
+    if 'INCOM' in s_up:
+        return BudgetType.INCOME
+    if 'ASSET' in s_up:
+        return BudgetType.ASSET
+    return BudgetType.EXPENSE
+
+def save_trade(symbol, instrument, strategy, action, qty, price, date, o_type=None, strike=None, expiry=None, user_id=None):
+    session = Session()
+    try:
+        inst_enum = normalize_instrument(instrument)
+        act_enum = normalize_action(action)
+        opt_enum = normalize_option_type(o_type)
+
+        new_trade = Trade(
+            symbol=str(symbol).upper(), quantity=int(qty), instrument=inst_enum, strategy=str(strategy),
+            action=act_enum, entry_date=pd.to_datetime(date), entry_price=float(price),
+            option_type=opt_enum, strike_price=float(strike) if strike else None,
+            expiry_date=pd.to_datetime(expiry) if expiry else None,
+            user_id=int(user_id) if user_id is not None else None
+        )
+        session.add(new_trade)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+def save_cash(action, amount, date, notes, user_id=None):
+    session = Session()
+    try:
+        action_enum = normalize_cash_action(action)
+        new_cash = CashFlow(
+            action=action_enum,
+            amount=float(amount), date=pd.to_datetime(date), notes=notes
+        )
+        if user_id is not None:
+            new_cash.user_id = int(user_id)
+        session.add(new_cash)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+def save_budget(category, b_type, amount, date, desc, user_id=None):
+    session = Session()
+    try:
+        type_enum = normalize_budget_type(b_type)
+
+        new_item = Budget(
+            category=str(category), type=type_enum, amount=float(amount),
+            date=pd.to_datetime(date), description=str(desc)
+        )
+        if user_id is not None:
+            new_item.user_id = int(user_id)
+        session.add(new_item)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+def load_data(user_id=None):
+    """Load trades, cash, budget. If `user_id` is provided, filter rows to that user."""
+    try:
+        if user_id is None:
+            trades = pd.read_sql("SELECT * FROM trades", engine)
+            cash = pd.read_sql("SELECT * FROM cash_flow", engine)
+            budget = pd.read_sql("SELECT * FROM budget", engine)
+        else:
+            trades = pd.read_sql("SELECT * FROM trades WHERE user_id = :uid", engine, params={"uid": int(user_id)})
+            cash = pd.read_sql("SELECT * FROM cash_flow WHERE user_id = :uid", engine, params={"uid": int(user_id)})
+            budget = pd.read_sql("SELECT * FROM budget WHERE user_id = :uid", engine, params={"uid": int(user_id)})
+
+        if not trades.empty:
+            trades['entry_date'] = pd.to_datetime(trades['entry_date'])
+        if not cash.empty:
+            cash['date'] = pd.to_datetime(cash['date'])
+        if not budget.empty:
+            budget['date'] = pd.to_datetime(budget['date'])
+
+        return trades, cash, budget
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+
+def delete_trade(trade_id, user_id=None):
+    session = Session()
+    try:
+        q = session.query(Trade).filter(Trade.id == int(trade_id))
+        if user_id is not None:
+            q = q.filter(Trade.user_id == int(user_id))
+        trade_to_delete = q.first()
+        if trade_to_delete:
+            session.delete(trade_to_delete)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        print(f"Error deleting trade: {e}")
+        return False
+    finally:
+        session.close()
+
+
+def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=None):
+    session = Session()
+    try:
+        q = session.query(Trade).filter(Trade.id == int(trade_id))
+        if user_id is not None:
+            q = q.filter(Trade.user_id == int(user_id))
+        trade = q.first()
+        if trade:
+            trade.symbol = str(symbol).upper()
+            trade.strategy = str(strategy)
+            trade.action = normalize_action(action)
+            trade.quantity = int(qty)
+            trade.entry_price = float(price)
+            trade.entry_date = pd.to_datetime(date)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        print(f"Error updating trade: {e}")
+        return False
+    finally:
+        session.close()
