@@ -43,7 +43,8 @@ def login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        mode = st.radio('', ['Sign in', 'Sign up'], index=0, horizontal=True)
+        # Provide a non-empty label for accessibility; hide it visually with label_visibility='collapsed'.
+        mode = st.radio('Mode', ['Sign in', 'Sign up'], index=0, horizontal=True, label_visibility='collapsed')
 
         if mode == 'Sign in':
             with st.form('signin'):
