@@ -13,9 +13,23 @@ from database.models import (
 
 def get_session():
     """Create a new SQLAlchemy Session bound to the engine returned by get_engine()."""
-    engine = get_engine()
-    Session = sessionmaker(bind=engine)
+    # Allow tests (or other callers) to monkeypatch `logic.services.engine`.
+    # If `engine` is set at module level, prefer it; otherwise create via get_engine().
+    try:
+        # module-level 'engine' may be set to a test engine by tests
+        if engine is not None:
+            _engine = engine
+        else:
+            _engine = get_engine()
+    except NameError:
+        _engine = get_engine()
+    Session = sessionmaker(bind=_engine)
     return Session()
+
+# Compatibility placeholder: tests may monkeypatch `logic.services.engine`.
+engine = None
+# Compatibility placeholder: tests may also monkeypatch a Session factory
+Session = None
 
 try:
     from passlib.context import CryptContext
@@ -192,15 +206,22 @@ def save_budget(category, b_type, amount, date, desc, user_id=None):
 def load_data(user_id=None):
     """Load trades, cash, budget. If `user_id` is provided, filter rows to that user."""
     try:
-        engine = get_engine()
+        # Prefer an overridden module-level engine (tests set this). Otherwise use configured engine.
+        try:
+            if engine is not None:
+                _engine = engine
+            else:
+                _engine = get_engine()
+        except NameError:
+            _engine = get_engine()
         if user_id is None:
-            trades = pd.read_sql("SELECT * FROM trades", engine)
-            cash = pd.read_sql("SELECT * FROM cash_flow", engine)
-            budget = pd.read_sql("SELECT * FROM budget", engine)
+            trades = pd.read_sql("SELECT * FROM trades", _engine)
+            cash = pd.read_sql("SELECT * FROM cash_flow", _engine)
+            budget = pd.read_sql("SELECT * FROM budget", _engine)
         else:
-            trades = pd.read_sql("SELECT * FROM trades WHERE user_id = :uid", engine, params={"uid": int(user_id)})
-            cash = pd.read_sql("SELECT * FROM cash_flow WHERE user_id = :uid", engine, params={"uid": int(user_id)})
-            budget = pd.read_sql("SELECT * FROM budget WHERE user_id = :uid", engine, params={"uid": int(user_id)})
+            trades = pd.read_sql("SELECT * FROM trades WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
+            cash = pd.read_sql("SELECT * FROM cash_flow WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
+            budget = pd.read_sql("SELECT * FROM budget WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
 
         if not trades.empty:
             trades['entry_date'] = pd.to_datetime(trades['entry_date'])
