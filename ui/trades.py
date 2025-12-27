@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
-from logic.services import save_trade, load_data, delete_trade, update_trade
+from frontend_client import save_trade, delete_trade
 from ui.utils import canonical_action, canonical_instrument
 
 
@@ -28,7 +28,11 @@ def trade_sidebar_form(TICKERS, TICKER_MAP):
             else:
                 inst = canonical_instrument('Stock')
                 act = canonical_action(s_act)
-                save_trade(s_sym, inst, s_strat, act, s_qty, s_price, s_date, user_id=st.session_state.get('user_id'))
+                token = st.session_state.get('token')
+                if not token:
+                    st.error('Missing session token. Please sign in again.')
+                else:
+                    save_trade(token, s_sym, inst, s_strat, act, s_qty, s_price, s_date)
                 st.toast(f"Executed: {s_sym}", icon="✅")
                 st.cache_data.clear()
                 st.rerun()
@@ -100,7 +104,11 @@ def render_trades_tab(trades_df):
             if 'user' not in st.session_state:
                 st.error('Sign in to delete trades')
             else:
-                delete_trade(row['id'], user_id=st.session_state.get('user_id'))
+                token = st.session_state.get('token')
+                if not token:
+                    st.error('Missing session token. Please sign in again.')
+                else:
+                    delete_trade(token, row['id'])
             st.toast(f"Deleted {row['symbol']}", icon="🗑")
             st.cache_data.clear()
             st.rerun()

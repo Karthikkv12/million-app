@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from logic.services import save_budget
+from frontend_client import save_budget
 from ui.utils import canonical_budget_type
 
 def budget_entry_form(budget_df):
@@ -17,7 +17,11 @@ def budget_entry_form(budget_df):
                     st.error('Please sign in to save records')
                 else:
                     btype = canonical_budget_type(b_type)
-                    save_budget(b_cat, btype, b_amt, b_date, b_desc, user_id=st.session_state.get('user_id'))
+                    token = st.session_state.get('token')
+                    if not token:
+                        st.error('Missing session token. Please sign in again.')
+                    else:
+                        save_budget(token, b_cat, btype, b_amt, b_date, b_desc)
                     st.toast("Saved!", icon="💾")
                     st.cache_data.clear()
                     st.rerun()

@@ -4,3 +4,7 @@ sqlalchemy
 plotly
 pytest
 passlib[bcrypt]
+fastapi
+uvicorn
+httpx
+PyJWT

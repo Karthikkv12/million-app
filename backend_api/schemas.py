@@ -1,0 +1,83 @@
+from datetime import date, datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class AuthSignupRequest(BaseModel):
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class AuthLoginRequest(BaseModel):
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    username: str
+
+
+class TradeCreateRequest(BaseModel):
+    symbol: str
+    instrument: str
+    strategy: str
+    action: str
+    qty: int
+    price: float
+    date: datetime
+
+
+class TradeUpdateRequest(BaseModel):
+    symbol: str
+    strategy: str
+    action: str
+    qty: int
+    price: float
+    date: datetime
+
+
+class TradeOut(BaseModel):
+    id: int
+    symbol: str
+    instrument: Optional[str] = None
+    strategy: Optional[str] = None
+    action: Optional[str] = None
+    quantity: Optional[int] = None
+    entry_price: Optional[float] = None
+    entry_date: Optional[datetime] = None
+
+
+class CashCreateRequest(BaseModel):
+    action: str
+    amount: float
+    date: datetime
+    notes: str = ""
+
+
+class CashOut(BaseModel):
+    id: int
+    action: str
+    amount: float
+    date: datetime
+    notes: Optional[str] = None
+
+
+class BudgetCreateRequest(BaseModel):
+    category: str
+    type: str
+    amount: float
+    date: datetime
+    description: str = ""
+
+
+class BudgetOut(BaseModel):
+    id: int
+    category: str
+    type: str
+    amount: float
+    date: datetime
+    description: Optional[str] = None

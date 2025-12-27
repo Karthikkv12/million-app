@@ -236,7 +236,7 @@ def load_data(user_id=None):
 
 
 def delete_trade(trade_id, user_id=None):
-    session = Session()
+    session = get_session()
     try:
         q = session.query(Trade).filter(Trade.id == int(trade_id))
         if user_id is not None:
@@ -256,7 +256,7 @@ def delete_trade(trade_id, user_id=None):
 
 
 def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=None):
-    session = Session()
+    session = get_session()
     try:
         q = session.query(Trade).filter(Trade.id == int(trade_id))
         if user_id is not None:

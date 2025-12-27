@@ -8,14 +8,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from database.models import init_db
-from logic.services import (
-    save_trade, save_cash, save_budget, load_data, delete_trade, update_trade
-)
 from ui.auth import sidebar_auth, login_page
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
+from frontend_client import load_data as api_load_data, update_trade as api_update_trade
 
 # --- CONSTANTS ---
 @st.cache_data(ttl=24*3600)
@@ -57,12 +54,7 @@ def get_ticker_details():
 # Load Data (Returns two values: the List and the Dictionary)
 TICKERS, TICKER_MAP = get_ticker_details()
 
-# Ensure DB and tables exist at app startup
-try:
-    init_db()
-except Exception:
-    # Non-fatal: init_db may be a no-op if DB already exists
-    pass
+
 
 # --- CSS STYLING ---
 st.markdown("""
@@ -125,13 +117,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SIDEBAR LOGIC ---
-st.sidebar.title("Million")
 # If not signed in, show the login page (blocking). After login the page will rerun.
 if 'user' not in st.session_state:
     login_page()
     st.stop()
 
-# Render authentication controls (shows signed-in state + logout)
+# Render sidebar title and authentication controls (shows signed-in state + logout)
+st.sidebar.title("Million")
 sidebar_auth()
 
 # Menu selection for UI
@@ -142,7 +134,17 @@ if mode == "Trade":
     trade_sidebar_form(TICKERS, TICKER_MAP)
 
 # --- MAIN DASHBOARD LOGIC ---
-trades_df, cash_df, budget_df = load_data(st.session_state.get('user_id') if 'user_id' in st.session_state else None)
+token = st.session_state.get('token')
+if not token:
+    # If user is somehow set without a token, force login page.
+    if 'user' in st.session_state:
+        del st.session_state['user']
+    if 'user_id' in st.session_state:
+        del st.session_state['user_id']
+    login_page()
+    st.stop()
+
+trades_df, cash_df, budget_df = api_load_data(token)
 
 portfolio_val = 0.0; total_trades = 0
 if not trades_df.empty:
@@ -179,7 +181,7 @@ def on_grid_change(key, trade_id, field):
         st.error('Sign in to edit trades')
         return
     new_val = st.session_state[key]
-    trades, _, _ = load_data(st.session_state.get('user_id') if 'user_id' in st.session_state else None)
+    trades, _, _ = api_load_data(token)
     row = trades[trades['id'] == trade_id].iloc[0]
     data = {'symbol': row['symbol'], 'strategy': row['strategy'], 'action': row['action'], 'qty': row['quantity'], 'price': row['entry_price'], 'date': row['entry_date']}
     if field == 'symbol': data['symbol'] = new_val
@@ -191,7 +193,7 @@ def on_grid_change(key, trade_id, field):
     # canonicalize action and symbol before calling update_trade
     data['symbol'] = str(data['symbol']).upper()
     data['action'] = canonical_action(data['action'])
-    update_trade(trade_id, data['symbol'], data['strategy'], data['action'], data['qty'], data['price'], data['date'], user_id=st.session_state.get('user_id'))
+    api_update_trade(token, trade_id, data['symbol'], data['strategy'], data['action'], data['qty'], data['price'], data['date'])
     st.toast(f"Updated {field}!", icon="💾")
 
 

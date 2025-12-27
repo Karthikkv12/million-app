@@ -1,6 +1,6 @@
 # Million App
 
-Simple trading / budget journal built with Streamlit.
+Trading / budget journal with a separated backend API (FastAPI) and frontend (Streamlit).
 
 ## Quick start (local)
 
@@ -18,22 +18,35 @@ pip install -r requirements.txt
 PYTHONPATH=. pytest -q
 ```
 
-3. Run the app:
+3. Run the backend API (FastAPI):
 
 ```bash
-streamlit run app.py
-# open the printed http://localhost:8501 (or port shown)
+export DATABASE_URL="sqlite:///trading_journal.db"  # or your Postgres URL
+export JWT_SECRET="change-me"                       # required for production
+uvicorn backend_api.main:app --reload --port 8000
 ```
 
-Demo credentials: `demo` / `demo123`
+4. Run the frontend (Streamlit):
 
-## Deploy to Streamlit Community Cloud
+```bash
+export API_BASE_URL="http://localhost:8000"
+streamlit run app.py
+```
+
+Demo credentials: `demo` / `demo123` (if you created it in the configured DB)
+
+## Deploy
+
+This setup requires deploying the backend API and the Streamlit frontend separately.
+
+- Backend: host `backend_api.main:app` on any Python host (Render/Railway/Fly.io/etc.) and set `DATABASE_URL` and `JWT_SECRET`.
+- Frontend (Streamlit Community Cloud): set `API_BASE_URL` in Streamlit Secrets pointing to your backend URL.
 
 1. Push your `main` branch to GitHub (already done).
 2. On https://share.streamlit.io create a new app using this repository and branch `main`.
-3. If you want persistent data, provision a Postgres DB (Supabase/Railway/Render) and add the connection URL as a secret named `DATABASE_URL`.
+3. If you want persistent data, provision a Postgres DB and set it as `DATABASE_URL` for the backend.
 
-The app will use `DATABASE_URL` if present; otherwise it falls back to a local sqlite file `trading_journal.db` in the repo root.
+The backend will use `DATABASE_URL` if present; otherwise it falls back to a local sqlite file `trading_journal.db` in the repo root.
 
 ## Migrate data from local SQLite to Postgres
 
