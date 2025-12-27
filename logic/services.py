@@ -6,9 +6,16 @@ from database.models import (
     get_engine
 )
 
-# Engine and session factory
-engine = get_engine()
-Session = sessionmaker(bind=engine)
+# NOTE: create engine/session per-call to ensure we respect the current
+# `DATABASE_URL` environment variable at runtime. If `engine`/`Session`
+# are created at import time they may point to a different DB (e.g. local
+# sqlite) if env vars change between processes.
+
+def get_session():
+    """Create a new SQLAlchemy Session bound to the engine returned by get_engine()."""
+    engine = get_engine()
+    Session = sessionmaker(bind=engine)
+    return Session()
 
 try:
     from passlib.context import CryptContext
@@ -23,7 +30,7 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def create_user(username, password):
-    session = Session()
+    session = get_session()
     try:
         username = str(username).strip()
         if not username:
@@ -54,7 +61,7 @@ def _normalize_str(x):
 
 
 def authenticate_user(username, password):
-    session = Session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.username == str(username)).first()
@@ -125,7 +132,7 @@ def normalize_budget_type(b_type):
     return BudgetType.EXPENSE
 
 def save_trade(symbol, instrument, strategy, action, qty, price, date, o_type=None, strike=None, expiry=None, user_id=None):
-    session = Session()
+    session = get_session()
     try:
         inst_enum = normalize_instrument(instrument)
         act_enum = normalize_action(action)
@@ -147,7 +154,7 @@ def save_trade(symbol, instrument, strategy, action, qty, price, date, o_type=No
         session.close()
 
 def save_cash(action, amount, date, notes, user_id=None):
-    session = Session()
+    session = get_session()
     try:
         action_enum = normalize_cash_action(action)
         new_cash = CashFlow(
@@ -165,7 +172,7 @@ def save_cash(action, amount, date, notes, user_id=None):
         session.close()
 
 def save_budget(category, b_type, amount, date, desc, user_id=None):
-    session = Session()
+    session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
 
@@ -185,6 +192,7 @@ def save_budget(category, b_type, amount, date, desc, user_id=None):
 def load_data(user_id=None):
     """Load trades, cash, budget. If `user_id` is provided, filter rows to that user."""
     try:
+        engine = get_engine()
         if user_id is None:
             trades = pd.read_sql("SELECT * FROM trades", engine)
             cash = pd.read_sql("SELECT * FROM cash_flow", engine)
