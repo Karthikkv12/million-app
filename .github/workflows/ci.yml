@@ -21,16 +21,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r million-app/requirements.txt
+          python -m pip install -r requirements.txt
       - name: Run tests
         run: |
-          PYTHONPATH=million-app python -m pytest -q
+          PYTHONPATH=. python -m pytest -q
       - name: Seed DB and smoke test Streamlit (optional)
         run: |
           # Seed the DB so the app has data
-          PYTHONPATH=million-app python million-app/seed_data.py
+          PYTHONPATH=. python seed_data.py
           # Start streamlit in background and run a quick health check
-          nohup streamlit run million-app/app.py --server.port 8501 --server.headless true > st.out 2>&1 &
+          nohup streamlit run app.py --server.port 8501 --server.headless true > st.out 2>&1 &
           sleep 4
           # Check the Streamlit web server is responding on the default port
           curl --fail http://127.0.0.1:8501 || (cat st.out && exit 1)
