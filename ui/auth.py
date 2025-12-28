@@ -19,6 +19,7 @@ from frontend_client import logout_all as api_logout_all
 from frontend_client import refresh as api_refresh
 from frontend_client import change_password as api_change_password
 from frontend_client import signup as api_signup
+from frontend_client import auth_events as api_auth_events
 
 from browser_sessions import cleanup_expired, delete_session, load_session, save_session
 
@@ -61,7 +62,7 @@ def ensure_canonical_host() -> None:
         )
 
 
-def _cookie_manager() -> CookieManager:
+def _cookie_manager() -> Any:
     # CookieManager is a Streamlit component (widget). It must NOT be created
     # inside any `st.cache_*` function.
     if CookieManager is None:
@@ -83,7 +84,7 @@ def _cookie_manager() -> CookieManager:
     return existing
 
 
-def _cookies() -> Optional[CookieManager]:
+def _cookies() -> Optional[Any]:
     if CookieManager is None:
         raise RuntimeError("streamlit-cookies-manager is not installed")
     cookies = _cookie_manager()
@@ -389,6 +390,27 @@ def render_security_section() -> None:
                 pass
             logout_and_rerun()
             return
+
+        st.markdown("**Recent security activity**")
+        try:
+            events = api_auth_events(str(token))
+        except APIError as e:
+            # Backwards-compatible with older backends.
+            if e.status_code not in {0, 404}:
+                st.caption(f"Could not load events: {e.detail}")
+            events = []
+        except Exception:
+            events = []
+
+        if events:
+            import pandas as _pd
+
+            df = _pd.DataFrame(events)
+            # Keep it compact.
+            cols = [c for c in ["created_at", "event_type", "success", "ip", "detail"] if c in df.columns]
+            st.dataframe(df[cols], use_container_width=True, hide_index=True)
+        else:
+            st.caption("No recent events.")
 
         st.markdown("**Change password**")
         with st.form("change_password_form"):

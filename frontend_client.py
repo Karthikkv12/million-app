@@ -182,6 +182,13 @@ def logout_with_refresh(token: str, refresh_token: Optional[str]) -> bool:
         raise
 
 
+def auth_events(token: str) -> list[dict]:
+    resp = _request_json("GET", "/auth/events", token=token, timeout=15)
+    if isinstance(resp, list):
+        return [dict(x) for x in resp]
+    return []
+
+
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     trades_df = pd.DataFrame(_request_json("GET", "/trades", token=token, timeout=30) or [])
     cash_df = pd.DataFrame(_request_json("GET", "/cash", token=token, timeout=30) or [])

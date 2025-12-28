@@ -71,3 +71,20 @@ def test_refresh_token_rotation_and_revoke_all(db_engine_and_session):
     n = services.revoke_all_refresh_tokens(user_id=uid)
     assert n >= 1
     assert services.validate_refresh_token(refresh_token=rt2) is None
+
+
+def test_login_rate_limit_counts_failures(db_engine_and_session, monkeypatch):
+    # Tighten limits for test.
+    monkeypatch.setenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "300")
+    monkeypatch.setenv("LOGIN_RATE_LIMIT_MAX_FAILURES", "3")
+
+    username = "frank"
+    ip = "1.2.3.4"
+    assert services.is_login_rate_limited(username=username, ip=ip) is False
+
+    services.log_auth_event(event_type="login", success=False, username=username, ip=ip)
+    services.log_auth_event(event_type="login", success=False, username=username, ip=ip)
+    assert services.is_login_rate_limited(username=username, ip=ip) is False
+
+    services.log_auth_event(event_type="login", success=False, username=username, ip=ip)
+    assert services.is_login_rate_limited(username=username, ip=ip) is True

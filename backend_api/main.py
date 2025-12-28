@@ -7,7 +7,7 @@ from datetime import timedelta
 from typing import Any, Dict, List
 
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -22,6 +22,7 @@ from .schemas import (
     AuthLogoutRequest,
     AuthRefreshRequest,
     AuthSignupRequest,
+    AuthEventOut,
     BudgetCreateRequest,
     BudgetOut,
     CashCreateRequest,
@@ -115,31 +116,84 @@ def signup(req: AuthSignupRequest) -> AuthResponse:
 
 
 @app.post("/auth/login", response_model=AuthResponse)
-def login(req: AuthLoginRequest) -> AuthResponse:
+def login(req: AuthLoginRequest, request: Request) -> AuthResponse:
     username = str(req.username).strip()
+    ip = getattr(getattr(request, "client", None), "host", None)
+    ua = request.headers.get("user-agent")
+
+    # Throttle repeated failed logins per (username, ip).
+    try:
+        if services.is_login_rate_limited(username=username, ip=str(ip) if ip else None):
+            services.log_auth_event(event_type="login_throttled", success=False, username=username, ip=str(ip) if ip else None, user_agent=ua)
+            raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
+    except HTTPException:
+        raise
+    except Exception:
+        # Best-effort; never block login if limiter fails.
+        pass
+
     user_id = services.authenticate_user(username, req.password)
     if not user_id:
+        services.log_auth_event(
+            event_type="login",
+            success=False,
+            username=username,
+            ip=str(ip) if ip else None,
+            user_agent=ua,
+            detail="invalid credentials",
+        )
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = create_access_token(subject=str(user_id), extra={"username": username})
     refresh_token = services.create_refresh_token(user_id=int(user_id))
+    services.log_auth_event(event_type="login", success=True, username=username, user_id=int(user_id), ip=str(ip) if ip else None, user_agent=ua)
     return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
 
 
 @app.post("/auth/refresh", response_model=AuthResponse)
-def refresh(req: AuthRefreshRequest) -> AuthResponse:
+def refresh(req: AuthRefreshRequest, request: Request) -> AuthResponse:
+    ip = getattr(getattr(request, "client", None), "host", None)
+    ua = request.headers.get("user-agent")
+    try:
+        if services.is_refresh_rate_limited(ip=str(ip) if ip else None):
+            services.log_auth_event(event_type="refresh_throttled", success=False, ip=str(ip) if ip else None, user_agent=ua)
+            raise HTTPException(status_code=429, detail="Too many refresh attempts. Please try again later.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     rotated = services.rotate_refresh_token(refresh_token=req.refresh_token)
     if not rotated:
+        services.log_auth_event(event_type="refresh", success=False, ip=str(ip) if ip else None, user_agent=ua, detail="invalid refresh token")
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     user_id, new_refresh_token = rotated
     u = services.get_user(int(user_id))
     username = str(getattr(u, "username", "") or "") if u is not None else ""
     token = create_access_token(subject=str(user_id), extra={"username": username})
+    services.log_auth_event(event_type="refresh", success=True, username=username, user_id=int(user_id), ip=str(ip) if ip else None, user_agent=ua)
     return AuthResponse(
         access_token=token,
         refresh_token=new_refresh_token,
         user_id=int(user_id),
         username=username,
     )
+
+
+@app.get("/auth/events", response_model=List[AuthEventOut])
+def auth_events(user=Depends(get_current_user)) -> List[AuthEventOut]:
+    rows = services.list_auth_events(user_id=int(user["sub"]), limit=25)
+    out: List[AuthEventOut] = []
+    for r in rows:
+        out.append(
+            AuthEventOut(
+                created_at=r.get("created_at"),
+                event_type=str(r.get("event_type") or ""),
+                success=bool(r.get("success")),
+                ip=str(r.get("ip") or "") or None,
+                detail=str(r.get("detail") or "") or None,
+            )
+        )
+    return out
 
 
 @app.get("/auth/me", response_model=AuthMeResponse)
@@ -171,6 +225,8 @@ def logout(req: AuthLogoutRequest | None = None, user=Depends(get_current_user))
             services.revoke_refresh_token(user_id=user_id, refresh_token=str(req.refresh_token))
     except Exception:
         pass
+
+    services.log_auth_event(event_type="logout", success=True, username=str(user.get("username") or ""), user_id=user_id)
     return {"status": "ok"}
 
 
@@ -202,6 +258,8 @@ def logout_all(user=Depends(get_current_user)) -> Dict[str, str]:
     if jti:
         services.revoke_token(user_id=user_id, jti=jti, expires_at=exp_dt)
 
+    services.log_auth_event(event_type="logout_all", success=True, username=str(user.get("username") or ""), user_id=user_id)
+
     return {"status": "ok"}
 
 
@@ -225,6 +283,8 @@ def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_use
         services.revoke_all_refresh_tokens(user_id=user_id)
     except Exception:
         pass
+
+    services.log_auth_event(event_type="change_password", success=True, username=str(user.get("username") or ""), user_id=user_id)
 
     # Mint a new token guaranteed to be valid after the cutoff.
     issued_at = datetime.fromtimestamp(int(user.get("iat") or 0) + 1, tz=timezone.utc)

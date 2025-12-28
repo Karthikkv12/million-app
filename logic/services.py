@@ -225,6 +225,130 @@ def revoke_all_refresh_tokens(*, user_id: int) -> int:
         session.close()
 
 
+def _rate_limit_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return int(default)
+
+
+def log_auth_event(
+    *,
+    event_type: str,
+    success: bool,
+    username: str | None = None,
+    user_id: int | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    detail: str | None = None,
+) -> None:
+    """Append an auth audit event (best-effort)."""
+    session = get_session()
+    try:
+        from database.models import AuthEvent
+
+        ev = AuthEvent(
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            event_type=str(event_type),
+            success=bool(success),
+            username=(str(username).strip() if username is not None else None),
+            user_id=(int(user_id) if user_id is not None else None),
+            ip=(str(ip).strip() if ip is not None else None),
+            user_agent=(str(user_agent)[:500] if user_agent else None),
+            detail=(str(detail)[:500] if detail else None),
+        )
+        session.add(ev)
+        session.commit()
+    except Exception:
+        session.rollback()
+        # Never block auth flows on logging failures.
+        return
+    finally:
+        session.close()
+
+
+def list_auth_events(*, user_id: int, limit: int = 25) -> list[dict]:
+    session = get_session()
+    try:
+        from database.models import AuthEvent
+
+        rows = (
+            session.query(AuthEvent)
+            .filter(AuthEvent.user_id == int(user_id))
+            .order_by(AuthEvent.created_at.desc())
+            .limit(int(limit))
+            .all()
+        )
+        out: list[dict] = []
+        for r in rows:
+            out.append(
+                {
+                    "created_at": getattr(r, "created_at", None),
+                    "event_type": str(getattr(r, "event_type", "")),
+                    "success": bool(getattr(r, "success", False)),
+                    "ip": str(getattr(r, "ip", "") or ""),
+                    "detail": str(getattr(r, "detail", "") or ""),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
+def is_login_rate_limited(*, username: str, ip: str | None = None) -> bool:
+    """Rate limit by counting failed login attempts in a window."""
+    window_s = _rate_limit_int("LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
+    max_failures = _rate_limit_int("LOGIN_RATE_LIMIT_MAX_FAILURES", 10)
+    if max_failures <= 0:
+        return False
+
+    since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
+    since_naive = since.replace(tzinfo=None)
+    session = get_session()
+    try:
+        from database.models import AuthEvent
+
+        q = (
+            session.query(AuthEvent)
+            .filter(AuthEvent.event_type == "login")
+            .filter(AuthEvent.success.is_(False))
+            .filter(AuthEvent.created_at >= since_naive)
+            .filter(AuthEvent.username == str(username).strip())
+        )
+        if ip:
+            q = q.filter(AuthEvent.ip == str(ip).strip())
+        count = int(q.count())
+        return count >= int(max_failures)
+    finally:
+        session.close()
+
+
+def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
+    """Rate limit refresh attempts in a short window (counts all refresh attempts)."""
+    window_s = _rate_limit_int("REFRESH_RATE_LIMIT_WINDOW_SECONDS", 60)
+    max_attempts = _rate_limit_int("REFRESH_RATE_LIMIT_MAX_ATTEMPTS", 60)
+    if max_attempts <= 0:
+        return False
+
+    since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
+    since_naive = since.replace(tzinfo=None)
+    session = get_session()
+    try:
+        from database.models import AuthEvent
+
+        q = (
+            session.query(AuthEvent)
+            .filter(AuthEvent.event_type == "refresh")
+            .filter(AuthEvent.created_at >= since_naive)
+        )
+        if ip:
+            q = q.filter(AuthEvent.ip == str(ip).strip())
+        count = int(q.count())
+        return count >= int(max_attempts)
+    finally:
+        session.close()
+
+
 def create_user(username, password):
     session = get_session()
     try:

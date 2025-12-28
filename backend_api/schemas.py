@@ -40,6 +40,14 @@ class AuthLogoutRequest(BaseModel):
     refresh_token: Optional[str] = None
 
 
+class AuthEventOut(BaseModel):
+    created_at: Optional[datetime] = None
+    event_type: str
+    success: bool
+    ip: Optional[str] = None
+    detail: Optional[str] = None
+
+
 class TradeCreateRequest(BaseModel):
     symbol: str
     instrument: str

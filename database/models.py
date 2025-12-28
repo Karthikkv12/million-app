@@ -119,6 +119,19 @@ class RefreshToken(Base):
     revoked_at = Column(DateTime, nullable=True)
     replaced_by_token_id = Column(Integer, nullable=True)
 
+
+class AuthEvent(Base):
+    __tablename__ = "auth_events"
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    success = Column(Boolean, nullable=False, default=False, index=True)
+    username = Column(String, nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    ip = Column(String, nullable=True, index=True)
+    user_agent = Column(String, nullable=True)
+    detail = Column(String, nullable=True)
+
 # Database Connection Setup
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
@@ -237,6 +250,32 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)"))
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_refresh_tokens_token_hash ON refresh_tokens(token_hash)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at ON refresh_tokens(expires_at)"))
+
+        # auth_events: new table (best-effort)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS auth_events (
+                        id INTEGER PRIMARY KEY,
+                        created_at DATETIME NOT NULL,
+                        event_type TEXT NOT NULL,
+                        success INTEGER NOT NULL DEFAULT 0,
+                        username TEXT,
+                        user_id INTEGER,
+                        ip TEXT,
+                        user_agent TEXT,
+                        detail TEXT
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_created_at ON auth_events(created_at)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_event_type ON auth_events(event_type)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_success ON auth_events(success)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_username ON auth_events(username)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_user_id ON auth_events(user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_ip ON auth_events(ip)"))
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return
