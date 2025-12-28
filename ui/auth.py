@@ -20,6 +20,8 @@ from frontend_client import refresh as api_refresh
 from frontend_client import change_password as api_change_password
 from frontend_client import signup as api_signup
 from frontend_client import auth_events as api_auth_events
+from frontend_client import auth_sessions as api_auth_sessions
+from frontend_client import revoke_session as api_revoke_session
 
 from browser_sessions import cleanup_expired, delete_session, load_session, save_session
 
@@ -391,7 +393,30 @@ def render_security_section() -> None:
             logout_and_rerun()
             return
 
-        st.markdown("**Recent security activity**")
+        def _parse_dt(s: Any) -> Optional[datetime]:
+            if not s:
+                return None
+            if isinstance(s, datetime):
+                return s
+            try:
+                txt = str(s).strip()
+                if txt.endswith("Z"):
+                    txt = txt[:-1] + "+00:00"
+                return datetime.fromisoformat(txt)
+            except Exception:
+                return None
+
+        # Load data once so status + tables stay consistent.
+        sessions: list[dict] = []
+        events: list[dict] = []
+        try:
+            sessions = api_auth_sessions(str(token))
+        except APIError as e:
+            if e.status_code not in {0, 404}:
+                st.caption(f"Could not load sessions: {e.detail}")
+        except Exception:
+            sessions = []
+
         try:
             events = api_auth_events(str(token))
         except APIError as e:
@@ -402,6 +427,64 @@ def render_security_section() -> None:
         except Exception:
             events = []
 
+        # --- Security status banner ---
+        now_utc = datetime.now(timezone.utc)
+        window = timedelta(hours=24)
+        recent_failures = 0
+        for ev in events:
+            created = _parse_dt(ev.get("created_at"))
+            if created is None:
+                continue
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if (now_utc - created) > window:
+                continue
+            if bool(ev.get("success")) is False:
+                recent_failures += 1
+
+        active_sessions = len(sessions)
+        st.markdown("**Security status**")
+        if recent_failures >= 3:
+            st.error(f"High risk: {recent_failures} failed auth events in the last 24 hours. Active sessions: {active_sessions}.")
+        elif recent_failures >= 1:
+            st.warning(f"Caution: {recent_failures} failed auth event(s) in the last 24 hours. Active sessions: {active_sessions}.")
+        else:
+            st.success(f"OK: no failed auth events in the last 24 hours. Active sessions: {active_sessions}.")
+
+        st.markdown("**Devices / sessions**")
+        if sessions:
+            options: list[tuple[int, str]] = []
+            for s in sessions:
+                sid = int(s.get("id"))
+                ip = str(s.get("ip") or "")
+                ua = str(s.get("user_agent") or "")
+                created = str(s.get("created_at") or "")
+                label = f"{sid} — {ip} — {ua[:60]}{'…' if len(ua) > 60 else ''} — {created}"
+                options.append((sid, label))
+
+            selected = st.selectbox(
+                "Active sessions",
+                options=options,
+                format_func=lambda x: x[1],
+            )
+
+            c1, _ = st.columns([1, 3])
+            if c1.button("Revoke selected", type="secondary"):
+                try:
+                    api_revoke_session(str(token), int(selected[0]))
+                    st.toast("Session revoked", icon="✅")
+                    if hasattr(st, 'rerun'):
+                        st.rerun()
+                    elif hasattr(st, 'experimental_rerun'):
+                        st.experimental_rerun()
+                except APIError as e:
+                    st.error(str(e.detail or e))
+                except Exception:
+                    st.error("Could not revoke session")
+        else:
+            st.caption("No active sessions.")
+
+        st.markdown("**Recent security activity**")
         if events:
             import pandas as _pd
 
@@ -413,6 +496,7 @@ def render_security_section() -> None:
             st.caption("No recent events.")
 
         st.markdown("**Change password**")
+        st.caption("Password policy: 12+ chars, upper + lower + number (special optional).")
         with st.form("change_password_form"):
             current = st.text_input("Current password", type="password")
             new = st.text_input("New password", type="password")
@@ -425,6 +509,19 @@ def render_security_section() -> None:
                 return
             if new != confirm:
                 st.error("New passwords do not match.")
+                return
+            # Client-side quick checks to avoid a round trip.
+            if len(new) < 12:
+                st.error("Password must be at least 12 characters.")
+                return
+            if not any(c.isupper() for c in new):
+                st.error("Password must include an uppercase letter.")
+                return
+            if not any(c.islower() for c in new):
+                st.error("Password must include a lowercase letter.")
+                return
+            if not any(c.isdigit() for c in new):
+                st.error("Password must include a number.")
                 return
             try:
                 resp = api_change_password(str(token), current, new)

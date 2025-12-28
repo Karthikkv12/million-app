@@ -8,6 +8,7 @@ from datetime import timedelta
 from sqlalchemy.orm import sessionmaker
 from database.models import (
     Trade, CashFlow, Budget,
+    Account, Holding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
     get_engine
 )
@@ -79,7 +80,7 @@ def _refresh_token_ttl_days() -> int:
         return 30
 
 
-def create_refresh_token(*, user_id: int) -> str:
+def create_refresh_token(*, user_id: int, ip: str | None = None, user_agent: str | None = None) -> str:
     """Create and persist a new refresh token for a user.
 
     Returns the *raw* refresh token (store it securely client-side).
@@ -91,12 +92,20 @@ def create_refresh_token(*, user_id: int) -> str:
         raw = f"rt_{secrets.token_urlsafe(32)}"
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         expires_at = (datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None)
+        ua = (str(user_agent)[:500] if user_agent else None)
+        ip_s = (str(ip).strip() if ip else None)
         rt = RefreshToken(
             user_id=int(user_id),
             token_hash=_hash_refresh_token(raw),
             created_at=now,
+            created_ip=ip_s,
+            created_user_agent=ua,
+            last_used_at=now,
+            last_used_ip=ip_s,
+            last_used_user_agent=ua,
             expires_at=expires_at,
             revoked_at=None,
+            revoked_reason=None,
             replaced_by_token_id=None,
         )
         session.add(rt)
@@ -129,7 +138,12 @@ def validate_refresh_token(*, refresh_token: str) -> int | None:
         session.close()
 
 
-def rotate_refresh_token(*, refresh_token: str) -> tuple[int, str] | None:
+def rotate_refresh_token(
+    *,
+    refresh_token: str,
+    ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[int, str] | None:
     """Atomically rotate a refresh token.
 
     On success, revokes the old token and returns (user_id, new_refresh_token).
@@ -150,18 +164,27 @@ def rotate_refresh_token(*, refresh_token: str) -> tuple[int, str] | None:
 
         user_id = int(getattr(rt, "user_id"))
         new_raw = f"rt_{secrets.token_urlsafe(32)}"
+        ua = (str(user_agent)[:500] if user_agent else None)
+        ip_s = (str(ip).strip() if ip else None)
         new_rt = RefreshToken(
             user_id=user_id,
             token_hash=_hash_refresh_token(new_raw),
             created_at=now,
+            created_ip=ip_s,
+            created_user_agent=ua,
+            last_used_at=now,
+            last_used_ip=ip_s,
+            last_used_user_agent=ua,
             expires_at=(datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None),
             revoked_at=None,
+            revoked_reason=None,
             replaced_by_token_id=None,
         )
         session.add(new_rt)
         session.flush()  # assign id
 
         rt.revoked_at = now
+        rt.revoked_reason = "rotated"
         rt.replaced_by_token_id = int(getattr(new_rt, "id"))
         session.add(rt)
         session.commit()
@@ -189,6 +212,7 @@ def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> N
         if getattr(rt, "revoked_at", None) is not None:
             return
         rt.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        rt.revoked_reason = "revoked"
         session.add(rt)
         session.commit()
     except Exception:
@@ -214,10 +238,71 @@ def revoke_all_refresh_tokens(*, user_id: int) -> int:
         n = 0
         for rt in tokens:
             rt.revoked_at = now
+            rt.revoked_reason = "revoked_all"
             session.add(rt)
             n += 1
         session.commit()
         return int(n)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def list_refresh_sessions(*, user_id: int, limit: int = 25) -> list[dict]:
+    """List active (non-revoked, non-expired) refresh sessions for a user."""
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        rows = (
+            session.query(RefreshToken)
+            .filter(RefreshToken.user_id == int(user_id))
+            .filter(RefreshToken.revoked_at.is_(None))
+            .filter(RefreshToken.expires_at > now)
+            .order_by(RefreshToken.created_at.desc())
+            .limit(int(limit))
+            .all()
+        )
+        out: list[dict] = []
+        for r in rows:
+            out.append(
+                {
+                    "id": int(getattr(r, "id")),
+                    "created_at": getattr(r, "created_at", None),
+                    "last_used_at": getattr(r, "last_used_at", None),
+                    "ip": str(getattr(r, "last_used_ip", "") or getattr(r, "created_ip", "") or "") or None,
+                    "user_agent": str(getattr(r, "last_used_user_agent", "") or getattr(r, "created_user_agent", "") or "") or None,
+                    "expires_at": getattr(r, "expires_at", None),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
+def revoke_refresh_session_by_id(*, user_id: int, session_id: int, reason: str = "revoked") -> bool:
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        rt = (
+            session.query(RefreshToken)
+            .filter(RefreshToken.user_id == int(user_id))
+            .filter(RefreshToken.id == int(session_id))
+            .first()
+        )
+        if not rt:
+            return False
+        if getattr(rt, "revoked_at", None) is not None:
+            return True
+        rt.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        rt.revoked_reason = str(reason)[:100]
+        session.add(rt)
+        session.commit()
+        return True
     except Exception:
         session.rollback()
         raise
@@ -362,6 +447,7 @@ def create_user(username, password):
         password = str(password)
         if not password:
             raise ValueError('password required')
+        _validate_password_policy(password)
         # Hash using passlib
         ph = pwd_context.hash(password)
         user = User(username=username, password_hash=ph, salt=None)
@@ -456,6 +542,7 @@ def change_password(
         new_password = str(new_password)
         if not new_password:
             raise ValueError("new password is required")
+        _validate_password_policy(new_password)
         u.password_hash = pwd_context.hash(new_password)
         if invalidate_tokens_before_epoch is not None:
             u.auth_valid_after = _utc_naive_from_epoch_seconds(int(invalidate_tokens_before_epoch))
@@ -469,6 +556,50 @@ def change_password(
         raise
     finally:
         session.close()
+
+
+def _policy_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return int(default)
+
+
+def _policy_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _validate_password_policy(password: str) -> None:
+    """Raise ValueError if password does not meet policy.
+
+    Defaults (can be overridden via env):
+    - PASSWORD_MIN_LENGTH=12
+    - PASSWORD_REQUIRE_UPPER=true
+    - PASSWORD_REQUIRE_LOWER=true
+    - PASSWORD_REQUIRE_DIGIT=true
+    - PASSWORD_REQUIRE_SPECIAL=false
+    """
+
+    pw = str(password or "")
+    min_len = _policy_int("PASSWORD_MIN_LENGTH", 12)
+    req_upper = _policy_bool("PASSWORD_REQUIRE_UPPER", True)
+    req_lower = _policy_bool("PASSWORD_REQUIRE_LOWER", True)
+    req_digit = _policy_bool("PASSWORD_REQUIRE_DIGIT", True)
+    req_special = _policy_bool("PASSWORD_REQUIRE_SPECIAL", False)
+
+    if len(pw) < int(min_len):
+        raise ValueError(f"password must be at least {int(min_len)} characters")
+    if req_upper and not any(c.isupper() for c in pw):
+        raise ValueError("password must include an uppercase letter")
+    if req_lower and not any(c.islower() for c in pw):
+        raise ValueError("password must include a lowercase letter")
+    if req_digit and not any(c.isdigit() for c in pw):
+        raise ValueError("password must include a number")
+    if req_special and not any((not c.isalnum()) for c in pw):
+        raise ValueError("password must include a special character")
 
 
 def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
@@ -648,6 +779,177 @@ def save_budget(category, b_type, amount, date, desc, user_id=None):
             new_item.user_id = int(user_id)
         session.add(new_item)
         session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def create_account(*, user_id: int, name: str, broker: str | None = None, currency: str = "USD") -> int:
+    session = get_session()
+    try:
+        nm = str(name or "").strip()
+        if not nm:
+            raise ValueError("account name is required")
+        cur = str(currency or "USD").strip().upper() or "USD"
+        acct = Account(
+            user_id=int(user_id),
+            name=nm,
+            broker=(str(broker).strip() if broker else None),
+            currency=cur,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        session.add(acct)
+        session.commit()
+        return int(acct.id)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def list_accounts(*, user_id: int) -> list[dict]:
+    session = get_session()
+    try:
+        rows = (
+            session.query(Account)
+            .filter(Account.user_id == int(user_id))
+            .order_by(Account.created_at.desc())
+            .all()
+        )
+        out: list[dict] = []
+        for a in rows:
+            out.append(
+                {
+                    "id": int(getattr(a, "id")),
+                    "name": str(getattr(a, "name", "") or ""),
+                    "broker": (str(getattr(a, "broker", "") or "") or None),
+                    "currency": str(getattr(a, "currency", "") or "USD"),
+                    "created_at": getattr(a, "created_at", None),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
+def list_holdings(*, user_id: int, account_id: int) -> list[dict]:
+    session = get_session()
+    try:
+        # Ensure account belongs to user.
+        acct = (
+            session.query(Account)
+            .filter(Account.id == int(account_id))
+            .filter(Account.user_id == int(user_id))
+            .first()
+        )
+        if not acct:
+            raise ValueError("account not found")
+
+        rows = (
+            session.query(Holding)
+            .filter(Holding.user_id == int(user_id))
+            .filter(Holding.account_id == int(account_id))
+            .order_by(Holding.symbol.asc())
+            .all()
+        )
+        out: list[dict] = []
+        for h in rows:
+            out.append(
+                {
+                    "id": int(getattr(h, "id")),
+                    "account_id": int(getattr(h, "account_id")),
+                    "symbol": str(getattr(h, "symbol", "") or ""),
+                    "quantity": float(getattr(h, "quantity", 0.0) or 0.0),
+                    "avg_cost": (float(getattr(h, "avg_cost", 0.0)) if getattr(h, "avg_cost", None) is not None else None),
+                    "updated_at": getattr(h, "updated_at", None),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
+def upsert_holding(
+    *,
+    user_id: int,
+    account_id: int,
+    symbol: str,
+    quantity: float,
+    avg_cost: float | None = None,
+) -> dict:
+    session = get_session()
+    try:
+        sym = str(symbol or "").strip().upper()
+        if not sym:
+            raise ValueError("symbol is required")
+
+        acct = (
+            session.query(Account)
+            .filter(Account.id == int(account_id))
+            .filter(Account.user_id == int(user_id))
+            .first()
+        )
+        if not acct:
+            raise ValueError("account not found")
+
+        h = (
+            session.query(Holding)
+            .filter(Holding.user_id == int(user_id))
+            .filter(Holding.account_id == int(account_id))
+            .filter(Holding.symbol == sym)
+            .first()
+        )
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if h is None:
+            h = Holding(
+                user_id=int(user_id),
+                account_id=int(account_id),
+                symbol=sym,
+                quantity=float(quantity),
+                avg_cost=(float(avg_cost) if avg_cost is not None else None),
+                updated_at=now,
+            )
+            session.add(h)
+            session.commit()
+        else:
+            h.quantity = float(quantity)
+            h.avg_cost = (float(avg_cost) if avg_cost is not None else None)
+            h.updated_at = now
+            session.add(h)
+            session.commit()
+
+        return {
+            "id": int(getattr(h, "id")),
+            "account_id": int(getattr(h, "account_id")),
+            "symbol": str(getattr(h, "symbol", "") or ""),
+            "quantity": float(getattr(h, "quantity", 0.0) or 0.0),
+            "avg_cost": (float(getattr(h, "avg_cost", 0.0)) if getattr(h, "avg_cost", None) is not None else None),
+            "updated_at": getattr(h, "updated_at", None),
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_holding(*, user_id: int, holding_id: int) -> bool:
+    session = get_session()
+    try:
+        h = (
+            session.query(Holding)
+            .filter(Holding.id == int(holding_id))
+            .filter(Holding.user_id == int(user_id))
+            .first()
+        )
+        if not h:
+            return False
+        session.delete(h)
+        session.commit()
+        return True
     except Exception:
         session.rollback()
         raise

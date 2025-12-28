@@ -23,6 +23,11 @@ from .schemas import (
     AuthRefreshRequest,
     AuthSignupRequest,
     AuthEventOut,
+    AuthSessionOut,
+    AccountCreateRequest,
+    AccountOut,
+    HoldingUpsertRequest,
+    HoldingOut,
     BudgetCreateRequest,
     BudgetOut,
     CashCreateRequest,
@@ -104,14 +109,16 @@ def health() -> Dict[str, str]:
 
 
 @app.post("/auth/signup", response_model=AuthResponse)
-def signup(req: AuthSignupRequest) -> AuthResponse:
+def signup(req: AuthSignupRequest, request: Request) -> AuthResponse:
     try:
         username = str(req.username).strip()
         user_id = services.create_user(username, req.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     token = create_access_token(subject=str(user_id), extra={"username": username})
-    refresh_token = services.create_refresh_token(user_id=int(user_id))
+    ip = getattr(getattr(request, "client", None), "host", None)
+    ua = request.headers.get("user-agent")
+    refresh_token = services.create_refresh_token(user_id=int(user_id), ip=str(ip) if ip else None, user_agent=ua)
     return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
 
 
@@ -144,7 +151,7 @@ def login(req: AuthLoginRequest, request: Request) -> AuthResponse:
         )
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = create_access_token(subject=str(user_id), extra={"username": username})
-    refresh_token = services.create_refresh_token(user_id=int(user_id))
+    refresh_token = services.create_refresh_token(user_id=int(user_id), ip=str(ip) if ip else None, user_agent=ua)
     services.log_auth_event(event_type="login", success=True, username=username, user_id=int(user_id), ip=str(ip) if ip else None, user_agent=ua)
     return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
 
@@ -162,7 +169,7 @@ def refresh(req: AuthRefreshRequest, request: Request) -> AuthResponse:
     except Exception:
         pass
 
-    rotated = services.rotate_refresh_token(refresh_token=req.refresh_token)
+    rotated = services.rotate_refresh_token(refresh_token=req.refresh_token, ip=str(ip) if ip else None, user_agent=ua)
     if not rotated:
         services.log_auth_event(event_type="refresh", success=False, ip=str(ip) if ip else None, user_agent=ua, detail="invalid refresh token")
         raise HTTPException(status_code=401, detail="Invalid refresh token")
@@ -291,6 +298,117 @@ def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_use
     token = create_access_token(subject=str(user_id), extra={"username": username}, issued_at=issued_at)
     refresh_token = services.create_refresh_token(user_id=int(user_id))
     return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
+
+
+@app.get("/auth/sessions", response_model=List[AuthSessionOut])
+def auth_sessions(user=Depends(get_current_user)) -> List[AuthSessionOut]:
+    rows = services.list_refresh_sessions(user_id=int(user["sub"]), limit=25)
+    out: List[AuthSessionOut] = []
+    for r in rows:
+        out.append(
+            AuthSessionOut(
+                id=int(r.get("id")),
+                created_at=r.get("created_at"),
+                last_used_at=r.get("last_used_at"),
+                ip=r.get("ip"),
+                user_agent=r.get("user_agent"),
+                expires_at=r.get("expires_at"),
+            )
+        )
+    return out
+
+
+@app.post("/auth/sessions/{session_id}/revoke")
+def revoke_session(session_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    user_id = int(user["sub"])
+    ok = services.revoke_refresh_session_by_id(user_id=user_id, session_id=int(session_id), reason="revoked")
+    if not ok:
+        raise HTTPException(status_code=404, detail="Session not found")
+    services.log_auth_event(event_type="revoke_session", success=True, username=str(user.get("username") or ""), user_id=user_id)
+    return {"status": "ok"}
+
+
+@app.get("/accounts", response_model=List[AccountOut])
+def list_accounts(user=Depends(get_current_user)) -> List[AccountOut]:
+    rows = services.list_accounts(user_id=int(user["sub"]))
+    out: List[AccountOut] = []
+    for r in rows:
+        out.append(
+            AccountOut(
+                id=int(r.get("id")),
+                name=str(r.get("name") or ""),
+                broker=(str(r.get("broker") or "") or None),
+                currency=str(r.get("currency") or "USD"),
+                created_at=r.get("created_at"),
+            )
+        )
+    return out
+
+
+@app.post("/accounts", response_model=AccountOut)
+def create_account(req: AccountCreateRequest, user=Depends(get_current_user)) -> AccountOut:
+    user_id = int(user["sub"])
+    try:
+        account_id = services.create_account(
+            user_id=user_id,
+            name=req.name,
+            broker=req.broker,
+            currency=req.currency,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return AccountOut(id=int(account_id), name=str(req.name), broker=req.broker, currency=str(req.currency).upper())
+
+
+@app.get("/accounts/{account_id}/holdings", response_model=List[HoldingOut])
+def list_holdings(account_id: int, user=Depends(get_current_user)) -> List[HoldingOut]:
+    try:
+        rows = services.list_holdings(user_id=int(user["sub"]), account_id=int(account_id))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    out: List[HoldingOut] = []
+    for r in rows:
+        out.append(
+            HoldingOut(
+                id=int(r.get("id")),
+                account_id=int(r.get("account_id")),
+                symbol=str(r.get("symbol") or ""),
+                quantity=float(r.get("quantity") or 0.0),
+                avg_cost=r.get("avg_cost"),
+                updated_at=r.get("updated_at"),
+            )
+        )
+    return out
+
+
+@app.put("/accounts/{account_id}/holdings", response_model=HoldingOut)
+def upsert_holding(account_id: int, req: HoldingUpsertRequest, user=Depends(get_current_user)) -> HoldingOut:
+    try:
+        r = services.upsert_holding(
+            user_id=int(user["sub"]),
+            account_id=int(account_id),
+            symbol=req.symbol,
+            quantity=float(req.quantity),
+            avg_cost=req.avg_cost,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return HoldingOut(
+        id=int(r.get("id")),
+        account_id=int(r.get("account_id")),
+        symbol=str(r.get("symbol") or ""),
+        quantity=float(r.get("quantity") or 0.0),
+        avg_cost=r.get("avg_cost"),
+        updated_at=r.get("updated_at"),
+    )
+
+
+@app.delete("/holdings/{holding_id}")
+def delete_holding(holding_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    ok = services.delete_holding(user_id=int(user["sub"]), holding_id=int(holding_id))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Holding not found")
+    return {"status": "ok"}
 
 
 @app.get("/trades", response_model=List[Dict[str, Any]])

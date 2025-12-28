@@ -189,6 +189,53 @@ def auth_events(token: str) -> list[dict]:
     return []
 
 
+def auth_sessions(token: str) -> list[dict]:
+    resp = _request_json("GET", "/auth/sessions", token=token, timeout=15)
+    if isinstance(resp, list):
+        return [dict(x) for x in resp]
+    return []
+
+
+def revoke_session(token: str, session_id: int) -> bool:
+    _request_json("POST", f"/auth/sessions/{int(session_id)}/revoke", token=token, timeout=15)
+    return True
+
+
+def list_accounts(token: str) -> list[dict]:
+    resp = _request_json("GET", "/accounts", token=token, timeout=15)
+    if isinstance(resp, list):
+        return [dict(x) for x in resp]
+    return []
+
+
+def create_account(token: str, name: str, broker: Optional[str] = None, currency: str = "USD") -> dict:
+    body: Dict[str, Any] = {"name": str(name), "currency": str(currency)}
+    if broker:
+        body["broker"] = str(broker)
+    resp = _request_json("POST", "/accounts", token=token, json_body=body, timeout=15)
+    return dict(resp or {})
+
+
+def list_holdings(token: str, account_id: int) -> list[dict]:
+    resp = _request_json("GET", f"/accounts/{int(account_id)}/holdings", token=token, timeout=15)
+    if isinstance(resp, list):
+        return [dict(x) for x in resp]
+    return []
+
+
+def upsert_holding(token: str, account_id: int, symbol: str, quantity: float, avg_cost: Optional[float] = None) -> dict:
+    body: Dict[str, Any] = {"symbol": str(symbol), "quantity": float(quantity)}
+    if avg_cost is not None:
+        body["avg_cost"] = float(avg_cost)
+    resp = _request_json("PUT", f"/accounts/{int(account_id)}/holdings", token=token, json_body=body, timeout=15)
+    return dict(resp or {})
+
+
+def delete_holding(token: str, holding_id: int) -> bool:
+    _request_json("DELETE", f"/holdings/{int(holding_id)}", token=token, timeout=15)
+    return True
+
+
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     trades_df = pd.DataFrame(_request_json("GET", "/trades", token=token, timeout=30) or [])
     cash_df = pd.DataFrame(_request_json("GET", "/cash", token=token, timeout=30) or [])

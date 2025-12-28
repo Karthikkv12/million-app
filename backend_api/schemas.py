@@ -48,6 +48,44 @@ class AuthEventOut(BaseModel):
     detail: Optional[str] = None
 
 
+class AuthSessionOut(BaseModel):
+    id: int
+    created_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    expires_at: Optional[datetime] = None
+
+
+class AccountCreateRequest(BaseModel):
+    name: str = Field(min_length=1)
+    broker: Optional[str] = None
+    currency: str = Field(default="USD", min_length=1)
+
+
+class AccountOut(BaseModel):
+    id: int
+    name: str
+    broker: Optional[str] = None
+    currency: str
+    created_at: Optional[datetime] = None
+
+
+class HoldingUpsertRequest(BaseModel):
+    symbol: str = Field(min_length=1)
+    quantity: float
+    avg_cost: Optional[float] = None
+
+
+class HoldingOut(BaseModel):
+    id: int
+    account_id: int
+    symbol: str
+    quantity: float
+    avg_cost: Optional[float] = None
+    updated_at: Optional[datetime] = None
+
+
 class TradeCreateRequest(BaseModel):
     symbol: str
     instrument: str

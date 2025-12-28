@@ -15,8 +15,9 @@ from ui.auth import (
     ensure_fresh_token,
     logout_and_rerun,
     login_page,
-    render_security_section,
 )
+from ui.settings import render_settings_page
+from ui.accounts import render_accounts_and_holdings_section
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
@@ -237,6 +238,7 @@ _sid_q = f"sid={quote(_sid)}&" if _sid else ""
 _home_href = f"?{_sid_q}page=main"
 _investment_href = f"?{_sid_q}page=investment"
 _budget_href = f"?{_sid_q}page=budget"
+_settings_href = f"?{_sid_q}page=settings"
 _logout_href = f"?{_sid_q}action=logout"
 st.markdown(
     (
@@ -245,6 +247,7 @@ st.markdown(
         '<div class="nav">'
         f'<a href="{_investment_href}" target="_self">Investment</a>'
         f'<a href="{_budget_href}" target="_self">Budget &amp; Cash Flow</a>'
+        f'<a href="{_settings_href}" target="_self">Settings</a>'
         f'<a href="{_logout_href}" target="_self">Logout</a>'
         '</div>'
         '</div>'
@@ -296,7 +299,7 @@ if not budget_df.empty:
 total_nw = portfolio_val + cash_balance + other_assets
 
 page = (_get_query_param("page") or "main").lower()
-if page not in {"main", "investment", "budget"}:
+if page not in {"main", "investment", "budget", "settings"}:
     page = "main"
 
 if page == "main":
@@ -335,7 +338,10 @@ def on_grid_change(key, trade_id, field):
 
 if page == "investment":
     trade_sidebar_form(TICKERS, TICKER_MAP)
-    render_security_section()
     render_trades_tab(trades_df)
+    st.divider()
+    render_accounts_and_holdings_section(title="Holdings")
 elif page == "budget":
     budget_entry_form(budget_df)
+elif page == "settings":
+    render_settings_page()

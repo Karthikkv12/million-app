@@ -115,8 +115,14 @@ class RefreshToken(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     token_hash = Column(String, nullable=False, unique=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_ip = Column(String, nullable=True, index=True)
+    created_user_agent = Column(String, nullable=True)
+    last_used_at = Column(DateTime, nullable=True, index=True)
+    last_used_ip = Column(String, nullable=True, index=True)
+    last_used_user_agent = Column(String, nullable=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime, nullable=True)
+    revoked_reason = Column(String, nullable=True)
     replaced_by_token_id = Column(Integer, nullable=True)
 
 
@@ -131,6 +137,36 @@ class AuthEvent(Base):
     ip = Column(String, nullable=True, index=True)
     user_agent = Column(String, nullable=True)
     detail = Column(String, nullable=True)
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    broker = Column(String, nullable=True)
+    currency = Column(String, nullable=False, default="USD")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)
+    quantity = Column(Float, nullable=False, default=0.0)
+    avg_cost = Column(Float, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+Index(
+    "ux_holdings_user_account_symbol",
+    Holding.user_id,
+    Holding.account_id,
+    Holding.symbol,
+    unique=True,
+)
 
 # Database Connection Setup
 @lru_cache(maxsize=1)
@@ -240,8 +276,14 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                         user_id INTEGER NOT NULL,
                         token_hash TEXT NOT NULL,
                         created_at DATETIME NOT NULL,
+                        created_ip TEXT,
+                        created_user_agent TEXT,
+                        last_used_at DATETIME,
+                        last_used_ip TEXT,
+                        last_used_user_agent TEXT,
                         expires_at DATETIME NOT NULL,
                         revoked_at DATETIME,
+                        revoked_reason TEXT,
                         replaced_by_token_id INTEGER
                     )
                     """
@@ -250,6 +292,21 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)"))
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_refresh_tokens_token_hash ON refresh_tokens(token_hash)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at ON refresh_tokens(expires_at)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_created_ip ON refresh_tokens(created_ip)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_at ON refresh_tokens(last_used_at)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_ip ON refresh_tokens(last_used_ip)"))
+
+        _add_columns(
+            "refresh_tokens",
+            [
+                ("created_ip", "TEXT"),
+                ("created_user_agent", "TEXT"),
+                ("last_used_at", "DATETIME"),
+                ("last_used_ip", "TEXT"),
+                ("last_used_user_agent", "TEXT"),
+                ("revoked_reason", "TEXT"),
+            ],
+        )
 
         # auth_events: new table (best-effort)
         with engine.begin() as conn:
@@ -276,6 +333,74 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_username ON auth_events(username)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_user_id ON auth_events(user_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_events_ip ON auth_events(ip)"))
+
+        # accounts: new table (best-effort)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS accounts (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        broker TEXT,
+                        currency TEXT NOT NULL DEFAULT 'USD',
+                        created_at DATETIME
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_accounts_user_id ON accounts(user_id)"))
+
+        _add_columns(
+            "accounts",
+            [
+                ("user_id", "INTEGER"),
+                ("name", "TEXT"),
+                ("broker", "TEXT"),
+                ("currency", "TEXT DEFAULT 'USD'"),
+                ("created_at", "DATETIME"),
+            ],
+        )
+
+        # holdings: new table (best-effort)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS holdings (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        account_id INTEGER NOT NULL,
+                        symbol TEXT NOT NULL,
+                        quantity REAL NOT NULL DEFAULT 0,
+                        avg_cost REAL,
+                        updated_at DATETIME
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_user_id ON holdings(user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_account_id ON holdings(account_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_symbol ON holdings(symbol)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_updated_at ON holdings(updated_at)"))
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_holdings_user_account_symbol ON holdings(user_id, account_id, symbol)"
+                )
+            )
+
+        _add_columns(
+            "holdings",
+            [
+                ("user_id", "INTEGER"),
+                ("account_id", "INTEGER"),
+                ("symbol", "TEXT"),
+                ("quantity", "REAL DEFAULT 0"),
+                ("avg_cost", "REAL"),
+                ("updated_at", "DATETIME"),
+            ],
+        )
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return
