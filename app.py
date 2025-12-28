@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from ui.auth import sidebar_auth, login_page
+from ui.auth import ensure_canonical_host, restore_auth_from_cookie, sidebar_auth, login_page
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
@@ -117,6 +117,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SIDEBAR LOGIC ---
+# Normalize hostname (localhost vs 127.0.0.1) so auth cookies match across refresh.
+ensure_canonical_host()
+
+# Restore auth state after browser refresh (Streamlit resets session_state on refresh)
+restore_auth_from_cookie()
+
 # If not signed in, show the login page (blocking). After login the page will rerun.
 if 'user' not in st.session_state:
     login_page()

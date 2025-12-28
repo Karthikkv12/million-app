@@ -1,9 +1,298 @@
 import streamlit as st
+from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
+from streamlit.components.v1 import html as _html
+from urllib.parse import urlencode
+import uuid
+
+try:
+    from streamlit_cookies_manager import CookieManager
+except Exception:  # optional dependency; app should still run without it
+    CookieManager = None  # type: ignore
 
 from frontend_client import APIError
 from frontend_client import api_base_url, api_health
 from frontend_client import login as api_login
 from frontend_client import signup as api_signup
+
+from browser_sessions import cleanup_expired, delete_session, load_session, save_session
+
+
+_PENDING_COOKIE_SET_KEY = "_million_pending_cookie_set"
+_PENDING_COOKIE_CLEAR_KEY = "_million_pending_cookie_clear"
+_COOKIE_RESTORE_RERUNS_KEY = "_million_cookie_restore_reruns"
+_SID_COOKIE_NAME = "million_sid"
+_SID_SESSION_KEY = "_million_sid"
+
+
+def ensure_canonical_host() -> None:
+        """Ensure the app runs on a single hostname so cookies persist.
+
+        If you sign in on `localhost` and later refresh on `127.0.0.1` (or vice-versa),
+        browser cookies won't match and auth restore will fail (Safari is especially easy
+        to hit here). This silently redirects to the canonical local hostname.
+        """
+
+        _html(
+                """
+<script>
+(function () {
+    try {
+        var desired = "127.0.0.1";
+        var h = window.location.hostname;
+        if (h === "localhost" || h === "0.0.0.0" || h === "::1") {
+            var url = new URL(window.location.href);
+            url.hostname = desired;
+            window.location.replace(url.toString());
+        }
+    } catch (e) {
+        // no-op
+    }
+})();
+</script>
+""",
+                height=0,
+                width=0,
+        )
+
+
+def _cookie_manager() -> CookieManager:
+    # CookieManager is a Streamlit component (widget). It must NOT be created
+    # inside any `st.cache_*` function.
+    if CookieManager is None:
+        raise RuntimeError("streamlit-cookies-manager is not installed")
+
+    key = "_million_cookie_manager"
+    existing = st.session_state.get(key)
+    if existing is None:
+        existing = CookieManager()
+        st.session_state[key] = existing
+
+    # Safari can be picky about parsing ISO datetimes without timezone and/or with
+    # microseconds. The component code does `new Date(spec.expires_at)`, so ensure
+    # we feed it a robust, timezone-aware UTC timestamp with no microseconds.
+    try:
+        existing._default_expiry = (datetime.now(timezone.utc) + timedelta(days=365)).replace(microsecond=0)
+    except Exception:
+        pass
+    return existing
+
+
+def _cookies() -> Optional[CookieManager]:
+    if CookieManager is None:
+        raise RuntimeError("streamlit-cookies-manager is not installed")
+    cookies = _cookie_manager()
+    # IMPORTANT: don't `st.stop()` here.
+    # On first load CookieManager may not be ready yet; stopping early can render a blank page.
+    # Callers should treat "not ready" as "no cookies available yet" and continue rendering.
+    if not cookies.ready():
+        return None
+    return cookies
+
+
+def _flush_pending_cookie_ops() -> None:
+    """Apply any queued cookie operations once CookieManager becomes ready.
+
+    CookieManager is sometimes not ready on the same run where a login/signup succeeds,
+    which would otherwise drop the cookie write and make refresh log the user out.
+    """
+
+    if CookieManager is None:
+        return
+
+    cookies = _cookies()
+    if cookies is None:
+        return
+
+    pending_set = st.session_state.get(_PENDING_COOKIE_SET_KEY)
+    pending_clear = bool(st.session_state.get(_PENDING_COOKIE_CLEAR_KEY))
+
+    if pending_clear:
+        for k in ("million_token", "million_user", "million_user_id"):
+            cookies.pop(k, None)
+        cookies.save()
+        st.session_state.pop(_PENDING_COOKIE_CLEAR_KEY, None)
+
+    if isinstance(pending_set, dict):
+        token = pending_set.get("token")
+        username = pending_set.get("username")
+        user_id = pending_set.get("user_id")
+        if token and username and user_id is not None:
+            cookies["million_token"] = str(token)
+            cookies["million_user"] = str(username)
+            cookies["million_user_id"] = str(user_id)
+            cookies.save()
+        st.session_state.pop(_PENDING_COOKIE_SET_KEY, None)
+
+
+def _set_sid_cookie(sid: str, *, days: int = 30) -> None:
+        # Set cookie on the *parent* document with a normal, unencoded path.
+        # Avoid streamlit-cookies-manager here; its path encoding is not Safari-friendly.
+        expires = (datetime.now(timezone.utc) + timedelta(days=int(days))).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        _html(
+                f"""
+<script>
+(function() {{
+    try {{
+        var expires = "{expires}";
+        window.parent.document.cookie = "{_SID_COOKIE_NAME}=" + encodeURIComponent("{sid}") + "; expires=" + expires + "; path=/";
+    }} catch (e) {{}}
+}})();
+</script>
+""",
+                height=0,
+                width=0,
+        )
+
+
+def _clear_sid_cookie() -> None:
+        _html(
+                f"""
+<script>
+(function() {{
+    try {{
+        window.parent.document.cookie = "{_SID_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    }} catch (e) {{}}
+}})();
+</script>
+""",
+                height=0,
+                width=0,
+        )
+
+
+def _ensure_sid_query_param_from_cookie() -> None:
+        # JS reads the sid cookie and, if present, appends it as `sid=` query param.
+        # We only move the sid (not JWT) into the URL. Streamlit can read it and load
+        # the JWT from server-side storage.
+        _html(
+                f"""
+<script>
+(function() {{
+    try {{
+        var name = "{_SID_COOKIE_NAME}=";
+        var cookies = window.parent.document.cookie.split(';');
+        var sid = null;
+        for (var i = 0; i < cookies.length; i++) {{
+            var c = cookies[i].trim();
+            if (c.indexOf(name) === 0) {{ sid = decodeURIComponent(c.substring(name.length)); break; }}
+        }}
+        if (!sid) return;
+        var url = new URL(window.parent.location.href);
+        if (!url.searchParams.get('sid')) {{
+            url.searchParams.set('sid', sid);
+            window.parent.location.replace(url.toString());
+        }}
+    }} catch (e) {{}}
+}})();
+</script>
+""",
+                height=0,
+                width=0,
+        )
+
+
+def _get_query_param(name: str) -> Optional[str]:
+    # Streamlit has two APIs depending on version.
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        val = qp.get(name)
+        if isinstance(val, list):
+            return val[0] if val else None
+        return str(val) if val is not None else None
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()
+            vals = qp.get(name)
+            return vals[0] if vals else None
+        except Exception:
+            return None
+
+
+def _clear_query_params() -> None:
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        qp.clear()
+    except Exception:
+        try:
+            st.experimental_set_query_params()
+        except Exception:
+            pass
+
+
+def _set_sid_query_param(sid: str) -> None:
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        qp["sid"] = sid
+    except Exception:
+        try:
+            st.experimental_set_query_params(sid=sid)
+        except Exception:
+            pass
+
+
+def _clear_sid_query_param() -> None:
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        qp.pop("sid", None)
+    except Exception:
+        try:
+            # Clear all params (older API can't pop one key).
+            st.experimental_set_query_params()
+        except Exception:
+            pass
+
+
+def restore_auth_from_cookie() -> None:
+    """Restore auth state after a browser refresh.
+
+    Streamlit session state is reset on refresh; we persist auth in browser cookies.
+    """
+
+    if st.session_state.get("token") and st.session_state.get("user") and st.session_state.get("user_id"):
+        return
+
+    # Primary persistence path (Safari-safe): sid cookie -> query param -> server-side lookup.
+    cleanup_expired()
+    _ensure_sid_query_param_from_cookie()
+    sid = _get_query_param("sid")
+    if not sid:
+        return
+    bs = load_session(str(sid))
+    if not bs:
+        # Invalid/expired; clear param and cookie to avoid redirect loops.
+        _clear_query_params()
+        _clear_sid_cookie()
+        return
+    st.session_state["token"] = bs.token
+    st.session_state["user"] = bs.username
+    st.session_state["user_id"] = int(bs.user_id)
+    st.session_state[_SID_SESSION_KEY] = bs.sid
+    # Keep `sid` in the URL so hard refresh continues to work even if the browser
+    # doesn't persist cookies reliably.
+
+
+def _persist_auth_to_cookie(*, token: str, username: str, user_id: int) -> None:
+    # Keep function name for compatibility, but persist via sid store.
+    sid = st.session_state.get(_SID_SESSION_KEY)
+    if not sid:
+        sid = uuid.uuid4().hex
+        st.session_state[_SID_SESSION_KEY] = sid
+    save_session(sid=str(sid), token=token, username=username, user_id=int(user_id))
+    _set_sid_cookie(str(sid))
+    _set_sid_query_param(str(sid))
+
+
+def _clear_auth_cookie() -> None:
+    sid = st.session_state.get(_SID_SESSION_KEY)
+    if sid:
+        try:
+            delete_session(str(sid))
+        except Exception:
+            pass
+    st.session_state.pop(_SID_SESSION_KEY, None)
+    _clear_sid_cookie()
+    _clear_sid_query_param()
 
 
 def _api_error_message(e: APIError, *, prefix: str) -> str:
@@ -19,9 +308,11 @@ def _api_error_message(e: APIError, *, prefix: str) -> str:
 
 def sidebar_auth():
     """Render sidebar auth controls (for signed-in state)."""
+    _flush_pending_cookie_ops()
     if 'user' in st.session_state:
         st.sidebar.markdown(f"**Signed in:** {st.session_state['user']}")
         if st.sidebar.button('Logout'):
+            _clear_auth_cookie()
             del st.session_state['user']
             if 'user_id' in st.session_state:
                 del st.session_state['user_id']
@@ -110,6 +401,11 @@ def login_page():
             "Then refresh this page.",
         )
 
+    # If the user refreshed and still has a valid persisted session, restore and continue.
+    restore_auth_from_cookie()
+    if st.session_state.get("user") and st.session_state.get("token"):
+        return
+
     # track whether user clicked Sign up to navigate to the signup page
     if 'show_signup' not in st.session_state:
         st.session_state['show_signup'] = False
@@ -163,6 +459,11 @@ def login_page():
                         st.session_state['user'] = resp.get('username', username_clean)
                         st.session_state['user_id'] = int(resp['user_id'])
                         st.session_state['token'] = resp['access_token']
+                        _persist_auth_to_cookie(
+                            token=st.session_state['token'],
+                            username=st.session_state['user'],
+                            user_id=st.session_state['user_id'],
+                        )
                         st.session_state['show_signup'] = False
                         if hasattr(st, 'experimental_rerun'):
                             try:
@@ -185,6 +486,11 @@ def login_page():
                                 st.session_state['user'] = resp.get('username', username_clean)
                                 st.session_state['user_id'] = int(resp['user_id'])
                                 st.session_state['token'] = resp['access_token']
+                                _persist_auth_to_cookie(
+                                    token=st.session_state['token'],
+                                    username=st.session_state['user'],
+                                    user_id=st.session_state['user_id'],
+                                )
                                 st.session_state['show_signup'] = False
                                 if hasattr(st, 'experimental_rerun'):
                                     try:
@@ -215,6 +521,11 @@ def login_page():
                         st.session_state['user'] = resp.get('username', username_clean)
                         st.session_state['user_id'] = int(resp['user_id'])
                         st.session_state['token'] = resp['access_token']
+                        _persist_auth_to_cookie(
+                            token=st.session_state['token'],
+                            username=st.session_state['user'],
+                            user_id=st.session_state['user_id'],
+                        )
                         st.session_state['show_signup'] = False
                         if hasattr(st, 'experimental_rerun'):
                             try:

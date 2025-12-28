@@ -17,6 +17,15 @@ env/
 # SQLite DB
 trading_journal.db
 
+# Local auth/session store
+.browser_sessions.sqlite
+
+# Local run artifacts
+.uvicorn.pid
+.uvicorn.log
+.streamlit.pid
+.streamlit.log
+
 # Snapshots and local artifacts
 /snapshots/
 
