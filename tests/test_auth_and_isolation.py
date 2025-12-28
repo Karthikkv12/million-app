@@ -45,3 +45,11 @@ def test_idempotent_trade_submission(db_engine_and_session):
     services.save_trade('AAPL', 'Stock', 'Swing', 'Buy', 1, 100.0, '2025-01-01', user_id=uid, client_order_id=coid)
     trades, _, _ = services.load_data(user_id=uid)
     assert len(trades) == 1
+
+
+def test_auth_valid_after_cutoff(db_engine_and_session):
+    uid = services.create_user('dave', 'pw')
+    services.set_auth_valid_after_epoch(user_id=uid, epoch_seconds=100)
+    assert services.is_token_time_valid(user_id=uid, token_iat=99) is False
+    assert services.is_token_time_valid(user_id=uid, token_iat=100) is True
+    assert services.is_token_time_valid(user_id=uid, token_iat=101) is True

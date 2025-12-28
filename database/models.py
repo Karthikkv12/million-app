@@ -10,6 +10,9 @@ from sqlalchemy.pool import NullPool
 import enum
 from datetime import datetime
 
+
+_EPOCH_UTC_NAIVE = datetime(1970, 1, 1)
+
 Base = declarative_base()
 
 # --- ENUMS ---
@@ -92,6 +95,8 @@ class User(Base):
     password_hash = Column(String)
     salt = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Tokens with iat < auth_valid_after are invalid (logout-everywhere / password-change).
+    auth_valid_after = Column(DateTime, nullable=False, default=_EPOCH_UTC_NAIVE)
 
 
 class RevokedToken(Base):
@@ -196,6 +201,9 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     "CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_user_client_order_id ON trades(user_id, client_order_id)"
                 )
             )
+
+        # users: auth validity cutoff
+        _add_columns("users", [("auth_valid_after", "DATETIME")])
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return

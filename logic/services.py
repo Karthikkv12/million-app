@@ -1,11 +1,21 @@
 import pandas as pd
 from datetime import datetime, timezone
+from datetime import timedelta
 from sqlalchemy.orm import sessionmaker
 from database.models import (
     Trade, CashFlow, Budget,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
     get_engine
 )
+
+
+def _utc_naive_from_epoch_seconds(epoch_seconds: int) -> datetime:
+    return datetime.fromtimestamp(int(epoch_seconds), tz=timezone.utc).replace(tzinfo=None)
+
+
+def _epoch_seconds_from_utc_naive(dt: datetime) -> int:
+    # Treat naive datetimes as UTC.
+    return int(dt.replace(tzinfo=timezone.utc).timestamp())
 
 # NOTE: create engine/session per-call to ensure we respect the current
 # `DATABASE_URL` environment variable at runtime. If `engine`/`Session`
@@ -102,7 +112,44 @@ def get_user(user_id: int):
         session.close()
 
 
-def change_password(*, user_id: int, old_password: str, new_password: str) -> None:
+def set_auth_valid_after_epoch(*, user_id: int, epoch_seconds: int) -> None:
+    session = get_session()
+    try:
+        from database.models import User
+        u = session.query(User).filter(User.id == int(user_id)).first()
+        if not u:
+            raise ValueError("user not found")
+        u.auth_valid_after = _utc_naive_from_epoch_seconds(int(epoch_seconds))
+        session.add(u)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def is_token_time_valid(*, user_id: int, token_iat: int) -> bool:
+    u = get_user(int(user_id))
+    if u is None:
+        return False
+    ava = getattr(u, "auth_valid_after", None)
+    if not ava:
+        return True
+    try:
+        cutoff = _epoch_seconds_from_utc_naive(ava)
+    except Exception:
+        return True
+    return int(token_iat) >= int(cutoff)
+
+
+def change_password(
+    *,
+    user_id: int,
+    old_password: str,
+    new_password: str,
+    invalidate_tokens_before_epoch: int | None = None,
+) -> None:
     session = get_session()
     try:
         from database.models import User
@@ -115,6 +162,11 @@ def change_password(*, user_id: int, old_password: str, new_password: str) -> No
         if not new_password:
             raise ValueError("new password is required")
         u.password_hash = pwd_context.hash(new_password)
+        if invalidate_tokens_before_epoch is not None:
+            u.auth_valid_after = _utc_naive_from_epoch_seconds(int(invalidate_tokens_before_epoch))
+        else:
+            # Best-effort: invalidate tokens issued before "now".
+            u.auth_valid_after = datetime.now(timezone.utc).replace(tzinfo=None)
         session.add(u)
         session.commit()
     except Exception:

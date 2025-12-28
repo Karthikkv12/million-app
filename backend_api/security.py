@@ -29,8 +29,14 @@ def _default_access_minutes() -> int:
         return 1440
 
 
-def create_access_token(*, subject: str, extra: Optional[Dict[str, Any]] = None, expires_minutes: Optional[int] = None) -> str:
-    now = datetime.now(timezone.utc)
+def create_access_token(
+    *,
+    subject: str,
+    extra: Optional[Dict[str, Any]] = None,
+    expires_minutes: Optional[int] = None,
+    issued_at: Optional[datetime] = None,
+) -> str:
+    now = datetime.now(timezone.utc) if issued_at is None else issued_at
     minutes = _default_access_minutes() if expires_minutes is None else int(expires_minutes)
     payload: Dict[str, Any] = {
         "sub": subject,

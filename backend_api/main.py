@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from datetime import timezone
 import os
+from datetime import timedelta
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -82,6 +83,11 @@ def get_current_user(
         jti = str(payload.get("jti") or "").strip()
         if jti and services.is_token_revoked(jti=jti):
             raise HTTPException(status_code=401, detail="Token has been revoked")
+
+        # Invalidate tokens issued before the user's cutoff (logout-everywhere / password change).
+        token_iat = int(payload.get("iat") or 0)
+        if not services.is_token_time_valid(user_id=int(payload["sub"]), token_iat=token_iat):
+            raise HTTPException(status_code=401, detail="Token is no longer valid. Please sign in again.")
         return payload
     except HTTPException:
         raise
@@ -140,17 +146,50 @@ def logout(user=Depends(get_current_user)) -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/auth/change-password")
-def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_user)) -> Dict[str, str]:
+@app.post("/auth/logout-all")
+def logout_all(user=Depends(get_current_user)) -> Dict[str, str]:
+    """Invalidate all tokens for this user (all devices).
+
+    We set auth_valid_after to (current token iat + 1s) so every token issued at or
+    before the current token becomes invalid.
+    """
+    user_id = int(user["sub"])
+    token_iat = int(user.get("iat") or 0)
+    cutoff_epoch = int(token_iat) + 1
+    services.set_auth_valid_after_epoch(user_id=user_id, epoch_seconds=cutoff_epoch)
+
+    # Also revoke this token's jti best-effort (helps even if auth_valid_after isn't enforced somewhere).
+    jti = str(user.get("jti") or "").strip()
+    exp_raw = user.get("exp")
+    try:
+        exp_dt = datetime.fromtimestamp(int(exp_raw), tz=timezone.utc)
+    except Exception:
+        exp_dt = datetime.now(timezone.utc)
+    if jti:
+        services.revoke_token(user_id=user_id, jti=jti, expires_at=exp_dt)
+
+    return {"status": "ok"}
+
+
+@app.post("/auth/change-password", response_model=AuthResponse)
+def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_user)) -> AuthResponse:
+    user_id = int(user["sub"])
+    username = str(user.get("username") or "")
     try:
         services.change_password(
-            user_id=int(user["sub"]),
+            user_id=user_id,
             old_password=req.current_password,
             new_password=req.new_password,
+            # Invalidate tokens issued at/before this one.
+            invalidate_tokens_before_epoch=int(user.get("iat") or 0) + 1,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"status": "ok"}
+
+    # Mint a new token guaranteed to be valid after the cutoff.
+    issued_at = datetime.fromtimestamp(int(user.get("iat") or 0) + 1, tz=timezone.utc)
+    token = create_access_token(subject=str(user_id), extra={"username": username}, issued_at=issued_at)
+    return AuthResponse(access_token=token, user_id=int(user_id), username=username)
 
 
 @app.get("/trades", response_model=List[Dict[str, Any]])

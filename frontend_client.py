@@ -137,14 +137,25 @@ def logout(token: str) -> bool:
         raise
 
 
-def change_password(token: str, current_password: str, new_password: str) -> None:
-    _request_json(
+def logout_all(token: str) -> bool:
+    try:
+        _request_json("POST", "/auth/logout-all", token=token, timeout=10)
+        return True
+    except APIError as e:
+        if e.status_code in {0, 404}:
+            return False
+        raise
+
+
+def change_password(token: str, current_password: str, new_password: str) -> Dict[str, Any]:
+    resp = _request_json(
         "POST",
         "/auth/change-password",
         token=token,
         json_body={"current_password": current_password, "new_password": new_password},
         timeout=15,
     )
+    return dict(resp or {})
 
 
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

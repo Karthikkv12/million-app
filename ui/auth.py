@@ -14,6 +14,7 @@ from frontend_client import APIError
 from frontend_client import api_base_url, api_health
 from frontend_client import login as api_login
 from frontend_client import logout as api_logout
+from frontend_client import logout_all as api_logout_all
 from frontend_client import change_password as api_change_password
 from frontend_client import signup as api_signup
 
@@ -370,6 +371,15 @@ def render_security_section() -> None:
             st.info("Sign in to manage security settings.")
             return
 
+        if st.button("Logout everywhere", type="secondary"):
+            # Best-effort: invalidate all tokens for this user, then clear local session.
+            try:
+                api_logout_all(str(token))
+            except Exception:
+                pass
+            logout_and_rerun()
+            return
+
         st.markdown("**Change password**")
         with st.form("change_password_form"):
             current = st.text_input("Current password", type="password")
@@ -385,10 +395,19 @@ def render_security_section() -> None:
                 st.error("New passwords do not match.")
                 return
             try:
-                api_change_password(str(token), current, new)
+                resp = api_change_password(str(token), current, new)
             except APIError as e:
                 st.error(str(e.detail or e))
             else:
+                # Backend returns a fresh token; keep the user signed in.
+                new_token = str(resp.get("access_token") or "").strip()
+                new_username = str(resp.get("username") or (st.session_state.get("user") or "")).strip()
+                new_user_id = resp.get("user_id")
+                if new_token and new_username and new_user_id is not None:
+                    st.session_state["token"] = new_token
+                    st.session_state["user"] = new_username
+                    st.session_state["user_id"] = int(new_user_id)
+                    _persist_auth_to_cookie(token=new_token, username=new_username, user_id=int(new_user_id))
                 st.toast("Password updated", icon="✅")
 
 
