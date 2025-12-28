@@ -12,9 +12,9 @@ from urllib.parse import quote
 from ui.auth import (
     ensure_canonical_host,
     restore_auth_from_cookie,
-    sidebar_auth_with_options,
     logout_and_rerun,
     login_page,
+    render_security_section,
 )
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
@@ -131,11 +131,11 @@ st.markdown("""
     .top-band .nav a:hover { color: #00c805; }
     .stApp { padding-top: 50px; }
     
-    /* Sidebar Styles */
-    [data-testid="stSidebar"] { background-color: #f5f8fa; min-width: 350px !important; max-width: 350px !important; border-right: 1px solid #e0e0e0; }
-    [data-testid="stSidebarCollapseButton"] { display: none; }
-    div[data-testid="stSidebarUserContent"] { padding-top: 2rem; }
-    [data-testid="stSidebar"] h1 { color: #00c805 !important; font-size: 3.5rem !important; margin-bottom: 20px; }
+    /* Hide Streamlit sidebar (all navigation happens in the top band + pages) */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
 
     /* Dark mode: make everything black and keep sidebar text readable */
     @media (prefers-color-scheme: dark) {
@@ -251,16 +251,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Render sidebar auth state (signed-in label only; logout is in the top band)
-sidebar_auth_with_options(show_logout=False)
-
-# Menu selection for UI
-mode = st.sidebar.selectbox("Menu", ["Trade", "Transactions"], label_visibility="collapsed")
-
-if mode == "Trade":
-    # trade form moved to ui.trades
-    trade_sidebar_form(TICKERS, TICKER_MAP)
-
 # --- MAIN DASHBOARD LOGIC ---
 token = st.session_state.get('token')
 if not token:
@@ -335,6 +325,8 @@ def on_grid_change(key, trade_id, field):
 # (canonical helpers moved to `ui.utils`)
 
 if page == "investment":
+    trade_sidebar_form(TICKERS, TICKER_MAP)
+    render_security_section()
     render_trades_tab(trades_df)
 elif page == "budget":
     budget_entry_form(budget_df)

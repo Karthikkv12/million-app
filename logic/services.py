@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import datetime, timezone
 from sqlalchemy.orm import sessionmaker
 from database.models import (
     Trade, CashFlow, Budget,
@@ -53,6 +54,9 @@ def create_user(username, password):
         existing = session.query(User).filter(User.username == username).first()
         if existing:
             raise ValueError('username already exists')
+        password = str(password)
+        if not password:
+            raise ValueError('password required')
         # Hash using passlib
         ph = pwd_context.hash(password)
         user = User(username=username, password_hash=ph, salt=None)
@@ -78,12 +82,82 @@ def authenticate_user(username, password):
     session = get_session()
     try:
         from database.models import User
-        u = session.query(User).filter(User.username == str(username)).first()
+        uname = str(username).strip()
+        u = session.query(User).filter(User.username == uname).first()
         if not u:
             return None
         # verify hash
         ok = pwd_context.verify(password, u.password_hash)
         return u.id if ok else None
+    finally:
+        session.close()
+
+
+def get_user(user_id: int):
+    session = get_session()
+    try:
+        from database.models import User
+        return session.query(User).filter(User.id == int(user_id)).first()
+    finally:
+        session.close()
+
+
+def change_password(*, user_id: int, old_password: str, new_password: str) -> None:
+    session = get_session()
+    try:
+        from database.models import User
+        u = session.query(User).filter(User.id == int(user_id)).first()
+        if not u:
+            raise ValueError("user not found")
+        if not pwd_context.verify(str(old_password), u.password_hash):
+            raise ValueError("current password is incorrect")
+        new_password = str(new_password)
+        if not new_password:
+            raise ValueError("new password is required")
+        u.password_hash = pwd_context.hash(new_password)
+        session.add(u)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
+    session = get_session()
+    try:
+        from database.models import RevokedToken
+        jti = str(jti).strip()
+        if not jti:
+            return
+        existing = session.query(RevokedToken).filter(RevokedToken.jti == jti).first()
+        if existing:
+            return
+        rt = RevokedToken(
+            user_id=int(user_id),
+            jti=jti,
+            revoked_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            expires_at=expires_at.replace(tzinfo=None),
+        )
+        session.add(rt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def is_token_revoked(*, jti: str) -> bool:
+    session = get_session()
+    try:
+        from database.models import RevokedToken
+        jti = str(jti).strip()
+        if not jti:
+            return False
+        hit = session.query(RevokedToken).filter(RevokedToken.jti == jti).first()
+        return hit is not None
     finally:
         session.close()
 
@@ -145,22 +219,51 @@ def normalize_budget_type(b_type):
         return BudgetType.ASSET
     return BudgetType.EXPENSE
 
-def save_trade(symbol, instrument, strategy, action, qty, price, date, o_type=None, strike=None, expiry=None, user_id=None):
+def save_trade(
+    symbol,
+    instrument,
+    strategy,
+    action,
+    qty,
+    price,
+    date,
+    o_type=None,
+    strike=None,
+    expiry=None,
+    user_id=None,
+    client_order_id=None,
+):
     session = get_session()
     try:
         inst_enum = normalize_instrument(instrument)
         act_enum = normalize_action(action)
         opt_enum = normalize_option_type(o_type)
 
+        coid = None
+        if client_order_id is not None:
+            coid = str(client_order_id).strip() or None
+
+        if coid and user_id is not None:
+            existing = (
+                session.query(Trade)
+                .filter(Trade.user_id == int(user_id))
+                .filter(Trade.client_order_id == coid)
+                .first()
+            )
+            if existing:
+                return existing.id
+
         new_trade = Trade(
             symbol=str(symbol).upper(), quantity=int(qty), instrument=inst_enum, strategy=str(strategy),
             action=act_enum, entry_date=pd.to_datetime(date), entry_price=float(price),
             option_type=opt_enum, strike_price=float(strike) if strike else None,
             expiry_date=pd.to_datetime(expiry) if expiry else None,
-            user_id=int(user_id) if user_id is not None else None
+            user_id=int(user_id) if user_id is not None else None,
+            client_order_id=coid,
         )
         session.add(new_trade)
         session.commit()
+        return new_trade.id
     except Exception as e:
         session.rollback()
         raise

@@ -13,6 +13,8 @@ except Exception:  # optional dependency; app should still run without it
 from frontend_client import APIError
 from frontend_client import api_base_url, api_health
 from frontend_client import login as api_login
+from frontend_client import logout as api_logout
+from frontend_client import change_password as api_change_password
 from frontend_client import signup as api_signup
 
 from browser_sessions import cleanup_expired, delete_session, load_session, save_session
@@ -327,6 +329,13 @@ def sidebar_auth_with_options(*, show_logout: bool = True) -> None:
 def logout_and_rerun() -> None:
     """Clear auth (sid cookie + server session + Streamlit state) and rerun."""
     _flush_pending_cookie_ops()
+    # Best-effort backend logout (token revocation). Ignore if backend is older or down.
+    try:
+        tok = st.session_state.get("token")
+        if tok:
+            api_logout(str(tok))
+    except Exception:
+        pass
     _clear_auth_cookie()
     st.session_state.pop('user', None)
     st.session_state.pop('user_id', None)
@@ -347,6 +356,40 @@ def logout_and_rerun() -> None:
             st.stop()
     else:
         st.stop()
+
+
+def render_security_section() -> None:
+    """Render identity/security controls (meant to be embedded inside the Investment page)."""
+    with st.expander("Security", expanded=False):
+        user = st.session_state.get("user")
+        if user:
+            st.caption(f"Signed in as **{user}**")
+
+        token = st.session_state.get("token")
+        if not token:
+            st.info("Sign in to manage security settings.")
+            return
+
+        st.markdown("**Change password**")
+        with st.form("change_password_form"):
+            current = st.text_input("Current password", type="password")
+            new = st.text_input("New password", type="password")
+            confirm = st.text_input("Confirm new password", type="password")
+            submitted = st.form_submit_button("Update password", type="primary")
+
+        if submitted:
+            if not current or not new:
+                st.error("Current and new password are required.")
+                return
+            if new != confirm:
+                st.error("New passwords do not match.")
+                return
+            try:
+                api_change_password(str(token), current, new)
+            except APIError as e:
+                st.error(str(e.detail or e))
+            else:
+                st.toast("Password updated", icon="✅")
 
 
 def login_page():

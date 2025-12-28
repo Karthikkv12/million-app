@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, create_engine, inspect, text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -54,6 +54,16 @@ class Trade(Base):
     strike_price = Column(Float, nullable=True)
     expiry_date = Column(DateTime, nullable=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    # Brokerage foundation: idempotent order submission (client generated UUID).
+    client_order_id = Column(String, nullable=True)
+
+
+Index(
+    "ux_trades_user_client_order_id",
+    Trade.user_id,
+    Trade.client_order_id,
+    unique=True,
+)
 
 class CashFlow(Base):
     __tablename__ = 'cash_flow'
@@ -82,6 +92,15 @@ class User(Base):
     password_hash = Column(String)
     salt = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    jti = Column(String, nullable=False, unique=True, index=True)
+    revoked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False, index=True)
 
 # Database Connection Setup
 @lru_cache(maxsize=1)
@@ -158,6 +177,7 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 ("exit_date", "DATETIME"),
                 ("exit_price", "REAL"),
                 ("realized_pnl", "REAL"),
+                ("client_order_id", "TEXT"),
             ],
         )
 
@@ -170,6 +190,12 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_trades_user_id ON trades(user_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_cash_flow_user_id ON cash_flow(user_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_budget_user_id ON budget(user_id)"))
+            # Allow multiple NULL client_order_id values; ensures idempotency when provided.
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_user_client_order_id ON trades(user_id, client_order_id)"
+                )
+            )
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return

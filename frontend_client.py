@@ -121,6 +121,32 @@ def login(username: str, password: str) -> Dict[str, Any]:
     return dict(resp or {})
 
 
+def me(token: str) -> Dict[str, Any]:
+    resp = _request_json("GET", "/auth/me", token=token, timeout=15)
+    return dict(resp or {})
+
+
+def logout(token: str) -> bool:
+    try:
+        _request_json("POST", "/auth/logout", token=token, timeout=10)
+        return True
+    except APIError as e:
+        # Backwards-compatible with older backends.
+        if e.status_code in {0, 404}:
+            return False
+        raise
+
+
+def change_password(token: str, current_password: str, new_password: str) -> None:
+    _request_json(
+        "POST",
+        "/auth/change-password",
+        token=token,
+        json_body={"current_password": current_password, "new_password": new_password},
+        timeout=15,
+    )
+
+
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     trades_df = pd.DataFrame(_request_json("GET", "/trades", token=token, timeout=30) or [])
     cash_df = pd.DataFrame(_request_json("GET", "/cash", token=token, timeout=30) or [])
@@ -147,20 +173,24 @@ def save_trade(
     qty: int,
     price: float,
     date,
+    client_order_id: Optional[str] = None,
 ) -> None:
+    body: Dict[str, Any] = {
+        "symbol": symbol,
+        "instrument": instrument,
+        "strategy": strategy,
+        "action": action,
+        "qty": int(qty),
+        "price": float(price),
+        "date": pd.to_datetime(date).to_pydatetime().isoformat(),
+    }
+    if client_order_id:
+        body["client_order_id"] = str(client_order_id)
     _request_json(
         "POST",
         "/trades",
         token=token,
-        json_body={
-            "symbol": symbol,
-            "instrument": instrument,
-            "strategy": strategy,
-            "action": action,
-            "qty": int(qty),
-            "price": float(price),
-            "date": pd.to_datetime(date).to_pydatetime().isoformat(),
-        },
+        json_body=body,
         timeout=30,
     )
 

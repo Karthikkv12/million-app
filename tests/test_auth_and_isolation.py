@@ -28,3 +28,20 @@ def test_per_user_isolation(db_engine_and_session):
     assert 'TSLA' not in trades_a['symbol'].values
     assert 'TSLA' in trades_b['symbol'].values
     assert 'AAPL' not in trades_b['symbol'].values
+
+
+def test_change_password(db_engine_and_session):
+    uid = services.create_user('bob', 'oldpass')
+    assert services.authenticate_user('bob', 'oldpass') == uid
+    services.change_password(user_id=uid, old_password='oldpass', new_password='newpass')
+    assert services.authenticate_user('bob', 'oldpass') is None
+    assert services.authenticate_user('bob', 'newpass') == uid
+
+
+def test_idempotent_trade_submission(db_engine_and_session):
+    uid = services.create_user('carol', 'pw')
+    coid = 'order-123'
+    services.save_trade('AAPL', 'Stock', 'Swing', 'Buy', 1, 100.0, '2025-01-01', user_id=uid, client_order_id=coid)
+    services.save_trade('AAPL', 'Stock', 'Swing', 'Buy', 1, 100.0, '2025-01-01', user_id=uid, client_order_id=coid)
+    trades, _, _ = services.load_data(user_id=uid)
+    assert len(trades) == 1
