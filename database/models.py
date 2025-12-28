@@ -9,6 +9,7 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 import enum
 from datetime import datetime
+from datetime import timedelta
 
 
 _EPOCH_UTC_NAIVE = datetime(1970, 1, 1)
@@ -107,6 +108,17 @@ class RevokedToken(Base):
     revoked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False, index=True)
 
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True)
+    replaced_by_token_id = Column(Integer, nullable=True)
+
 # Database Connection Setup
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
@@ -204,6 +216,27 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
 
         # users: auth validity cutoff
         _add_columns("users", [("auth_valid_after", "DATETIME")])
+
+        # refresh_tokens: new table (best-effort)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS refresh_tokens (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        token_hash TEXT NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        expires_at DATETIME NOT NULL,
+                        revoked_at DATETIME,
+                        replaced_by_token_id INTEGER
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_refresh_tokens_token_hash ON refresh_tokens(token_hash)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at ON refresh_tokens(expires_at)"))
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return

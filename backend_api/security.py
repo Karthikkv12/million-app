@@ -24,9 +24,10 @@ def _jwt_audience() -> str:
 
 def _default_access_minutes() -> int:
     try:
-        return int(os.getenv("ACCESS_TOKEN_EXPIRES_MINUTES", "1440"))
+        # Default to short-lived access tokens; rely on refresh tokens for longevity.
+        return int(os.getenv("ACCESS_TOKEN_EXPIRES_MINUTES", "15"))
     except Exception:
-        return 1440
+        return 15
 
 
 def create_access_token(

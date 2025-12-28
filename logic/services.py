@@ -1,4 +1,8 @@
 import pandas as pd
+import hashlib
+import hmac
+import os
+import secrets
 from datetime import datetime, timezone
 from datetime import timedelta
 from sqlalchemy.orm import sessionmaker
@@ -52,6 +56,173 @@ except Exception as e:
 # Use passlib CryptContext. Use PBKDF2-SHA256 to avoid system bcrypt backend issues
 # (still secure and avoids the bcrypt 72-byte limitation and native backend compatibility).
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+def _refresh_token_pepper() -> str:
+    # Prefer a dedicated pepper, fall back to JWT secret for convenience.
+    return (
+        os.getenv("REFRESH_TOKEN_PEPPER")
+        or os.getenv("JWT_SECRET")
+        or "dev-insecure-secret"
+    )
+
+
+def _hash_refresh_token(token: str) -> str:
+    tok = str(token or "").strip()
+    return hmac.new(_refresh_token_pepper().encode("utf-8"), tok.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _refresh_token_ttl_days() -> int:
+    try:
+        return int(os.getenv("REFRESH_TOKEN_EXPIRES_DAYS", "30"))
+    except Exception:
+        return 30
+
+
+def create_refresh_token(*, user_id: int) -> str:
+    """Create and persist a new refresh token for a user.
+
+    Returns the *raw* refresh token (store it securely client-side).
+    """
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        raw = f"rt_{secrets.token_urlsafe(32)}"
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None)
+        rt = RefreshToken(
+            user_id=int(user_id),
+            token_hash=_hash_refresh_token(raw),
+            created_at=now,
+            expires_at=expires_at,
+            revoked_at=None,
+            replaced_by_token_id=None,
+        )
+        session.add(rt)
+        session.commit()
+        return raw
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def validate_refresh_token(*, refresh_token: str) -> int | None:
+    """Return user_id if the refresh token is valid, else None."""
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        th = _hash_refresh_token(refresh_token)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        rt = session.query(RefreshToken).filter(RefreshToken.token_hash == th).first()
+        if not rt:
+            return None
+        if getattr(rt, "revoked_at", None) is not None:
+            return None
+        if getattr(rt, "expires_at", now) <= now:
+            return None
+        return int(getattr(rt, "user_id"))
+    finally:
+        session.close()
+
+
+def rotate_refresh_token(*, refresh_token: str) -> tuple[int, str] | None:
+    """Atomically rotate a refresh token.
+
+    On success, revokes the old token and returns (user_id, new_refresh_token).
+    """
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        th = _hash_refresh_token(refresh_token)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        rt = session.query(RefreshToken).filter(RefreshToken.token_hash == th).first()
+        if not rt:
+            return None
+        if getattr(rt, "revoked_at", None) is not None:
+            return None
+        if getattr(rt, "expires_at", now) <= now:
+            return None
+
+        user_id = int(getattr(rt, "user_id"))
+        new_raw = f"rt_{secrets.token_urlsafe(32)}"
+        new_rt = RefreshToken(
+            user_id=user_id,
+            token_hash=_hash_refresh_token(new_raw),
+            created_at=now,
+            expires_at=(datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None),
+            revoked_at=None,
+            replaced_by_token_id=None,
+        )
+        session.add(new_rt)
+        session.flush()  # assign id
+
+        rt.revoked_at = now
+        rt.replaced_by_token_id = int(getattr(new_rt, "id"))
+        session.add(rt)
+        session.commit()
+        return user_id, new_raw
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> None:
+    """Revoke a single refresh token (best-effort, no error if missing)."""
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        th = _hash_refresh_token(refresh_token)
+        q = session.query(RefreshToken).filter(RefreshToken.token_hash == th)
+        if user_id is not None:
+            q = q.filter(RefreshToken.user_id == int(user_id))
+        rt = q.first()
+        if not rt:
+            return
+        if getattr(rt, "revoked_at", None) is not None:
+            return
+        rt.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        session.add(rt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def revoke_all_refresh_tokens(*, user_id: int) -> int:
+    """Revoke all refresh tokens for a user. Returns count revoked."""
+    session = get_session()
+    try:
+        from database.models import RefreshToken
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        tokens = (
+            session.query(RefreshToken)
+            .filter(RefreshToken.user_id == int(user_id))
+            .filter(RefreshToken.revoked_at.is_(None))
+            .all()
+        )
+        n = 0
+        for rt in tokens:
+            rt.revoked_at = now
+            session.add(rt)
+            n += 1
+        session.commit()
+        return int(n)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def create_user(username, password):

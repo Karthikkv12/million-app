@@ -14,7 +14,9 @@ from frontend_client import APIError
 from frontend_client import api_base_url, api_health
 from frontend_client import login as api_login
 from frontend_client import logout as api_logout
+from frontend_client import logout_with_refresh as api_logout_with_refresh
 from frontend_client import logout_all as api_logout_all
+from frontend_client import refresh as api_refresh
 from frontend_client import change_password as api_change_password
 from frontend_client import signup as api_signup
 
@@ -268,6 +270,8 @@ def restore_auth_from_cookie() -> None:
         _clear_sid_cookie()
         return
     st.session_state["token"] = bs.token
+    if getattr(bs, "refresh_token", None):
+        st.session_state["refresh_token"] = str(bs.refresh_token)
     st.session_state["user"] = bs.username
     st.session_state["user_id"] = int(bs.user_id)
     st.session_state[_SID_SESSION_KEY] = bs.sid
@@ -275,13 +279,13 @@ def restore_auth_from_cookie() -> None:
     # doesn't persist cookies reliably.
 
 
-def _persist_auth_to_cookie(*, token: str, username: str, user_id: int) -> None:
+def _persist_auth_to_cookie(*, token: str, refresh_token: str = "", username: str, user_id: int) -> None:
     # Keep function name for compatibility, but persist via sid store.
     sid = st.session_state.get(_SID_SESSION_KEY)
     if not sid:
         sid = uuid.uuid4().hex
         st.session_state[_SID_SESSION_KEY] = sid
-    save_session(sid=str(sid), token=token, username=username, user_id=int(user_id))
+    save_session(sid=str(sid), token=token, refresh_token=str(refresh_token or ""), username=username, user_id=int(user_id))
     _set_sid_cookie(str(sid))
     _set_sid_query_param(str(sid))
 
@@ -333,14 +337,20 @@ def logout_and_rerun() -> None:
     # Best-effort backend logout (token revocation). Ignore if backend is older or down.
     try:
         tok = st.session_state.get("token")
+        rt = st.session_state.get("refresh_token")
         if tok:
-            api_logout(str(tok))
+            # Prefer revoking refresh token too.
+            try:
+                api_logout_with_refresh(str(tok), str(rt) if rt else None)
+            except Exception:
+                api_logout(str(tok))
     except Exception:
         pass
     _clear_auth_cookie()
     st.session_state.pop('user', None)
     st.session_state.pop('user_id', None)
     st.session_state.pop('token', None)
+    st.session_state.pop('refresh_token', None)
     # Also clear any other query params (e.g. `action=logout`) to avoid loops.
     _clear_query_params()
 
@@ -407,8 +417,76 @@ def render_security_section() -> None:
                     st.session_state["token"] = new_token
                     st.session_state["user"] = new_username
                     st.session_state["user_id"] = int(new_user_id)
-                    _persist_auth_to_cookie(token=new_token, username=new_username, user_id=int(new_user_id))
+                    new_refresh = str(resp.get("refresh_token") or "").strip()
+                    if new_refresh:
+                        st.session_state["refresh_token"] = new_refresh
+                    _persist_auth_to_cookie(
+                        token=new_token,
+                        refresh_token=str(st.session_state.get("refresh_token") or ""),
+                        username=new_username,
+                        user_id=int(new_user_id),
+                    )
                 st.toast("Password updated", icon="✅")
+
+
+def ensure_fresh_token(*, min_ttl_seconds: int = 60) -> None:
+    """Best-effort: refresh access token if it's near expiry.
+
+    This is intentionally silent; if refresh fails (backend down), we keep the
+    current token and let API calls surface errors.
+    """
+    token = str(st.session_state.get("token") or "").strip()
+    refresh_token = str(st.session_state.get("refresh_token") or "").strip()
+    if not token or not refresh_token:
+        return
+
+    # Decode exp without verifying signature (we only use it as a hint).
+    exp = None
+    try:
+        import jwt  # type: ignore
+
+        payload = jwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_iss": False})
+        exp = int(payload.get("exp") or 0)
+    except Exception:
+        exp = None
+
+    if exp is None:
+        return
+
+    now = int(datetime.now(timezone.utc).timestamp())
+    if (exp - now) > int(min_ttl_seconds):
+        return
+
+    try:
+        resp = api_refresh(refresh_token)
+    except APIError as e:
+        # If the refresh token is invalid/expired, force re-login.
+        if int(e.status_code) == 401:
+            logout_and_rerun()
+        return
+    except Exception:
+        return
+
+    new_access = str(resp.get("access_token") or "").strip()
+    new_refresh = str(resp.get("refresh_token") or "").strip()
+    if not new_access:
+        return
+
+    st.session_state["token"] = new_access
+    if new_refresh:
+        st.session_state["refresh_token"] = new_refresh
+    # Keep persisted server-side session in sync.
+    username = str(resp.get("username") or (st.session_state.get("user") or "")).strip()
+    user_id = resp.get("user_id")
+    if username and user_id is not None:
+        st.session_state["user"] = username
+        st.session_state["user_id"] = int(user_id)
+        _persist_auth_to_cookie(
+            token=new_access,
+            refresh_token=str(st.session_state.get("refresh_token") or ""),
+            username=username,
+            user_id=int(user_id),
+        )
 
 
 def login_page():
@@ -537,8 +615,10 @@ def login_page():
                         st.session_state['user'] = resp.get('username', username_clean)
                         st.session_state['user_id'] = int(resp['user_id'])
                         st.session_state['token'] = resp['access_token']
+                        st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
                         _persist_auth_to_cookie(
                             token=st.session_state['token'],
+                            refresh_token=str(st.session_state.get('refresh_token') or ''),
                             username=st.session_state['user'],
                             user_id=st.session_state['user_id'],
                         )
@@ -564,8 +644,10 @@ def login_page():
                                 st.session_state['user'] = resp.get('username', username_clean)
                                 st.session_state['user_id'] = int(resp['user_id'])
                                 st.session_state['token'] = resp['access_token']
+                                st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
                                 _persist_auth_to_cookie(
                                     token=st.session_state['token'],
+                                    refresh_token=str(st.session_state.get('refresh_token') or ''),
                                     username=st.session_state['user'],
                                     user_id=st.session_state['user_id'],
                                 )
@@ -599,8 +681,10 @@ def login_page():
                         st.session_state['user'] = resp.get('username', username_clean)
                         st.session_state['user_id'] = int(resp['user_id'])
                         st.session_state['token'] = resp['access_token']
+                        st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
                         _persist_auth_to_cookie(
                             token=st.session_state['token'],
+                            refresh_token=str(st.session_state.get('refresh_token') or ''),
                             username=st.session_state['user'],
                             user_id=st.session_state['user_id'],
                         )

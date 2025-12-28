@@ -12,6 +12,7 @@ from urllib.parse import quote
 from ui.auth import (
     ensure_canonical_host,
     restore_auth_from_cookie,
+    ensure_fresh_token,
     logout_and_rerun,
     login_page,
     render_security_section,
@@ -259,6 +260,14 @@ if not token:
         del st.session_state['user']
     if 'user_id' in st.session_state:
         del st.session_state['user_id']
+    login_page()
+    st.stop()
+
+# Best-effort: refresh access token if nearing expiry.
+ensure_fresh_token(min_ttl_seconds=60)
+token = st.session_state.get('token')
+
+if not token:
     login_page()
     st.stop()
 

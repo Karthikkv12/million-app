@@ -19,6 +19,8 @@ from .schemas import (
     AuthMeResponse,
     AuthResponse,
     AuthChangePasswordRequest,
+    AuthLogoutRequest,
+    AuthRefreshRequest,
     AuthSignupRequest,
     BudgetCreateRequest,
     BudgetOut,
@@ -108,7 +110,8 @@ def signup(req: AuthSignupRequest) -> AuthResponse:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     token = create_access_token(subject=str(user_id), extra={"username": username})
-    return AuthResponse(access_token=token, user_id=int(user_id), username=username)
+    refresh_token = services.create_refresh_token(user_id=int(user_id))
+    return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
 
 
 @app.post("/auth/login", response_model=AuthResponse)
@@ -118,7 +121,25 @@ def login(req: AuthLoginRequest) -> AuthResponse:
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = create_access_token(subject=str(user_id), extra={"username": username})
-    return AuthResponse(access_token=token, user_id=int(user_id), username=username)
+    refresh_token = services.create_refresh_token(user_id=int(user_id))
+    return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
+
+
+@app.post("/auth/refresh", response_model=AuthResponse)
+def refresh(req: AuthRefreshRequest) -> AuthResponse:
+    rotated = services.rotate_refresh_token(refresh_token=req.refresh_token)
+    if not rotated:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    user_id, new_refresh_token = rotated
+    u = services.get_user(int(user_id))
+    username = str(getattr(u, "username", "") or "") if u is not None else ""
+    token = create_access_token(subject=str(user_id), extra={"username": username})
+    return AuthResponse(
+        access_token=token,
+        refresh_token=new_refresh_token,
+        user_id=int(user_id),
+        username=username,
+    )
 
 
 @app.get("/auth/me", response_model=AuthMeResponse)
@@ -133,7 +154,7 @@ def me(user=Depends(get_current_user)) -> AuthMeResponse:
 
 
 @app.post("/auth/logout")
-def logout(user=Depends(get_current_user)) -> Dict[str, str]:
+def logout(req: AuthLogoutRequest | None = None, user=Depends(get_current_user)) -> Dict[str, str]:
     user_id = int(user["sub"])
     jti = str(user.get("jti") or "").strip()
     exp_raw = user.get("exp")
@@ -143,6 +164,13 @@ def logout(user=Depends(get_current_user)) -> Dict[str, str]:
         exp_dt = datetime.now(timezone.utc)
     if jti:
         services.revoke_token(user_id=user_id, jti=jti, expires_at=exp_dt)
+
+    # Optionally revoke the current refresh token (device logout).
+    try:
+        if req is not None and getattr(req, "refresh_token", None):
+            services.revoke_refresh_token(user_id=user_id, refresh_token=str(req.refresh_token))
+    except Exception:
+        pass
     return {"status": "ok"}
 
 
@@ -157,6 +185,12 @@ def logout_all(user=Depends(get_current_user)) -> Dict[str, str]:
     token_iat = int(user.get("iat") or 0)
     cutoff_epoch = int(token_iat) + 1
     services.set_auth_valid_after_epoch(user_id=user_id, epoch_seconds=cutoff_epoch)
+
+    # Revoke all refresh tokens for this user.
+    try:
+        services.revoke_all_refresh_tokens(user_id=user_id)
+    except Exception:
+        pass
 
     # Also revoke this token's jti best-effort (helps even if auth_valid_after isn't enforced somewhere).
     jti = str(user.get("jti") or "").strip()
@@ -186,10 +220,17 @@ def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_use
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Password change should invalidate refresh tokens too.
+    try:
+        services.revoke_all_refresh_tokens(user_id=user_id)
+    except Exception:
+        pass
+
     # Mint a new token guaranteed to be valid after the cutoff.
     issued_at = datetime.fromtimestamp(int(user.get("iat") or 0) + 1, tz=timezone.utc)
     token = create_access_token(subject=str(user_id), extra={"username": username}, issued_at=issued_at)
-    return AuthResponse(access_token=token, user_id=int(user_id), username=username)
+    refresh_token = services.create_refresh_token(user_id=int(user_id))
+    return AuthResponse(access_token=token, refresh_token=refresh_token, user_id=int(user_id), username=username)
 
 
 @app.get("/trades", response_model=List[Dict[str, Any]])

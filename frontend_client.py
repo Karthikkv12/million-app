@@ -158,6 +158,30 @@ def change_password(token: str, current_password: str, new_password: str) -> Dic
     return dict(resp or {})
 
 
+def refresh(refresh_token: str) -> Dict[str, Any]:
+    resp = _request_json(
+        "POST",
+        "/auth/refresh",
+        json_body={"refresh_token": str(refresh_token)},
+        timeout=15,
+    )
+    return dict(resp or {})
+
+
+def logout_with_refresh(token: str, refresh_token: Optional[str]) -> bool:
+    """Logout and optionally revoke the refresh token too."""
+    body = None
+    if refresh_token:
+        body = {"refresh_token": str(refresh_token)}
+    try:
+        _request_json("POST", "/auth/logout", token=token, json_body=body, timeout=10)
+        return True
+    except APIError as e:
+        if e.status_code in {0, 404}:
+            return False
+        raise
+
+
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     trades_df = pd.DataFrame(_request_json("GET", "/trades", token=token, timeout=30) or [])
     cash_df = pd.DataFrame(_request_json("GET", "/cash", token=token, timeout=30) or [])

@@ -16,6 +16,7 @@ class AuthLoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     user_id: int
     username: str
@@ -29,6 +30,14 @@ class AuthMeResponse(BaseModel):
 class AuthChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1)
     new_password: str = Field(min_length=1)
+
+
+class AuthRefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class AuthLogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
 
 
 class TradeCreateRequest(BaseModel):
