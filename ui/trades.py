@@ -5,6 +5,7 @@ from datetime import datetime
 import urllib.error
 import urllib.request
 import io
+import uuid
 from frontend_client import APIError, save_trade, delete_trade, close_trade
 from ui.utils import canonical_action, canonical_instrument
 
@@ -168,32 +169,57 @@ def render_live_positions(trades_df: pd.DataFrame) -> None:
 
 
 def trade_sidebar_form(TICKERS, TICKER_MAP):
-    with st.sidebar.form("trade_form"):
-        st.subheader("New Order")
-        c1, c2 = st.columns(2)
-        s_sym = c1.selectbox(
-            "Ticker",
-            options=TICKERS,
-            format_func=lambda x: f"{x} - {TICKER_MAP.get(x, '')}"
-        )
-        s_act = c2.selectbox("Type", ["Buy", "Sell"])
-        s_strat = st.selectbox("Strategy", ["Day Trade", "Swing Trade", "Buy & Hold"])
-        c3, c4 = st.columns(2)
-        s_qty = c3.number_input("Shares", min_value=1, max_value=100000, value=1)
-        s_price = c4.number_input("Price ($)", min_value=0.01, value=100.0, step=0.01)
-        s_date = st.date_input("Date", datetime.today())
+    # Keep function name for compatibility, but render in the main page.
+    with st.expander("New Order", expanded=False):
+        with st.form("trade_form"):
+            c1, c2 = st.columns(2)
+            s_sym = c1.selectbox(
+                "Ticker",
+                options=TICKERS,
+                format_func=lambda x: f"{x} - {TICKER_MAP.get(x, '')}",
+            )
+            s_act = c2.selectbox("Type", ["Buy", "Sell"])
+            s_strat = st.selectbox("Strategy", ["Day Trade", "Swing Trade", "Buy & Hold"])
+            c3, c4 = st.columns(2)
+            s_qty = c3.number_input("Shares", min_value=1, max_value=100000, value=1)
+            s_price = c4.number_input("Price ($)", min_value=0.01, value=100.0, step=0.01)
+            s_date = st.date_input("Date", datetime.today())
+            submitted = st.form_submit_button("Submit Order", type="primary")
 
-        if st.form_submit_button("Submit Order", type="primary"):
+        if submitted:
             if 'user' not in st.session_state:
                 st.error('Please sign in to submit orders')
+                return
+
+            inst = canonical_instrument('Stock')
+            act = canonical_action(s_act)
+            token = st.session_state.get('token')
+            if not token:
+                st.error('Missing session token. Please sign in again.')
+                return
+            # Brokerage foundation: idempotent order submission.
+            # If the request is retried (network hiccup / Streamlit rerun), we reuse the same ID.
+            coid_key = "_pending_client_order_id"
+            if not st.session_state.get(coid_key):
+                st.session_state[coid_key] = uuid.uuid4().hex
+
+            try:
+                save_trade(
+                    token,
+                    s_sym,
+                    inst,
+                    s_strat,
+                    act,
+                    s_qty,
+                    s_price,
+                    s_date,
+                    client_order_id=str(st.session_state.get(coid_key)),
+                )
+            except APIError as e:
+                st.error(str(e.detail or e))
+                return
             else:
-                inst = canonical_instrument('Stock')
-                act = canonical_action(s_act)
-                token = st.session_state.get('token')
-                if not token:
-                    st.error('Missing session token. Please sign in again.')
-                else:
-                    save_trade(token, s_sym, inst, s_strat, act, s_qty, s_price, s_date)
+                st.session_state.pop(coid_key, None)
                 st.toast(f"Executed: {s_sym}", icon="✅")
                 st.cache_data.clear()
                 st.rerun()

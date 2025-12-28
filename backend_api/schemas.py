@@ -21,6 +21,16 @@ class AuthResponse(BaseModel):
     username: str
 
 
+class AuthMeResponse(BaseModel):
+    user_id: int
+    username: str
+
+
+class AuthChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+
+
 class TradeCreateRequest(BaseModel):
     symbol: str
     instrument: str
@@ -29,6 +39,7 @@ class TradeCreateRequest(BaseModel):
     qty: int
     price: float
     date: datetime
+    client_order_id: Optional[str] = None
 
 
 class TradeUpdateRequest(BaseModel):

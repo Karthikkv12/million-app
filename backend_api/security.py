@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -13,12 +14,31 @@ def _jwt_secret() -> str:
     return secret
 
 
-def create_access_token(*, subject: str, extra: Optional[Dict[str, Any]] = None, expires_minutes: int = 60 * 24) -> str:
+def _jwt_issuer() -> str:
+    return os.getenv("JWT_ISSUER", "million-api")
+
+
+def _jwt_audience() -> str:
+    return os.getenv("JWT_AUDIENCE", "million-app")
+
+
+def _default_access_minutes() -> int:
+    try:
+        return int(os.getenv("ACCESS_TOKEN_EXPIRES_MINUTES", "1440"))
+    except Exception:
+        return 1440
+
+
+def create_access_token(*, subject: str, extra: Optional[Dict[str, Any]] = None, expires_minutes: Optional[int] = None) -> str:
     now = datetime.now(timezone.utc)
+    minutes = _default_access_minutes() if expires_minutes is None else int(expires_minutes)
     payload: Dict[str, Any] = {
         "sub": subject,
+        "iss": _jwt_issuer(),
+        "aud": _jwt_audience(),
+        "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+        "exp": int((now + timedelta(minutes=minutes)).timestamp()),
     }
     if extra:
         payload.update(extra)
@@ -26,4 +46,11 @@ def create_access_token(*, subject: str, extra: Optional[Dict[str, Any]] = None,
 
 
 def decode_token(token: str) -> Dict[str, Any]:
-    return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+    return jwt.decode(
+        token,
+        _jwt_secret(),
+        algorithms=["HS256"],
+        audience=_jwt_audience(),
+        issuer=_jwt_issuer(),
+        options={"require": ["sub", "exp", "iat", "jti", "iss", "aud"]},
+    )
