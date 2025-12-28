@@ -78,6 +78,13 @@ This setup requires deploying the backend API and the Streamlit frontend separat
 2. On https://share.streamlit.io create a new app using this repository and branch `main`.
 3. If you want persistent data, provision a Postgres DB and set it as `DATABASE_URL` for the backend.
 
+Recommended “best free now, AWS-ready later” path:
+- Streamlit Community Cloud (frontend)
+- Render (FastAPI backend)
+- Neon (Postgres)
+
+See `docs/FREE_HOSTING.md` for the step-by-step.
+
 The backend will use `DATABASE_URL` if present; otherwise it falls back to a local sqlite file `trading_journal.db` in the repo root.
 
 ## Migrate data from local SQLite to Postgres

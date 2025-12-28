@@ -2,7 +2,7 @@
 set -eu
 
 : "${API_HOST:=0.0.0.0}"
-: "${API_PORT:=8000}"
+: "${API_PORT:=${PORT:-8000}}"
 
 # Run migrations for non-SQLite databases (Postgres in docker-compose / prod).
 # For SQLite, the app can auto-create tables in dev.
