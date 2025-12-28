@@ -19,6 +19,7 @@ from .schemas import (
     BudgetOut,
     CashCreateRequest,
     CashOut,
+    TradeCloseRequest,
     TradeCreateRequest,
     TradeOut,
     TradeUpdateRequest,
@@ -133,6 +134,19 @@ def update_trade(trade_id: int, req: TradeUpdateRequest, user=Depends(get_curren
     )
     if not ok:
         raise HTTPException(status_code=404, detail="Trade not found")
+    return {"status": "ok"}
+
+
+@app.post("/trades/{trade_id}/close")
+def close_trade(trade_id: int, req: TradeCloseRequest, user=Depends(get_current_user)) -> Dict[str, str]:
+    ok = services.close_trade(
+        trade_id,
+        req.exit_price,
+        exit_date=req.exit_date,
+        user_id=int(user["sub"]),
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail="Trade not found or already closed")
     return {"status": "ok"}
 
 

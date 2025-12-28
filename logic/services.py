@@ -225,6 +225,8 @@ def load_data(user_id=None):
 
         if not trades.empty:
             trades['entry_date'] = pd.to_datetime(trades['entry_date'])
+            if 'exit_date' in trades.columns:
+                trades['exit_date'] = pd.to_datetime(trades['exit_date'], errors='coerce')
         if not cash.empty:
             cash['date'] = pd.to_datetime(cash['date'])
         if not budget.empty:
@@ -233,6 +235,53 @@ def load_data(user_id=None):
         return trades, cash, budget
     except Exception:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+
+def close_trade(trade_id, exit_price, exit_date=None, user_id=None):
+    """Close a single trade row by recording exit and realized P&L.
+
+    Realized P&L convention:
+    - BUY:  (exit - entry) * qty
+    - SELL: (entry - exit) * qty
+    """
+    session = get_session()
+    try:
+        q = session.query(Trade).filter(Trade.id == int(trade_id))
+        if user_id is not None:
+            q = q.filter(Trade.user_id == int(user_id))
+        trade = q.first()
+        if not trade:
+            return False
+
+        if getattr(trade, 'is_closed', False) or getattr(trade, 'exit_price', None) is not None:
+            # Already closed
+            return False
+
+        xp = float(exit_price)
+        ed = pd.to_datetime(exit_date) if exit_date is not None else pd.to_datetime('today')
+
+        qty = int(trade.quantity or 0)
+        entry = float(trade.entry_price or 0.0)
+        act = getattr(trade.action, 'value', str(trade.action))
+        act_up = str(act).upper()
+
+        if act_up == 'SELL':
+            realized = (entry - xp) * qty
+        else:
+            realized = (xp - entry) * qty
+
+        trade.exit_price = xp
+        trade.exit_date = ed
+        trade.realized_pnl = float(realized)
+        trade.is_closed = True
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        print(f"Error closing trade: {e}")
+        return False
+    finally:
+        session.close()
 
 
 def delete_trade(trade_id, user_id=None):

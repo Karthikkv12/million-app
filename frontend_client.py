@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
-@dataclass(frozen=True)
+@dataclass
 class APIError(RuntimeError):
     status_code: int
     detail: str
@@ -128,6 +128,8 @@ def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     if not trades_df.empty and "entry_date" in trades_df.columns:
         trades_df["entry_date"] = pd.to_datetime(trades_df["entry_date"], errors="coerce")
+    if not trades_df.empty and "exit_date" in trades_df.columns:
+        trades_df["exit_date"] = pd.to_datetime(trades_df["exit_date"], errors="coerce")
     if not cash_df.empty and "date" in cash_df.columns:
         cash_df["date"] = pd.to_datetime(cash_df["date"], errors="coerce")
     if not budget_df.empty and "date" in budget_df.columns:
@@ -201,6 +203,37 @@ def delete_trade(token: str, trade_id: int) -> bool:
         return True
     except APIError as e:
         if e.status_code == 404:
+            return False
+        raise
+
+
+def close_trade(token: str, trade_id: int, exit_price: float, exit_date=None) -> bool:
+    try:
+        body: Dict[str, Any] = {"exit_price": float(exit_price)}
+        if exit_date is not None:
+            body["exit_date"] = pd.to_datetime(exit_date).to_pydatetime().isoformat()
+        _request_json(
+            "POST",
+            f"/trades/{int(trade_id)}/close",
+            token=token,
+            json_body=body,
+            timeout=30,
+        )
+        return True
+    except APIError as e:
+        # 404 can mean either route missing (old backend) or resource not found.
+        if e.status_code == 404:
+            if "Not Found" in (e.detail or ""):
+                raise APIError(
+                    status_code=404,
+                    detail=(
+                        "Backend does not support closing positions yet. "
+                        "Restart/update the backend and try again."
+                    ),
+                    body=e.body,
+                ) from e
+            return False
+        if e.status_code == 400:
             return False
         raise
 

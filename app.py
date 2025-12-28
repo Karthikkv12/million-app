@@ -8,11 +8,49 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from ui.auth import ensure_canonical_host, restore_auth_from_cookie, sidebar_auth, login_page
+from urllib.parse import quote
+from ui.auth import (
+    ensure_canonical_host,
+    restore_auth_from_cookie,
+    sidebar_auth_with_options,
+    logout_and_rerun,
+    login_page,
+)
 from ui.trades import trade_sidebar_form, render_trades_tab
 from ui.budget import budget_entry_form
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
 from frontend_client import load_data as api_load_data, update_trade as api_update_trade
+
+
+def _get_query_param(name: str) -> str | None:
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        val = qp.get(name)
+        if isinstance(val, list):
+            return val[0] if val else None
+        return str(val) if val is not None else None
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()
+            vals = qp.get(name)
+            return vals[0] if vals else None
+        except Exception:
+            return None
+
+
+def _set_query_param(name: str, value: str) -> None:
+    try:
+        qp = st.query_params  # type: ignore[attr-defined]
+        qp[name] = value
+    except Exception:
+        # Older API: must set all query params at once.
+        try:
+            qp = st.experimental_get_query_params()
+            qp[name] = [value]
+            flat = {k: (v[0] if isinstance(v, list) and v else v) for k, v in qp.items()}
+            st.experimental_set_query_params(**flat)
+        except Exception:
+            pass
 
 # --- CONSTANTS ---
 @st.cache_data(ttl=24*3600)
@@ -61,12 +99,71 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* Top bar (shared) */
+    .top-band {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        background: #000;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        box-sizing: border-box;
+    }
+    .top-band .brand {
+        font-size: 22px;
+        font-weight: 800;
+        color: #00c805;
+        line-height: 1;
+    }
+    .top-band a.brand { text-decoration: none; }
+    .top-band .nav a {
+        color: #fff;
+        font-weight: 800;
+        text-decoration: none;
+        margin-left: 16px;
+    }
+    .top-band .nav a:hover { color: #00c805; }
+    .stApp { padding-top: 50px; }
     
     /* Sidebar Styles */
     [data-testid="stSidebar"] { background-color: #f5f8fa; min-width: 350px !important; max-width: 350px !important; border-right: 1px solid #e0e0e0; }
     [data-testid="stSidebarCollapseButton"] { display: none; }
     div[data-testid="stSidebarUserContent"] { padding-top: 2rem; }
     [data-testid="stSidebar"] h1 { color: #00c805 !important; font-size: 3.5rem !important; margin-bottom: 20px; }
+
+    /* Dark mode: make everything black and keep sidebar text readable */
+    @media (prefers-color-scheme: dark) {
+        .stApp { background: #000 !important; }
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"] {
+            background: #000 !important;
+        }
+
+        [data-testid="stSidebar"],
+        [data-testid="stSidebarContent"],
+        div[data-testid="stSidebarUserContent"] {
+            background: #000 !important;
+            border-right: none !important;
+        }
+
+        /* Ensure sidebar text is visible */
+        [data-testid="stSidebar"] * { color: #fff !important; }
+
+        /* Inputs/Selects: keep readable on black */
+        .stTextInput input, .stNumberInput input, .stDateInput input,
+        .stSelectbox div[data-baseweb="select"] > div {
+            color: #fff !important;
+            border-color: rgba(255,255,255,0.18) !important;
+        }
+    }
     
     /* INPUT FIELDS (Clean Look) */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] > div { 
@@ -123,14 +220,39 @@ ensure_canonical_host()
 # Restore auth state after browser refresh (Streamlit resets session_state on refresh)
 restore_auth_from_cookie()
 
+# Query-param logout action (used by the top-band Logout link)
+if (_get_query_param("action") or "").lower() == "logout":
+    logout_and_rerun()
+    st.stop()
+
 # If not signed in, show the login page (blocking). After login the page will rerun.
 if 'user' not in st.session_state:
     login_page()
     st.stop()
 
-# Render sidebar title and authentication controls (shows signed-in state + logout)
-st.sidebar.title("Million")
-sidebar_auth()
+# Fixed top bar (brand routes to Main, nav on the right)
+_sid = _get_query_param("sid")
+_sid_q = f"sid={quote(_sid)}&" if _sid else ""
+_home_href = f"?{_sid_q}page=main"
+_investment_href = f"?{_sid_q}page=investment"
+_budget_href = f"?{_sid_q}page=budget"
+_logout_href = f"?{_sid_q}action=logout"
+st.markdown(
+    (
+        '<div class="top-band">'
+        f'<a class="brand" href="{_home_href}" target="_self">Million</a>'
+        '<div class="nav">'
+        f'<a href="{_investment_href}" target="_self">Investment</a>'
+        f'<a href="{_budget_href}" target="_self">Budget &amp; Cash Flow</a>'
+        f'<a href="{_logout_href}" target="_self">Logout</a>'
+        '</div>'
+        '</div>'
+    ),
+    unsafe_allow_html=True,
+)
+
+# Render sidebar auth state (signed-in label only; logout is in the top band)
+sidebar_auth_with_options(show_logout=False)
 
 # Menu selection for UI
 mode = st.sidebar.selectbox("Menu", ["Trade", "Transactions"], label_visibility="collapsed")
@@ -174,13 +296,20 @@ if not budget_df.empty:
 
 total_nw = portfolio_val + cash_balance + other_assets
 
-st.markdown(f"<h1 style='font-size: 80px; font-weight: 800; margin-top: -20px;'>${total_nw:,.2f}</h1>", unsafe_allow_html=True)
-st.caption(f"Total Net Worth • Updated {datetime.now().strftime('%H:%M')}")
-c1, c2, c3 = st.columns(3)
-c1.metric("Investing", f"${portfolio_val:,.2f}", f"{total_trades} Positions")
-c2.metric("Buying Power", f"${cash_balance:,.2f}", "Cash Available")
-c3.metric("Other Assets", f"${other_assets:,.2f}", "Real Estate / Savings")
-st.markdown("---")
+page = (_get_query_param("page") or "main").lower()
+if page not in {"main", "investment", "budget"}:
+    page = "main"
+
+if page == "main":
+    st.markdown(
+        f"<h1 style='font-size: 80px; font-weight: 800; margin-top: -20px;'>${total_nw:,.2f}</h1>",
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Total Net Worth • Updated {datetime.now().strftime('%H:%M')}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Investing", f"${portfolio_val:,.2f}", f"{total_trades} Positions")
+    c2.metric("Buying Power", f"${cash_balance:,.2f}", "Cash Available")
+    c3.metric("Other Assets", f"${other_assets:,.2f}", "Real Estate / Savings")
 
 def on_grid_change(key, trade_id, field):
     if 'user' not in st.session_state:
@@ -205,12 +334,7 @@ def on_grid_change(key, trade_id, field):
 
 # (canonical helpers moved to `ui.utils`)
 
-tab1, tab2 = st.tabs(["Investing", "Budget & Cash Flow"])
-
-with tab1:
-    # Render trading tab from ui.trades
+if page == "investment":
     render_trades_tab(trades_df)
-
-with tab2:
-    # Render budget entry & analysis from ui.budget
+elif page == "budget":
     budget_entry_form(budget_df)

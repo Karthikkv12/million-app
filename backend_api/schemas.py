@@ -40,6 +40,11 @@ class TradeUpdateRequest(BaseModel):
     date: datetime
 
 
+class TradeCloseRequest(BaseModel):
+    exit_price: float
+    exit_date: Optional[datetime] = None
+
+
 class TradeOut(BaseModel):
     id: int
     symbol: str

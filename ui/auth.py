@@ -308,29 +308,45 @@ def _api_error_message(e: APIError, *, prefix: str) -> str:
 
 def sidebar_auth():
     """Render sidebar auth controls (for signed-in state)."""
+    return sidebar_auth_with_options(show_logout=True)
+
+
+def sidebar_auth_with_options(*, show_logout: bool = True) -> None:
+    """Render sidebar auth controls (for signed-in state).
+
+    Args:
+        show_logout: Whether to show the Logout button in the sidebar.
+    """
     _flush_pending_cookie_ops()
     if 'user' in st.session_state:
         st.sidebar.markdown(f"**Signed in:** {st.session_state['user']}")
-        if st.sidebar.button('Logout'):
-            _clear_auth_cookie()
-            del st.session_state['user']
-            if 'user_id' in st.session_state:
-                del st.session_state['user_id']
-            if 'token' in st.session_state:
-                del st.session_state['token']
-            # Attempt to rerun; different Streamlit versions expose different APIs.
-            if hasattr(st, 'experimental_rerun'):
-                try:
-                    st.experimental_rerun()
-                except Exception:
-                    st.stop()
-            elif hasattr(st, 'rerun'):
-                try:
-                    st.rerun()
-                except Exception:
-                    st.stop()
-            else:
-                st.stop()
+        if show_logout and st.sidebar.button('Logout'):
+            logout_and_rerun()
+
+
+def logout_and_rerun() -> None:
+    """Clear auth (sid cookie + server session + Streamlit state) and rerun."""
+    _flush_pending_cookie_ops()
+    _clear_auth_cookie()
+    st.session_state.pop('user', None)
+    st.session_state.pop('user_id', None)
+    st.session_state.pop('token', None)
+    # Also clear any other query params (e.g. `action=logout`) to avoid loops.
+    _clear_query_params()
+
+    # Attempt to rerun; different Streamlit versions expose different APIs.
+    if hasattr(st, 'experimental_rerun'):
+        try:
+            st.experimental_rerun()
+        except Exception:
+            st.stop()
+    elif hasattr(st, 'rerun'):
+        try:
+            st.rerun()
+        except Exception:
+            st.stop()
+    else:
+        st.stop()
 
 
 def login_page():

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -45,6 +45,11 @@ class Trade(Base):
     action = Column(Enum(Action))
     entry_date = Column(DateTime)
     entry_price = Column(Float)
+    # Position lifecycle
+    is_closed = Column(Boolean, default=False)
+    exit_date = Column(DateTime, nullable=True)
+    exit_price = Column(Float, nullable=True)
+    realized_pnl = Column(Float, nullable=True)
     option_type = Column(Enum(OptionType), nullable=True)
     strike_price = Column(Float, nullable=True)
     expiry_date = Column(DateTime, nullable=True)
@@ -116,4 +121,55 @@ def init_db():
     auto_create = os.getenv("AUTO_CREATE_DB", auto_default)
     if str(auto_create).strip() in {"1", "true", "TRUE", "yes", "YES"}:
         Base.metadata.create_all(engine)
+
+    # Ensure backwards-compatible schema upgrades for local SQLite DBs.
+    if url.startswith("sqlite"):
+        _ensure_sqlite_schema(engine)
     return engine
+
+
+def _ensure_sqlite_schema(engine: Engine) -> None:
+    """Best-effort schema upgrades for existing SQLite DBs.
+
+    Streamlit dev environments often rely on `create_all()`, which won't ALTER existing
+    tables. This keeps upgrades automatic and safe.
+    """
+    try:
+        insp = inspect(engine)
+        tables = set(insp.get_table_names())
+
+        def _add_columns(table: str, columns: list[tuple[str, str]]) -> None:
+            if table not in tables:
+                return
+            existing_cols = {c["name"] for c in insp.get_columns(table)}
+            to_add = [(n, d) for (n, d) in columns if n not in existing_cols]
+            if not to_add:
+                return
+            with engine.begin() as conn:
+                for col_name, col_def in to_add:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"))
+
+        # trades: per-user + close lifecycle
+        _add_columns(
+            "trades",
+            [
+                ("user_id", "INTEGER"),
+                ("is_closed", "INTEGER DEFAULT 0"),
+                ("exit_date", "DATETIME"),
+                ("exit_price", "REAL"),
+                ("realized_pnl", "REAL"),
+            ],
+        )
+
+        # cash_flow/budget: per-user
+        _add_columns("cash_flow", [("user_id", "INTEGER")])
+        _add_columns("budget", [("user_id", "INTEGER")])
+
+        # Add indexes if missing (safe no-op if already exists)
+        with engine.begin() as conn:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_trades_user_id ON trades(user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_cash_flow_user_id ON cash_flow(user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_budget_user_id ON budget(user_id)"))
+    except Exception:
+        # Best-effort: never break app startup due to migration helpers.
+        return
