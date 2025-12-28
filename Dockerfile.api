@@ -1,0 +1,26 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# System deps (psycopg binary wheels cover most cases; keep minimal)
+RUN pip install --no-cache-dir --upgrade pip
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY . /app
+
+# Default envs; override in docker-compose / cloud
+ENV PYTHONPATH=/app \
+    API_HOST=0.0.0.0 \
+    API_PORT=8000
+
+COPY scripts/entrypoint_api.sh /entrypoint_api.sh
+RUN chmod +x /entrypoint_api.sh
+
+EXPOSE 8000
+
+CMD ["/entrypoint_api.sh"]

@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: million
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - million_pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/million
+      JWT_SECRET: change-me-in-prod
+      AUTO_CREATE_DB: "0"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      # Streamlit calls the API from the server-side Python process, so it can use the compose service name.
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+volumes:
+  million_pgdata:

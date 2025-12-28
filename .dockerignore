@@ -1,0 +1,10 @@
+.git
+__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/
+.DS_Store
+trading_journal.db
+backend.log
+snapshots/
+.venv/

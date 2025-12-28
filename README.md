@@ -44,6 +44,20 @@ Notes:
 - By default, the app auto-creates tables only for SQLite. For Postgres, run Alembic migrations.
 - Optional pooling knobs for the backend: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`.
 
+## Docker (local Postgres + API + Streamlit)
+
+Run everything with Postgres via Docker Compose:
+
+```bash
+cd million-app
+docker compose up --build
+```
+
+- Streamlit: http://127.0.0.1:8501
+- API health: http://127.0.0.1:8000/health
+
+The API container runs `alembic upgrade head` on startup (Postgres only).
+
 4. Run the frontend (Streamlit):
 
 ```bash
