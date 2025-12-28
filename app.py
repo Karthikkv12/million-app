@@ -12,7 +12,6 @@ from urllib.parse import quote
 from ui.auth import (
     ensure_canonical_host,
     restore_auth_from_cookie,
-    sidebar_auth_with_options,
     logout_and_rerun,
     login_page,
 )
@@ -130,12 +129,33 @@ st.markdown("""
     }
     .top-band .nav a:hover { color: #00c805; }
     .stApp { padding-top: 50px; }
+
+    /* Responsive helpers */
+    .top-band { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .top-band::-webkit-scrollbar { display: none; }
+    .top-band { scrollbar-width: none; }
+    .top-band .nav { display: flex; align-items: center; white-space: nowrap; }
+
+    .net-worth {
+        font-size: clamp(40px, 8vw, 80px);
+        font-weight: 800;
+        margin-top: -20px;
+        line-height: 1.05;
+    }
+
+    @media (max-width: 640px) {
+        .top-band { padding: 0 10px; }
+        .top-band .brand { font-size: 18px; }
+        .top-band .nav a { margin-left: 10px; font-size: 14px; }
+        .net-worth { margin-top: -10px; }
+    }
     
     /* Sidebar Styles */
-    [data-testid="stSidebar"] { background-color: #f5f8fa; min-width: 350px !important; max-width: 350px !important; border-right: 1px solid #e0e0e0; }
-    [data-testid="stSidebarCollapseButton"] { display: none; }
-    div[data-testid="stSidebarUserContent"] { padding-top: 2rem; }
-    [data-testid="stSidebar"] h1 { color: #00c805 !important; font-size: 3.5rem !important; margin-bottom: 20px; }
+    /* Sidebar is no longer used; hide it completely. */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
 
     /* Dark mode: make everything black and keep sidebar text readable */
     @media (prefers-color-scheme: dark) {
@@ -252,14 +272,7 @@ st.markdown(
 )
 
 # Render sidebar auth state (signed-in label only; logout is in the top band)
-sidebar_auth_with_options(show_logout=False)
 
-# Menu selection for UI
-mode = st.sidebar.selectbox("Menu", ["Trade", "Transactions"], label_visibility="collapsed")
-
-if mode == "Trade":
-    # trade form moved to ui.trades
-    trade_sidebar_form(TICKERS, TICKER_MAP)
 
 # --- MAIN DASHBOARD LOGIC ---
 token = st.session_state.get('token')
@@ -302,7 +315,7 @@ if page not in {"main", "investment", "budget"}:
 
 if page == "main":
     st.markdown(
-        f"<h1 style='font-size: 80px; font-weight: 800; margin-top: -20px;'>${total_nw:,.2f}</h1>",
+        f"<h1 class='net-worth'>${total_nw:,.2f}</h1>",
         unsafe_allow_html=True,
     )
     st.caption(f"Total Net Worth • Updated {datetime.now().strftime('%H:%M')}")
@@ -335,6 +348,8 @@ def on_grid_change(key, trade_id, field):
 # (canonical helpers moved to `ui.utils`)
 
 if page == "investment":
+    with st.expander("New Order", expanded=False):
+        trade_sidebar_form(TICKERS, TICKER_MAP)
     render_trades_tab(trades_df)
 elif page == "budget":
     budget_entry_form(budget_df)

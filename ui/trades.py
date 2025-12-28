@@ -168,7 +168,7 @@ def render_live_positions(trades_df: pd.DataFrame) -> None:
 
 
 def trade_sidebar_form(TICKERS, TICKER_MAP):
-    with st.sidebar.form("trade_form"):
+    with st.form("trade_form"):
         st.subheader("New Order")
         c1, c2 = st.columns(2)
         s_sym = c1.selectbox(
