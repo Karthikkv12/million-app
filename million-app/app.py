@@ -194,7 +194,7 @@ with tab1:
             fig = px.area(df_display, x='entry_date', y='cumulative_value', template="plotly_white")
             fig.update_traces(line_color='#00c805', fillcolor='rgba(0, 200, 5, 0.1)')
             fig.update_layout(margin=dict(l=0, r=0, t=10, b=0), yaxis_title=None, xaxis_title=None)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.caption(f"No trade data available for the last {range_opt}.")
 
@@ -220,7 +220,7 @@ with tab1:
                 arrow = " ▲" if st.session_state.sort_asc else " ▼"
             
             # Type="secondary" -> Transparent, Text only
-            if col.button(f"{display}{arrow}", key=f"btn_sort_{db_col}", use_container_width=True, type="secondary"):
+            if col.button(f"{display}{arrow}", key=f"btn_sort_{db_col}", width="stretch", type="secondary"):
                 if st.session_state.sort_col == db_col:
                     st.session_state.sort_asc = not st.session_state.sort_asc
                 else:
@@ -250,7 +250,7 @@ with tab1:
             c6.number_input("P", value=float(row['entry_price']), step=0.01, key=f"p_{row['id']}", label_visibility="collapsed", on_change=on_grid_change, args=(f"p_{row['id']}", row['id'], 'price'))
             
             # Primary Green Button for Delete
-            if c7.button("Delete", key=f"del_{row['id']}", type="primary", use_container_width=True):
+            if c7.button("Delete", key=f"del_{row['id']}", type="primary", width="stretch"):
                 delete_trade(row['id'])
                 st.toast(f"Deleted {row['symbol']}", icon="🗑")
                 st.cache_data.clear()
@@ -284,9 +284,9 @@ with tab2:
                 with c_chart:
                     fig_pie = px.pie(pie_data, values='amount', names='category', title="Expense Breakdown", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
                     fig_pie.update_layout(showlegend=False, margin=dict(l=0, r=0, t=30, b=0))
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.plotly_chart(fig_pie, width="stretch")
                 with c_stats:
                     st.metric("Total Expenses", f"${expenses['amount'].sum():,.2f}")
-                    st.dataframe(expenses[['date', 'category', 'amount']].sort_values('date', ascending=False), use_container_width=True, height=200)
+                    st.dataframe(expenses[['date', 'category', 'amount']].sort_values('date', ascending=False), width="stretch", height=200)
             else: st.info("No expenses recorded yet.")
         else: st.info("No budget data available.")

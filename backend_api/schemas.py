@@ -86,6 +86,41 @@ class HoldingOut(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class OrderCreateRequest(BaseModel):
+    symbol: str = Field(min_length=1)
+    instrument: str = Field(default="STOCK", min_length=1)
+    action: str = Field(min_length=1)
+    strategy: Optional[str] = None
+    qty: int = Field(ge=1)
+    limit_price: Optional[float] = None
+    client_order_id: Optional[str] = None
+
+
+class OrderFillRequest(BaseModel):
+    filled_price: float = Field(gt=0)
+    filled_at: Optional[datetime] = None
+
+
+class OrderOut(BaseModel):
+    id: int
+    symbol: str
+    instrument: str
+    action: str
+    strategy: Optional[str] = None
+    quantity: int
+    limit_price: Optional[float] = None
+    status: str
+    created_at: Optional[datetime] = None
+    filled_at: Optional[datetime] = None
+    filled_price: Optional[float] = None
+    trade_id: Optional[int] = None
+    client_order_id: Optional[str] = None
+    external_order_id: Optional[str] = None
+    venue: Optional[str] = None
+    external_status: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+
+
 class TradeCreateRequest(BaseModel):
     symbol: str
     instrument: str

@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
@@ -23,9 +24,15 @@ def _request_json(
     *,
     token: Optional[str] = None,
     json_body: Optional[Dict[str, Any]] = None,
+    params: Optional[Dict[str, Any]] = None,
     timeout: float = 30.0,
 ) -> Any:
     url = f"{_base_url()}{path}"
+    if params:
+        # Encode query params onto URL (urllib doesn't accept `params=` like requests).
+        qs = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None}, doseq=True)
+        if qs:
+            url = f"{url}{'&' if '?' in url else '?'}{qs}"
     data = None
     headers: Dict[str, str] = {"Accept": "application/json"}
     headers.update(_headers(token))
@@ -236,6 +243,69 @@ def delete_holding(token: str, holding_id: int) -> bool:
     return True
 
 
+def list_orders(token: str) -> list[dict]:
+    resp = _request_json("GET", "/orders", token=token, timeout=15)
+    if isinstance(resp, list):
+        return [dict(x) for x in resp]
+    return []
+
+
+def create_order(
+    token: str,
+    symbol: str,
+    instrument: str,
+    strategy: str,
+    action: str,
+    qty: int,
+    limit_price: Optional[float] = None,
+    client_order_id: Optional[str] = None,
+) -> dict:
+    body: Dict[str, Any] = {
+        "symbol": str(symbol),
+        "instrument": str(instrument),
+        "strategy": str(strategy),
+        "action": str(action),
+        "qty": int(qty),
+    }
+    if limit_price is not None:
+        body["limit_price"] = float(limit_price)
+    if client_order_id:
+        body["client_order_id"] = str(client_order_id)
+    resp = _request_json("POST", "/orders", token=token, json_body=body, timeout=15)
+    return dict(resp or {})
+
+
+def cancel_order(token: str, order_id: int) -> bool:
+    _request_json("POST", f"/orders/{int(order_id)}/cancel", token=token, timeout=15)
+    return True
+
+
+def fill_order(token: str, order_id: int, filled_price: float, filled_at=None) -> dict:
+    body: Dict[str, Any] = {"filled_price": float(filled_price)}
+    if filled_at is not None:
+        body["filled_at"] = pd.to_datetime(filled_at).to_pydatetime().isoformat()
+    resp = _request_json("POST", f"/orders/{int(order_id)}/fill", token=token, json_body=body, timeout=30)
+    return dict(resp or {})
+
+
+def sync_order(token: str, order_id: int) -> bool:
+    _request_json("POST", f"/orders/{int(order_id)}/sync", token=token, timeout=15)
+    return True
+
+
+def sync_pending_orders(token: str) -> dict:
+    resp = _request_json("POST", "/orders/sync-pending", token=token, timeout=30)
+    return dict(resp or {})
+
+
+def fill_order_external(token: str, order_id: int, filled_price: float, filled_at=None) -> dict:
+    body: Dict[str, Any] = {"filled_price": float(filled_price)}
+    if filled_at is not None:
+        body["filled_at"] = pd.to_datetime(filled_at).to_pydatetime().isoformat()
+    resp = _request_json("POST", f"/orders/{int(order_id)}/fill-external", token=token, json_body=body, timeout=30)
+    return dict(resp or {})
+
+
 def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     trades_df = pd.DataFrame(_request_json("GET", "/trades", token=token, timeout=30) or [])
     cash_df = pd.DataFrame(_request_json("GET", "/cash", token=token, timeout=30) or [])
@@ -251,6 +321,15 @@ def load_data(token: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         budget_df["date"] = pd.to_datetime(budget_df["date"], errors="coerce")
 
     return trades_df, cash_df, budget_df
+
+
+def get_cash_balance(token: str, currency: str = "USD") -> float:
+    cur = str(currency or "USD").strip().upper() or "USD"
+    resp = _request_json("GET", "/cash/balance", token=token, timeout=15, params={"currency": cur})
+    try:
+        return float((resp or {}).get("balance") or 0.0)
+    except Exception:
+        return 0.0
 
 
 def save_trade(

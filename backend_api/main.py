@@ -28,6 +28,9 @@ from .schemas import (
     AccountOut,
     HoldingUpsertRequest,
     HoldingOut,
+    OrderCreateRequest,
+    OrderFillRequest,
+    OrderOut,
     BudgetCreateRequest,
     BudgetOut,
     CashCreateRequest,
@@ -411,6 +414,103 @@ def delete_holding(holding_id: int, user=Depends(get_current_user)) -> Dict[str,
     return {"status": "ok"}
 
 
+@app.get("/orders", response_model=List[OrderOut])
+def list_orders(user=Depends(get_current_user)) -> List[OrderOut]:
+    rows = services.list_orders(user_id=int(user["sub"]))
+    out: List[OrderOut] = []
+    for r in rows:
+        out.append(
+            OrderOut(
+                id=int(r.get("id")),
+                symbol=str(r.get("symbol") or ""),
+                instrument=str(r.get("instrument") or ""),
+                action=str(r.get("action") or ""),
+                strategy=(str(r.get("strategy") or "") or None),
+                quantity=int(r.get("quantity") or 0),
+                limit_price=r.get("limit_price"),
+                status=str(r.get("status") or ""),
+                created_at=r.get("created_at"),
+                filled_at=r.get("filled_at"),
+                filled_price=r.get("filled_price"),
+                trade_id=(int(r.get("trade_id")) if r.get("trade_id") is not None else None),
+                client_order_id=(str(r.get("client_order_id") or "") or None),
+                external_order_id=(str(r.get("external_order_id") or "") or None),
+                venue=(str(r.get("venue") or "") or None),
+                external_status=(str(r.get("external_status") or "") or None),
+                last_synced_at=r.get("last_synced_at"),
+            )
+        )
+    return out
+
+
+@app.post("/orders", response_model=Dict[str, Any])
+def create_order(req: OrderCreateRequest, user=Depends(get_current_user)) -> Dict[str, Any]:
+    try:
+        oid = services.create_order(
+            user_id=int(user["sub"]),
+            symbol=req.symbol,
+            instrument=req.instrument,
+            action=req.action,
+            strategy=req.strategy,
+            qty=int(req.qty),
+            limit_price=req.limit_price,
+            client_order_id=req.client_order_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok", "order_id": int(oid)}
+
+
+@app.post("/orders/{order_id}/cancel")
+def cancel_order(order_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    ok = services.cancel_order(user_id=int(user["sub"]), order_id=int(order_id))
+    if not ok:
+        raise HTTPException(status_code=400, detail="Order not found or not cancelable")
+    return {"status": "ok"}
+
+
+@app.post("/orders/{order_id}/fill", response_model=Dict[str, Any])
+def fill_order(order_id: int, req: OrderFillRequest, user=Depends(get_current_user)) -> Dict[str, Any]:
+    try:
+        trade_id = services.fill_order(
+            user_id=int(user["sub"]),
+            order_id=int(order_id),
+            filled_price=float(req.filled_price),
+            filled_at=req.filled_at,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok", "trade_id": int(trade_id)}
+
+
+@app.post("/orders/{order_id}/sync")
+def sync_order(order_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    ok = services.sync_order_status(user_id=int(user["sub"]), order_id=int(order_id))
+    if not ok:
+        raise HTTPException(status_code=400, detail="Order not found, not linked to broker, or broker disabled")
+    return {"status": "ok"}
+
+
+@app.post("/orders/sync-pending")
+def sync_pending_orders(user=Depends(get_current_user)) -> Dict[str, int]:
+    n = services.sync_pending_orders(user_id=int(user["sub"]))
+    return {"status": 0, "updated": int(n)}
+
+
+@app.post("/orders/{order_id}/fill-external", response_model=Dict[str, Any])
+def fill_order_external(order_id: int, req: OrderFillRequest, user=Depends(get_current_user)) -> Dict[str, Any]:
+    try:
+        trade_id = services.fill_order_via_broker(
+            user_id=int(user["sub"]),
+            order_id=int(order_id),
+            filled_price=float(req.filled_price),
+            filled_at=req.filled_at,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok", "trade_id": int(trade_id)}
+
+
 @app.get("/trades", response_model=List[Dict[str, Any]])
 def list_trades(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
     trades, _, _ = services.load_data(user_id=int(user["sub"]))
@@ -477,6 +577,13 @@ def list_cash(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
     return _df_records(cash)
 
 
+@app.get("/cash/balance")
+def cash_balance(user=Depends(get_current_user), currency: str = "USD") -> Dict[str, Any]:
+    cur = str(currency or "USD").strip().upper() or "USD"
+    bal = services.get_cash_balance(user_id=int(user["sub"]), currency=cur)
+    return {"currency": cur, "balance": float(bal)}
+
+
 @app.post("/cash")
 def create_cash(req: CashCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
     services.save_cash(req.action, req.amount, req.date, req.notes, user_id=int(user["sub"]))
@@ -493,3 +600,24 @@ def list_budget(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
 def create_budget(req: BudgetCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
     services.save_budget(req.category, req.type, req.amount, req.date, req.description, user_id=int(user["sub"]))
     return {"status": "ok"}
+
+
+@app.get("/ledger/cash-balance")
+def ledger_cash_balance(user=Depends(get_current_user)) -> Dict[str, Any]:
+    bal = services.get_cash_balance(user_id=int(user["sub"]), currency="USD")
+    return {"currency": "USD", "balance": float(bal)}
+
+
+@app.get("/ledger/entries", response_model=List[Dict[str, Any]])
+def ledger_entries(user=Depends(get_current_user), limit: int = 100) -> List[Dict[str, Any]]:
+    rows = services.list_ledger_entries(user_id=int(user["sub"]), limit=int(limit))
+    # normalize datetimes for JSON
+    cleaned: List[Dict[str, Any]] = []
+    for r in rows:
+        rec: Dict[str, Any] = dict(r)
+        for k in ("created_at", "effective_at"):
+            v = rec.get(k)
+            if isinstance(v, (pd.Timestamp, datetime)):
+                rec[k] = pd.to_datetime(v).to_pydatetime().isoformat()
+        cleaned.append(rec)
+    return cleaned

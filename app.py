@@ -18,10 +18,12 @@ from ui.auth import (
 )
 from ui.settings import render_settings_page
 from ui.accounts import render_accounts_and_holdings_section
-from ui.trades import trade_sidebar_form, render_trades_tab
+from ui.orders import render_orders_section
+from ui.trades import trade_sidebar_form, render_live_positions, render_profit_and_loss_page
 from ui.budget import budget_entry_form
+from ui.search import render_stock_page
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
-from frontend_client import load_data as api_load_data, update_trade as api_update_trade
+from frontend_client import load_data as api_load_data, update_trade as api_update_trade, get_cash_balance as api_get_cash_balance
 
 
 def _get_query_param(name: str) -> str | None:
@@ -282,11 +284,7 @@ if not trades_df.empty:
     portfolio_val = invested * 1.10
     total_trades = len(trades_df)
 
-cash_balance = 0.0
-if not cash_df.empty:
-    deps = cash_df[cash_df['action'].astype(str).str.contains("DEPOSIT", case=False)]['amount'].sum()
-    withs = cash_df[cash_df['action'].astype(str).str.contains("WITHDRAW", case=False)]['amount'].sum()
-    cash_balance = deps - withs
+cash_balance = api_get_cash_balance(token, currency="USD")
 
 other_assets = 0.0
 if not budget_df.empty:
@@ -299,7 +297,7 @@ if not budget_df.empty:
 total_nw = portfolio_val + cash_balance + other_assets
 
 page = (_get_query_param("page") or "main").lower()
-if page not in {"main", "investment", "budget", "settings"}:
+if page not in {"main", "investment", "stock", "budget", "settings", "pnl"}:
     page = "main"
 
 if page == "main":
@@ -338,9 +336,23 @@ def on_grid_change(key, trade_id, field):
 
 if page == "investment":
     trade_sidebar_form(TICKERS, TICKER_MAP)
-    render_trades_tab(trades_df)
+    st.divider()
+    render_live_positions(trades_df)
     st.divider()
     render_accounts_and_holdings_section(title="Holdings")
+    st.divider()
+    render_orders_section(tickers=TICKERS, ticker_map=TICKER_MAP)
+    st.divider()
+    _pnl_href = f"?{_sid_q}page=pnl"
+    st.markdown(
+        f"""<h3 style="margin: 0;">Profit &amp; Loss <a href="{_pnl_href}" target="_self" style="text-decoration:none;">&gt;</a></h3>""",
+        unsafe_allow_html=True,
+    )
+elif page == "stock":
+    sym = _get_query_param("symbol") or ""
+    render_stock_page(symbol=str(sym), ticker_map=TICKER_MAP)
+elif page == "pnl":
+    render_profit_and_loss_page(trades_df)
 elif page == "budget":
     budget_entry_form(budget_df)
 elif page == "settings":

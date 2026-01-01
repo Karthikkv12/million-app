@@ -5,6 +5,16 @@ from streamlit.components.v1 import html as _html
 from urllib.parse import urlencode
 import uuid
 
+
+# `streamlit-cookies-manager` still uses the deprecated `st.cache` decorator.
+# Shim it to `st.cache_data` to avoid noisy deprecation warnings on startup.
+try:
+    if hasattr(st, "cache_data") and not getattr(st, "_million_cache_shim", False):
+        setattr(st, "cache", st.cache_data)
+        setattr(st, "_million_cache_shim", True)
+except Exception:
+    pass
+
 try:
     from streamlit_cookies_manager import CookieManager
 except Exception:  # optional dependency; app should still run without it
@@ -384,6 +394,23 @@ def render_security_section() -> None:
             st.info("Sign in to manage security settings.")
             return
 
+        # --- Token/session quick glance ---
+        try:
+            import jwt  # type: ignore
+
+            payload = jwt.decode(str(token), options={"verify_signature": False, "verify_aud": False, "verify_iss": False})
+            exp = int(payload.get("exp") or 0)
+            now = int(datetime.now(timezone.utc).timestamp())
+            ttl = max(0, exp - now)
+            m, s = divmod(int(ttl), 60)
+            h, m = divmod(int(m), 60)
+            ttl_txt = f"{h}h {m}m" if h else f"{m}m {s}s"
+            c1, c2 = st.columns(2)
+            c1.metric("Access token expires in", ttl_txt)
+            c2.caption("Auto-refreshes when near expiry.")
+        except Exception:
+            pass
+
         if st.button("Logout everywhere", type="secondary"):
             # Best-effort: invalidate all tokens for this user, then clear local session.
             try:
@@ -451,6 +478,36 @@ def render_security_section() -> None:
         else:
             st.success(f"OK: no failed auth events in the last 24 hours. Active sessions: {active_sessions}.")
 
+        # Last successful login + recent new sessions signal.
+        try:
+            last_login = None
+            for ev in events:
+                if str(ev.get("event_type") or "") != "login":
+                    continue
+                if bool(ev.get("success")) is not True:
+                    continue
+                last_login = ev
+                break
+            if last_login is not None:
+                ll_dt = _parse_dt(last_login.get("created_at"))
+                ll_ip = str(last_login.get("ip") or "") or None
+                ll_txt = ll_dt.isoformat() if isinstance(ll_dt, datetime) else str(last_login.get("created_at") or "")
+                st.caption(f"Last login: {ll_txt}" + (f" from {ll_ip}" if ll_ip else ""))
+
+            new_sessions_24h = 0
+            for s in sessions:
+                created = _parse_dt(s.get("created_at"))
+                if created is None:
+                    continue
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (now_utc - created) <= window:
+                    new_sessions_24h += 1
+            if new_sessions_24h >= 2:
+                st.warning(f"{new_sessions_24h} sessions created in the last 24 hours.")
+        except Exception:
+            pass
+
         st.markdown("**Devices / sessions**")
         if sessions:
             options: list[tuple[int, str]] = []
@@ -491,7 +548,7 @@ def render_security_section() -> None:
             df = _pd.DataFrame(events)
             # Keep it compact.
             cols = [c for c in ["created_at", "event_type", "success", "ip", "detail"] if c in df.columns]
-            st.dataframe(df[cols], use_container_width=True, hide_index=True)
+            st.dataframe(df[cols], width="stretch", hide_index=True)
         else:
             st.caption("No recent events.")
 
@@ -671,8 +728,10 @@ def login_page():
         st.warning(
             "Backend API is not reachable at "
             f"`{api_base_url()}`. Start the backend in a separate terminal:\n\n"
-            "`PYTHONPATH=/Users/karthikkondajjividyaranya/Desktop/million-app/million-app `"
-            "`/Users/karthikkondajjividyaranya/Desktop/million-app/.venv/bin/python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000`\n\n"
+            "Option A (one-command dev runner):\n"
+            "`./scripts/dev.sh`\n\n"
+            "Option B (API only):\n"
+            "`cd <repo_root> && PYTHONPATH=$PWD python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000`\n\n"
             "Then refresh this page.",
         )
 

@@ -6,12 +6,599 @@ import secrets
 from datetime import datetime, timezone
 from datetime import timedelta
 from sqlalchemy.orm import sessionmaker
+
+from brokers import broker_enabled as _broker_enabled
+from brokers import get_broker
+from brokers.base import SubmitOrderRequest
 from database.models import (
     Trade, CashFlow, Budget,
+    Order,
     Account, Holding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
+    OrderStatus,
+    LedgerAccount, LedgerAccountType,
+    LedgerEntry, LedgerEntryType,
+    LedgerLine,
     get_engine
 )
+
+
+_HOLDINGS_SYNC_ACCOUNT_NAME = (os.getenv("HOLDINGS_SYNC_ACCOUNT_NAME") or "Trading").strip() or "Trading"
+
+
+def _get_or_create_cash_ledger_accounts(session, *, user_id: int, currency: str = "USD") -> tuple[LedgerAccount, LedgerAccount]:
+    """Return (cash_asset_account, equity_funding_account) for the user."""
+    cur = str(currency or "USD").strip().upper() or "USD"
+
+    cash_name = f"Cash ({cur})"
+    equity_name = "Owner Equity"
+
+    cash_acct = (
+        session.query(LedgerAccount)
+        .filter(LedgerAccount.user_id == int(user_id))
+        .filter(LedgerAccount.name == cash_name)
+        .filter(LedgerAccount.currency == cur)
+        .first()
+    )
+    if cash_acct is None:
+        cash_acct = LedgerAccount(
+            user_id=int(user_id),
+            name=cash_name,
+            type=LedgerAccountType.ASSET,
+            currency=cur,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        session.add(cash_acct)
+        session.flush()
+
+    equity_acct = (
+        session.query(LedgerAccount)
+        .filter(LedgerAccount.user_id == int(user_id))
+        .filter(LedgerAccount.name == equity_name)
+        .filter(LedgerAccount.currency == cur)
+        .first()
+    )
+    if equity_acct is None:
+        equity_acct = LedgerAccount(
+            user_id=int(user_id),
+            name=equity_name,
+            type=LedgerAccountType.EQUITY,
+            currency=cur,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        session.add(equity_acct)
+        session.flush()
+
+    return cash_acct, equity_acct
+
+
+def _post_cash_ledger_entry(
+    session,
+    *,
+    user_id: int,
+    action: CashAction,
+    amount: float,
+    effective_at: datetime | None,
+    notes: str | None,
+    idempotency_key: str | None,
+    source_type: str | None,
+    source_id: int | None,
+    currency: str = "USD",
+) -> None:
+    amt = float(amount or 0.0)
+    if amt <= 0:
+        raise ValueError("amount must be > 0")
+
+    et = LedgerEntryType.CASH_DEPOSIT if str(getattr(action, "value", action)).upper() == "DEPOSIT" else LedgerEntryType.CASH_WITHDRAW
+    # Idempotency: if already posted, no-op.
+    if idempotency_key:
+        exists = (
+            session.query(LedgerEntry)
+            .filter(LedgerEntry.user_id == int(user_id))
+            .filter(LedgerEntry.idempotency_key == str(idempotency_key))
+            .first()
+        )
+        if exists is not None:
+            return
+
+    cash_acct, equity_acct = _get_or_create_cash_ledger_accounts(session, user_id=int(user_id), currency=currency)
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    e = LedgerEntry(
+        user_id=int(user_id),
+        entry_type=et,
+        created_at=now,
+        effective_at=effective_at,
+        description=(str(notes)[:500] if notes else None),
+        idempotency_key=(str(idempotency_key) if idempotency_key else None),
+        source_type=(str(source_type) if source_type else None),
+        source_id=(int(source_id) if source_id is not None else None),
+    )
+    session.add(e)
+    session.flush()
+
+    if et == LedgerEntryType.CASH_DEPOSIT:
+        # Debit Cash, Credit Equity
+        lines = [
+            LedgerLine(entry_id=int(e.id), account_id=int(cash_acct.id), amount=+amt, memo=None),
+            LedgerLine(entry_id=int(e.id), account_id=int(equity_acct.id), amount=-amt, memo=None),
+        ]
+    else:
+        # Debit Equity, Credit Cash
+        lines = [
+            LedgerLine(entry_id=int(e.id), account_id=int(equity_acct.id), amount=+amt, memo=None),
+            LedgerLine(entry_id=int(e.id), account_id=int(cash_acct.id), amount=-amt, memo=None),
+        ]
+
+    session.add_all(lines)
+
+
+def _trade_signed_quantity(*, action: Action, quantity: int) -> float:
+    act = getattr(action, "value", str(action))
+    act_up = str(act).upper()
+    q = float(int(quantity or 0))
+    return q if act_up == "BUY" else -q
+
+
+def _get_or_create_holdings_sync_account(session, *, user_id: int) -> Account:
+    acct = (
+        session.query(Account)
+        .filter(Account.user_id == int(user_id))
+        .filter(Account.name == _HOLDINGS_SYNC_ACCOUNT_NAME)
+        .first()
+    )
+    if acct is not None:
+        return acct
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    acct = Account(
+        user_id=int(user_id),
+        name=_HOLDINGS_SYNC_ACCOUNT_NAME,
+        broker=None,
+        currency="USD",
+        created_at=now,
+    )
+    session.add(acct)
+    session.flush()
+    return acct
+
+
+def _apply_holding_delta(
+    session,
+    *,
+    user_id: int,
+    symbol: str,
+    delta_qty: float,
+    price: float | None,
+) -> None:
+    # Best-effort: no-op on tiny deltas.
+    dq = float(delta_qty or 0.0)
+    if abs(dq) < 1e-12:
+        return
+
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        return
+
+    acct = _get_or_create_holdings_sync_account(session, user_id=int(user_id))
+
+    h = (
+        session.query(Holding)
+        .filter(Holding.user_id == int(user_id))
+        .filter(Holding.account_id == int(acct.id))
+        .filter(Holding.symbol == sym)
+        .first()
+    )
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if h is None:
+        h = Holding(
+            user_id=int(user_id),
+            account_id=int(acct.id),
+            symbol=sym,
+            quantity=0.0,
+            avg_cost=None,
+            updated_at=now,
+        )
+        session.add(h)
+        session.flush()
+
+    old_qty = float(getattr(h, "quantity", 0.0) or 0.0)
+    old_avg = getattr(h, "avg_cost", None)
+    new_qty = old_qty + dq
+
+    # Clamp tiny float noise to 0.
+    if abs(new_qty) < 1e-9:
+        new_qty = 0.0
+
+    px = float(price) if price is not None else None
+    new_avg = old_avg
+
+    if new_qty == 0.0:
+        new_avg = None
+    else:
+        # If opening a position (or we never had a cost basis), set avg_cost from price when available.
+        if (old_qty == 0.0 or old_avg is None) and px is not None:
+            new_avg = px
+        else:
+            # If increasing position magnitude in same direction, blend via moving average.
+            if px is not None and old_qty != 0.0 and (old_qty * dq) > 0.0:
+                denom = abs(old_qty) + abs(dq)
+                if denom > 0:
+                    base = float(old_avg or 0.0)
+                    new_avg = (abs(old_qty) * base + abs(dq) * px) / denom
+
+            # If we cross through zero (flip long<->short), reset basis to the trade price when available.
+            if px is not None and old_qty != 0.0 and (old_qty * new_qty) < 0.0:
+                new_avg = px
+
+    h.quantity = float(new_qty)
+    h.avg_cost = (float(new_avg) if new_avg is not None else None)
+    h.updated_at = now
+    session.add(h)
+
+    # Avoid clutter: delete empty rows.
+    if float(new_qty) == 0.0:
+        session.delete(h)
+
+
+def create_order(
+    *,
+    user_id: int,
+    symbol: str,
+    instrument: str = "STOCK",
+    action: str = "BUY",
+    strategy: str | None = None,
+    qty: int = 1,
+    limit_price: float | None = None,
+    client_order_id: str | None = None,
+) -> int:
+    session = get_session()
+    try:
+        sym = str(symbol or "").strip().upper()
+        if not sym:
+            raise ValueError("symbol is required")
+        if int(qty) < 1:
+            raise ValueError("qty must be >= 1")
+
+        inst_enum = normalize_instrument(instrument)
+        act_enum = normalize_action(action)
+        coid = (str(client_order_id).strip() if client_order_id is not None else "") or None
+
+        if coid:
+            existing = (
+                session.query(Order)
+                .filter(Order.user_id == int(user_id))
+                .filter(Order.client_order_id == coid)
+                .first()
+            )
+            if existing is not None:
+                return int(existing.id)
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        o = Order(
+            user_id=int(user_id),
+            symbol=sym,
+            instrument=inst_enum,
+            action=act_enum,
+            strategy=(str(strategy).strip() if strategy else None),
+            quantity=int(qty),
+            limit_price=(float(limit_price) if limit_price is not None else None),
+            status=OrderStatus.PENDING,
+            created_at=now,
+            filled_at=None,
+            filled_price=None,
+            trade_id=None,
+            client_order_id=coid,
+        )
+        session.add(o)
+
+        # Execution-capable mode: submit to configured broker/OMS and persist linkage.
+        if _broker_enabled():
+            session.flush()  # assign order id before submission
+            broker = get_broker()
+            resp = broker.submit_order(
+                user_id=int(user_id),
+                req=SubmitOrderRequest(
+                    symbol=sym,
+                    instrument=str(inst_enum.value),
+                    action=str(act_enum.value),
+                    quantity=int(qty),
+                    limit_price=(float(limit_price) if limit_price is not None else None),
+                    client_order_id=(coid or f"order:{int(o.id)}"),
+                ),
+            )
+            o.external_order_id = str(resp.external_order_id)
+            o.venue = str(resp.venue)
+            o.external_status = str(resp.external_status)
+            o.last_synced_at = getattr(resp, "submitted_at", None)
+            session.add(o)
+
+        session.commit()
+        return int(o.id)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def list_orders(*, user_id: int, limit: int = 100) -> list[dict]:
+    session = get_session()
+    try:
+        rows = (
+            session.query(Order)
+            .filter(Order.user_id == int(user_id))
+            .order_by(Order.created_at.desc())
+            .limit(int(limit))
+            .all()
+        )
+        out: list[dict] = []
+        for o in rows:
+            out.append(
+                {
+                    "id": int(getattr(o, "id")),
+                    "symbol": str(getattr(o, "symbol", "") or ""),
+                    "instrument": str(getattr(getattr(o, "instrument", None), "value", getattr(o, "instrument", "")) or ""),
+                    "action": str(getattr(getattr(o, "action", None), "value", getattr(o, "action", "")) or ""),
+                    "strategy": (str(getattr(o, "strategy", "") or "") or None),
+                    "quantity": int(getattr(o, "quantity", 0) or 0),
+                    "limit_price": (float(getattr(o, "limit_price")) if getattr(o, "limit_price", None) is not None else None),
+                    "status": str(getattr(getattr(o, "status", None), "value", getattr(o, "status", "")) or ""),
+                    "created_at": getattr(o, "created_at", None),
+                    "filled_at": getattr(o, "filled_at", None),
+                    "filled_price": (float(getattr(o, "filled_price")) if getattr(o, "filled_price", None) is not None else None),
+                    "trade_id": (int(getattr(o, "trade_id")) if getattr(o, "trade_id", None) is not None else None),
+                    "client_order_id": (str(getattr(o, "client_order_id", "") or "") or None),
+                    "external_order_id": (str(getattr(o, "external_order_id", "") or "") or None),
+                    "venue": (str(getattr(o, "venue", "") or "") or None),
+                    "external_status": (str(getattr(o, "external_status", "") or "") or None),
+                    "last_synced_at": getattr(o, "last_synced_at", None),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
+def cancel_order(*, user_id: int, order_id: int) -> bool:
+    session = get_session()
+    try:
+        o = (
+            session.query(Order)
+            .filter(Order.id == int(order_id))
+            .filter(Order.user_id == int(user_id))
+            .first()
+        )
+        if o is None:
+            return False
+        if getattr(o, "status", None) != OrderStatus.PENDING:
+            return False
+
+        if _broker_enabled() and getattr(o, "external_order_id", None):
+            broker = get_broker()
+            broker.cancel_order(user_id=int(user_id), external_order_id=str(getattr(o, "external_order_id")))
+            o.external_status = "CANCELLED"
+            o.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        o.status = OrderStatus.CANCELLED
+        session.add(o)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def sync_order_status(*, user_id: int, order_id: int) -> bool:
+    """Sync an order's external status from the configured broker/OMS adapter."""
+    if not _broker_enabled():
+        return False
+
+    session = get_session()
+    try:
+        o = (
+            session.query(Order)
+            .filter(Order.user_id == int(user_id))
+            .filter(Order.id == int(order_id))
+            .first()
+        )
+        if o is None:
+            return False
+        if not getattr(o, "external_order_id", None):
+            return False
+
+        broker = get_broker()
+        resp = broker.get_order_status(user_id=int(user_id), external_order_id=str(getattr(o, "external_order_id")))
+        o.venue = str(resp.venue)
+        o.external_status = str(resp.external_status)
+        o.last_synced_at = resp.last_synced_at
+        session.add(o)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def sync_pending_orders(*, user_id: int, limit: int = 200) -> int:
+    """Sync external status for all pending, broker-linked orders for a user."""
+    if not _broker_enabled():
+        return 0
+    session = get_session()
+    try:
+        rows = (
+            session.query(Order)
+            .filter(Order.user_id == int(user_id))
+            .filter(Order.status == OrderStatus.PENDING)
+            .filter(Order.external_order_id.isnot(None))
+            .order_by(Order.created_at.desc())
+            .limit(int(limit))
+            .all()
+        )
+        if not rows:
+            return 0
+        broker = get_broker()
+        updated = 0
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        for o in rows:
+            resp = broker.get_order_status(user_id=int(user_id), external_order_id=str(o.external_order_id))
+            o.venue = str(resp.venue)
+            o.external_status = str(resp.external_status)
+            o.last_synced_at = getattr(resp, "last_synced_at", None) or now
+            session.add(o)
+            updated += 1
+        session.commit()
+        return int(updated)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def fill_order_via_broker(
+    *,
+    user_id: int,
+    order_id: int,
+    filled_price: float,
+    filled_at=None,
+) -> int:
+    """Ask the broker/OMS to fill, then record the fill locally (creates Trade + marks Order FILLED)."""
+    if not _broker_enabled():
+        raise ValueError("broker disabled")
+
+    session = get_session()
+    try:
+        o = (
+            session.query(Order)
+            .filter(Order.user_id == int(user_id))
+            .filter(Order.id == int(order_id))
+            .first()
+        )
+        if o is None:
+            raise ValueError("order not found")
+        if getattr(o, "status", None) != OrderStatus.PENDING:
+            raise ValueError("order not fillable")
+        if not getattr(o, "external_order_id", None):
+            raise ValueError("order not linked to broker")
+
+        broker = get_broker()
+        resp = broker.fill_order(
+            user_id=int(user_id),
+            external_order_id=str(o.external_order_id),
+            filled_price=float(filled_price),
+            filled_at=filled_at,
+        )
+
+        # Update linkage fields first; then reuse our canonical fill path.
+        o.external_status = str(resp.external_status)
+        o.last_synced_at = getattr(resp, "filled_at", None)
+        session.add(o)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    # Canonical local fill: creates trade and marks order FILLED.
+    return fill_order(user_id=int(user_id), order_id=int(order_id), filled_price=float(filled_price), filled_at=filled_at)
+
+
+def fill_order(*, user_id: int, order_id: int, filled_price: float, filled_at=None) -> int:
+    session = get_session()
+    try:
+        o = (
+            session.query(Order)
+            .filter(Order.id == int(order_id))
+            .filter(Order.user_id == int(user_id))
+            .first()
+        )
+        if o is None:
+            raise ValueError("order not found")
+        if getattr(o, "status", None) != OrderStatus.PENDING:
+            raise ValueError("order is not fillable")
+
+        px = float(filled_price)
+        if px <= 0:
+            raise ValueError("filled_price must be > 0")
+
+        ts = pd.to_datetime(filled_at) if filled_at is not None else pd.to_datetime("today")
+
+        # Create the trade row in the same transaction.
+        inst_enum = getattr(o, "instrument", InstrumentType.STOCK)
+        act_enum = getattr(o, "action", Action.BUY)
+        sym = str(getattr(o, "symbol", "") or "").strip().upper()
+        qty = int(getattr(o, "quantity", 0) or 0)
+        strat = str(getattr(o, "strategy", "") or "Swing")
+
+        # Ensure a client_order_id for the trade to prevent accidental duplication.
+        trade_coid = (str(getattr(o, "client_order_id", "") or "").strip() or None)
+        if trade_coid is None:
+            trade_coid = f"order:{int(order_id)}"
+
+        # If a trade already exists for this order, return it (defensive).
+        existing_trade = (
+            session.query(Trade)
+            .filter(Trade.user_id == int(user_id))
+            .filter(Trade.client_order_id == trade_coid)
+            .first()
+        )
+        if existing_trade is not None:
+            o.status = OrderStatus.FILLED
+            o.filled_price = px
+            o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            o.trade_id = int(getattr(existing_trade, "id"))
+            session.add(o)
+            session.commit()
+            return int(getattr(existing_trade, "id"))
+
+        new_trade = Trade(
+            symbol=sym,
+            quantity=int(qty),
+            instrument=inst_enum,
+            strategy=strat,
+            action=act_enum,
+            entry_date=ts,
+            entry_price=float(px),
+            option_type=None,
+            strike_price=None,
+            expiry_date=None,
+            user_id=int(user_id),
+            client_order_id=trade_coid,
+        )
+        session.add(new_trade)
+        session.flush()  # assign id
+
+        # Auto-sync holdings for STOCK trades.
+        try:
+            if inst_enum == InstrumentType.STOCK:
+                signed_qty = _trade_signed_quantity(action=act_enum, quantity=int(qty))
+                _apply_holding_delta(
+                    session,
+                    user_id=int(user_id),
+                    symbol=sym,
+                    delta_qty=float(signed_qty),
+                    price=float(px),
+                )
+        except Exception:
+            pass
+
+        o.status = OrderStatus.FILLED
+        o.filled_price = float(px)
+        o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        o.trade_id = int(getattr(new_trade, "id"))
+        session.add(o)
+        session.commit()
+        return int(getattr(new_trade, "id"))
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def _utc_naive_from_epoch_seconds(epoch_seconds: int) -> datetime:
@@ -697,6 +1284,60 @@ def normalize_budget_type(b_type):
         return BudgetType.ASSET
     return BudgetType.EXPENSE
 
+
+def _trades_create_filled_orders_enabled() -> bool:
+    v = str(os.getenv("TRADES_CREATE_FILLED_ORDERS", "1") or "").strip().lower()
+    return v not in {"0", "false", "no", "off"}
+
+
+def _ensure_filled_order_for_trade(session, *, trade: Trade) -> None:
+    """Best-effort: ensure a FILLED Order exists for this Trade.
+
+    This is intentionally idempotent and should never block trade creation.
+    """
+    try:
+        if trade is None or trade.user_id is None:
+            return
+        if trade.id is None:
+            return
+
+        coid = f"trade:{trade.client_order_id}" if trade.client_order_id else f"trade:{trade.id}"
+        existing = (
+            session.query(Order)
+            .filter(Order.user_id == int(trade.user_id))
+            .filter(Order.client_order_id == coid)
+            .first()
+        )
+        if existing is not None:
+            # Ensure it is linked.
+            if existing.trade_id is None:
+                existing.trade_id = int(trade.id)
+                session.add(existing)
+            return
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        filled_at = getattr(trade, "entry_date", None) or now
+        filled_price = getattr(trade, "entry_price", None)
+
+        o = Order(
+            user_id=int(trade.user_id),
+            symbol=str(getattr(trade, "symbol", "") or "").upper(),
+            instrument=getattr(trade, "instrument", None),
+            action=getattr(trade, "action", None),
+            strategy=str(getattr(trade, "strategy", "") or ""),
+            quantity=int(getattr(trade, "quantity", 0) or 0),
+            limit_price=None,
+            status=OrderStatus.FILLED,
+            created_at=filled_at,
+            filled_at=filled_at,
+            filled_price=float(filled_price) if filled_price is not None else None,
+            trade_id=int(trade.id),
+            client_order_id=coid,
+        )
+        session.add(o)
+    except Exception:
+        return
+
 def save_trade(
     symbol,
     instrument,
@@ -729,6 +1370,9 @@ def save_trade(
                 .first()
             )
             if existing:
+                if _trades_create_filled_orders_enabled():
+                    _ensure_filled_order_for_trade(session, trade=existing)
+                    session.commit()
                 return existing.id
 
         new_trade = Trade(
@@ -740,6 +1384,29 @@ def save_trade(
             client_order_id=coid,
         )
         session.add(new_trade)
+
+        # Ensure the trade has an id before creating an Order row that references it.
+        session.flush()
+
+        # Auto-sync holdings for STOCK trades (best-effort). Uses a dedicated per-user account.
+        try:
+            if user_id is not None and inst_enum == InstrumentType.STOCK:
+                signed_qty = _trade_signed_quantity(action=act_enum, quantity=int(qty))
+                _apply_holding_delta(
+                    session,
+                    user_id=int(user_id),
+                    symbol=str(symbol),
+                    delta_qty=float(signed_qty),
+                    price=float(price),
+                )
+        except Exception:
+            # Never block trade creation if holdings sync fails.
+            pass
+
+        # Optional: create a FILLED Order record for the trade so Orders UI reflects trade submissions.
+        if _trades_create_filled_orders_enabled():
+            _ensure_filled_order_for_trade(session, trade=new_trade)
+
         session.commit()
         return new_trade.id
     except Exception as e:
@@ -759,10 +1426,108 @@ def save_cash(action, amount, date, notes, user_id=None):
         if user_id is not None:
             new_cash.user_id = int(user_id)
         session.add(new_cash)
+        session.flush()
+
+        # Post to the double-entry ledger (cash only for now).
+        if user_id is not None:
+            try:
+                eff = pd.to_datetime(date).to_pydatetime() if date is not None else None
+            except Exception:
+                eff = None
+            _post_cash_ledger_entry(
+                session,
+                user_id=int(user_id),
+                action=action_enum,
+                amount=float(amount),
+                effective_at=eff,
+                notes=str(notes) if notes is not None else None,
+                idempotency_key=f"cash_flow:{int(new_cash.id)}",
+                source_type="cash_flow",
+                source_id=int(new_cash.id),
+                currency="USD",
+            )
+
         session.commit()
     except Exception:
         session.rollback()
         raise
+    finally:
+        session.close()
+
+
+def get_cash_balance_ledger(*, user_id: int, currency: str = "USD") -> float:
+    """Return cash balance derived from the ledger (cash-only MVP)."""
+    session = get_session()
+    try:
+        cur = str(currency or "USD").strip().upper() or "USD"
+        cash_name = f"Cash ({cur})"
+        cash_acct = (
+            session.query(LedgerAccount)
+            .filter(LedgerAccount.user_id == int(user_id))
+            .filter(LedgerAccount.name == cash_name)
+            .filter(LedgerAccount.currency == cur)
+            .first()
+        )
+        if cash_acct is None:
+            return 0.0
+        rows = (
+            session.query(LedgerLine.amount)
+            .filter(LedgerLine.account_id == int(cash_acct.id))
+            .all()
+        )
+        return float(sum(float(r[0] or 0.0) for r in rows))
+    finally:
+        session.close()
+
+
+def get_cash_balance(*, user_id: int, currency: str = "USD") -> float:
+    """Canonical cash balance for the product.
+
+    Source of truth: double-entry ledger (cash-only for now).
+    """
+    return get_cash_balance_ledger(user_id=int(user_id), currency=str(currency or "USD"))
+
+
+def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
+    session = get_session()
+    try:
+        es = (
+            session.query(LedgerEntry)
+            .filter(LedgerEntry.user_id == int(user_id))
+            .order_by(LedgerEntry.created_at.desc())
+            .limit(int(limit))
+            .all()
+        )
+        out: list[dict] = []
+        for e in es:
+            lines = (
+                session.query(LedgerLine, LedgerAccount)
+                .join(LedgerAccount, LedgerAccount.id == LedgerLine.account_id)
+                .filter(LedgerLine.entry_id == int(e.id))
+                .all()
+            )
+            out.append(
+                {
+                    "id": int(e.id),
+                    "entry_type": str(getattr(getattr(e, "entry_type", None), "value", e.entry_type) or ""),
+                    "created_at": getattr(e, "created_at", None),
+                    "effective_at": getattr(e, "effective_at", None),
+                    "description": (str(getattr(e, "description", "") or "") or None),
+                    "idempotency_key": (str(getattr(e, "idempotency_key", "") or "") or None),
+                    "source_type": (str(getattr(e, "source_type", "") or "") or None),
+                    "source_id": (int(getattr(e, "source_id")) if getattr(e, "source_id", None) is not None else None),
+                    "lines": [
+                        {
+                            "account": str(getattr(a, "name", "") or ""),
+                            "account_type": str(getattr(getattr(a, "type", None), "value", a.type) or ""),
+                            "currency": str(getattr(a, "currency", "") or "USD"),
+                            "amount": float(getattr(l, "amount", 0.0) or 0.0),
+                        }
+                        for (l, a) in lines
+                    ],
+                }
+            )
+        return out
     finally:
         session.close()
 
@@ -1026,6 +1791,21 @@ def close_trade(trade_id, exit_price, exit_date=None, user_id=None):
         trade.exit_date = ed
         trade.realized_pnl = float(realized)
         trade.is_closed = True
+
+        # Auto-sync holdings: closing a trade reduces/offsets the position.
+        try:
+            if user_id is not None and getattr(trade, "instrument", None) == InstrumentType.STOCK:
+                signed_entry_qty = _trade_signed_quantity(action=trade.action, quantity=int(qty))
+                _apply_holding_delta(
+                    session,
+                    user_id=int(user_id),
+                    symbol=str(getattr(trade, "symbol", "")),
+                    delta_qty=float(-signed_entry_qty),
+                    price=float(xp),
+                )
+        except Exception:
+            pass
+
         session.commit()
         return True
     except Exception as e:
@@ -1044,6 +1824,27 @@ def delete_trade(trade_id, user_id=None):
             q = q.filter(Trade.user_id == int(user_id))
         trade_to_delete = q.first()
         if trade_to_delete:
+            # If the trade is still open, reverse its position impact.
+            try:
+                if (
+                    user_id is not None
+                    and getattr(trade_to_delete, "is_closed", False) is False
+                    and getattr(trade_to_delete, "instrument", None) == InstrumentType.STOCK
+                ):
+                    signed_entry_qty = _trade_signed_quantity(
+                        action=trade_to_delete.action,
+                        quantity=int(getattr(trade_to_delete, "quantity", 0) or 0),
+                    )
+                    _apply_holding_delta(
+                        session,
+                        user_id=int(user_id),
+                        symbol=str(getattr(trade_to_delete, "symbol", "")),
+                        delta_qty=float(-signed_entry_qty),
+                        price=float(getattr(trade_to_delete, "entry_price", 0.0) or 0.0),
+                    )
+            except Exception:
+                pass
+
             session.delete(trade_to_delete)
             session.commit()
             return True
@@ -1064,6 +1865,47 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
             q = q.filter(Trade.user_id == int(user_id))
         trade = q.first()
         if trade:
+            # Best-effort holdings sync for STOCK trades when editing an open trade.
+            try:
+                if (
+                    user_id is not None
+                    and getattr(trade, "is_closed", False) is False
+                    and getattr(trade, "instrument", None) == InstrumentType.STOCK
+                ):
+                    old_signed = _trade_signed_quantity(action=trade.action, quantity=int(getattr(trade, "quantity", 0) or 0))
+                    new_act = normalize_action(action)
+                    new_signed = _trade_signed_quantity(action=new_act, quantity=int(qty))
+                    old_sym = str(getattr(trade, "symbol", "") or "").strip().upper()
+                    new_sym = str(symbol or "").strip().upper()
+
+                    if old_sym and new_sym and old_sym != new_sym:
+                        _apply_holding_delta(
+                            session,
+                            user_id=int(user_id),
+                            symbol=old_sym,
+                            delta_qty=float(-old_signed),
+                            price=float(getattr(trade, "entry_price", 0.0) or 0.0),
+                        )
+                        _apply_holding_delta(
+                            session,
+                            user_id=int(user_id),
+                            symbol=new_sym,
+                            delta_qty=float(new_signed),
+                            price=float(price),
+                        )
+                    else:
+                        delta = float(new_signed - old_signed)
+                        if abs(delta) > 1e-12 and new_sym:
+                            _apply_holding_delta(
+                                session,
+                                user_id=int(user_id),
+                                symbol=new_sym,
+                                delta_qty=float(delta),
+                                price=float(price),
+                            )
+            except Exception:
+                pass
+
             trade.symbol = str(symbol).upper()
             trade.strategy = str(strategy)
             trade.action = normalize_action(action)

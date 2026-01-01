@@ -3,6 +3,7 @@ streamlit-cookies-manager
 pandas
 sqlalchemy
 plotly
+yfinance
 pytest
 passlib[bcrypt]
 alembic

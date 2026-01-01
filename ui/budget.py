@@ -37,10 +37,10 @@ def budget_entry_form(budget_df):
                 with c_chart:
                     fig_pie = px.pie(pie_data, values='amount', names='category', title="Expense Breakdown", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
                     fig_pie.update_layout(showlegend=False, margin=dict(l=0, r=0, t=30, b=0))
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.plotly_chart(fig_pie, width="stretch")
                 with c_stats:
                     st.metric("Total Expenses", f"${expenses['amount'].sum():,.2f}")
-                    st.dataframe(expenses[['date', 'category', 'amount']].sort_values('date', ascending=False), use_container_width=True, height=200)
+                    st.dataframe(expenses[['date', 'category', 'amount']].sort_values('date', ascending=False), width="stretch", height=200)
             else:
                 st.info("No expenses recorded yet.")
         else:

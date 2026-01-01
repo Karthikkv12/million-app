@@ -104,7 +104,7 @@ def render_live_positions(trades_df: pd.DataFrame) -> None:
             else:
                 c5.write(f"${pnl:,.2f}")
 
-            if c6.button("Close", key=f"close_btn_{trade_id}", type="primary", use_container_width=True):
+            if c6.button("Close", key=f"close_btn_{trade_id}", type="primary", width="stretch"):
                 st.session_state["_closing_trade_id"] = trade_id
                 st.session_state["_closing_trade_symbol"] = symbol
                 st.session_state["_closing_trade_last"] = float(last) if last is not None else None
@@ -152,131 +152,100 @@ def render_live_positions(trades_df: pd.DataFrame) -> None:
                                 st.session_state.pop(k, None)
                             st.rerun()
 
-    # Realized P/L summary (closed trades)
-    if closed_df is not None and not closed_df.empty:
-        closed = closed_df.copy()
-        if "realized_pnl" not in closed.columns and "exit_price" in closed.columns:
-            def _calc(row: pd.Series) -> float:
-                qty = float(row.get("quantity") or 0)
-                entry = float(row.get("entry_price") or 0.0)
-                exitp = float(row.get("exit_price") or 0.0)
-                act = str(row.get("action") or "BUY").upper()
-                return (entry - exitp) * qty if act == "SELL" else (exitp - entry) * qty
-            closed["realized_pnl"] = closed.apply(_calc, axis=1)
-
-        if "realized_pnl" in closed.columns:
-            st.metric("Realized P/L", f"${float(closed['realized_pnl'].fillna(0).sum()):,.2f}")
 
 
-def trade_sidebar_form(TICKERS, TICKER_MAP):
-    # Keep function name for compatibility, but render in the main page.
-    with st.expander("New Order", expanded=False):
-        with st.form("trade_form"):
-            c1, c2 = st.columns(2)
-            s_sym = c1.selectbox(
-                "Ticker",
-                options=TICKERS,
-                format_func=lambda x: f"{x} - {TICKER_MAP.get(x, '')}",
-            )
-            s_act = c2.selectbox("Type", ["Buy", "Sell"])
-            s_strat = st.selectbox("Strategy", ["Day Trade", "Swing Trade", "Buy & Hold"])
-            c3, c4 = st.columns(2)
-            s_qty = c3.number_input("Shares", min_value=1, max_value=100000, value=1)
-            s_price = c4.number_input("Price ($)", min_value=0.01, value=100.0, step=0.01)
-            s_date = st.date_input("Date", datetime.today())
-            submitted = st.form_submit_button("Submit Order", type="primary")
+def render_profit_and_loss_page(trades_df: pd.DataFrame) -> None:
+    st.subheader("Profit & Loss")
 
-        if submitted:
-            if 'user' not in st.session_state:
-                st.error('Please sign in to submit orders')
-                return
-
-            inst = canonical_instrument('Stock')
-            act = canonical_action(s_act)
-            token = st.session_state.get('token')
-            if not token:
-                st.error('Missing session token. Please sign in again.')
-                return
-            # Brokerage foundation: idempotent order submission.
-            # If the request is retried (network hiccup / Streamlit rerun), we reuse the same ID.
-            coid_key = "_pending_client_order_id"
-            if not st.session_state.get(coid_key):
-                st.session_state[coid_key] = uuid.uuid4().hex
-
-            try:
-                save_trade(
-                    token,
-                    s_sym,
-                    inst,
-                    s_strat,
-                    act,
-                    s_qty,
-                    s_price,
-                    s_date,
-                    client_order_id=str(st.session_state.get(coid_key)),
-                )
-            except APIError as e:
-                st.error(str(e.detail or e))
-                return
-            else:
-                st.session_state.pop(coid_key, None)
-                st.toast(f"Executed: {s_sym}", icon="✅")
-                st.cache_data.clear()
-                st.rerun()
-
-
-def render_trades_tab(trades_df):
-    render_live_positions(trades_df)
-    st.markdown("---")
-
-    if trades_df.empty:
+    if trades_df is None or trades_df.empty:
+        st.info("No trades executed yet.")
         return
 
     # Portfolio/Journal should reflect closed trades only.
     _, closed_df = _split_open_closed(trades_df)
-    if closed_df.empty:
+    if closed_df is None or closed_df.empty:
         st.info("No closed trades yet. Close a position to add it to the journal.")
         return
 
-    trades_df = closed_df
+    trades_df = closed_df.copy()
 
-    trades_df['market_value'] = trades_df['entry_price'] * trades_df['quantity']
-    df_chart = trades_df.sort_values('entry_date')
-    df_chart['cumulative_value'] = df_chart['market_value'].cumsum()
+    if "realized_pnl" not in trades_df.columns and "exit_price" in trades_df.columns:
+        def _calc(row: pd.Series) -> float:
+            qty = float(row.get("quantity") or 0)
+            entry = float(row.get("entry_price") or 0.0)
+            exitp = float(row.get("exit_price") or 0.0)
+            act = str(row.get("action") or "BUY").upper()
+            return (entry - exitp) * qty if act == "SELL" else (exitp - entry) * qty
+
+        trades_df["realized_pnl"] = trades_df.apply(_calc, axis=1)
+
+    if "realized_pnl" in trades_df.columns:
+        st.metric("Realized P/L", f"${float(trades_df['realized_pnl'].fillna(0).sum()):,.2f}")
+
+    trades_df["market_value"] = trades_df["entry_price"] * trades_df["quantity"]
+    df_chart = trades_df.sort_values("entry_date")
+    df_chart["cumulative_value"] = df_chart["market_value"].cumsum()
 
     c_title, c_toggle = st.columns([2, 1])
-    c_title.subheader("Portfolio Performance")
-    range_opt = c_toggle.radio("Time Range", ["1W", "1M", "6M", "1Y", "All"], index=4, horizontal=True, label_visibility="collapsed")
+    c_title.write("")
+    range_opt = c_toggle.radio(
+        "Time Range",
+        ["1W", "1M", "6M", "1Y", "All"],
+        index=4,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="pnl_time_range",
+    )
 
     if range_opt != "All":
         cutoff = datetime.now()
-        if range_opt == "1W": cutoff -= pd.Timedelta(weeks=1)
-        elif range_opt == "1M": cutoff -= pd.Timedelta(days=30)
-        elif range_opt == "6M": cutoff -= pd.Timedelta(days=180)
-        elif range_opt == "1Y": cutoff -= pd.Timedelta(days=365)
-        df_display = df_chart[df_chart['entry_date'] >= cutoff]
+        if range_opt == "1W":
+            cutoff -= pd.Timedelta(weeks=1)
+        elif range_opt == "1M":
+            cutoff -= pd.Timedelta(days=30)
+        elif range_opt == "6M":
+            cutoff -= pd.Timedelta(days=180)
+        elif range_opt == "1Y":
+            cutoff -= pd.Timedelta(days=365)
+        df_display = df_chart[df_chart["entry_date"] >= cutoff]
     else:
         df_display = df_chart
 
     if not df_display.empty:
-        fig = px.area(df_display, x='entry_date', y='cumulative_value', template="plotly_white")
-        fig.update_traces(line_color='#00c805', fillcolor='rgba(0, 200, 5, 0.1)')
+        fig = px.area(df_display, x="entry_date", y="cumulative_value", template="plotly_white")
+        fig.update_traces(line_color="#00c805", fillcolor="rgba(0, 200, 5, 0.1)")
         fig.update_layout(margin=dict(l=0, r=0, t=10, b=0), yaxis_title=None, xaxis_title=None)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.caption(f"No trade data available for the last {range_opt}.")
 
-    st.subheader("Trade Journal")
-    if 'sort_col' not in st.session_state: st.session_state.sort_col = 'entry_date'
-    if 'sort_asc' not in st.session_state: st.session_state.sort_asc = False
+    st.divider()
+    if "sort_col" not in st.session_state:
+        st.session_state.sort_col = "entry_date"
+    if "sort_asc" not in st.session_state:
+        st.session_state.sort_asc = False
 
-    header_map = {"Date": "entry_date", "Ticker": "symbol", "Type": "action", "Strategy": "strategy", "Qty": "quantity", "Price": "entry_price", "Exit": "exit_price", "P/L": "realized_pnl"}
+    header_map = {
+        "Date": "entry_date",
+        "Ticker": "symbol",
+        "Type": "action",
+        "Strategy": "strategy",
+        "Qty": "quantity",
+        "Price": "entry_price",
+        "Exit": "exit_price",
+        "P/L": "realized_pnl",
+    }
     cols = st.columns([1.5, 1, 1, 1.5, 1, 1, 1, 1, 1])
     for col, (display, db_col) in zip(cols[:-1], header_map.items()):
         arrow = ""
         if st.session_state.sort_col == db_col:
             arrow = " ▲" if st.session_state.sort_asc else " ▼"
-        if col.button(f"{display}{arrow}", key=f"btn_sort_{db_col}", use_container_width=True, type="secondary"):
+        if col.button(
+            f"{display}{arrow}",
+            key=f"btn_sort_{db_col}",
+            width="stretch",
+            type="secondary",
+        ):
             if st.session_state.sort_col == db_col:
                 st.session_state.sort_asc = not st.session_state.sort_asc
             else:
@@ -284,32 +253,116 @@ def render_trades_tab(trades_df):
                 st.session_state.sort_asc = True
             st.rerun()
 
-    cols[-1].markdown("<div style='text-align: center; font-weight: 800; color: #00c805; padding-top: 8px;'>Action</div>", unsafe_allow_html=True)
+    cols[-1].markdown(
+        "<div style='text-align: center; font-weight: 800; color: #00c805; padding-top: 8px;'>Action</div>",
+        unsafe_allow_html=True,
+    )
     df_sorted = trades_df.sort_values(by=st.session_state.sort_col, ascending=st.session_state.sort_asc)
 
-    for i, row in df_sorted.iterrows():
+    for _, row in df_sorted.iterrows():
         c1, c2, c3, c4, c5, c6, c_exit, c_pnl, c7 = st.columns([1.5, 1, 1, 1.5, 1, 1, 1, 1, 1])
-        c1.date_input("D", row['entry_date'], key=f"d_{row['id']}", label_visibility="collapsed")
-        c2.text_input("T", row['symbol'], key=f"t_{row['id']}", label_visibility="collapsed")
-        c3.selectbox("S", ["BUY", "SELL"], index=0 if row['action']=="BUY" else 1, key=f"a_{row['id']}", label_visibility="collapsed")
-        try: strat_idx = ["Day Trade", "Swing Trade", "Buy & Hold"].index(row['strategy'])
-        except: strat_idx = 0
-        c4.selectbox("St", ["Day Trade", "Swing Trade", "Buy & Hold"], index=strat_idx, key=f"st_{row['id']}", label_visibility="collapsed")
-        c5.number_input("Q", value=int(row['quantity']), step=1, key=f"q_{row['id']}", label_visibility="collapsed")
-        c6.number_input("P", value=float(row['entry_price']), step=0.01, key=f"p_{row['id']}", label_visibility="collapsed")
-        exit_v = row.get('exit_price', None)
-        pnl_v = row.get('realized_pnl', None)
+        c1.date_input("D", row["entry_date"], key=f"d_{row['id']}", label_visibility="collapsed")
+        c2.text_input("T", row["symbol"], key=f"t_{row['id']}", label_visibility="collapsed")
+        c3.selectbox(
+            "S",
+            ["BUY", "SELL"],
+            index=0 if row["action"] == "BUY" else 1,
+            key=f"a_{row['id']}",
+            label_visibility="collapsed",
+        )
+        try:
+            strat_idx = ["Day Trade", "Swing Trade", "Buy & Hold"].index(row["strategy"])
+        except Exception:
+            strat_idx = 0
+        c4.selectbox(
+            "St",
+            ["Day Trade", "Swing Trade", "Buy & Hold"],
+            index=strat_idx,
+            key=f"st_{row['id']}",
+            label_visibility="collapsed",
+        )
+        c5.number_input("Q", value=int(row["quantity"]), step=1, key=f"q_{row['id']}", label_visibility="collapsed")
+        c6.number_input("P", value=float(row["entry_price"]), step=0.01, key=f"p_{row['id']}", label_visibility="collapsed")
+        exit_v = row.get("exit_price", None)
+        pnl_v = row.get("realized_pnl", None)
         c_exit.write("—" if pd.isna(exit_v) else f"${float(exit_v):,.2f}")
         c_pnl.write("—" if pd.isna(pnl_v) else f"${float(pnl_v):,.2f}")
-        if c7.button("Delete", key=f"del_{row['id']}", type="primary", use_container_width=True):
-            if 'user' not in st.session_state:
-                st.error('Sign in to delete trades')
+        if c7.button("Delete", key=f"del_{row['id']}", type="primary", width="stretch"):
+            if "user" not in st.session_state:
+                st.error("Sign in to delete trades")
             else:
-                token = st.session_state.get('token')
+                token = st.session_state.get("token")
                 if not token:
-                    st.error('Missing session token. Please sign in again.')
+                    st.error("Missing session token. Please sign in again.")
                 else:
-                    delete_trade(token, row['id'])
+                    delete_trade(token, row["id"])
             st.toast(f"Deleted {row['symbol']}", icon="🗑")
             st.cache_data.clear()
             st.rerun()
+
+
+def trade_sidebar_form(TICKERS, TICKER_MAP):
+    # Keep function name for compatibility, but render in the main page.
+    prefill = st.session_state.get("_trade_prefill") if isinstance(st.session_state.get("_trade_prefill"), dict) else {}
+    pre_sym = str(prefill.get("symbol") or "").strip().upper() if prefill else ""
+    # Search-first navigation. Order entry happens inside the Stock page.
+    tab = st.tabs(["Search"])[0]
+    with tab:
+        q = st.text_input("Search", value=(pre_sym if pre_sym else ""), placeholder="Type ticker or company name")
+        qn = str(q or "").strip().lower()
+
+        def _matches(sym: str) -> bool:
+            if not qn:
+                return False
+            name = str(TICKER_MAP.get(sym) or "")
+            hay = f"{sym} {name}".lower()
+            return qn in hay
+
+        matches = [s for s in (TICKERS or []) if _matches(str(s))]
+        matches = matches[:25]
+
+        chosen_sym = ""
+        # Exact ticker shortcut
+        if qn and str(q or "").strip().upper() in (TICKERS or []):
+            chosen_sym = str(q or "").strip().upper()
+        elif matches:
+            chosen_sym = st.radio(
+                "Matches",
+                options=matches,
+                format_func=lambda s: f"{s} — {TICKER_MAP.get(s, '')}",
+                label_visibility="collapsed",
+            )
+        elif qn:
+            st.caption("No matches.")
+
+        if chosen_sym:
+            name = str(TICKER_MAP.get(chosen_sym) or "").strip()
+            if name:
+                st.caption(name)
+
+            c_view, _ = st.columns([1, 3])
+            if c_view.button("View", type="secondary"):
+                try:
+                    qp = st.query_params  # type: ignore[attr-defined]
+                    qp["page"] = "stock"
+                    qp["symbol"] = str(chosen_sym)
+                except Exception:
+                    try:
+                        qp = st.experimental_get_query_params()
+                        qp["page"] = ["stock"]
+                        qp["symbol"] = [str(chosen_sym)]
+                        flat = {k: (v[0] if isinstance(v, list) and v else v) for k, v in qp.items()}
+                        st.experimental_set_query_params(**flat)
+                    except Exception:
+                        pass
+
+        # If the user opened the form due to a prefill action, clear it even if they don't submit.
+        # (Avoid confusing repeated defaults on later visits.)
+        if prefill:
+            st.session_state.pop("_trade_prefill", None)
+
+
+def render_trades_tab(trades_df):
+    render_live_positions(trades_df)
+    st.markdown("---")
+    render_profit_and_loss_page(trades_df)

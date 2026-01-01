@@ -38,6 +38,77 @@ class BudgetType(enum.Enum):
     INCOME = "INCOME"
     ASSET = "ASSET"
 
+
+class LedgerAccountType(enum.Enum):
+    ASSET = "ASSET"
+    LIABILITY = "LIABILITY"
+    EQUITY = "EQUITY"
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
+
+
+class LedgerEntryType(enum.Enum):
+    CASH_DEPOSIT = "CASH_DEPOSIT"
+    CASH_WITHDRAW = "CASH_WITHDRAW"
+
+
+class OrderStatus(enum.Enum):
+    PENDING = "PENDING"
+    FILLED = "FILLED"
+    CANCELLED = "CANCELLED"
+
+
+class LedgerAccount(Base):
+    __tablename__ = "ledger_accounts"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    type = Column(Enum(LedgerAccountType), nullable=False, index=True)
+    currency = Column(String, nullable=False, default="USD")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+Index(
+    "ux_ledger_accounts_user_name_currency",
+    LedgerAccount.user_id,
+    LedgerAccount.name,
+    LedgerAccount.currency,
+    unique=True,
+)
+
+
+class LedgerEntry(Base):
+    __tablename__ = "ledger_entries"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    entry_type = Column(Enum(LedgerEntryType), nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    effective_at = Column(DateTime, nullable=True, index=True)
+    description = Column(String, nullable=True)
+    # Idempotency for safe retries.
+    idempotency_key = Column(String, nullable=True)
+    # Best-effort linkage to source record(s)
+    source_type = Column(String, nullable=True, index=True)
+    source_id = Column(Integer, nullable=True, index=True)
+
+
+Index(
+    "ux_ledger_entries_user_idempotency_key",
+    LedgerEntry.user_id,
+    LedgerEntry.idempotency_key,
+    unique=True,
+)
+
+
+class LedgerLine(Base):
+    __tablename__ = "ledger_lines"
+    id = Column(Integer, primary_key=True)
+    entry_id = Column(Integer, ForeignKey('ledger_entries.id'), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey('ledger_accounts.id'), nullable=False, index=True)
+    # Signed amount in the account currency.
+    amount = Column(Float, nullable=False)
+    memo = Column(String, nullable=True)
+
 # --- TABLES ---
 class Trade(Base):
     __tablename__ = 'trades'
@@ -168,6 +239,39 @@ Index(
     unique=True,
 )
 
+
+class Order(Base):
+    __tablename__ = "orders"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)
+    instrument = Column(Enum(InstrumentType), nullable=False)
+    action = Column(Enum(Action), nullable=False)
+    strategy = Column(String, nullable=True)
+    quantity = Column(Integer, nullable=False)
+    limit_price = Column(Float, nullable=True)
+    status = Column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    filled_at = Column(DateTime, nullable=True, index=True)
+    filled_price = Column(Float, nullable=True)
+    trade_id = Column(Integer, ForeignKey('trades.id'), nullable=True, index=True)
+    # Brokerage foundation: client-generated idempotency key (UUID) per user.
+    client_order_id = Column(String, nullable=True)
+
+    # External OMS linkage (rentable OMS adapters)
+    external_order_id = Column(String, nullable=True, index=True)
+    venue = Column(String, nullable=True, index=True)
+    external_status = Column(String, nullable=True, index=True)
+    last_synced_at = Column(DateTime, nullable=True, index=True)
+
+
+Index(
+    "ux_orders_user_client_order_id",
+    Order.user_id,
+    Order.client_order_id,
+    unique=True,
+)
+
 # Database Connection Setup
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
@@ -223,6 +327,13 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
         insp = inspect(engine)
         tables = set(insp.get_table_names())
 
+        def _safe_execute(conn, stmt: str) -> None:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                # Best-effort: ignore DDL failures (e.g., existing dupes preventing unique indexes).
+                return
+
         def _add_columns(table: str, columns: list[tuple[str, str]]) -> None:
             if table not in tables:
                 return
@@ -232,7 +343,10 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 return
             with engine.begin() as conn:
                 for col_name, col_def in to_add:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"))
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"))
+                    except Exception:
+                        continue
 
         # trades: per-user + close lifecycle
         _add_columns(
@@ -253,14 +367,13 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
 
         # Add indexes if missing (safe no-op if already exists)
         with engine.begin() as conn:
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_trades_user_id ON trades(user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_cash_flow_user_id ON cash_flow(user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_budget_user_id ON budget(user_id)"))
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_trades_user_id ON trades(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_cash_flow_user_id ON cash_flow(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_budget_user_id ON budget(user_id)")
             # Allow multiple NULL client_order_id values; ensures idempotency when provided.
-            conn.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_user_client_order_id ON trades(user_id, client_order_id)"
-                )
+            _safe_execute(
+                conn,
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_user_client_order_id ON trades(user_id, client_order_id)",
             )
 
         # users: auth validity cutoff
@@ -268,33 +381,32 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
 
         # refresh_tokens: new table (best-effort)
         with engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    CREATE TABLE IF NOT EXISTS refresh_tokens (
-                        id INTEGER PRIMARY KEY,
-                        user_id INTEGER NOT NULL,
-                        token_hash TEXT NOT NULL,
-                        created_at DATETIME NOT NULL,
-                        created_ip TEXT,
-                        created_user_agent TEXT,
-                        last_used_at DATETIME,
-                        last_used_ip TEXT,
-                        last_used_user_agent TEXT,
-                        expires_at DATETIME NOT NULL,
-                        revoked_at DATETIME,
-                        revoked_reason TEXT,
-                        replaced_by_token_id INTEGER
-                    )
-                    """
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS refresh_tokens (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    token_hash TEXT NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    created_ip TEXT,
+                    created_user_agent TEXT,
+                    last_used_at DATETIME,
+                    last_used_ip TEXT,
+                    last_used_user_agent TEXT,
+                    expires_at DATETIME NOT NULL,
+                    revoked_at DATETIME,
+                    revoked_reason TEXT,
+                    replaced_by_token_id INTEGER
                 )
+                """.strip(),
             )
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)"))
-            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_refresh_tokens_token_hash ON refresh_tokens(token_hash)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at ON refresh_tokens(expires_at)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_created_ip ON refresh_tokens(created_ip)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_at ON refresh_tokens(last_used_at)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_ip ON refresh_tokens(last_used_ip)"))
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)")
+            _safe_execute(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_refresh_tokens_token_hash ON refresh_tokens(token_hash)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_refresh_tokens_expires_at ON refresh_tokens(expires_at)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_refresh_tokens_created_ip ON refresh_tokens(created_ip)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_at ON refresh_tokens(last_used_at)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_refresh_tokens_last_used_ip ON refresh_tokens(last_used_ip)")
 
         _add_columns(
             "refresh_tokens",
@@ -365,29 +477,27 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
 
         # holdings: new table (best-effort)
         with engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    CREATE TABLE IF NOT EXISTS holdings (
-                        id INTEGER PRIMARY KEY,
-                        user_id INTEGER NOT NULL,
-                        account_id INTEGER NOT NULL,
-                        symbol TEXT NOT NULL,
-                        quantity REAL NOT NULL DEFAULT 0,
-                        avg_cost REAL,
-                        updated_at DATETIME
-                    )
-                    """
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS holdings (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    account_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    quantity REAL NOT NULL DEFAULT 0,
+                    avg_cost REAL,
+                    updated_at DATETIME
                 )
+                """.strip(),
             )
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_user_id ON holdings(user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_account_id ON holdings(account_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_symbol ON holdings(symbol)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_holdings_updated_at ON holdings(updated_at)"))
-            conn.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_holdings_user_account_symbol ON holdings(user_id, account_id, symbol)"
-                )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holdings_user_id ON holdings(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holdings_account_id ON holdings(account_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holdings_symbol ON holdings(symbol)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holdings_updated_at ON holdings(updated_at)")
+            _safe_execute(
+                conn,
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_holdings_user_account_symbol ON holdings(user_id, account_id, symbol)",
             )
 
         _add_columns(
@@ -399,6 +509,69 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 ("quantity", "REAL DEFAULT 0"),
                 ("avg_cost", "REAL"),
                 ("updated_at", "DATETIME"),
+            ],
+        )
+
+        # orders: new table (best-effort)
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS orders (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    instrument TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    strategy TEXT,
+                    quantity INTEGER NOT NULL,
+                    limit_price REAL,
+                    status TEXT NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    filled_at DATETIME,
+                    filled_price REAL,
+                    trade_id INTEGER,
+                    client_order_id TEXT,
+                    external_order_id TEXT,
+                    venue TEXT,
+                    external_status TEXT,
+                    last_synced_at DATETIME
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_user_id ON orders(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_symbol ON orders(symbol)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_status ON orders(status)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_created_at ON orders(created_at)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_filled_at ON orders(filled_at)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_trade_id ON orders(trade_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_external_order_id ON orders(external_order_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_venue ON orders(venue)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_external_status ON orders(external_status)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_orders_last_synced_at ON orders(last_synced_at)")
+            # Allow multiple NULL client_order_id values; ensures idempotency when provided.
+            _safe_execute(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_orders_user_client_order_id ON orders(user_id, client_order_id)")
+
+        _add_columns(
+            "orders",
+            [
+                ("user_id", "INTEGER"),
+                ("symbol", "TEXT"),
+                ("instrument", "TEXT"),
+                ("action", "TEXT"),
+                ("strategy", "TEXT"),
+                ("quantity", "INTEGER"),
+                ("limit_price", "REAL"),
+                ("status", "TEXT"),
+                ("created_at", "DATETIME"),
+                ("filled_at", "DATETIME"),
+                ("filled_price", "REAL"),
+                ("trade_id", "INTEGER"),
+                ("client_order_id", "TEXT"),
+                ("external_order_id", "TEXT"),
+                ("venue", "TEXT"),
+                ("external_status", "TEXT"),
+                ("last_synced_at", "DATETIME"),
             ],
         )
     except Exception:

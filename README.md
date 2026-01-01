@@ -2,6 +2,9 @@
 
 Trading / budget journal with a separated backend API (FastAPI) and frontend (Streamlit).
 
+Maintenance checklist: see `MAINTENANCE.md`.
+Master plan (growing): see `MASTER_PLAN.md`.
+
 ## Quick start (local)
 
 1. Create a virtualenv and install dependencies:
@@ -25,6 +28,23 @@ export DATABASE_URL="sqlite:///trading_journal.db"  # or your Postgres URL
 export JWT_SECRET="change-me"                       # required for production
 PYTHONPATH=$PWD python -m uvicorn backend_api.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+### One-command dev (API + Streamlit)
+
+From the repo root, you can start both services with:
+
+```bash
+./scripts/dev.sh
+```
+
+### Broker / OMS adapter (execution-capable)
+
+Orders can optionally be routed through a broker/OMS adapter.
+
+- Enable adapter: `export BROKER_ENABLED=1`
+- Choose provider: `export BROKER_PROVIDER=paper`
+
+When enabled, order creation will submit to the adapter and persist external linkage fields on the `orders` row (`external_order_id`, `venue`, `external_status`, `last_synced_at`). Cancelling an order will call the adapter cancel path and update `external_status`/`last_synced_at`.
 
 ## Phase 1: Postgres + migrations (recommended)
 

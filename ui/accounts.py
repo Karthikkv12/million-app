@@ -27,7 +27,7 @@ def render_accounts_and_holdings_section(*, title: str = "Accounts & holdings") 
         import pandas as _pd
 
         st.markdown("**Accounts**")
-        st.dataframe(_pd.DataFrame(accounts), use_container_width=True, hide_index=True)
+        st.dataframe(_pd.DataFrame(accounts), width="stretch", hide_index=True)
     else:
         st.caption("No accounts yet.")
 
@@ -66,7 +66,40 @@ def render_accounts_and_holdings_section(*, title: str = "Accounts & holdings") 
     if holdings:
         import pandas as _pd
 
-        st.dataframe(_pd.DataFrame(holdings), use_container_width=True, hide_index=True)
+        st.dataframe(_pd.DataFrame(holdings), width="stretch", hide_index=True)
+
+        # Convert holding -> prefilled trade (best-effort UX shortcut).
+        try:
+            hold_options = []
+            for h in holdings:
+                sym = str(h.get("symbol") or "").strip().upper()
+                qty = float(h.get("quantity") or 0.0)
+                hold_options.append((sym, qty, h))
+            if hold_options:
+                st.markdown("**Convert holding to trade**")
+                chosen = st.selectbox(
+                    "Holding",
+                    options=hold_options,
+                    format_func=lambda x: f"{x[0]} ({x[1]:g})",
+                    key=f"holding_to_trade__{title}",
+                )
+                if st.button("Prefill trade form", type="secondary", key=f"prefill_trade_btn__{title}"):
+                    sym, qty, h = chosen
+                    # If long, default to SELL (close). If short, default to BUY (cover).
+                    default_action = "Sell" if float(qty) > 0 else "Buy"
+                    st.session_state["_trade_prefill"] = {
+                        "symbol": sym,
+                        "qty": abs(float(qty)) if float(qty) != 0 else 1.0,
+                        "action": default_action,
+                        "price": (h.get("avg_cost") if h.get("avg_cost") is not None else None),
+                        "strategy": "Swing Trade",
+                    }
+                    if hasattr(st, "rerun"):
+                        st.rerun()
+                    elif hasattr(st, "experimental_rerun"):
+                        st.experimental_rerun()
+        except Exception:
+            pass
     else:
         st.caption("No holdings in this account.")
 
