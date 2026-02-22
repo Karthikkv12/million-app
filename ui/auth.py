@@ -720,7 +720,7 @@ def login_page():
         text-align: center;
     }
     </style>
-    <div class="top-band"><div class="brand">Million</div></div>
+    <div class="top-band"><div class="brand">OptionFlow</div></div>
     """, unsafe_allow_html=True)
 
     # Backend status hint (common setup issue when running split frontend/backend).

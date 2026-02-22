@@ -5,6 +5,14 @@ except AttributeError:
     pass
 
 import streamlit as st
+
+st.set_page_config(
+    page_title="OptionFlow",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
@@ -247,7 +255,7 @@ _logout_href = f"?{_sid_q}action=logout"
 st.markdown(
     (
         '<div class="top-band">'
-        f'<a class="brand" href="{_home_href}" target="_self">Million</a>'
+        f'<a class="brand" href="{_home_href}" target="_self">OptionFlow</a>'
         '<div class="nav">'
         f'<a href="{_gamma_href}" target="_self">Gamma</a>'
         f'<a href="{_settings_href}" target="_self">Settings</a>'

@@ -41,7 +41,7 @@ from .schemas import (
 from .security import create_access_token, decode_token
 
 
-app = FastAPI(title="Million API", version="1.0.0")
+app = FastAPI(title="OptionFlow API", version="1.0.0")
 
 # CORS: default to permissive for local dev, but allow locking down via env.
 _cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
