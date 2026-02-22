@@ -49,10 +49,11 @@ interface Instrument {
 }
 
 const EQUITY: Instrument[] = [
-  { symbol: "SPY",     label: "S&P 500",     sublabel: "SPY",     accent: "bg-blue-50 dark:bg-blue-900/30",    iconColor: "text-blue-500"   },
-  { symbol: "QQQ",     label: "Nasdaq 100",  sublabel: "QQQ",     accent: "bg-violet-50 dark:bg-violet-900/30",iconColor: "text-violet-500" },
-  { symbol: "IWM",     label: "Russell 2000",sublabel: "IWM",     accent: "bg-orange-50 dark:bg-orange-900/30",iconColor: "text-orange-500" },
-  { symbol: "BTC-USD", label: "Bitcoin",     sublabel: "BTC/USD", accent: "bg-amber-50 dark:bg-amber-900/30",  iconColor: "text-amber-500"  },
+  { symbol: "SPY",     label: "S&P 500",     sublabel: "SPY",       accent: "bg-blue-50 dark:bg-blue-900/30",    iconColor: "text-blue-500"   },
+  { symbol: "QQQ",     label: "Nasdaq 100",  sublabel: "QQQ",       accent: "bg-violet-50 dark:bg-violet-900/30",iconColor: "text-violet-500" },
+  { symbol: "IWM",     label: "Russell 2000",sublabel: "IWM",       accent: "bg-orange-50 dark:bg-orange-900/30",iconColor: "text-orange-500" },
+  { symbol: "BTC-USD", label: "Bitcoin",     sublabel: "BTC/USD",   accent: "bg-amber-50 dark:bg-amber-900/30",  iconColor: "text-amber-500"  },
+  { symbol: "GC=F",    label: "Gold",        sublabel: "Spot USD/oz",accent: "bg-yellow-50 dark:bg-yellow-900/30",iconColor: "text-yellow-500" },
 ];
 
 const FUTURES: Instrument[] = [
@@ -60,13 +61,14 @@ const FUTURES: Instrument[] = [
   { symbol: "NQ=F",    label: "Nasdaq 100",  sublabel: "NQ Futures",  accent: "bg-violet-50 dark:bg-violet-900/30",iconColor: "text-violet-500" },
   { symbol: "RTY=F",   label: "Russell 2000",sublabel: "RTY Futures", accent: "bg-orange-50 dark:bg-orange-900/30",iconColor: "text-orange-500" },
   { symbol: "BTC-USD", label: "Bitcoin",     sublabel: "BTC/USD",     accent: "bg-amber-50 dark:bg-amber-900/30",  iconColor: "text-amber-500"  },
+  { symbol: "GC=F",    label: "Gold",        sublabel: "Spot USD/oz",  accent: "bg-yellow-50 dark:bg-yellow-900/30",iconColor: "text-yellow-500" },
 ];
 
 const INDIA: Instrument[] = [
-  { symbol: "^NSEI",   label: "Nifty 50",    sublabel: "NSE India",   accent: "bg-blue-50 dark:bg-blue-900/30",     iconColor: "text-blue-500"    },
-  { symbol: "^BSESN",  label: "Sensex",      sublabel: "BSE India",   accent: "bg-orange-50 dark:bg-orange-900/30", iconColor: "text-orange-500"  },
-  { symbol: "INR=X",   label: "INR / USD",   sublabel: "Spot Rate",   accent: "bg-emerald-50 dark:bg-emerald-900/30",iconColor: "text-emerald-500" },
-  { symbol: "GC=F",    label: "Gold",        sublabel: "Spot (USD/oz)",accent: "bg-yellow-50 dark:bg-yellow-900/30", iconColor: "text-yellow-500"  },
+  { symbol: "^NSEI",    label: "Nifty 50",    sublabel: "NSE India",    accent: "bg-blue-50 dark:bg-blue-900/30",     iconColor: "text-blue-500"    },
+  { symbol: "^BSESN",   label: "Sensex",      sublabel: "BSE India",    accent: "bg-orange-50 dark:bg-orange-900/30", iconColor: "text-orange-500"  },
+  { symbol: "^NSEBANK", label: "Bank Nifty",  sublabel: "NSE Banking",  accent: "bg-violet-50 dark:bg-violet-900/30", iconColor: "text-violet-500"  },
+  { symbol: "INR=X",    label: "INR / USD",   sublabel: "Spot Rate",    accent: "bg-emerald-50 dark:bg-emerald-900/30",iconColor: "text-emerald-500" },
 ];
 
 // ── Quote fetching ─────────────────────────────────────────────────────────────
@@ -239,7 +241,7 @@ export default function MarketCards() {
         <p className="text-xs text-red-400 mb-2">Could not load market data — will retry automatically.</p>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {instruments.map((inst) => (
           <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />
         ))}
