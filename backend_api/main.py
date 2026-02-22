@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
 import pandas as pd
+import yfinance as yf
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -107,6 +108,35 @@ def get_current_user(
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/market/quotes")
+def market_quotes(symbols: str) -> List[Dict[str, Any]]:
+    """Return live quotes for a comma-separated list of symbols (e.g. SPY,QQQ,ES=F).
+    Uses yfinance — no API key required. Protected by the same CORS policy as the rest of the API.
+    """
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not syms or len(syms) > 10:
+        raise HTTPException(status_code=400, detail="Provide 1–10 comma-separated symbols")
+    results: List[Dict[str, Any]] = []
+    for sym in syms:
+        try:
+            t = yf.Ticker(sym)
+            info = t.fast_info  # lightweight, no full scrape
+            price     = float(info.last_price)        if info.last_price     is not None else None
+            prev      = float(info.previous_close)    if info.previous_close is not None else None
+            change    = round(price - prev, 4)        if price is not None and prev is not None else None
+            change_pct = round((change / prev) * 100, 4) if change is not None and prev else None
+            results.append({
+                "symbol":     sym,
+                "price":      price,
+                "prev_close": prev,
+                "change":     change,
+                "change_pct": change_pct,
+            })
+        except Exception:
+            results.append({"symbol": sym, "price": None, "prev_close": None, "change": None, "change_pct": None})
+    return results
 
 
 @app.post("/auth/signup", response_model=AuthResponse)

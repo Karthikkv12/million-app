@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { PageHeader, SectionLabel, SkeletonStatGrid, Tabs, Badge, RefreshButton } from "@/components/ui";
+import MarketCards from "@/components/dashboard/MarketCards";
 
 const QUICK = [
   { href: "/options-flow", label: "GEX Flow",    sub: "Gamma exposure data",  color: "from-purple-500 to-purple-700" },
@@ -158,7 +159,7 @@ export default function DashboardPage() {
         </button>
       </form>
 
-      {/* Stat cards */}}
+      {/* Stat cards */}
       {isLoading ? (
         <div className="mb-6 sm:mb-8"><SkeletonStatGrid count={4} /></div>
       ) : (
@@ -215,6 +216,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Market ticker cards */}
+      <MarketCards />
 
       {/* Quick actions */}
       <SectionLabel>Quick Actions</SectionLabel>
