@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchGex, GexResult } from "@/lib/api";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
 import { fmtGex as fmtGexUtil } from "@/lib/gex";
-import { Activity, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { PageHeader, SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 
 const STRIKE_OPTIONS = [10, 20, 30, 40, 50] as const;
 
@@ -50,13 +51,7 @@ export default function OptionsFlowPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
-          <Activity size={16} className="text-purple-600 dark:text-purple-400" />
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">Options Flow</h1>
-      </div>
+      <PageHeader title="Options Flow" sub={`GEX analysis — ${ticker}`} />
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -87,15 +82,9 @@ export default function OptionsFlowPage() {
       </div>
 
       {/* States */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm animate-pulse">
-          Loading GEX data for {ticker}…
-        </div>
-      )}
+      {isLoading && <SkeletonStatGrid count={6} />}
       {isError && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
-          Failed to load GEX data. Make sure the backend is running and {ticker} is a valid symbol.
-        </div>
+        <ErrorBanner message={`Failed to load GEX data. Make sure the backend is running and ${ticker} is a valid symbol.`} />
       )}
 
       {data && (
@@ -103,7 +92,7 @@ export default function OptionsFlowPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             {summaryItems.map(({ label, value, pos }) => (
-              <div key={label} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5">
+              <div key={label} className="card-hover bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5">
                 <p className="text-xs text-gray-400 mb-1">{label}</p>
                 <p className={`text-lg font-black ${
                   pos === null

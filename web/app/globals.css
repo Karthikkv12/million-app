@@ -14,14 +14,63 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
 }
 
+/* Custom scrollbar — light */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Custom scrollbar — dark */
+.dark ::-webkit-scrollbar-thumb { background: #374151; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+/* Input / select autofill fix */
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  transition: background-color 0s 600000s, color 0s 600000s;
+}
+
+/* Number input — hide spinner arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
+
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+
+  /* Safe-area bottom padding for devices with home indicator */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pb-nav  { padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); }
+
+  /* Smooth card hover lift */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600;
+  }
+
+  /* Skeleton pulse animation */
+  .skeleton {
+    @apply bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse;
   }
 }

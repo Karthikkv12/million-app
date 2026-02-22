@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchAuthSessions, fetchAuthEvents, revokeSession, changePassword, AuthSession, AuthEvent } from "@/lib/api";
 import { Shield, Monitor, Key, CheckCircle, XCircle } from "lucide-react";
+import { PageHeader } from "@/components/ui";
 
 const EVENT_COLOR: Record<string, string> = {
   login:           "text-green-500",
@@ -13,7 +14,8 @@ const EVENT_COLOR: Record<string, string> = {
   failed_login:    "text-red-500",
 };
 
-// ── Change Password ───────────────────────────────────────────────────────────
+const inp = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
 function ChangePasswordSection() {
   const [current, setCurrent] = useState("");
   const [next, setNext]       = useState("");
@@ -31,8 +33,6 @@ function ChangePasswordSection() {
     onError: (e: Error) => { setErr(e.message); setOk(false); },
   });
 
-  const inputCls = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
-
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
       <div className="flex items-center gap-3 mb-4">
@@ -47,7 +47,7 @@ function ChangePasswordSection() {
         ].map(({ label, val, set }) => (
           <div key={label}>
             <label className="text-xs text-gray-400 block mb-1">{label}</label>
-            <input type="password" value={val} onChange={(e) => set(e.target.value)} autoComplete="off" className={inputCls} />
+            <input type="password" value={val} onChange={(e) => set(e.target.value)} autoComplete="off" className={inp} />
           </div>
         ))}
       </div>
@@ -61,7 +61,6 @@ function ChangePasswordSection() {
   );
 }
 
-// ── Sessions ──────────────────────────────────────────────────────────────────
 function SessionsSection() {
   const qc = useQueryClient();
   const { data: sessions = [], isLoading } = useQuery<AuthSession[]>({ queryKey: ["auth-sessions"], queryFn: fetchAuthSessions, staleTime: 30_000 });
@@ -79,12 +78,17 @@ function SessionsSection() {
           <p className="text-xs text-gray-400">Revoke a session to force sign-out on that device.</p>
         </div>
       </div>
-      {isLoading && <p className="text-sm text-gray-400 p-4">Loading…</p>}
-      {!isLoading && sessions.length === 0 && <p className="text-sm text-gray-400 p-4">No active sessions.</p>}
+
+      {isLoading && (
+        <div className="p-4 space-y-2">
+          {[1,2].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}
+        </div>
+      )}
+      {!isLoading && sessions.length === 0 && <p className="text-sm text-gray-400 p-5">No active sessions.</p>}
 
       {sessions.length > 0 && (
         <>
-          {/* Mobile: cards */}
+          {/* Mobile */}
           <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 md:hidden">
             {sessions.map((s) => (
               <div key={s.id} className={`p-4 ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
@@ -97,7 +101,7 @@ function SessionsSection() {
                   </div>
                   {!s.is_current && (
                     <button onClick={() => revoke.mutate(s.id)} disabled={revoke.isPending}
-                      className="text-xs px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition disabled:opacity-50 shrink-0">
+                      className="text-xs px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition disabled:opacity-50 shrink-0 ml-3">
                       Revoke
                     </button>
                   )}
@@ -106,11 +110,11 @@ function SessionsSection() {
             ))}
           </div>
 
-          {/* Desktop: table */}
+          {/* Desktop */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide">
+                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
                   {["Created", "Last Used", "IP", "Device", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                   ))}
@@ -118,7 +122,7 @@ function SessionsSection() {
               </thead>
               <tbody>
                 {sessions.map((s) => (
-                  <tr key={s.id} className={`border-b border-gray-50 dark:border-gray-800/50 ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
+                  <tr key={s.id} className={`border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
                     <td className="px-4 py-3 text-gray-400 text-xs">{s.created_at.slice(0, 16).replace("T", " ")}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{s.last_used_at ? s.last_used_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs font-mono">{s.ip_address ?? "—"}</td>
@@ -145,7 +149,6 @@ function SessionsSection() {
   );
 }
 
-// ── Auth Events ───────────────────────────────────────────────────────────────
 function EventsSection() {
   const { data: events = [], isLoading } = useQuery<AuthEvent[]>({ queryKey: ["auth-events"], queryFn: fetchAuthEvents, staleTime: 60_000 });
 
@@ -158,11 +161,17 @@ function EventsSection() {
           <p className="text-xs text-gray-400">Last 25 security events on your account.</p>
         </div>
       </div>
-      {isLoading && <p className="text-sm text-gray-400 p-4">Loading…</p>}
-      {!isLoading && events.length === 0 && <p className="text-sm text-gray-400 p-4">No events recorded.</p>}
+
+      {isLoading && (
+        <div className="p-4 space-y-2">
+          {[1,2,3].map(i => <div key={i} className="skeleton h-10 rounded-xl" />)}
+        </div>
+      )}
+      {!isLoading && events.length === 0 && <p className="text-sm text-gray-400 p-5">No events recorded.</p>}
+
       {events.length > 0 && (
         <>
-          {/* Mobile: cards */}
+          {/* Mobile */}
           <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 md:hidden overflow-y-auto max-h-[320px]">
             {events.map((e) => (
               <div key={e.id} className="flex items-center justify-between p-3">
@@ -170,18 +179,16 @@ function EventsSection() {
                   <span className={`text-xs font-mono font-bold ${EVENT_COLOR[e.event_type] ?? "text-gray-500"}`}>{e.event_type}</span>
                   <p className="text-[10px] text-gray-400">{e.created_at.slice(0, 16).replace("T", " ")} · {e.ip_address ?? "—"}</p>
                 </div>
-                {e.success
-                  ? <CheckCircle size={14} className="text-green-500 shrink-0" />
-                  : <XCircle size={14} className="text-red-500 shrink-0" />}
+                {e.success ? <CheckCircle size={14} className="text-green-500 shrink-0" /> : <XCircle size={14} className="text-red-500 shrink-0" />}
               </div>
             ))}
           </div>
 
-          {/* Desktop: table */}
+          {/* Desktop */}
           <div className="hidden md:block overflow-y-auto max-h-[320px]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-white dark:bg-gray-900">
+                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-white dark:bg-gray-900 bg-gray-50/50 dark:bg-gray-800/30">
                   {["Time", "Event", "Result", "IP"].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
                   ))}
@@ -189,11 +196,11 @@ function EventsSection() {
               </thead>
               <tbody>
                 {events.map((e) => (
-                  <tr key={e.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <tr key={e.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                     <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{e.created_at.slice(0, 16).replace("T", " ")}</td>
                     <td className={`px-4 py-2.5 font-mono text-xs font-semibold ${EVENT_COLOR[e.event_type] ?? "text-gray-500"}`}>{e.event_type}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${e.success ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${e.success ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"}`}>
                         {e.success ? "OK" : "FAIL"}
                       </span>
                     </td>
@@ -212,7 +219,7 @@ function EventsSection() {
 export default function SettingsPage() {
   return (
     <div className="p-4 sm:p-6 max-w-screen-lg mx-auto">
-      <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-6">Settings</h1>
+      <PageHeader title="Settings" />
       <div className="flex flex-col gap-5">
         <ChangePasswordSection />
         <SessionsSection />

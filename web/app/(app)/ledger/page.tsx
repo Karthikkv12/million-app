@@ -1,6 +1,8 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { BookOpen } from "lucide-react";
+import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid } from "@/components/ui";
 
 interface LedgerLine {
   entry_id: number; account_name: string; amount: number;
@@ -26,7 +28,6 @@ export default function LedgerPage() {
     queryKey: ["ledger"], queryFn: () => fetchLedger(200), staleTime: 30_000,
   });
 
-  // Aggregate totals by account
   const totals: Record<string, { debit: number; credit: number }> = {};
   for (const r of rows) {
     const acct = r.account_name ?? "Unknown";
@@ -39,20 +40,24 @@ export default function LedgerPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-      <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-5">Ledger</h1>
+      <PageHeader title="Ledger" sub="Double-entry transaction log" />
 
-      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
-      {isError   && <p className="text-sm text-red-400">Failed to load ledger entries.</p>}
+      {isError && <p className="text-sm text-red-400 mb-4">Failed to load ledger entries.</p>}
 
-      {/* Account balance cards */}
-      {Object.keys(totals).length > 0 && (
+      {/* Account balances */}
+      {isLoading ? (
         <>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Account Balances</h2>
+          <SectionLabel>Account Balances</SectionLabel>
+          <div className="mb-6"><SkeletonStatGrid count={4} /></div>
+        </>
+      ) : Object.keys(totals).length > 0 && (
+        <>
+          <SectionLabel>Account Balances</SectionLabel>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             {Object.entries(totals).map(([acct, { debit, credit }]) => {
               const net = credit - debit;
               return (
-                <div key={acct} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                <div key={acct} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 card-hover">
                   <div className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mb-1 truncate">{acct}</div>
                   <div className={`text-xl font-black ${net >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt(net)}</div>
                   <div className="flex gap-2 mt-1.5 text-[10px]">
@@ -67,15 +72,17 @@ export default function LedgerPage() {
         </>
       )}
 
+      {/* Transaction log */}
       {!isLoading && rows.length === 0 && (
-        <p className="text-sm text-gray-400">No ledger entries yet. Deposits and withdrawals will appear here.</p>
+        <EmptyState icon={BookOpen} title="No transactions yet"
+          body="Deposits, withdrawals and trades will appear here." />
       )}
 
       {rows.length > 0 && (
         <>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Transaction Log</h2>
+          <SectionLabel>Transaction Log</SectionLabel>
 
-          {/* Mobile: cards */}
+          {/* Mobile */}
           <div className="flex flex-col gap-2 md:hidden">
             {rows.map((r, i) => {
               const side = (r.side ?? "").toLowerCase();
@@ -99,11 +106,11 @@ export default function LedgerPage() {
             })}
           </div>
 
-          {/* Desktop: table */}
+          {/* Desktop */}
           <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide">
+                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
                   {["Effective", "Account", "Side", "Amount", "Description"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                   ))}
@@ -113,7 +120,7 @@ export default function LedgerPage() {
                 {rows.map((r, i) => {
                   const side = (r.side ?? "").toLowerCase();
                   return (
-                    <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                         {(r.effective_at ?? r.entry_effective_at ?? r.created_at ?? "").slice(0, 10)}
                       </td>

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "@/lib/api";
-import { Search, TrendingUp, TrendingDown, X } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, X, BarChart2 } from "lucide-react";
+import { PageHeader } from "@/components/ui";
 
 interface QuoteBar { date: string; close: number; open?: number; high?: number; low?: number; volume?: number; }
 interface StockHistory { symbol: string; name?: string; bars: QuoteBar[]; current_price?: number; error?: string; }
@@ -106,7 +107,12 @@ function StockDetail({ symbol }: { symbol: string }) {
     queryKey: ["history", symbol], queryFn: () => fetchHistory(symbol), staleTime: 60_000, retry: false,
   });
 
-  if (isLoading) return <p className="text-sm text-gray-400 mt-6 animate-pulse">Loading {symbol}…</p>;
+  if (isLoading) return (
+    <div className="mt-5 space-y-3">
+      <div className="h-20 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+      <div className="h-64 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+    </div>
+  );
 
   if (isError || !data) {
     return (
@@ -171,7 +177,7 @@ export default function SearchPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-md mx-auto">
-      <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-5">Search</h1>
+      <PageHeader title="Search" sub="Look up any stock, ETF, or crypto" />
 
       <form onSubmit={handleSearch} className="flex gap-2 mb-1">
         <div className="relative flex-1">
@@ -188,6 +194,13 @@ export default function SearchPage() {
           View
         </button>
       </form>
+
+      {!chosen && (
+        <div className="mt-12 flex flex-col items-center gap-3 text-center text-gray-400">
+          <BarChart2 size={40} className="opacity-30" />
+          <p className="text-sm">Enter a ticker above and press <span className="font-semibold">View</span></p>
+        </div>
+      )}
 
       {chosen && (
         <>
