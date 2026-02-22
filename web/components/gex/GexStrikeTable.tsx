@@ -38,7 +38,7 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
     return expiries.map((exp, ei) => {
       const gexMap: Record<number, number> = {};
       (heatmap_strikes ?? []).forEach((s, si) => {
-        gexMap[s] = (heatmap_values?.[si]?.[ei]) ?? 0;
+        gexMap[s] = (heatmap_values?.[ei]?.[si]) ?? 0;
       });
       const vmax = Math.max(...Object.values(gexMap).map(Math.abs), 1);
       const kingStrike = Object.entries(gexMap).reduce(
