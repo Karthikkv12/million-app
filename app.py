@@ -15,7 +15,8 @@ st.set_page_config(
 
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 from urllib.parse import quote
 from ui.auth import (
     ensure_canonical_host,
@@ -56,7 +57,6 @@ def _set_query_param(name: str, value: str) -> None:
         qp = st.query_params  # type: ignore[attr-defined]
         qp[name] = value
     except Exception:
-        # Older API: must set all query params at once.
         try:
             qp = st.experimental_get_query_params()
             qp[name] = [value]
@@ -69,231 +69,305 @@ def _set_query_param(name: str, value: str) -> None:
 @st.cache_data(ttl=24*3600)
 def get_ticker_details():
     try:
-        # Fetch the "Full" JSONs (contains Symbol AND Name)
         url_nasdaq = "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nasdaq/nasdaq_full_tickers.json"
         url_nyse = "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_full_tickers.json"
-        
-        # Load as DataFrames
         df_nasdaq = pd.read_json(url_nasdaq)
         df_nyse = pd.read_json(url_nyse)
-        
-        # Combine
         df_all = pd.concat([df_nasdaq, df_nyse])
-        
-        # Create a dictionary: {"AAPL": "Apple Inc.", "MSFT": "Microsoft Corp..."}
-        # We zip them together to create a fast lookup map
         ticker_map = dict(zip(df_all['symbol'], df_all['name']))
-        
-        # Create the list of keys (symbols) sorted
         ticker_list = sorted(ticker_map.keys())
-        
-        # Move popular stocks to the top for convenience
         priority = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'MSFT', 'AMZN', 'GOOGL', 'SPY', 'QQQ']
         for p in reversed(priority):
             if p in ticker_list:
                 ticker_list.insert(0, ticker_list.pop(ticker_list.index(p)))
-                
         return ticker_list, ticker_map
-
     except Exception as e:
-        print(f"Error: {e}")
-        # Fallback if download fails
         defaults = ["NVDA", "AAPL", "TSLA", "AMD", "MSFT"]
-        default_map = {k: k for k in defaults} # No names in fallback
-        return defaults, default_map
+        return defaults, {k: k for k in defaults}
 
-# Load Data (Returns two values: the List and the Dictionary)
 TICKERS, TICKER_MAP = get_ticker_details()
 
-
-
-# --- CSS STYLING ---
+# ── GLOBAL STYLES ─────────────────────────────────────────────────────────────
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-    /* Top bar (shared) */
-    .top-band {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 50px;
-        background: #000;
-        z-index: 2147483647;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 16px;
-        box-sizing: border-box;
-    }
-    .top-band .brand {
-        font-size: 22px;
-        font-weight: 800;
-        color: #00c805;
-        line-height: 1;
-    }
-    .top-band a.brand { text-decoration: none; }
-    .top-band .nav a {
-        color: #fff;
-        font-weight: 800;
-        text-decoration: none;
-        margin-left: 16px;
-    }
-    .top-band .nav a:hover { color: #00c805; }
-    .stApp { padding-top: 50px; }
-    
-    /* Hide Streamlit sidebar (all navigation happens in the top band + pages) */
-    [data-testid="stSidebar"],
-    [data-testid="stSidebarCollapseButton"] {
-        display: none !important;
-    }
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
 
-    /* Dark mode: make everything black and keep sidebar text readable */
-    @media (prefers-color-scheme: dark) {
-        .stApp { background: #000 !important; }
-        [data-testid="stAppViewContainer"],
-        [data-testid="stMain"],
-        [data-testid="stHeader"],
-        [data-testid="stToolbar"] {
-            background: #000 !important;
-        }
+/* ── Full dark background ───────────────────────────────────────────────── */
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+section[data-testid="stMain"] > div:first-child {
+    background: #0d0d0d !important;
+}
+[data-testid="stMainBlockContainer"] {
+    background: transparent !important;
+    padding-top: 70px !important;
+    max-width: 1400px !important;
+}
 
-        [data-testid="stSidebar"],
-        [data-testid="stSidebarContent"],
-        div[data-testid="stSidebarUserContent"] {
-            background: #000 !important;
-            border-right: none !important;
-        }
+/* ── Hide chrome ────────────────────────────────────────────────────────── */
+[data-testid="stSidebar"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+footer { display: none !important; }
 
-        /* Ensure sidebar text is visible */
-        [data-testid="stSidebar"] * { color: #fff !important; }
+/* ── Top nav bar ────────────────────────────────────────────────────────── */
+.topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: #111;
+    border-bottom: 1px solid #222;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    box-sizing: border-box;
+}
+.topbar-brand {
+    font-size: 20px;
+    font-weight: 800;
+    color: #00c805;
+    text-decoration: none;
+    letter-spacing: -0.5px;
+}
+.topbar-nav { display: flex; align-items: center; gap: 4px; }
+.topbar-nav a {
+    color: #888;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.15s;
+}
+.topbar-nav a:hover { color: #fff; background: #1e1e1e; }
+.topbar-nav a.active { color: #fff; background: #1e1e1e; }
+.topbar-nav .nav-logout {
+    color: #555;
+    margin-left: 8px;
+    border: 1px solid #2a2a2a;
+}
+.topbar-nav .nav-logout:hover { color: #ff4444; border-color: #ff4444; background: transparent; }
+.topbar-user {
+    font-size: 12px;
+    color: #555;
+    font-weight: 500;
+}
 
-        /* Inputs/Selects: keep readable on black */
-        .stTextInput input, .stNumberInput input, .stDateInput input,
-        .stSelectbox div[data-baseweb="select"] > div {
-            color: #fff !important;
-            border-color: rgba(255,255,255,0.18) !important;
-        }
-    }
-    
-    /* INPUT FIELDS (Clean Look) */
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] > div { 
-        background-color: transparent !important; border: 1px solid #f0f2f6; 
-    }
-    .stTextInput input:focus, .stNumberInput input:focus { 
-        border-color: #00c805 !important; box-shadow: none !important; 
-    }
+/* ── Metric cards ───────────────────────────────────────────────────────── */
+.metric-card {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 14px;
+    padding: 20px 24px;
+}
+.metric-card .label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+}
+.metric-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+.metric-card .change {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 6px;
+}
+.metric-card .change.pos { color: #00c805; }
+.metric-card .change.neg { color: #ff4444; }
+.metric-card .change.neu { color: #555; }
 
-    /* --- BUTTON STYLES --- */
-    
-    /* Primary Button (Use for: Delete, Submit, Transfer) -> Green Background, White Text */
-    button[kind="primary"] { 
-        background-color: #00c805 !important; 
-        color: white !important; 
-        border: none !important; 
-        border-radius: 8px !important; 
-        font-weight: 700 !important; 
-        transition: 0.2s;
-    }
-    button[kind="primary"]:hover { 
-        background-color: #00a804 !important; 
-    }
+/* ── Section headers ────────────────────────────────────────────────────── */
+.section-header {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 32px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.section-header a {
+    font-size: 12px;
+    font-weight: 500;
+    color: #00c805;
+    text-decoration: none;
+    margin-left: auto;
+}
 
-    /* Secondary Button (Use for: Sort Headers) -> Transparent, No Border, Green Text */
-    button[kind="secondary"] { 
-        background-color: transparent !important; 
-        color: #00c805 !important; 
-        border: none !important; 
-        font-weight: 800 !important; 
-        box-shadow: none !important;
-        padding: 0px !important;
-    }
-    button[kind="secondary"]:hover { 
-        color: #008f03 !important; 
-        background-color: transparent !important;
-    }
-    button[kind="secondary"]:focus { 
-        color: #00c805 !important; 
-        border-color: transparent !important; 
-        box-shadow: none !important;
-    }
+/* ── Quick action tiles ─────────────────────────────────────────────────── */
+.quick-tile {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+    display: block;
+}
+.quick-tile:hover { border-color: #00c805; background: #0f1f0f; }
+.quick-tile .tile-icon { font-size: 28px; margin-bottom: 8px; }
+.quick-tile .tile-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ccc;
+}
+.quick-tile .tile-sub {
+    font-size: 11px;
+    color: #555;
+    margin-top: 3px;
+}
 
-    /* Grid Alignment */
-    div[data-testid="column"] { vertical-align: middle; }
-    div[data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; }
-    </style>
+/* ── Activity row ───────────────────────────────────────────────────────── */
+.activity-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #1a1a1a;
+}
+.activity-row:last-child { border-bottom: none; }
+.activity-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #00c805;
+    margin-right: 14px;
+    flex-shrink: 0;
+}
+.activity-text { flex: 1; font-size: 13px; color: #ccc; }
+.activity-meta { font-size: 11px; color: #444; }
+
+/* ── Table overrides ────────────────────────────────────────────────────── */
+[data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
+
+/* ── Button styles ──────────────────────────────────────────────────────── */
+button[kind="primary"] {
+    background: #00c805 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+}
+button[kind="primary"]:hover { background: #00a804 !important; }
+button[kind="secondary"] {
+    background: transparent !important;
+    color: #00c805 !important;
+    border: none !important;
+    font-weight: 700 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+.stTextInput input, .stNumberInput input, .stDateInput input,
+.stSelectbox div[data-baseweb="select"] > div {
+    background: #161616 !important;
+    border-color: #2a2a2a !important;
+    color: #fff !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus {
+    border-color: #00c805 !important;
+    box-shadow: none !important;
+}
+
+/* ── Metrics ────────────────────────────────────────────────────────────── */
+div[data-testid="stMetricValue"] { font-size: 26px; font-weight: 700; color: #fff; }
+div[data-testid="stMetricLabel"] { font-size: 12px; color: #666 !important; }
+div[data-testid="stMetricDelta"] { font-size: 13px; }
+
+/* ── Divider ────────────────────────────────────────────────────────────── */
+hr { border-color: #1e1e1e !important; margin: 24px 0 !important; }
+</style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR LOGIC ---
-# Normalize hostname (localhost vs 127.0.0.1) so auth cookies match across refresh.
+# ── AUTH GATE ─────────────────────────────────────────────────────────────────
 ensure_canonical_host()
-
-# Restore auth state after browser refresh (Streamlit resets session_state on refresh)
 restore_auth_from_cookie()
 
-# Query-param logout action (used by the top-band Logout link)
 if (_get_query_param("action") or "").lower() == "logout":
     logout_and_rerun()
     st.stop()
 
-# If not signed in, show the login page (blocking). After login the page will rerun.
 if 'user' not in st.session_state:
     login_page()
     st.stop()
 
-# Fixed top bar (brand routes to Main, nav on the right)
+# ── NAV BAR ───────────────────────────────────────────────────────────────────
 _sid = _get_query_param("sid")
-_sid_q = f"sid={quote(_sid)}&" if _sid else ""
-_home_href = f"?{_sid_q}page=main"
-_investment_href = f"?{_sid_q}page=investment"
-_gamma_href = f"?{_sid_q}page=gamma"
-_budget_href = f"?{_sid_q}page=budget"
-_settings_href = f"?{_sid_q}page=settings"
-_logout_href = f"?{_sid_q}action=logout"
+_q = f"sid={quote(_sid)}&" if _sid else ""
+page = (_get_query_param("page") or "home").lower()
+
+def _href(p):
+    return f"?{_q}page={p}"
+
+def _nav_link(label, p):
+    active = " active" if page == p else ""
+    return f'<a href="{_href(p)}" target="_self" class="{active}">{label}</a>'
+
+username = st.session_state.get("user", "")
 st.markdown(
-    (
-        '<div class="top-band">'
-        f'<a class="brand" href="{_home_href}" target="_self">OptionFlow</a>'
-        '<div class="nav">'
-        f'<a href="{_gamma_href}" target="_self">Gamma</a>'
-        f'<a href="{_settings_href}" target="_self">Settings</a>'
-        f'<a href="{_logout_href}" target="_self">Logout</a>'
-        '</div>'
-        '</div>'
-    ),
+    f"""
+    <div class="topbar">
+        <a class="topbar-brand" href="{_href('home')}" target="_self">OptionFlow</a>
+        <div class="topbar-nav">
+            {_nav_link("Dashboard", "home")}
+            {_nav_link("Portfolio", "investment")}
+            {_nav_link("Options Flow", "gamma")}
+            {_nav_link("P&amp;L", "pnl")}
+            {_nav_link("Settings", "settings")}
+            <a href="?{_q}action=logout" target="_self" class="nav-logout">Sign out</a>
+        </div>
+        <div class="topbar-user">👤 {username}</div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
-# --- MAIN DASHBOARD LOGIC ---
+# ── TOKEN REFRESH ─────────────────────────────────────────────────────────────
 token = st.session_state.get('token')
 if not token:
-    # If user is somehow set without a token, force login page.
-    if 'user' in st.session_state:
-        del st.session_state['user']
-    if 'user_id' in st.session_state:
-        del st.session_state['user_id']
+    for k in ('user', 'user_id'):
+        st.session_state.pop(k, None)
     login_page()
     st.stop()
 
-# Best-effort: refresh access token if nearing expiry.
 ensure_fresh_token(min_ttl_seconds=60)
 token = st.session_state.get('token')
-
 if not token:
     login_page()
     st.stop()
 
+# ── DATA LOAD ─────────────────────────────────────────────────────────────────
 trades_df, cash_df, budget_df = api_load_data(token)
+cash_balance = api_get_cash_balance(token, currency="USD")
 
-portfolio_val = 0.0; total_trades = 0
+# Portfolio calculations
+portfolio_val = 0.0
+total_trades = 0
+open_positions = 0
 if not trades_df.empty:
     invested = (trades_df['entry_price'] * trades_df['quantity']).sum()
     portfolio_val = invested * 1.10
     total_trades = len(trades_df)
-
-cash_balance = api_get_cash_balance(token, currency="USD")
+    if 'is_closed' in trades_df.columns:
+        open_positions = int((trades_df['is_closed'] == 0).sum())
+    else:
+        open_positions = total_trades
 
 other_assets = 0.0
 if not budget_df.empty:
@@ -305,24 +379,176 @@ if not budget_df.empty:
 
 total_nw = portfolio_val + cash_balance + other_assets
 
-page = (_get_query_param("page") or "main").lower()
-# Hidden pages — keep routing logic intact but redirect to main if accessed directly
-_HIDDEN_PAGES = {"investment", "stock", "budget", "pnl"}
-if page not in {"main", "investment", "stock", "budget", "settings", "pnl", "gamma"}:
-    page = "main"
-if page in _HIDDEN_PAGES:
-    page = "main"
+# ── ROUTING ───────────────────────────────────────────────────────────────────
+if page not in {"home", "investment", "stock", "budget", "settings", "pnl", "gamma"}:
+    page = "home"
 
-if page == "main":
+# ── HOME / DASHBOARD ──────────────────────────────────────────────────────────
+if page == "home":
+    now = datetime.now()
+    hour = now.hour
+    if hour < 12:
+        greeting = "Good morning"
+    elif hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
+
     st.markdown(
-        f"<h1 style='font-size: 80px; font-weight: 800; margin-top: -20px;'>${total_nw:,.2f}</h1>",
+        f"<div style='font-size:13px;color:#555;margin-bottom:4px;'>{now.strftime('%A, %B %d %Y · %H:%M')}</div>"
+        f"<div style='font-size:32px;font-weight:800;color:#fff;margin-bottom:32px;'>{greeting}, {username.title()} 👋</div>",
         unsafe_allow_html=True,
     )
-    st.caption(f"Total Net Worth • Updated {datetime.now().strftime('%H:%M')}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Investing", f"${portfolio_val:,.2f}", f"{total_trades} Positions")
-    c2.metric("Buying Power", f"${cash_balance:,.2f}", "Cash Available")
-    c3.metric("Other Assets", f"${other_assets:,.2f}", "Real Estate / Savings")
+
+    # ── Top KPI row ──────────────────────────────────────────────────────────
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="label">Total Net Worth</div>
+            <div class="value">${total_nw:,.0f}</div>
+            <div class="change neu">↕ All assets combined</div>
+        </div>""", unsafe_allow_html=True)
+
+    with k2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="label">Portfolio Value</div>
+            <div class="value">${portfolio_val:,.0f}</div>
+            <div class="change {'pos' if open_positions > 0 else 'neu'}">{open_positions} open position{'s' if open_positions != 1 else ''}</div>
+        </div>""", unsafe_allow_html=True)
+
+    with k3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="label">Buying Power</div>
+            <div class="value">${cash_balance:,.0f}</div>
+            <div class="change neu">Cash available</div>
+        </div>""", unsafe_allow_html=True)
+
+    with k4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="label">Other Assets</div>
+            <div class="value">${other_assets:,.0f}</div>
+            <div class="change neu">Real estate · savings</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+
+    # ── Quick actions ─────────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">Quick Actions</div>', unsafe_allow_html=True)
+    qa1, qa2, qa3, qa4, qa5 = st.columns(5)
+
+    tiles = [
+        (qa1, "📊", "Portfolio", "Positions & trades", "investment"),
+        (qa2, "🌊", "Options Flow", "GEX & gamma analysis", "gamma"),
+        (qa3, "📈", "P&L", "Profit & loss report", "pnl"),
+        (qa4, "💰", "Budget", "Income & expenses", "budget"),
+        (qa5, "⚙️", "Settings", "Account settings", "settings"),
+    ]
+    for col, icon, label, sub, target in tiles:
+        with col:
+            st.markdown(f"""
+            <a href="{_href(target)}" target="_self" class="quick-tile">
+                <div class="tile-icon">{icon}</div>
+                <div class="tile-label">{label}</div>
+                <div class="tile-sub">{sub}</div>
+            </a>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # ── Portfolio snapshot + recent trades ────────────────────────────────────
+    left_col, right_col = st.columns([2, 1])
+
+    with left_col:
+        st.markdown(
+            f'<div class="section-header">Portfolio Snapshot'
+            f'<a href="{_href("investment")}" target="_self">View all →</a></div>',
+            unsafe_allow_html=True,
+        )
+        if trades_df.empty:
+            st.markdown(
+                "<div style='background:#161616;border:1px solid #222;border-radius:14px;"
+                "padding:40px;text-align:center;color:#444;font-size:14px;'>"
+                "No positions yet. <a href='?page=investment' style='color:#00c805'>Add your first trade →</a>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            display_cols = ['symbol', 'quantity', 'entry_price']
+            available = [c for c in display_cols if c in trades_df.columns]
+            preview = trades_df[available].head(6).copy()
+            if 'entry_price' in preview.columns:
+                preview['entry_price'] = preview['entry_price'].apply(lambda x: f"${x:,.2f}")
+            if 'quantity' in preview.columns:
+                preview['quantity'] = preview['quantity'].apply(lambda x: f"{x:,.0f}")
+            preview.columns = [c.replace('_', ' ').title() for c in preview.columns]
+            st.dataframe(preview, use_container_width=True, hide_index=True)
+
+    with right_col:
+        st.markdown(
+            '<div class="section-header">Market Hours</div>',
+            unsafe_allow_html=True,
+        )
+        now_et_hour = (now + timedelta(hours=0)).hour  # adjust if needed
+        market_open = 9 <= now.hour < 16
+        market_status = "🟢 Market Open" if market_open else "🔴 Market Closed"
+        pre_market = now.hour < 9
+        after_hours = now.hour >= 16
+
+        st.markdown(f"""
+        <div class="metric-card" style="margin-bottom:12px;">
+            <div class="label">NYSE / NASDAQ</div>
+            <div style="font-size:16px;font-weight:700;color:#fff;margin:6px 0">{market_status}</div>
+            <div style="font-size:11px;color:#444;">
+                {'Pre-market active (4:00–9:30 AM ET)' if pre_market else
+                 'After-hours active (4:00–8:00 PM ET)' if after_hours else
+                 'Regular session 9:30 AM–4:00 PM ET'}
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Today</div>
+            <div style="font-size:15px;font-weight:600;color:#ccc;margin-top:4px">{now.strftime('%A')}</div>
+            <div style="font-size:12px;color:#444;margin-top:4px">{now.strftime('%B %d, %Y')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ── PORTFOLIO PAGE ────────────────────────────────────────────────────────────
+elif page == "investment":
+    st.markdown('<div class="section-header" style="margin-top:0">Portfolio</div>', unsafe_allow_html=True)
+    trade_sidebar_form(TICKERS, TICKER_MAP)
+    st.divider()
+    render_live_positions(trades_df)
+    st.divider()
+    render_accounts_and_holdings_section(title="Holdings")
+    st.divider()
+    render_orders_section(tickers=TICKERS, ticker_map=TICKER_MAP)
+
+# ── INDIVIDUAL STOCK ──────────────────────────────────────────────────────────
+elif page == "stock":
+    sym = _get_query_param("symbol") or ""
+    render_stock_page(symbol=str(sym), ticker_map=TICKER_MAP)
+
+# ── P&L PAGE ──────────────────────────────────────────────────────────────────
+elif page == "pnl":
+    st.markdown('<div class="section-header" style="margin-top:0">Profit &amp; Loss</div>', unsafe_allow_html=True)
+    render_profit_and_loss_page(trades_df)
+
+# ── GAMMA / OPTIONS FLOW ──────────────────────────────────────────────────────
+elif page == "gamma":
+    render_gamma_exposure_page()
+
+# ── BUDGET ────────────────────────────────────────────────────────────────────
+elif page == "budget":
+    st.markdown('<div class="section-header" style="margin-top:0">Budget &amp; Assets</div>', unsafe_allow_html=True)
+    budget_entry_form(budget_df)
+
+# ── SETTINGS ─────────────────────────────────────────────────────────────────
+elif page == "settings":
+    render_settings_page()
+
 
 def on_grid_change(key, trade_id, field):
     if 'user' not in st.session_state:
@@ -331,44 +557,22 @@ def on_grid_change(key, trade_id, field):
     new_val = st.session_state[key]
     trades, _, _ = api_load_data(token)
     row = trades[trades['id'] == trade_id].iloc[0]
-    data = {'symbol': row['symbol'], 'strategy': row['strategy'], 'action': row['action'], 'qty': row['quantity'], 'price': row['entry_price'], 'date': row['entry_date']}
+    data = {
+        'symbol': row['symbol'], 'strategy': row['strategy'],
+        'action': row['action'], 'qty': row['quantity'],
+        'price': row['entry_price'], 'date': row['entry_date'],
+    }
     if field == 'symbol': data['symbol'] = new_val
     elif field == 'action': data['action'] = new_val
     elif field == 'strategy': data['strategy'] = new_val
     elif field == 'qty': data['qty'] = new_val
     elif field == 'price': data['price'] = new_val
     elif field == 'date': data['date'] = new_val
-    # canonicalize action and symbol before calling update_trade
     data['symbol'] = str(data['symbol']).upper()
     data['action'] = canonical_action(data['action'])
-    api_update_trade(token, trade_id, data['symbol'], data['strategy'], data['action'], data['qty'], data['price'], data['date'])
+    api_update_trade(token, trade_id, data['symbol'], data['strategy'],
+                     data['action'], data['qty'], data['price'], data['date'])
     st.toast(f"Updated {field}!", icon="💾")
 
 
-# (canonical helpers moved to `ui.utils`)
 
-if page == "investment":
-    trade_sidebar_form(TICKERS, TICKER_MAP)
-    st.divider()
-    render_live_positions(trades_df)
-    st.divider()
-    render_accounts_and_holdings_section(title="Holdings")
-    st.divider()
-    render_orders_section(tickers=TICKERS, ticker_map=TICKER_MAP)
-    st.divider()
-    _pnl_href = f"?{_sid_q}page=pnl"
-    st.markdown(
-        f"""<h3 style="margin: 0;">Profit &amp; Loss <a href="{_pnl_href}" target="_self" style="text-decoration:none;">&gt;</a></h3>""",
-        unsafe_allow_html=True,
-    )
-elif page == "stock":
-    sym = _get_query_param("symbol") or ""
-    render_stock_page(symbol=str(sym), ticker_map=TICKER_MAP)
-elif page == "pnl":
-    render_profit_and_loss_page(trades_df)
-elif page == "gamma":
-    render_gamma_exposure_page()
-elif page == "budget":
-    budget_entry_form(budget_df)
-elif page == "settings":
-    render_settings_page()
