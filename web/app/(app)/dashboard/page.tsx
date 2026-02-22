@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import {
   Plus, X, TrendingUp, TrendingDown, DollarSign, Activity, Clock, ArrowRight,
 } from "lucide-react";
-import { PageHeader, SectionLabel, SkeletonStatGrid, Tabs, Badge } from "@/components/ui";
+import { PageHeader, SectionLabel, SkeletonStatGrid, Tabs, Badge, RefreshButton } from "@/components/ui";
 
 const QUICK = [
   { href: "/search",       label: "New Trade",   sub: "Search & place order", color: "from-blue-500 to-blue-700" },
@@ -89,6 +89,13 @@ export default function DashboardPage() {
   const cashQ   = useQuery({ queryKey: ["cash-balance"], queryFn: () => fetchCashBalance(), staleTime: 30_000 });
   const ordersQ = useQuery({ queryKey: ["orders"],       queryFn: fetchOrders,          staleTime: 30_000 });
 
+  const handleRefresh = () => {
+    tradesQ.refetch();
+    cashQ.refetch();
+    ordersQ.refetch();
+  };
+  const isRefreshing = tradesQ.isFetching || cashQ.isFetching || ordersQ.isFetching;
+
   const trades = tradesQ.data ?? [];
   const { pnl, openCount, closedCount } = calcPnl(trades);
   const cash = cashQ.data?.balance ?? null;
@@ -113,11 +120,14 @@ export default function DashboardPage() {
         title={user?.username ? `Hey, ${user.username} 👋` : "Dashboard"}
         sub="Your portfolio at a glance."
         action={
-          <button onClick={() => setShowCash(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition shadow-sm">
-            <Plus size={15} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Cash</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <RefreshButton onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+            <button onClick={() => setShowCash(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition shadow-sm">
+              <Plus size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Cash</span>
+            </button>
+          </div>
         }
       />
 

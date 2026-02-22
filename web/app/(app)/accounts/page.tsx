@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchAccounts, fetchCashBalance, Account, api } from "@/lib/api";
 import { Plus, X, Wallet, TrendingUp } from "lucide-react";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState, RefreshButton } from "@/components/ui";
 
 interface Holding {
   id: number; account_id: number; symbol: string;
@@ -106,7 +106,7 @@ function UpsertHoldingForm({ accountId, onDone }: { accountId: number; onDone: (
 
 export default function AccountsPage() {
   const qc = useQueryClient();
-  const { data: accounts = [], isLoading } = useQuery<Account[]>({ queryKey: ["accounts"], queryFn: fetchAccounts, staleTime: 30_000 });
+  const { data: accounts = [], isLoading, refetch, isFetching } = useQuery<Account[]>({ queryKey: ["accounts"], queryFn: fetchAccounts, staleTime: 30_000 });
   const cashQ = useQuery({ queryKey: ["cash-balance"], queryFn: () => fetchCashBalance(), staleTime: 30_000 });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -119,6 +119,9 @@ export default function AccountsPage() {
   const holdingsQ = useHoldings(activeId);
   const holdings  = holdingsQ.data ?? [];
 
+  const handleRefresh = () => { refetch(); cashQ.refetch(); holdingsQ.refetch(); };
+  const isRefreshing  = isFetching || cashQ.isFetching;
+
   const deleteHolding = useMutation({
     mutationFn: (id: number) => api.del(`/holdings/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["holdings", activeId] }),
@@ -130,10 +133,13 @@ export default function AccountsPage() {
         title="Accounts"
         sub={cashQ.data?.balance != null ? `Cash balance: $${cashQ.data.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : undefined}
         action={
-          <button onClick={() => setShowAddAcct((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showAddAcct ? "bg-[var(--surface-2)] text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
-            {showAddAcct ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Account</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <RefreshButton onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+            <button onClick={() => setShowAddAcct((v) => !v)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showAddAcct ? "bg-[var(--surface-2)] text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+              {showAddAcct ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Account</>}
+            </button>
+          </div>
         }
       />
 

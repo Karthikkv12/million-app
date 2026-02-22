@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchOrders, Order, api } from "@/lib/api";
 import { clsx } from "clsx";
 import { Plus, X, ClipboardList } from "lucide-react";
-import { PageHeader, EmptyState, SkeletonCard, Badge } from "@/components/ui";
+import { PageHeader, EmptyState, SkeletonCard, Badge, RefreshButton } from "@/components/ui";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING:   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
@@ -146,7 +146,7 @@ function OrderCard({ o, onFill }: { o: Order; onFill: () => void }) {
 }
 
 export default function OrdersPage() {
-  const { data: orders = [], isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders, staleTime: 20_000 });
+  const { data: orders = [], isLoading, refetch, isFetching } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders, staleTime: 20_000 });
   const [showNew, setShowNew] = useState(false);
   const [filling, setFilling] = useState<Order | null>(null);
   const [filter, setFilter]   = useState<string>("ALL");
@@ -161,12 +161,15 @@ export default function OrdersPage() {
       <PageHeader
         title="Orders"
         action={
-          <button onClick={() => setShowNew((v) => !v)}
-            className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition",
-              showNew ? "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
-            )}>
-            {showNew ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Order</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <RefreshButton onRefresh={refetch} isRefreshing={isFetching} />
+            <button onClick={() => setShowNew((v) => !v)}
+              className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition",
+                showNew ? "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
+              )}>
+              {showNew ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Order</>}
+            </button>
+          </div>
         }
       />
 

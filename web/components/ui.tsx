@@ -1,6 +1,6 @@
 // Shared UI primitives
-import React from "react";
-import { LucideIcon } from "lucide-react";
+import React, { useState } from "react";
+import { LucideIcon, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -129,6 +129,56 @@ export function PageHeader({ title, sub, action }: PageHeaderProps) {
       </div>
       {action && <div className="shrink-0 mt-0.5">{action}</div>}
     </div>
+  );
+}
+
+// ── Refresh button ───────────────────────────────────────────────────────────
+export function RefreshButton({ onRefresh, isRefreshing = false }: {
+  onRefresh: () => void;
+  isRefreshing?: boolean;
+}) {
+  const [spinning, setSpinning] = useState(false);
+
+  const handleClick = () => {
+    if (spinning || isRefreshing) return;
+    setSpinning(true);
+    onRefresh();
+    setTimeout(() => setSpinning(false), 800);
+  };
+
+  const active = spinning || isRefreshing;
+
+  return (
+    <button
+      onClick={handleClick}
+      aria-label="Refresh"
+      className={clsx(
+        "relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200",
+        "bg-[var(--surface)] border border-[var(--border)]",
+        "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+        "active:scale-90 shadow-sm",
+        active && "border-blue-400 bg-blue-50 dark:bg-blue-900/20",
+      )}
+    >
+      {/* outer glow ring */}
+      <span
+        className={clsx(
+          "absolute inset-0 rounded-full transition-opacity duration-300",
+          active
+            ? "opacity-100 animate-[refresh-pulse_1s_ease-out_infinite]"
+            : "opacity-0 group-hover:opacity-100",
+        )}
+        style={{ boxShadow: "0 0 0 0 rgba(99,130,251,0.5)" }}
+      />
+      <RefreshCw
+        size={15}
+        strokeWidth={2.2}
+        className={clsx(
+          "text-gray-400 transition-colors duration-200",
+          active ? "text-blue-500 animate-[spin_0.7s_linear_infinite]" : "hover:text-blue-500",
+        )}
+      />
+    </button>
   );
 }
 

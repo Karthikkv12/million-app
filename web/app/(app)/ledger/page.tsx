@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { BookOpen } from "lucide-react";
-import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid } from "@/components/ui";
+import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid, RefreshButton } from "@/components/ui";
 
 interface LedgerLine {
   entry_id: number; account_name: string; amount: number;
@@ -24,7 +24,7 @@ const SIDE_CLS: Record<string, string> = {
 const fmt = (v: number) => "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
 export default function LedgerPage() {
-  const { data: rows = [], isLoading, isError } = useQuery<LedgerEntry[]>({
+  const { data: rows = [], isLoading, isError, refetch, isFetching } = useQuery<LedgerEntry[]>({
     queryKey: ["ledger"], queryFn: () => fetchLedger(200), staleTime: 30_000,
   });
 
@@ -40,7 +40,9 @@ export default function LedgerPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-      <PageHeader title="Ledger" sub="Double-entry transaction log" />
+      <PageHeader title="Ledger" sub="Double-entry transaction log"
+        action={<RefreshButton onRefresh={refetch} isRefreshing={isFetching} />}
+      />
 
       {isError && <p className="text-sm text-red-400 mb-4">Failed to load ledger entries.</p>}
 

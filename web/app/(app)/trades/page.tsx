@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchTrades, Trade, api } from "@/lib/api";
 import { BarChart2, X } from "lucide-react";
-import { PageHeader, EmptyState, SkeletonCard, Tabs, Badge } from "@/components/ui";
+import { PageHeader, EmptyState, SkeletonCard, Tabs, Badge, RefreshButton } from "@/components/ui";
 
 function isOpen(t: Trade) { return t.exit_price == null; }
 
@@ -106,7 +106,7 @@ function TradeCard({ t, onClose, onDelete }: { t: Trade; onClose: () => void; on
 }
 
 export default function TradesPage() {
-  const { data: trades = [], isLoading } = useQuery({ queryKey: ["trades"], queryFn: fetchTrades, staleTime: 30_000 });
+  const { data: trades = [], isLoading, refetch, isFetching } = useQuery({ queryKey: ["trades"], queryFn: fetchTrades, staleTime: 30_000 });
   const [closing, setClosing] = useState<Trade | null>(null);
   const [tab, setTab]         = useState<"open" | "closed">("open");
   const deleteMut = useDeleteTrade();
@@ -123,6 +123,7 @@ export default function TradesPage() {
       <PageHeader
         title="Trades"
         sub={closed.length > 0 ? `Realized P/L: ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}` : undefined}
+        action={<RefreshButton onRefresh={refetch} isRefreshing={isFetching} />}
       />
 
       {/* Tabs */}

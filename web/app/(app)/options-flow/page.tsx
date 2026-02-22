@@ -5,7 +5,7 @@ import { fetchGex, GexResult } from "@/lib/api";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
 import { fmtGex as fmtGexUtil } from "@/lib/gex";
 import { Search, TrendingUp } from "lucide-react";
-import { PageHeader, SkeletonStatGrid, ErrorBanner } from "@/components/ui";
+import { PageHeader, SkeletonStatGrid, ErrorBanner, RefreshButton } from "@/components/ui";
 
 const STRIKE_OPTIONS = [10, 20, 30, 40, 50] as const;
 
@@ -15,7 +15,7 @@ export default function OptionsFlowPage() {
   const [nStrikes, setNStrikes]   = useState<number>(20);
   const [expiryFilter, setExpiry] = useState<string[] | null>(null);
 
-  const { data, isLoading, isError } = useQuery<GexResult>({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<GexResult>({
     queryKey: ["gex", ticker],
     queryFn:  () => fetchGex(ticker),
     staleTime: 30_000,
@@ -51,7 +51,9 @@ export default function OptionsFlowPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-      <PageHeader title="Options Flow" sub={`GEX analysis — ${ticker}`} />
+      <PageHeader title="Options Flow" sub={`GEX analysis — ${ticker}`}
+        action={<RefreshButton onRefresh={refetch} isRefreshing={isFetching} />}
+      />
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
