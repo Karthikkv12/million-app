@@ -1086,7 +1086,7 @@ def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
 def create_user(username, password):
     session = get_session()
     try:
-        username = str(username).strip()
+        username = str(username).strip().lower()
         if not username:
             raise ValueError('username required')
         from database.models import User
@@ -1122,7 +1122,7 @@ def authenticate_user(username, password):
     session = get_session()
     try:
         from database.models import User
-        uname = str(username).strip()
+        uname = str(username).strip().lower()
         u = session.query(User).filter(User.username == uname).first()
         if not u:
             return None

@@ -672,55 +672,140 @@ def login_page():
     """
     st.markdown("""
     <style>
-    /* Keep the CTA clean: remove any focus outline/border on this page */
-    button[kind="primary"],
-    button[kind="primary"]:focus,
-    button[kind="primary"]:focus-visible {
-        outline: none !important;
-        box-shadow: none !important;
-        border: none !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* ── Dark page background ───────────────────────────────────────────── */
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    section[data-testid="stMain"] > div:first-child {
+        background: #0d0d0d !important;
+    }
+    [data-testid="stMainBlockContainer"] {
+        background: transparent !important;
+        padding-top: 0 !important;
     }
 
-    /* Exactly center the landing CTA in the viewport area below the 50px top band.
-       We position the *button element* itself (not the container), because the container
-       can be full-width and look visually off-center. */
-    #landing-cta + div[data-testid="stButton"] button {
-        position: fixed;
-        top: calc(50% + 25px);
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 2147483646;
-        margin: 0 !important;
-    }
-    .top-band {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 50px;
-        background: #000;
-        z-index: 2147483647;
-        display: flex;
-        align-items: center;
-        padding-left: 16px;
-        box-sizing: border-box;
-    }
-    .top-band .brand {
-        font-size: 28px;
+    /* Hide Streamlit chrome */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stHeader"],
+    [data-testid="stToolbar"],
+    footer { display: none !important; }
+
+    /* ── Logo / tagline ─────────────────────────────────────────────────── */
+    .auth-logo {
+        font-size: 112px;
         font-weight: 800;
         color: #00c805;
+        letter-spacing: -4px;
+        text-align: center;
+        margin-top: 72px;
+        margin-bottom: 4px;
         line-height: 1;
     }
-    .login-box {
-        max-width: 480px;
-        margin: 140px auto;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    .auth-tagline {
+        font-size: 14px;
+        color: #666;
         text-align: center;
+        margin-bottom: 40px;
+        font-weight: 400;
+        letter-spacing: 0.2px;
+    }
+
+    /* ── Card: style the Streamlit column block directly ───────────────── */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+    [data-testid="column"]:nth-child(2) > div:first-child {
+        background: #181818 !important;
+        border-radius: 16px !important;
+        border: 1px solid #2a2a2a !important;
+    }
+
+    /* ── Tab buttons ────────────────────────────────────────────────────── */
+    /* active tab = primary */
+    button[kind="primary"] {
+        background: #00c805 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        box-shadow: none !important;
+        transition: background 0.2s !important;
+    }
+    button[kind="primary"]:hover { background: #00a804 !important; }
+
+    /* inactive tab = secondary */
+    button[kind="secondary"] {
+        background: #262626 !important;
+        color: #999 !important;
+        border: 1px solid #333 !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        box-shadow: none !important;
+    }
+    button[kind="secondary"]:hover {
+        background: #2f2f2f !important;
+        color: #ccc !important;
+        border-color: #444 !important;
+    }
+
+    /* ── Inputs ─────────────────────────────────────────────────────────── */
+    .stTextInput label {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        color: #888 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.6px !important;
+    }
+    .stTextInput input {
+        background: #111 !important;
+        border: 1px solid #333 !important;
+        border-radius: 10px !important;
+        color: #fff !important;
+        font-size: 15px !important;
+        padding: 10px 14px !important;
+    }
+    .stTextInput input:focus {
+        border-color: #00c805 !important;
+        box-shadow: 0 0 0 2px rgba(0,200,5,0.15) !important;
+        outline: none !important;
+    }
+    .stTextInput input::placeholder { color: #444 !important; }
+
+    /* ── Submit button inside form ──────────────────────────────────────── */
+    [data-testid="stForm"] button[kind="primaryFormSubmit"],
+    [data-testid="stForm"] button[kind="primary"] {
+        background: #00c805 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
+        width: 100% !important;
+        box-shadow: 0 4px 16px rgba(0,200,5,0.2) !important;
+        margin-top: 8px !important;
+    }
+    [data-testid="stForm"] button[kind="primaryFormSubmit"]:hover,
+    [data-testid="stForm"] button[kind="primary"]:hover {
+        background: #00a804 !important;
+        box-shadow: 0 6px 20px rgba(0,200,5,0.3) !important;
+    }
+
+    /* ── Divider / footer ───────────────────────────────────────────────── */
+    hr { border-color: #2a2a2a !important; margin: 16px 0 !important; }
+
+    .auth-footer {
+        text-align: center;
+        font-size: 11px;
+        color: #444;
+        margin-top: 20px;
+        padding-bottom: 8px;
     }
     </style>
-    <div class="top-band"><div class="brand">OptionFlow</div></div>
     """, unsafe_allow_html=True)
 
     # Backend status hint (common setup issue when running split frontend/backend).
@@ -743,160 +828,134 @@ def login_page():
     # track whether user clicked Sign up to navigate to the signup page
     if 'show_signup' not in st.session_state:
         st.session_state['show_signup'] = False
+    # track active tab: 'signin' or 'signup'
+    if 'auth_tab' not in st.session_state:
+        st.session_state['auth_tab'] = 'signin'
 
-    if not st.session_state.get('show_signup'):
-        # Landing: only a green Sign up CTA centered on screen (no box around it).
-        # Note: Streamlit widgets can't be reliably wrapped/centered by custom HTML divs,
-        # so we use Streamlit layout primitives.
-        st.markdown('<div id="landing-cta"></div>', unsafe_allow_html=True)
-        # Avoid `st.form` here because it renders a thin container outline in some themes.
-        if st.button('Sign up', type='primary'):
-            st.session_state['show_signup'] = True
-            if hasattr(st, 'experimental_rerun'):
-                try:
-                    st.experimental_rerun()
-                except Exception:
-                    st.stop()
-            elif hasattr(st, 'rerun'):
-                try:
-                    st.rerun()
-                except Exception:
-                    st.stop()
-            else:
+    def _rerun():
+        if hasattr(st, 'rerun'):
+            try:
+                st.rerun()
+            except Exception:
                 st.stop()
+        elif hasattr(st, 'experimental_rerun'):
+            try:
+                st.experimental_rerun()
+            except Exception:
+                st.stop()
+        else:
+            st.stop()
 
-    else:
-        # Sign-up page
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown('<div class="login-box">', unsafe_allow_html=True)
-            st.header('Create an account')
-            with st.form('signup'):
-                username = st.text_input('Choose a username', key='signup_username')
-                password = st.text_input('Choose a password', type='password', key='signup_password')
-                b1, b2 = st.columns(2)
-                with b1:
-                    create_submitted = st.form_submit_button('Create account', type='primary')
-                with b2:
-                    signin_submitted = st.form_submit_button('Sign in')
+    # Logo + tagline — rendered above the card on the dark background
+    st.markdown("""
+    <div class="auth-logo">OptionFlow</div>
+    <div class="auth-tagline">Real-time options analytics &amp; flow intelligence</div>
+    """, unsafe_allow_html=True)
 
-                username_clean = (username or "").strip()
-                password_clean = password or ""
+    # Card layout
+    col1, col2, col3 = st.columns([1, 1.6, 1])
+    with col2:
+        # Tab switcher (visual only — logic driven by session state)
+        signin_tab = st.session_state['auth_tab'] == 'signin'
+        signup_tab = st.session_state['auth_tab'] == 'signup'
+        tc1, tc2 = st.columns(2)
+        with tc1:
+            if st.button('Sign In', type='primary' if signin_tab else 'secondary', use_container_width=True, key='tab_signin'):
+                st.session_state['auth_tab'] = 'signin'
+                _rerun()
+        with tc2:
+            if st.button('Create Account', type='primary' if signup_tab else 'secondary', use_container_width=True, key='tab_signup'):
+                st.session_state['auth_tab'] = 'signup'
+                _rerun()
 
-                if create_submitted:
-                    if not username_clean or not password_clean:
-                        st.error('Username and password are required')
-                        st.stop()
-                    try:
-                        resp = api_signup(username_clean, password_clean)
-                        st.success('Account created — signing you in...')
-                        st.session_state['user'] = resp.get('username', username_clean)
-                        st.session_state['user_id'] = int(resp['user_id'])
-                        st.session_state['token'] = resp['access_token']
-                        st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
-                        _persist_auth_to_cookie(
-                            token=st.session_state['token'],
-                            refresh_token=str(st.session_state.get('refresh_token') or ''),
-                            username=st.session_state['user'],
-                            user_id=st.session_state['user_id'],
-                        )
-                        st.session_state['show_signup'] = False
-                        if hasattr(st, 'experimental_rerun'):
-                            try:
-                                st.experimental_rerun()
-                            except Exception:
-                                st.stop()
-                        elif hasattr(st, 'rerun'):
-                            try:
-                                st.rerun()
-                            except Exception:
-                                st.stop()
-                        else:
-                            st.stop()
-                    except APIError as e:
-                        # If account exists, treat this page as a sign-in using the same inputs.
-                        if e.status_code == 400 and 'exists' in str(e.detail).lower():
-                            try:
-                                resp = api_login(username_clean, password_clean)
-                                st.success('Signed in')
-                                st.session_state['user'] = resp.get('username', username_clean)
-                                st.session_state['user_id'] = int(resp['user_id'])
-                                st.session_state['token'] = resp['access_token']
-                                st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
-                                _persist_auth_to_cookie(
-                                    token=st.session_state['token'],
-                                    refresh_token=str(st.session_state.get('refresh_token') or ''),
-                                    username=st.session_state['user'],
-                                    user_id=st.session_state['user_id'],
-                                )
-                                st.session_state['show_signup'] = False
-                                if hasattr(st, 'experimental_rerun'):
-                                    try:
-                                        st.experimental_rerun()
-                                    except Exception:
-                                        st.stop()
-                                elif hasattr(st, 'rerun'):
-                                    try:
-                                        st.rerun()
-                                    except Exception:
-                                        st.stop()
-                                else:
-                                    st.stop()
-                            except APIError:
-                                st.error('Username already exists, and password did not match')
-                        else:
-                            st.error(_api_error_message(e, prefix='Registration error'))
-                    except Exception as e:
-                        st.error(f'Registration error: {e}')
+        st.markdown("---")
 
-                elif signin_submitted:
-                    if not username_clean or not password_clean:
-                        st.error('Username and password are required')
-                        st.stop()
-                    try:
-                        resp = api_login(username_clean, password_clean)
-                        st.success('Signed in')
-                        st.session_state['user'] = resp.get('username', username_clean)
-                        st.session_state['user_id'] = int(resp['user_id'])
-                        st.session_state['token'] = resp['access_token']
-                        st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
-                        _persist_auth_to_cookie(
-                            token=st.session_state['token'],
-                            refresh_token=str(st.session_state.get('refresh_token') or ''),
-                            username=st.session_state['user'],
-                            user_id=st.session_state['user_id'],
-                        )
-                        st.session_state['show_signup'] = False
-                        if hasattr(st, 'experimental_rerun'):
-                            try:
-                                st.experimental_rerun()
-                            except Exception:
-                                st.stop()
-                        elif hasattr(st, 'rerun'):
-                            try:
-                                st.rerun()
-                            except Exception:
-                                st.stop()
-                        else:
-                            st.stop()
-                    except APIError as e:
-                        st.error(_api_error_message(e, prefix='Sign-in error'))
-                    except Exception as e:
-                        st.error(f'Sign-in error: {e}')
+        active_tab = st.session_state['auth_tab']
 
-            if st.button('Back'):
-                st.session_state['show_signup'] = False
-                if hasattr(st, 'experimental_rerun'):
-                    try:
-                        st.experimental_rerun()
-                    except Exception:
-                        st.stop()
-                elif hasattr(st, 'rerun'):
-                    try:
-                        st.rerun()
-                    except Exception:
-                        st.stop()
-                else:
+        if active_tab == 'signin':
+            with st.form('signin_form'):
+                username = st.text_input('Username', key='si_username', placeholder='Enter your username')
+                password = st.text_input('Password', type='password', key='si_password', placeholder='Enter your password')
+                signin_submitted = st.form_submit_button('Sign In →', type='primary', use_container_width=True)
+                create_submitted = False
+
+        else:
+            with st.form('signup_form'):
+                username = st.text_input('Username', key='su_username', placeholder='Choose a username')
+                password = st.text_input('Password', type='password', key='su_password', placeholder='Choose a password')
+                create_submitted = st.form_submit_button('Create Account →', type='primary', use_container_width=True)
+                signin_submitted = False
+
+        if True:  # keep indentation parity with old code below
+            username_clean = (username or "").strip()
+            password_clean = password or ""
+
+            if create_submitted:
+                if not username_clean or not password_clean:
+                    st.error('Username and password are required')
                     st.stop()
+                try:
+                    resp = api_signup(username_clean, password_clean)
+                    st.success('Account created — signing you in...')
+                    st.session_state['user'] = resp.get('username', username_clean)
+                    st.session_state['user_id'] = int(resp['user_id'])
+                    st.session_state['token'] = resp['access_token']
+                    st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
+                    _persist_auth_to_cookie(
+                        token=st.session_state['token'],
+                        refresh_token=str(st.session_state.get('refresh_token') or ''),
+                        username=st.session_state['user'],
+                        user_id=st.session_state['user_id'],
+                    )
+                    st.session_state['show_signup'] = False
+                    _rerun()
+                except APIError as e:
+                    # If account exists, treat this page as a sign-in using the same inputs.
+                    if e.status_code == 400 and 'exists' in str(e.detail).lower():
+                        try:
+                            resp = api_login(username_clean, password_clean)
+                            st.success('Signed in')
+                            st.session_state['user'] = resp.get('username', username_clean)
+                            st.session_state['user_id'] = int(resp['user_id'])
+                            st.session_state['token'] = resp['access_token']
+                            st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
+                            _persist_auth_to_cookie(
+                                token=st.session_state['token'],
+                                refresh_token=str(st.session_state.get('refresh_token') or ''),
+                                username=st.session_state['user'],
+                                user_id=st.session_state['user_id'],
+                            )
+                            st.session_state['show_signup'] = False
+                            _rerun()
+                        except APIError:
+                            st.error('Username already exists, and password did not match')
+                    else:
+                        st.error(_api_error_message(e, prefix='Registration error'))
+                except Exception as e:
+                    st.error(f'Registration error: {e}')
 
-            st.markdown('</div>', unsafe_allow_html=True)
+            elif signin_submitted:
+                if not username_clean or not password_clean:
+                    st.error('Username and password are required')
+                    st.stop()
+                try:
+                    resp = api_login(username_clean, password_clean)
+                    st.success('Signed in')
+                    st.session_state['user'] = resp.get('username', username_clean)
+                    st.session_state['user_id'] = int(resp['user_id'])
+                    st.session_state['token'] = resp['access_token']
+                    st.session_state['refresh_token'] = str(resp.get('refresh_token') or '')
+                    _persist_auth_to_cookie(
+                        token=st.session_state['token'],
+                        refresh_token=str(st.session_state.get('refresh_token') or ''),
+                        username=st.session_state['user'],
+                        user_id=st.session_state['user_id'],
+                    )
+                    st.session_state['show_signup'] = False
+                    _rerun()
+                except APIError as e:
+                    st.error(_api_error_message(e, prefix='Sign-in error'))
+                except Exception as e:
+                    st.error(f'Sign-in error: {e}')
+
+        st.markdown('<div class="auth-footer">By continuing, you agree to OptionFlow\'s Terms of Service.</div>', unsafe_allow_html=True)

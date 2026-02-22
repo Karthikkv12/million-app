@@ -112,7 +112,7 @@ def health() -> Dict[str, str]:
 @app.post("/auth/signup", response_model=AuthResponse)
 def signup(req: AuthSignupRequest, request: Request) -> AuthResponse:
     try:
-        username = str(req.username).strip()
+        username = str(req.username).strip().lower()
         user_id = services.create_user(username, req.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -125,7 +125,7 @@ def signup(req: AuthSignupRequest, request: Request) -> AuthResponse:
 
 @app.post("/auth/login", response_model=AuthResponse)
 def login(req: AuthLoginRequest, request: Request) -> AuthResponse:
-    username = str(req.username).strip()
+    username = str(req.username).strip().lower()
     ip = getattr(getattr(request, "client", None), "host", None)
     ua = request.headers.get("user-agent")
 
