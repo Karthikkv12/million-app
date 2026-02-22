@@ -242,7 +242,7 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
     regime_color = "#00cc44" if net >= 0 else "#ff4444"
 
     LBL_S = "font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px"
-    VAL_S = "font-size:13px;font-weight:800"
+    VAL_S = "font-size:13px;font-weight:800;"
 
     rowA = (
         f"<tr><th colspan='{ncols}' style='{TH};text-align:left;"
@@ -424,7 +424,7 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
         regime_color = "#00cc44" if p["net"] >= 0 else "#ff4444"
 
         C_LBL = "font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px"
-        C_VAL = "font-size:13px;font-weight:800"
+        C_VAL = "font-size:13px;font-weight:800;"
         th_style = (f"background:var(--gex-bg2);padding:8px 14px;font-size:11px;font-weight:700;"
                     f"position:sticky;top:0;z-index:3;border-bottom:2px solid var(--gex-border2);"
                     f"white-space:nowrap;text-align:left{sep}")
