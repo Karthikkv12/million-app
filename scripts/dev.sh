@@ -25,13 +25,13 @@ fi
 
 API_HOST="${API_HOST:-127.0.0.1}"
 API_PORT="${API_PORT:-8000}"
-WEB_PORT="${WEB_PORT:-8501}"
+WEB_PORT="${WEB_PORT:-3000}"  # Next.js dev server
 
 export PYTHONPATH="$ROOT_DIR"
 export API_BASE_URL="${API_BASE_URL:-http://${API_HOST}:${API_PORT}}"
 
 API_PID_FILE="$ROOT_DIR/.uvicorn.pid"
-WEB_PID_FILE="$ROOT_DIR/.streamlit.pid"
+WEB_PID_FILE="$ROOT_DIR/.nextjs.pid"
 
 is_pid_running() {
   local pid="$1"
@@ -92,9 +92,9 @@ status() {
   fi
 
   if is_pid_running "$web_pid"; then
-    echo "[dev] Web: running (pid=$web_pid) http://127.0.0.1:${WEB_PORT}"
+    echo "[dev] Web (Next.js): running (pid=$web_pid) http://127.0.0.1:${WEB_PORT}"
   else
-    echo "[dev] Web: stopped http://127.0.0.1:${WEB_PORT}"
+    echo "[dev] Web (Next.js): stopped http://127.0.0.1:${WEB_PORT}"
   fi
 
   if command -v lsof >/dev/null 2>&1; then
@@ -143,9 +143,10 @@ if command -v curl >/dev/null 2>&1; then
   done
 fi
 
-echo "[dev] Starting Streamlit: http://127.0.0.1:${WEB_PORT}"
-"$PYTHON_BIN" -m streamlit run app.py --server.port "$WEB_PORT" &
+echo "[dev] Starting Next.js: http://127.0.0.1:${WEB_PORT}"
+cd "$ROOT_DIR/web" && npm run dev -- --port "$WEB_PORT" &
 WEB_PID=$!
+cd "$ROOT_DIR"
 echo "$WEB_PID" >"$WEB_PID_FILE"
 
 wait "$API_PID" "$WEB_PID"

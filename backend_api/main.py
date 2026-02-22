@@ -619,6 +619,45 @@ def ledger_cash_balance(user=Depends(get_current_user)) -> Dict[str, Any]:
     return {"currency": "USD", "balance": float(bal)}
 
 
+@app.get("/stocks/{symbol}/history", response_model=Dict[str, Any])
+def stock_history(symbol: str, period: str = "6mo", _user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Return OHLCV history + current price for a symbol via yfinance."""
+    import yfinance as yf
+
+    sym = symbol.strip().upper()
+    allowed_periods = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
+    p = period if period in allowed_periods else "6mo"
+    try:
+        ticker = yf.Ticker(sym)
+        hist = ticker.history(period=p)
+        if hist is None or hist.empty:
+            return {"symbol": sym, "bars": [], "current_price": None, "error": f"No data for {sym}"}
+        hist = hist.reset_index()
+        bars: List[Dict[str, Any]] = []
+        for _, row in hist.iterrows():
+            dt = row.get("Date") or row.get("Datetime")
+            close = row.get("Close")
+            if dt is None or close is None:
+                continue
+            try:
+                date_str = pd.to_datetime(dt).strftime("%Y-%m-%d")
+                close_f  = float(close)
+            except Exception:
+                continue
+            bars.append({
+                "date":   date_str,
+                "open":   float(row["Open"])   if "Open"   in row and pd.notna(row["Open"])   else None,
+                "high":   float(row["High"])   if "High"   in row and pd.notna(row["High"])   else None,
+                "low":    float(row["Low"])    if "Low"    in row and pd.notna(row["Low"])    else None,
+                "close":  close_f,
+                "volume": int(row["Volume"])   if "Volume" in row and pd.notna(row["Volume"]) else None,
+            })
+        current_price = bars[-1]["close"] if bars else None
+        return {"symbol": sym, "bars": bars, "current_price": current_price, "error": None}
+    except Exception as exc:
+        return {"symbol": sym, "bars": [], "current_price": None, "error": str(exc)}
+
+
 @app.get("/options/gamma-exposure/{symbol}", response_model=Dict[str, Any])
 def gamma_exposure(symbol: str, _user=Depends(get_current_user)) -> Dict[str, Any]:
     """Compute and return Gamma Exposure (GEX) for a given symbol.

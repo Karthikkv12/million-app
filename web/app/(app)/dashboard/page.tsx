@@ -1,8 +1,66 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
-import { fetchTrades, fetchCashBalance, fetchOrders, Trade } from "@/lib/api";
+import { fetchTrades, fetchCashBalance, fetchOrders, addCash, Trade } from "@/lib/api";
+
+// ── Cash modal ────────────────────────────────────────────────────────────────
+function CashModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [dir, setDir]       = useState<"deposit" | "withdrawal">("deposit");
+  const [amount, setAmount] = useState("");
+  const [note, setNote]     = useState("");
+  const [err, setErr]       = useState("");
+
+  const mut = useMutation({
+    mutationFn: () => addCash(parseFloat(amount), dir, note || undefined),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cash-balance"] }); onClose(); },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-bold text-gray-900 dark:text-white mb-4 text-base">Cash Transaction</h3>
+        <div className="flex gap-2 mb-4">
+          {(["deposit", "withdrawal"] as const).map((d) => (
+            <button key={d} onClick={() => setDir(d)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${
+                dir === d
+                  ? d === "deposit" ? "bg-green-600 text-white" : "bg-red-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              }`}>
+              {d.charAt(0).toUpperCase() + d.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="mb-3">
+          <label className="text-xs text-gray-400 block mb-1">Amount ($)</label>
+          <input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)}
+            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+        </div>
+        <div className="mb-4">
+          <label className="text-xs text-gray-400 block mb-1">Note (opt.)</label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Monthly contribution"
+            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+        </div>
+        {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={() => mut.mutate()} disabled={mut.isPending || !amount}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition ${
+              dir === "deposit" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+            }`}>
+            {mut.isPending ? "Processing…" : `Confirm ${dir}`}
+          </button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function StatCard({
   label, value, sub, color,
@@ -36,6 +94,7 @@ function calcPnl(trades: Trade[]) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [showCash, setShowCash] = useState(false);
   const tradesQ = useQuery({ queryKey: ["trades"], queryFn: fetchTrades, staleTime: 30_000 });
   const cashQ   = useQuery({ queryKey: ["cash-balance"], queryFn: () => fetchCashBalance(), staleTime: 30_000 });
   const ordersQ = useQuery({ queryKey: ["orders"], queryFn: fetchOrders, staleTime: 30_000 });
@@ -49,11 +108,19 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white">
-          Welcome back{user?.username ? `, ${user.username}` : ""}
-        </h1>
-        <p className="text-sm text-gray-400 mt-0.5">Here&apos;s your portfolio at a glance.</p>
+      {showCash && <CashModal onClose={() => setShowCash(false)} />}
+
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white">
+            Welcome back{user?.username ? `, ${user.username}` : ""}
+          </h1>
+          <p className="text-sm text-gray-400 mt-0.5">Here&apos;s your portfolio at a glance.</p>
+        </div>
+        <button onClick={() => setShowCash(true)}
+          className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition shrink-0">
+          + Cash
+        </button>
       </div>
 
       {/* Stat cards */}
@@ -64,11 +131,13 @@ export default function DashboardPage() {
           sub={`${closedCount} closed trade${closedCount !== 1 ? "s" : ""}`}
           color={pnlColor}
         />
-        <StatCard
-          label="Cash Balance"
-          value={cash == null ? "—" : `$${cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          sub="USD"
-        />
+        <button onClick={() => setShowCash(true)} className="text-left">
+          <StatCard
+            label="Cash Balance"
+            value={cash == null ? "—" : `$${cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            sub="click to deposit / withdraw"
+          />
+        </button>
         <StatCard
           label="Open Positions"
           value={String(openCount)}

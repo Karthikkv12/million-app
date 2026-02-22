@@ -64,5 +64,6 @@ Rules:
 
 ## UI / product
 - [x] ~~Search moved into Investment page (replaces old New Order dropdown UX)~~
+- [x] ~~React/Next.js migration complete — all Streamlit pages ported (Dashboard, Options Flow, Search, Trades, Orders, Accounts, Budget, Ledger, Settings). Streamlit decommissioned from dev.sh + Dockerfile.web.~~
 - [ ] Replace remaining dropdown-based ticker selection with consistent Search-first UX
 - [ ] Account switcher (when multiple accounts exist)
