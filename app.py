@@ -283,7 +283,6 @@ footer { display: none !important; }
     display: block;
 }
 .quick-tile:hover { border-color: #00c805; background: var(--tile-hover); }
-.quick-tile .tile-icon { font-size: 28px; margin-bottom: 8px; }
 .quick-tile .tile-label { font-size: 13px; font-weight: 600; color: var(--text); }
 .quick-tile .tile-sub { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
 
@@ -490,17 +489,16 @@ if page == "home":
     qa1, qa2, qa3, qa4, qa5 = st.columns(5)
 
     tiles = [
-        (qa1, "📊", "Portfolio", "Positions & trades", "investment"),
-        (qa2, "🌊", "Options Flow", "GEX & gamma analysis", "gamma"),
-        (qa3, "📈", "P&L", "Profit & loss report", "pnl"),
-        (qa4, "💰", "Budget", "Income & expenses", "budget"),
-        (qa5, "⚙️", "Settings", "Account settings", "settings"),
+        (qa1, "Portfolio", "Positions & trades", "investment"),
+        (qa2, "Options Flow", "GEX & gamma analysis", "gamma"),
+        (qa3, "P&L", "Profit & loss report", "pnl"),
+        (qa4, "Budget", "Income & expenses", "budget"),
+        (qa5, "Settings", "Account settings", "settings"),
     ]
-    for col, icon, label, sub, target in tiles:
+    for col, label, sub, target in tiles:
         with col:
             st.markdown(f"""
             <a href="{_href(target)}" target="_self" class="quick-tile">
-                <div class="tile-icon">{icon}</div>
                 <div class="tile-label">{label}</div>
                 <div class="tile-sub">{sub}</div>
             </a>""", unsafe_allow_html=True)

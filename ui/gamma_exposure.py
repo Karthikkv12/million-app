@@ -30,40 +30,42 @@ def _fmt_gex(v: float) -> str:
 def _heat_bg(v: float, vmax: float) -> str:
     """Return an RGB colour string: green = strong positive GEX (long), red = strong negative (short)."""
     if vmax == 0 or (isinstance(v, float) and math.isnan(v)):
-        return "#0d0d0d"
+        return "transparent"
     ratio = max(-1.0, min(1.0, v / vmax))
     if ratio >= 0:
-        # dark → bright green
+        # light green → bright green
         t = ratio
         if t < 0.25:
-            f = t / 0.25; r, g, b = 0, int(30 + f * 80), 0
+            f = t / 0.25; r, g, b = int(220 - f*60), int(240 - f*30), int(220 - f*60)
         elif t < 0.5:
-            f = (t - 0.25) / 0.25; r, g, b = 0, int(110 + f * 90), int(f * 20)
+            f = (t - 0.25) / 0.25; r, g, b = int(160 - f*80), int(210 - f*30), int(160 - f*80)
         elif t < 0.75:
-            f = (t - 0.5) / 0.25; r, g, b = int(f * 40), int(200 + f * 40), int(20 + f * 20)
+            f = (t - 0.5) / 0.25; r, g, b = int(80 - f*60), int(180 + f*40), int(80 - f*60)
         else:
-            f = (t - 0.75) / 0.25; r, g, b = int(40 + f * 50), int(240 + f * 15), int(40 + f * 30)
+            f = (t - 0.75) / 0.25; r, g, b = int(20 + f*30), int(220 + f*15), int(20 + f*20)
     else:
-        # dark → bright red
+        # light red → bright red
         t = -ratio
         if t < 0.25:
-            f = t / 0.25; r, g, b = int(40 + f * 80), 0, 0
+            f = t / 0.25; r, g, b = int(240 - f*30), int(220 - f*60), int(220 - f*60)
         elif t < 0.5:
-            f = (t - 0.25) / 0.25; r, g, b = int(120 + f * 80), int(f * 10), 0
+            f = (t - 0.25) / 0.25; r, g, b = int(210 - f*30), int(160 - f*80), int(160 - f*80)
         elif t < 0.75:
-            f = (t - 0.5) / 0.25; r, g, b = int(200 + f * 40), int(10 + f * 20), 0
+            f = (t - 0.5) / 0.25; r, g, b = int(180 + f*40), int(80 - f*60), int(80 - f*60)
         else:
-            f = (t - 0.75) / 0.25; r, g, b = int(240 + f * 15), int(30 + f * 30), int(f * 20)
+            f = (t - 0.75) / 0.25; r, g, b = int(220 + f*15), int(20 + f*30), int(20 + f*20)
     return f"rgb({r},{g},{b})"
 
 
 def _fg(bg: str) -> str:
-    """Return white or dark text depending on background luminance."""
+    """Return black or white text depending on background luminance."""
+    if bg == "transparent":
+        return "inherit"
     try:
         r, g, b = [int(x) for x in bg[4:-1].split(",")]
-        return "#ffffff" if (0.299 * r + 0.587 * g + 0.114 * b) < 140 else "#0a0a0a"
+        return "#111111" if (0.299 * r + 0.587 * g + 0.114 * b) >= 100 else "#ffffff"
     except Exception:
-        return "#ffffff"
+        return "#111111"
 
 
 # ──────────────────────────────────────────────
@@ -189,7 +191,7 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
         exp_cols.append((exp, short, gex_map, vmax, king))
 
     if not exp_cols:
-        return "<p style='color:#888'>No expiry data for selected filter.</p>"
+        return "<p style='color:var(--gex-text3)'>No expiry data for selected filter.</p>"
 
     # union of strikes ±20% of spot across all selected expiries
     lo, hi = spot * 0.80, spot * 1.20
@@ -198,7 +200,7 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
         all_s.update(s for s in gm if lo <= s <= hi)
     all_sorted = sorted(all_s)          # ascending
     if not all_sorted:
-        return "<p style='color:#888'>No strikes in ±20% range.</p>"
+        return "<p style='color:var(--gex-text3)'>No strikes in ±20% range.</p>"
     # Centre on spot: find nearest strike, take n//2 above and n//2 below
     half = max(1, n_strikes // 2)
     spot_idx = min(range(len(all_sorted)), key=lambda i: abs(all_sorted[i] - spot))
@@ -226,55 +228,81 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
     zg_s  = f"${zg:.2f}" if zg else "—"
     lot   = d.get("lot_size", 100)
     lot_badge = (
-        f"&nbsp;&nbsp;<span style='font-size:9px;background:#1a1a1a;color:#888;"
-        f"border:1px solid #333;border-radius:3px;padding:1px 5px'>lot×{lot}</span>"
+        f"&nbsp;&nbsp;<span style='font-size:9px;background:var(--gex-bg2);color:var(--gex-text3);"
+        f"border:1px solid var(--gex-border2);border-radius:3px;padding:1px 5px'>lot×{lot}</span>"
         if lot != 100 else ""
     )
 
     # ── header ────────────────────────────────────────────────────────────
-    TH = "background:#0d0d0d;padding:3px 8px;font-size:10px;font-weight:700;" \
-         "position:sticky;top:0;z-index:3;border-bottom:2px solid #2a2a2a;white-space:nowrap"
+    TH = ("background:var(--gex-bg2);padding:4px 10px;font-size:10px;font-weight:700;"
+          "position:sticky;top:0;z-index:3;border-bottom:1px solid var(--gex-border2);white-space:nowrap")
 
-    # Row A: ticker info spanning all columns
-    ncols = 1 + len(exp_cols)  # strike col + one col per expiry
+    ncols = 1 + len(exp_cols)
+    regime_label = "Long \u03b3" if net >= 0 else "Short \u03b3"
+    regime_color = "#00cc44" if net >= 0 else "#ff4444"
+
     rowA = (
-        f"<tr><th colspan='{ncols}' style='{TH};text-align:left'>"
-        f"<span style='font-size:15px;font-weight:800;color:#fff'>{sym}</span>"
-        f"&nbsp;&nbsp;<span style='font-size:15px;color:#fff'>${lp:.2f}</span>"
-        f"&nbsp;<span style='font-size:11px;color:{chg_c}'>{arr}{chg:.2f} ({arr}{chg_p:.2f}%)</span>"
-        f"&nbsp;&nbsp;<span style='font-size:9px;color:#555'>ZG <span style='color:#aaa'>{zg_s}</span></span>"
-        f"&nbsp;&nbsp;<span style='font-size:9px;color:#555'>Net <span style='color:{net_c};font-weight:700'>{_fmt_gex(net)}</span></span>"
-        f"{lot_badge}"
-        f"</th></tr>"
+        f"<tr><th colspan='{ncols}' style='{TH};text-align:left;"
+        f"padding:8px 12px;border-bottom:2px solid var(--gex-border2)'>"
+        f"<span style='font-size:17px;font-weight:900;color:var(--gex-text);"
+        f"letter-spacing:0.5px;margin-right:10px'>{sym}</span>"
+        f"<span style='font-size:15px;font-weight:700;color:var(--gex-text);"
+        f"margin-right:8px'>${lp:.2f}</span>"
+        f"<span style='font-size:12px;font-weight:700;color:{chg_c};"
+        f"margin-right:18px'>{arr}{chg:.2f}&nbsp;({arr}{chg_p:.2f}%)</span>"
+        f"<span style='color:var(--gex-border2);margin-right:18px;font-size:13px'>|</span>"
+        f"<span style='font-size:10px;font-weight:500;color:var(--gex-text3);"
+        f"margin-right:4px'>Net GEX</span>"
+        f"<span style='font-size:12px;font-weight:700;color:{net_c};"
+        f"margin-right:18px'>{_fmt_gex(net)}</span>"
+        f"<span style='font-size:10px;font-weight:500;color:var(--gex-text3);"
+        f"margin-right:4px'>Regime</span>"
+        f"<span style='font-size:12px;font-weight:700;color:{regime_color};"
+        f"margin-right:18px'>{regime_label}</span>"
+        f"<span style='font-size:10px;font-weight:500;color:var(--gex-text3);"
+        f"margin-right:4px'>Zero \u03b3</span>"
+        f"<span style='font-size:12px;font-weight:600;color:var(--gex-text2);"
+        f"margin-right:14px'>{zg_s}</span>"
+        + (f"<span style='font-size:9px;background:var(--gex-bg);color:var(--gex-text3);"
+           f"border:1px solid var(--gex-border2);border-radius:3px;padding:1px 5px'>"
+           f"lot\u00d7{lot}</span>" if lot != 100 else "")
+        + "</th></tr>"
     )
-    # Row B: column headers
-    rowB_cells = f"<th style='{TH};color:#555;text-align:left;min-width:70px'>STRIKE</th>"
+
+    rowB_cells = f"<th style='{TH};color:var(--gex-text3);text-align:left;min-width:90px'>STRIKE</th>"
     for (exp, short, _, _, king) in exp_cols:
-        star = " &#9733;" if king in sorted_strikes else ""
-        rowB_cells += f"<th style='{TH};color:#888;text-align:right;min-width:90px;border-left:1px solid #222'>{short}{star}</th>"
+        king_badge = (" <span style='background:#cc8800;color:#fff;font-size:7px;font-weight:800;"
+                      "border-radius:2px;padding:0 3px'>&#9733;</span>") if king in sorted_strikes else ""
+        rowB_cells += (f"<th style='{TH};color:var(--gex-text2);text-align:right;"
+                       f"min-width:100px;border-left:1px solid var(--gex-border)'>"
+                       f"{short}{king_badge}</th>")
     rowB = f"<tr>{rowB_cells}</tr>"
 
     thead = f"<thead>{rowA}{rowB}</thead>"
 
     # ── body ──────────────────────────────────────────────────────────────
-    BASE_TD = "padding:1px 8px;font-size:11px;font-family:'Courier New',monospace;border-bottom:1px solid #141414"
+    BASE_TD = "padding:1px 8px;font-size:11px;font-weight:600;font-family:'Courier New',monospace;border-bottom:1px solid var(--gex-border)"
     rows_html = ""
     for strike in sorted_strikes:
         is_spot = (strike == nearest_spot)
-        sk_bg   = "#1a1400" if is_spot else "#0a0a0a"
-        sk_col  = "#ffd700" if is_spot else "#aaaaaa"
+        sk_bg   = "var(--gex-spot-bg)" if is_spot else "var(--gex-bg)"
+        sk_col  = "#111" if is_spot else "var(--gex-text2)"
         sk_wt   = "font-weight:800" if is_spot else ""
-        sk_bdr  = "border-top:1px solid #ffd700;border-bottom:1px solid #ffd700" if is_spot else ""
-        marker  = "<span style='color:#ffd700;margin-right:2px'>&#9658;</span>" if is_spot else ""
+        sk_bdr  = "border-top:2px solid #FFB800;border-bottom:2px solid #FFB800;border-left:4px solid #FFB800" if is_spot else ""
+        spot_badge = (
+            f"<span style='background:#FFB800;color:#111;font-size:8px;font-weight:800;"
+            f"border-radius:3px;padding:1px 5px;margin-right:4px;vertical-align:middle'>"
+            f"&#9658; SPOT ${lp:.2f}</span>"
+        ) if is_spot else ""
 
         cells = (
             f"<td style='background:{sk_bg};color:{sk_col};{sk_wt};"
-            f"{BASE_TD};text-align:left;{sk_bdr}'>{marker}{strike:.1f}</td>"
+            f"{BASE_TD};text-align:left;{sk_bdr}'>{spot_badge}{strike:.1f}</td>"
         )
         for (_, _, gex_map, vmax, king) in exp_cols:
             v = gex_map.get(strike, float("nan"))
             if isinstance(v, float) and math.isnan(v):
-                cells += f"<td style='background:#0d0d0d;color:#333;{BASE_TD};text-align:right;border-left:1px solid #1a1a1a'>—</td>"
+                cells += f"<td style='background:var(--gex-bg);color:var(--gex-border2);{BASE_TD};text-align:right;border-left:1px solid var(--gex-border)'>—</td>"
                 continue
             cell_bg = _heat_bg(v, vmax)
             fg      = _fg(cell_bg)
@@ -283,8 +311,8 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
                 pct = int(round(v / vmax * 100))
                 bc  = "#00cc44" if pct > 0 else "#ff4444"
                 badge = f"<span style='background:{bc};color:#000;font-size:7px;font-weight:700;border-radius:3px;padding:0 3px;margin-right:2px;vertical-align:middle'>{pct:+d}%</span>"
-            star = "<span style='color:#ffd700;font-size:10px;margin-left:2px'>&#9733;</span>" if king == strike else ""
-            bdr  = "border-top:1px solid #ffd700;border-bottom:1px solid #ffd700" if is_spot else ""
+            star = "<span style='color:#fff;background:#cc8800;font-size:9px;font-weight:800;border-radius:3px;padding:1px 4px;margin-left:3px;vertical-align:middle'>&#9733; KING</span>" if king == strike else ""
+            bdr  = "border-top:1px solid #cc8800;border-bottom:1px solid #cc8800" if is_spot else ""
             cells += (
                 f"<td style='background:{cell_bg};color:{fg};"
                 f"{BASE_TD};text-align:right;border-left:1px solid #1a1a1a;{bdr}'>"
@@ -294,9 +322,9 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
 
     return (
         "<style>.gex-a-wrap{overflow-x:auto;overflow-y:auto;max-height:640px;"
-        "border-radius:6px;border:1px solid #222;background:#0a0a0a}"
+        "border-radius:6px;border:1px solid var(--gex-border);background:var(--gex-bg)}"
         ".gex-a{border-collapse:collapse;width:100%;font-family:'Courier New',monospace}"
-        ".gex-a tbody tr:hover td{filter:brightness(1.4)}</style>"
+        ".gex-a tbody tr:hover td{filter:brightness(0.85)}</style>"
         "<div class='gex-a-wrap'><table class='gex-a'>"
         f"{thead}<tbody>{rows_html}</tbody></table></div>"
     )
@@ -315,9 +343,9 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
     except Exception:
         exp_label = expiry
 
-    SEP     = "border-left:3px solid #333"
-    BASE_TD = "padding:1px 8px;font-size:11px;font-family:'Courier New',monospace;border-bottom:1px solid #141414"
-    TH      = "background:#0d0d0d;padding:4px 8px;position:sticky;top:0;z-index:3;border-bottom:1px solid #2a2a2a;white-space:nowrap"
+    SEP     = "border-left:3px solid var(--gex-border2)"
+    BASE_TD = "padding:1px 8px;font-size:11px;font-weight:600;font-family:'Courier New',monospace;border-bottom:1px solid var(--gex-border)"
+    TH      = "background:var(--gex-bg2);padding:4px 8px;position:sticky;top:0;z-index:3;border-bottom:1px solid var(--gex-border2);white-space:nowrap"
 
     panels: list[dict] = []
     for d in datasets:
@@ -382,37 +410,42 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
         })
 
     if not panels:
-        return "<p style='color:#888'>No data for selected expiry.</p>"
+        return "<p style='color:var(--gex-text3)'>No data for selected expiry.</p>"
 
     # header rows
-    rowA = ""; rowB = ""; rowC = ""
+    rowA = ""; rowC = ""
     for i, p in enumerate(panels):
-        sep = f";{SEP}" if i > 0 else ""
-        chg_c = "#00cc44" if p["chg"] >= 0 else "#ff4444"
-        arr   = "+" if p["chg"] >= 0 else ""
-        net_c = "#00cc44" if p["net"] >= 0 else "#ff4444"
-        zg_s  = f"${p['zg']:.2f}" if p["zg"] else "—"
+        sep          = f";{SEP}" if i > 0 else ""
+        chg_c        = "#00cc44" if p["chg"] >= 0 else "#ff4444"
+        arr          = "+" if p["chg"] >= 0 else ""
+        net_c        = "#00cc44" if p["net"] >= 0 else "#ff4444"
+        zg_s         = f"${p['zg']:.2f}" if p["zg"] else "—"
+        regime_label = "Long \u03b3" if p["net"] >= 0 else "Short \u03b3"
+        regime_color = "#00cc44" if p["net"] >= 0 else "#ff4444"
+
+        th_style = (f"background:var(--gex-bg2);padding:8px 14px;font-size:11px;font-weight:700;"
+                    f"position:sticky;top:0;z-index:3;border-bottom:2px solid var(--gex-border2);"
+                    f"white-space:nowrap;text-align:left{sep}")
         rowA += (
-            f"<th colspan='2' style='{TH};text-align:left{sep}'>"
-            f"<span style='font-size:15px;font-weight:800;color:#fff'>{p['sym']}</span>"
-            f"&nbsp;&nbsp;<span style='font-size:14px;color:#fff'>${p['lp']:.2f}</span>"
-            f"&nbsp;<span style='font-size:11px;color:{chg_c}'>{arr}{p['chg']:.2f} ({arr}{p['chg_p']:.2f}%)</span>"
+            f"<th colspan='2' style='{th_style}'>"
+            f"<span style='font-size:16px;font-weight:900;color:var(--gex-text);margin-right:10px'>{p['sym']}</span>"
+            f"<span style='font-size:13px;font-weight:700;color:var(--gex-text);margin-right:8px'>${p['lp']:.2f}</span>"
+            f"<span style='font-size:12px;font-weight:700;color:{chg_c};margin-right:10px'>{arr}{p['chg']:.2f} ({arr}{p['chg_p']:.2f}%)</span>"
+            f"<span style='font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px'>Net GEX</span>"
+            f"<span style='font-size:12px;font-weight:700;color:{net_c};margin-right:10px'>{_fmt_gex(p['net'])}</span>"
+            f"<span style='font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px'>Regime</span>"
+            f"<span style='font-size:12px;font-weight:700;color:{regime_color};margin-right:10px'>{regime_label}</span>"
+            f"<span style='font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px'>Zero \u03b3</span>"
+            f"<span style='font-size:12px;font-weight:700;color:var(--gex-text2)'>{zg_s}</span>"
             f"</th>"
         )
-        rowB += (
-            f"<th colspan='2' style='{TH};font-size:9px;font-weight:400;color:#666;text-align:left{sep}'>"
-            f"<span style='color:#888'>{exp_label}</span>"
-            f"&nbsp;&nbsp;ZG <span style='color:#aaa'>{zg_s}</span>"
-            f"&nbsp;&nbsp;Net <span style='color:{net_c};font-weight:700'>{_fmt_gex(p['net'])}</span>"
-            f"</th>"
-        )
-        col_th = f"{TH};font-size:9px;font-weight:700;color:#555;border-bottom:2px solid #2a2a2a"
+        col_th = f"{TH};font-size:9px;font-weight:700;color:var(--gex-text3);border-top:2px solid var(--gex-border2);border-bottom:2px solid var(--gex-border2)"
         rowC += (
             f"<th style='{col_th};text-align:left{sep}'>STRIKE</th>"
             f"<th style='{col_th};text-align:right;min-width:100px'>GEX</th>"
         )
 
-    thead = f"<thead><tr>{rowA}</tr><tr>{rowB}</tr><tr>{rowC}</tr></thead>"
+    thead = f"<thead><tr>{rowA}</tr><tr>{rowC}</tr></thead>"
 
     max_len   = max(len(p["strikes"]) for p in panels)
     rows_html = ""
@@ -422,7 +455,7 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
             sep = f";{SEP}" if i > 0 else ""
             strikes = p["strikes"]
             if row_i >= len(strikes):
-                cells += f"<td style='background:#0a0a0a;{BASE_TD}{sep}'></td><td style='background:#0a0a0a;{BASE_TD}'></td>"
+                cells += f"<td style='background:var(--gex-bg);{BASE_TD}{sep}'></td><td style='background:var(--gex-bg);{BASE_TD}'></td>"
                 continue
             strike   = strikes[row_i]
             v        = p["gex_map"].get(strike, 0)
@@ -430,20 +463,25 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
             is_king  = (strike == p["king_strike"])
             cell_bg  = _heat_bg(v, p["vmax"])
             fg       = _fg(cell_bg)
-            sk_bg    = "#1a1400" if is_spot else "#0a0a0a"
-            sk_col   = "#ffd700" if is_spot else "#aaaaaa"
+            sk_bg    = "var(--gex-spot-bg)" if is_spot else "var(--gex-bg)"
+            sk_col   = "#111" if is_spot else "var(--gex-text2)"
             sk_wt    = "font-weight:800" if is_spot else ""
-            sk_bdr   = "border-top:1px solid #ffd700;border-bottom:1px solid #ffd700" if is_spot else ""
-            marker   = "<span style='color:#ffd700;margin-right:2px'>&#9658;</span>" if is_spot else ""
+            sk_bdr   = "border-top:2px solid #FFB800;border-bottom:2px solid #FFB800;border-left:4px solid #FFB800" if is_spot else ""
+            spot_badge = (
+                f"<span style='background:#FFB800;color:#111;font-size:8px;font-weight:800;"
+                f"border-radius:3px;padding:1px 5px;margin-right:4px;vertical-align:middle'>"
+                f"&#9658; SPOT ${p['lp']:.2f}</span>"
+            ) if is_spot else ""
+            marker   = ""
             badge    = ""
             if p["vmax"] > 0 and abs(v) >= 0.10 * p["vmax"]:
                 pct = int(round(v / p["vmax"] * 100))
                 bc  = "#00cc44" if pct > 0 else "#ff4444"
                 badge = f"<span style='background:{bc};color:#000;font-size:7px;font-weight:700;border-radius:3px;padding:0 3px;margin-right:2px;vertical-align:middle'>{pct:+d}%</span>"
-            star = "<span style='color:#ffd700;font-size:10px;margin-left:2px'>&#9733;</span>" if is_king else ""
+            star = "<span style='color:#fff;background:#cc8800;font-size:9px;font-weight:800;border-radius:3px;padding:1px 4px;margin-left:3px;vertical-align:middle'>&#9733; KING</span>" if is_king else ""
             cells += (
                 f"<td style='background:{sk_bg};color:{sk_col};{sk_wt};{BASE_TD};text-align:left;{sk_bdr}{sep}'>"
-                f"{marker}{strike:.1f}</td>"
+                f"{spot_badge}{strike:.1f}</td>"
                 f"<td style='background:{cell_bg};color:{fg};{BASE_TD};text-align:right;{sk_bdr}'>"
                 f"{badge}{_fmt_cell(v) if v != 0 else ''}{star}</td>"
             )
@@ -451,9 +489,9 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
 
     return (
         "<style>.gex-b-wrap{overflow-x:auto;overflow-y:auto;max-height:640px;"
-        "border-radius:6px;border:1px solid #222;background:#0a0a0a}"
+        "border-radius:6px;border:1px solid var(--gex-border);background:var(--gex-bg)}"
         ".gex-b{border-collapse:collapse;width:100%;font-family:'Courier New',monospace}"
-        ".gex-b tbody tr:hover td{filter:brightness(1.4)}</style>"
+        ".gex-b tbody tr:hover td{filter:brightness(0.85)}</style>"
         "<div class='gex-b-wrap'><table class='gex-b'>"
         f"{thead}<tbody>{rows_html}</tbody></table></div>"
     )
@@ -717,8 +755,38 @@ def _resolve_symbol(raw: str) -> str:
 # ──────────────────────────────────────────────
 
 def render_gamma_exposure_page() -> None:
+    # ── Theme-adaptive CSS variables ─────────────────────────────────────────
+    st.markdown("""
+    <style>
+    :root {
+        --gex-bg:      #f5f5f5;
+        --gex-bg2:     #ffffff;
+        --gex-border:  #e0e0e0;
+        --gex-border2: #cccccc;
+        --gex-text:    #111111;
+        --gex-text2:   #444444;
+        --gex-text3:   #888888;
+        --gex-spot-bg: #fffbe6;
+        --gex-head:    #111111;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --gex-bg:      #0a0a0a;
+            --gex-bg2:     #0d0d0d;
+            --gex-border:  #222222;
+            --gex-border2: #2a2a2a;
+            --gex-text:    #e0e0e0;
+            --gex-text2:   #aaaaaa;
+            --gex-text3:   #555555;
+            --gex-spot-bg: #1a1400;
+            --gex-head:    #e0e0e0;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown(
-        "<h2 style='color:#e0e0e0;margin-bottom:4px'>Gamma Exposure (GEX)</h2>",
+        "<h2 style='color:var(--gex-head);margin-bottom:4px'>Gamma Exposure (GEX)</h2>",
         unsafe_allow_html=True,
     )
 
@@ -727,12 +795,16 @@ def render_gamma_exposure_page() -> None:
     if "gex_tickers_pending" in st.session_state:
         st.session_state["gex_tickers"] = st.session_state.pop("gex_tickers_pending")
 
+    # Default to SPY on first load
+    if "gex_tickers" not in st.session_state:
+        st.session_state["gex_tickers"] = "SPY"
+
     col_input, col_btn = st.columns([5, 1])
     with col_input:
         raw_input = st.text_input(
             "Tickers",
             key="gex_tickers",
-            placeholder="Search tickers — e.g.  SPY  RELIANCE.NS  BANKNIFTY  (up to 5, space or comma separated)",
+            placeholder="e.g. SPY  AAPL  RELIANCE.NS  (up to 5, space or comma separated)",
             label_visibility="collapsed",
         )
     with col_btn:
@@ -740,12 +812,6 @@ def render_gamma_exposure_page() -> None:
 
     tickers = [_resolve_symbol(t) for t in raw_input.replace(",", " ").split() if t.strip()][:5]
     if not tickers:
-        st.markdown(
-            "<div style='margin-top:24px;text-align:center;color:#444;font-size:13px'>"
-            "🔍&nbsp; Search a ticker above to load GEX data"
-            "</div>",
-            unsafe_allow_html=True,
-        )
         return
 
     datasets: list = []
@@ -775,10 +841,10 @@ def render_gamma_exposure_page() -> None:
             continue
 
         st.markdown(
-            f"<div style='background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;"
+            f"<div style='background:var(--gex-bg2);border:1px solid var(--gex-border2);border-radius:8px;"
             f"padding:10px 16px 6px 16px;margin-bottom:8px'>"
-            f"<div style='font-size:11px;color:#888;margin-bottom:8px'>"
-            f"⚠️&nbsp; No options data for <b style='color:#fff'>{sym}</b>"
+            f"<div style='font-size:11px;color:var(--gex-text3);margin-bottom:8px'>"
+            f"⚠️&nbsp; No options data for <b style='color:var(--gex-text)'>{sym}</b>"
             f" — did you mean one of these?"
             f"</div></div>",
             unsafe_allow_html=True,
@@ -831,46 +897,46 @@ def render_gamma_exposure_page() -> None:
 
             with col:
                 st.markdown(
-                    f"<div style='background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;"
+                    f"<div style='background:var(--gex-bg2);border:1px solid var(--gex-border2);border-radius:8px;"
                     f"padding:12px 14px;'>"
                     # ticker + spot
                     f"<div style='display:flex;justify-content:space-between;align-items:baseline'>"
-                    f"<span style='font-size:20px;font-weight:800;color:#fff;letter-spacing:1px'>{sym}</span>"
-                    f"<span style='font-size:22px;font-weight:700;color:#fff'>${spot:.2f}</span>"
+                    f"<span style='font-size:20px;font-weight:800;color:var(--gex-text);letter-spacing:1px'>{sym}</span>"
+                    f"<span style='font-size:22px;font-weight:700;color:var(--gex-text)'>${spot:.2f}</span>"
                     f"</div>"
                     # daily change
                     f"<div style='margin-top:2px'>"
                     f"<span style='font-size:13px;font-weight:700;color:{chg_c}'>"
                     f"{chg_arrow}{chg:.2f} ({chg_arrow}{chg_p:.2f}%)</span>"
-                    f"<span style='font-size:10px;color:#555;margin-left:8px'>today</span>"
+                    f"<span style='font-size:10px;color:var(--gex-text3);margin-left:8px'>today</span>"
                     f"</div>"
                     # high / low / volume
-                    f"<div style='display:flex;gap:12px;margin-top:6px;font-size:10px;color:#666'>"
-                    f"<span>H&nbsp;<b style='color:#aaa'>${hi:.2f}</b></span>"
-                    f"<span>L&nbsp;<b style='color:#aaa'>${lo:.2f}</b></span>"
-                    f"<span>Vol&nbsp;<b style='color:#aaa'>{vol_s}</b></span>"
+                    f"<div style='display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--gex-text3)'>"
+                    f"<span>H&nbsp;<b style='color:var(--gex-text2)'>${hi:.2f}</b></span>"
+                    f"<span>L&nbsp;<b style='color:var(--gex-text2)'>${lo:.2f}</b></span>"
+                    f"<span>Vol&nbsp;<b style='color:var(--gex-text2)'>{vol_s}</b></span>"
                     f"</div>"
                     # divider
-                    f"<div style='border-top:1px solid #1e1e1e;margin:8px 0'></div>"
+                    f"<div style='border-top:1px solid var(--gex-border);margin:8px 0'></div>"
                     # GEX stats
                     f"<div style='display:flex;justify-content:space-between;font-size:10px'>"
                     f"<div>"
-                    f"<div style='color:#555'>Regime</div>"
+                    f"<div style='color:var(--gex-text3)'>Regime</div>"
                     f"<div style='color:{rc};font-weight:700;font-size:11px'>{rl}</div>"
                     f"</div>"
                     f"<div>"
-                    f"<div style='color:#555'>Net GEX</div>"
-                    f"<div style='color:#ffe066;font-weight:700;font-size:11px'>{_fmt_gex(net)}</div>"
+                    f"<div style='color:var(--gex-text3)'>Net GEX</div>"
+                    f"<div style='color:#cc8800;font-weight:700;font-size:11px'>{_fmt_gex(net)}</div>"
                     f"</div>"
                     f"<div>"
-                    f"<div style='color:#555'>Zero Gamma</div>"
-                    f"<div style='color:#aaa;font-size:11px'>{zg_s}</div>"
+                    f"<div style='color:var(--gex-text3)'>Zero Gamma</div>"
+                    f"<div style='color:var(--gex-text2);font-size:11px'>{zg_s}</div>"
                     f"</div>"
                     f"</div>"
                     # call / put walls
                     f"<div style='display:flex;gap:14px;margin-top:6px;font-size:10px'>"
-                    f"<span style='color:#555'>Call Wall&nbsp;<b style='color:#00cc44'>${mcw:.0f}</b></span>" if mcw else ""
-                    f"<span style='color:#555'>Put Wall&nbsp;<b style='color:#ff4444'>${mpw:.0f}</b></span>" if mpw else ""
+                    f"<span style='color:var(--gex-text3)'>Call Wall&nbsp;<b style='color:#00cc44'>${mcw:.0f}</b></span>" if mcw else ""
+                    f"<span style='color:var(--gex-text3)'>Put Wall&nbsp;<b style='color:#ff4444'>${mpw:.0f}</b></span>" if mpw else ""
                     f"</div>"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -903,8 +969,8 @@ def render_gamma_exposure_page() -> None:
                 "}"
                 "div.gex-ctrl-bar div[data-baseweb='select'] > div,"
                 "div.gex-ctrl-bar input[type='number'] {"
-                "  background: #111 !important; border: 1px solid #2a2a2a !important;"
-                "  border-radius: 6px !important; color: #ccc !important; font-size:12px !important;"
+                "  background: var(--gex-bg2) !important; border: 1px solid var(--gex-border2) !important;"
+                "  border-radius: 6px !important; color: var(--gex-text) !important; font-size:12px !important;"
                 "}"
                 "</style>",
                 unsafe_allow_html=True,
@@ -948,7 +1014,7 @@ def render_gamma_exposure_page() -> None:
                             n_strikes = int(_strike_sel)
                             st.markdown(
                                 f"<div style='height:38px;display:flex;align-items:center;"
-                                f"font-size:11px;color:#555'>±{n_strikes//2} around spot</div>",
+                                f"font-size:11px;color:var(--gex-text3)'>±{n_strikes//2} around spot</div>",
                                 unsafe_allow_html=True,
                             )
                     st.markdown("</div>", unsafe_allow_html=True)
@@ -988,7 +1054,7 @@ def render_gamma_exposure_page() -> None:
                             n_strikes = int(_strike_sel)
                             st.markdown(
                                 f"<div style='height:38px;display:flex;align-items:center;"
-                                f"font-size:11px;color:#555'>±{n_strikes//2} around spot</div>",
+                                f"font-size:11px;color:var(--gex-text3)'>±{n_strikes//2} around spot</div>",
                                 unsafe_allow_html=True,
                             )
                     st.markdown("</div>", unsafe_allow_html=True)
@@ -999,11 +1065,11 @@ def render_gamma_exposure_page() -> None:
                 )
 
             st.markdown(
-                "<div style='margin-top:8px;font-size:10px;color:#555'>"
+                "<div style='margin-top:8px;font-size:10px;color:var(--gex-text3)'>"
                 "Green = dealer <b>long gamma</b> &nbsp;|&nbsp; "
                 "Red = dealer <b>short gamma</b> &nbsp;|&nbsp; "
-                "<span style='color:#ffd700'>&#9658;</span> = <b>current spot</b> &nbsp;|&nbsp; "
-                "<span style='color:#ffd700'>&#9733;</span> = <b>King Node</b>"
+                "<span style='background:#FFB800;color:#111;font-size:8px;font-weight:800;border-radius:3px;padding:1px 5px'>&#9658; SPOT</span> = <b>current spot</b> &nbsp;|&nbsp; "
+                "<span style='color:#fff;background:#cc8800;font-size:9px;font-weight:800;border-radius:3px;padding:1px 4px'>&#9733; KING</span> = <b>King Node</b>"
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -1025,7 +1091,7 @@ def render_gamma_exposure_page() -> None:
 
     with tab_compare:
         st.markdown(
-            "<p style='color:#888;font-size:12px;margin-bottom:12px'>"
+            "<p style='color:var(--gex-text3);font-size:12px;margin-bottom:12px'>"
             "Compare GEX profiles for up to 3 tickers side-by-side for a chosen expiry.</p>",
             unsafe_allow_html=True,
         )
@@ -1086,31 +1152,31 @@ def render_gamma_exposure_page() -> None:
 
                     with hc:
                         st.markdown(
-                            f"<div style='background:#0d0d0d;border:1px solid #2a2a2a;"
+                            f"<div style='background:var(--gex-bg2);border:1px solid var(--gex-border2);"
                             f"border-radius:8px;padding:12px 14px;margin-bottom:10px'>"
                             f"<div style='display:flex;justify-content:space-between;align-items:baseline'>"
-                            f"<span style='font-size:20px;font-weight:800;color:#fff'>{sym}</span>"
-                            f"<span style='font-size:20px;font-weight:700;color:#fff'>${spot:.2f}</span>"
+                            f"<span style='font-size:20px;font-weight:800;color:var(--gex-text)'>{sym}</span>"
+                            f"<span style='font-size:20px;font-weight:700;color:var(--gex-text)'>${spot:.2f}</span>"
                             f"</div>"
                             f"<div style='font-size:13px;font-weight:700;color:{chg_c};margin-top:2px'>"
                             f"{arr}{chg:.2f} ({arr}{chg_p:.2f}%)</div>"
-                            f"<div style='display:flex;gap:10px;margin-top:5px;font-size:10px;color:#666'>"
-                            f"<span>H <b style='color:#aaa'>${hi:.2f}</b></span>"
-                            f"<span>L <b style='color:#aaa'>${lo:.2f}</b></span>"
-                            f"<span>Vol <b style='color:#aaa'>{vol_s}</b></span>"
+                            f"<div style='display:flex;gap:10px;margin-top:5px;font-size:10px;color:var(--gex-text3)'>"
+                            f"<span>H <b style='color:var(--gex-text2)'>${hi:.2f}</b></span>"
+                            f"<span>L <b style='color:var(--gex-text2)'>${lo:.2f}</b></span>"
+                            f"<span>Vol <b style='color:var(--gex-text2)'>{vol_s}</b></span>"
                             f"</div>"
-                            f"<div style='border-top:1px solid #1e1e1e;margin:7px 0'></div>"
+                            f"<div style='border-top:1px solid var(--gex-border);margin:7px 0'></div>"
                             f"<div style='display:flex;justify-content:space-between;font-size:10px'>"
-                            f"<div><div style='color:#555'>Regime</div>"
+                            f"<div><div style='color:var(--gex-text3)'>Regime</div>"
                             f"<div style='color:{rc};font-weight:700'>{rl}</div></div>"
-                            f"<div><div style='color:#555'>Net GEX</div>"
-                            f"<div style='color:#ffe066;font-weight:700'>{_fmt_gex(net)}</div></div>"
-                            f"<div><div style='color:#555'>Zero Gamma</div>"
-                            f"<div style='color:#aaa'>{zg_s}</div></div>"
+                            f"<div><div style='color:var(--gex-text3)'>Net GEX</div>"
+                            f"<div style='color:#cc8800;font-weight:700'>{_fmt_gex(net)}</div></div>"
+                            f"<div><div style='color:var(--gex-text3)'>Zero Gamma</div>"
+                            f"<div style='color:var(--gex-text2)'>{zg_s}</div></div>"
                             f"</div>"
                             f"<div style='display:flex;gap:12px;margin-top:5px;font-size:10px'>"
-                            + (f"<span style='color:#555'>Call Wall <b style='color:#00cc44'>${mcw:.0f}</b></span>" if mcw else "")
-                            + (f"<span style='color:#555'>Put Wall <b style='color:#ff4444'>${mpw:.0f}</b></span>" if mpw else "")
+                            + (f"<span style='color:var(--gex-text3)'>Call Wall <b style='color:#00cc44'>${mcw:.0f}</b></span>" if mcw else "")
+                            + (f"<span style='color:var(--gex-text3)'>Put Wall <b style='color:#ff4444'>${mpw:.0f}</b></span>" if mpw else "")
                             + f"</div></div>",
                             unsafe_allow_html=True,
                         )
@@ -1185,11 +1251,11 @@ def render_gamma_exposure_page() -> None:
                                     king_v = dict(zip(sk, vk)).get(king_s, 0)
                                     kc2 = "#00cc44" if king_v >= 0 else "#ff4444"
                                     st.markdown(
-                                        f"<div style='background:#1a1400;border:1px solid #ffd700;"
+                                        f"<div style='background:var(--gex-spot-bg);border:1px solid #cc8800;"
                                         f"border-radius:5px;padding:6px 12px;font-size:11px'>"
-                                        f"<span style='color:#ffd700;font-weight:700'>King Node</span>"
+                                        f"<span style='color:#cc8800;font-weight:700'>King Node</span>"
                                         f"&nbsp;&nbsp;"
-                                        f"<span style='color:#fff;font-size:13px;font-weight:700'>${king_s:.0f}</span>"
+                                        f"<span style='color:var(--gex-text);font-size:13px;font-weight:700'>${king_s:.0f}</span>"
                                         f"&nbsp;"
                                         f"<span style='color:{kc2}'>{_fmt_gex(king_v)}</span>"
                                         f"</div>",
@@ -1205,7 +1271,7 @@ def render_gamma_exposure_page() -> None:
                     # ── strike table for selected expiry ──────────────────
                     st.markdown(
                         "<div style='margin-top:18px;margin-bottom:6px;"
-                        "font-size:12px;font-weight:700;color:#888;letter-spacing:1px'>"
+                        "font-size:12px;font-weight:700;color:var(--gex-text3);letter-spacing:1px'>"
                         "STRIKE TABLE</div>",
                         unsafe_allow_html=True,
                     )
@@ -1214,11 +1280,11 @@ def render_gamma_exposure_page() -> None:
                         unsafe_allow_html=True,
                     )
                     st.markdown(
-                        "<div style='margin-top:6px;font-size:10px;color:#555'>"
+                        "<div style='margin-top:6px;font-size:10px;color:var(--gex-text3)'>"
                         "Green = dealer <b>long gamma</b> &nbsp;|&nbsp; "
                         "Red = dealer <b>short gamma</b> &nbsp;|&nbsp; "
-                        "<span style='color:#ffd700'>&#9658;</span> = spot &nbsp;|&nbsp; "
-                        "<span style='color:#ffd700'>&#9733;</span> = King Node"
+                        "<span style='background:#FFB800;color:#111;font-size:8px;font-weight:800;border-radius:3px;padding:1px 5px'>&#9658; SPOT</span> = spot &nbsp;|&nbsp; "
+                        "<span style='color:#fff;background:#cc8800;font-size:9px;font-weight:800;border-radius:3px;padding:1px 4px'>&#9733; KING</span> = King Node"
                         "</div>",
                         unsafe_allow_html=True,
                     )
