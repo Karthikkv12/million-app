@@ -92,16 +92,64 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ── CSS variables — light mode defaults ────────────────────────────────── */
+:root {
+    --bg:          #f5f5f5;
+    --bg2:         #ffffff;
+    --card-bg:     #ffffff;
+    --card-border: #e8e8e8;
+    --text:        #111111;
+    --text-muted:  #666666;
+    --text-sub:    #999999;
+    --nav-bg:      #ffffff;
+    --nav-border:  #e8e8e8;
+    --nav-link:    #555555;
+    --nav-active:  #111111;
+    --nav-active-bg: #f0f0f0;
+    --input-bg:    #ffffff;
+    --input-border:#d0d0d0;
+    --input-text:  #111111;
+    --divider:     #ececec;
+    --tile-hover:  #f0fff0;
+    --metric-val:  #111111;
+    --metric-lbl:  #888888;
+}
+
+/* ── Dark mode overrides ────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg:          #0d0d0d;
+        --bg2:         #111111;
+        --card-bg:     #161616;
+        --card-border: #2a2a2a;
+        --text:        #e0e0e0;
+        --text-muted:  #888888;
+        --text-sub:    #555555;
+        --nav-bg:      #111111;
+        --nav-border:  #222222;
+        --nav-link:    #888888;
+        --nav-active:  #ffffff;
+        --nav-active-bg: #1e1e1e;
+        --input-bg:    #1e1e1e;
+        --input-border:#3a3a3a;
+        --input-text:  #e0e0e0;
+        --divider:     #1e1e1e;
+        --tile-hover:  #0f1f0f;
+        --metric-val:  #ffffff;
+        --metric-lbl:  #aaaaaa;
+    }
+}
+
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
 
-/* ── Full dark background ───────────────────────────────────────────────── */
+/* ── Page background ────────────────────────────────────────────────────── */
 .stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
 section[data-testid="stMain"] > div:first-child {
-    background: #0d0d0d !important;
+    background: var(--bg) !important;
 }
 [data-testid="stMainBlockContainer"] {
     background: transparent !important;
@@ -109,7 +157,28 @@ section[data-testid="stMain"] > div:first-child {
     max-width: 1400px !important;
 }
 
-/* ── Hide chrome ────────────────────────────────────────────────────────── */
+/* ── All text inherits theme color ──────────────────────────────────────── */
+p, span, div, label, h1, h2, h3, h4, h5, h6, li,
+[data-testid="stMarkdownContainer"] *,
+[data-testid="stText"] *,
+[data-testid="stHeading"] *,
+.stMarkdown p, .stMarkdown span, .stMarkdown li,
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+[class*="stSelectbox"] label,
+[class*="stTextInput"] label,
+[class*="stNumberInput"] label,
+[class*="stDateInput"] label,
+[class*="stCheckbox"] label,
+[class*="stRadio"] label,
+[data-testid="stWidgetLabel"] * {
+    color: var(--text) !important;
+}
+[data-testid="stCaption"] p,
+[data-testid="stCaption"] span {
+    color: var(--text-muted) !important;
+}
+
+/* ── Hide Streamlit chrome ──────────────────────────────────────────────── */
 [data-testid="stSidebar"],
 [data-testid="stSidebarCollapseButton"],
 [data-testid="stHeader"],
@@ -121,8 +190,8 @@ footer { display: none !important; }
     position: fixed;
     top: 0; left: 0; right: 0;
     height: 56px;
-    background: #111;
-    border-bottom: 1px solid #222;
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--nav-border);
     z-index: 9999;
     display: flex;
     align-items: center;
@@ -139,7 +208,7 @@ footer { display: none !important; }
 }
 .topbar-nav { display: flex; align-items: center; gap: 4px; }
 .topbar-nav a {
-    color: #888;
+    color: var(--nav-link);
     font-size: 13px;
     font-weight: 500;
     text-decoration: none;
@@ -147,31 +216,27 @@ footer { display: none !important; }
     border-radius: 8px;
     transition: all 0.15s;
 }
-.topbar-nav a:hover { color: #fff; background: #1e1e1e; }
-.topbar-nav a.active { color: #fff; background: #1e1e1e; }
+.topbar-nav a:hover { color: var(--nav-active); background: var(--nav-active-bg); }
+.topbar-nav a.active { color: var(--nav-active); background: var(--nav-active-bg); font-weight: 600; }
 .topbar-nav .nav-logout {
-    color: #555;
+    color: var(--text-sub);
     margin-left: 8px;
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--card-border);
 }
 .topbar-nav .nav-logout:hover { color: #ff4444; border-color: #ff4444; background: transparent; }
-.topbar-user {
-    font-size: 12px;
-    color: #555;
-    font-weight: 500;
-}
+.topbar-user { font-size: 12px; color: var(--text-sub); font-weight: 500; }
 
 /* ── Metric cards ───────────────────────────────────────────────────────── */
 .metric-card {
-    background: #161616;
-    border: 1px solid #222;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     border-radius: 14px;
     padding: 20px 24px;
 }
 .metric-card .label {
     font-size: 11px;
     font-weight: 600;
-    color: #555;
+    color: var(--text-sub);
     text-transform: uppercase;
     letter-spacing: 0.8px;
     margin-bottom: 8px;
@@ -179,23 +244,19 @@ footer { display: none !important; }
 .metric-card .value {
     font-size: 28px;
     font-weight: 700;
-    color: #fff;
+    color: var(--metric-val);
     letter-spacing: -0.5px;
 }
-.metric-card .change {
-    font-size: 13px;
-    font-weight: 500;
-    margin-top: 6px;
-}
+.metric-card .change { font-size: 13px; font-weight: 500; margin-top: 6px; }
 .metric-card .change.pos { color: #00c805; }
 .metric-card .change.neg { color: #ff4444; }
-.metric-card .change.neu { color: #555; }
+.metric-card .change.neu { color: var(--text-sub); }
 
 /* ── Section headers ────────────────────────────────────────────────────── */
 .section-header {
     font-size: 18px;
     font-weight: 700;
-    color: #fff;
+    color: var(--text);
     margin: 32px 0 16px;
     display: flex;
     align-items: center;
@@ -211,8 +272,8 @@ footer { display: none !important; }
 
 /* ── Quick action tiles ─────────────────────────────────────────────────── */
 .quick-tile {
-    background: #161616;
-    border: 1px solid #222;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     border-radius: 14px;
     padding: 20px;
     text-align: center;
@@ -221,41 +282,15 @@ footer { display: none !important; }
     text-decoration: none;
     display: block;
 }
-.quick-tile:hover { border-color: #00c805; background: #0f1f0f; }
+.quick-tile:hover { border-color: #00c805; background: var(--tile-hover); }
 .quick-tile .tile-icon { font-size: 28px; margin-bottom: 8px; }
-.quick-tile .tile-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #ccc;
-}
-.quick-tile .tile-sub {
-    font-size: 11px;
-    color: #555;
-    margin-top: 3px;
-}
-
-/* ── Activity row ───────────────────────────────────────────────────────── */
-.activity-row {
-    display: flex;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid #1a1a1a;
-}
-.activity-row:last-child { border-bottom: none; }
-.activity-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #00c805;
-    margin-right: 14px;
-    flex-shrink: 0;
-}
-.activity-text { flex: 1; font-size: 13px; color: #ccc; }
-.activity-meta { font-size: 11px; color: #444; }
+.quick-tile .tile-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.quick-tile .tile-sub { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
 
 /* ── Table overrides ────────────────────────────────────────────────────── */
 [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
 
-/* ── Button styles ──────────────────────────────────────────────────────── */
+/* ── Buttons ────────────────────────────────────────────────────────────── */
 button[kind="primary"] {
     background: #00c805 !important;
     color: #fff !important;
@@ -275,23 +310,36 @@ button[kind="secondary"] {
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
 .stTextInput input, .stNumberInput input, .stDateInput input,
-.stSelectbox div[data-baseweb="select"] > div {
-    background: #161616 !important;
-    border-color: #2a2a2a !important;
-    color: #fff !important;
+.stSelectbox div[data-baseweb="select"] > div,
+[data-baseweb="input"] input,
+[data-baseweb="textarea"] textarea {
+    background: var(--input-bg) !important;
+    border: 1.5px solid var(--input-border) !important;
+    border-radius: 8px !important;
+    color: var(--input-text) !important;
+    font-weight: 500 !important;
 }
-.stTextInput input:focus, .stNumberInput input:focus {
+.stTextInput input::placeholder, .stNumberInput input::placeholder {
+    color: var(--text-sub) !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus,
+[data-baseweb="input"] input:focus {
     border-color: #00c805 !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 0 2px rgba(0,200,5,0.15) !important;
+}
+.stSelectbox div[data-baseweb="select"] span,
+.stSelectbox div[data-baseweb="select"] div {
+    color: var(--input-text) !important;
 }
 
 /* ── Metrics ────────────────────────────────────────────────────────────── */
-div[data-testid="stMetricValue"] { font-size: 26px; font-weight: 700; color: #fff; }
-div[data-testid="stMetricLabel"] { font-size: 12px; color: #666 !important; }
+div[data-testid="stMetricValue"] { font-size: 26px; font-weight: 700; color: var(--metric-val) !important; }
+div[data-testid="stMetricLabel"] { font-size: 12px; color: var(--metric-lbl) !important; }
+div[data-testid="stMetricLabel"] * { color: var(--metric-lbl) !important; }
 div[data-testid="stMetricDelta"] { font-size: 13px; }
 
 /* ── Divider ────────────────────────────────────────────────────────────── */
-hr { border-color: #1e1e1e !important; margin: 24px 0 !important; }
+hr { border-color: var(--divider) !important; margin: 24px 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
