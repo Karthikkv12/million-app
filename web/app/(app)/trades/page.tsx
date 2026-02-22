@@ -1,0 +1,179 @@
+"use client";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchTrades, Trade,
+  api,
+} from "@/lib/api";
+import { clsx } from "clsx";
+
+function isOpen(t: Trade) { return t.exit_price == null; }
+
+function calcPnl(t: Trade) {
+  if (t.exit_price == null) return null;
+  const d = t.action?.toUpperCase() === "SELL" ? t.price - t.exit_price : t.exit_price - t.price;
+  return d * t.qty;
+}
+
+// ── Close trade modal ─────────────────────────────────────────────────────────
+function CloseModal({ trade, onDone }: { trade: Trade; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [price, setPrice] = useState(trade.price?.toFixed(2) ?? "");
+  const [date, setDate]   = useState(new Date().toISOString().slice(0, 10));
+  const [err, setErr]     = useState("");
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.post(`/trades/${trade.id}/close`, { exit_price: parseFloat(price), exit_date: date }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["trades"] }); onDone(); },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-80 shadow-xl border border-gray-200 dark:border-gray-700">
+        <h3 className="font-bold text-gray-900 dark:text-white mb-4">Close {trade.symbol}</h3>
+        <label className="block text-xs text-gray-500 mb-1">Exit Price ($)</label>
+        <input
+          type="number" step="0.01" value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm mb-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+        <label className="block text-xs text-gray-500 mb-1">Exit Date</label>
+        <input
+          type="date" value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm mb-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+        {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
+        <div className="flex gap-2">
+          <button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending}
+            className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            {mut.isPending ? "Closing…" : "Confirm Close"}
+          </button>
+          <button onClick={onDone} className="flex-1 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete confirm ────────────────────────────────────────────────────────────
+function useDeleteTrade() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.del(`/trades/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["trades"] }),
+  });
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function TradesPage() {
+  const { data: trades = [], isLoading } = useQuery({ queryKey: ["trades"], queryFn: fetchTrades, staleTime: 30_000 });
+  const [closing, setClosing] = useState<Trade | null>(null);
+  const [tab, setTab]         = useState<"open" | "closed">("open");
+  const deleteMut = useDeleteTrade();
+
+  const open   = trades.filter(isOpen);
+  const closed = trades.filter((t) => !isOpen(t));
+  const shown  = tab === "open" ? open : closed;
+
+  const totalPnl = closed.reduce((s, t) => s + (calcPnl(t) ?? 0), 0);
+  const pnlColor = totalPnl > 0 ? "#00cc44" : totalPnl < 0 ? "#ff4444" : undefined;
+
+  return (
+    <div className="p-4 max-w-screen-xl mx-auto">
+      {closing && <CloseModal trade={closing} onDone={() => setClosing(null)} />}
+
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-black text-gray-900 dark:text-white">Trades</h1>
+        {closed.length > 0 && (
+          <span className="text-sm font-bold" style={{ color: pnlColor }}>
+            Realized P/L: {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
+          </span>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-800">
+        {(["open", "closed"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={clsx(
+              "px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors capitalize",
+              tab === t
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-gray-400 hover:text-gray-600",
+            )}
+          >
+            {t} ({t === "open" ? open.length : closed.length})
+          </button>
+        ))}
+      </div>
+
+      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+      {!isLoading && shown.length === 0 && (
+        <p className="text-sm text-gray-400">No {tab} trades.</p>
+      )}
+
+      {shown.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide">
+                {["Date", "Symbol", "Action", "Strategy", "Qty", "Entry", "Exit", "P/L", ""].map((h) => (
+                  <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((t) => {
+                const pnl = calcPnl(t);
+                const pnlC = pnl == null ? "" : pnl >= 0 ? "#00cc44" : "#ff4444";
+                return (
+                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{String(t.date ?? "").slice(0, 10)}</td>
+                    <td className="px-3 py-2 font-bold text-gray-900 dark:text-white">{t.symbol}</td>
+                    <td className="px-3 py-2 font-semibold" style={{ color: t.action?.toUpperCase() === "BUY" ? "#00cc44" : "#ff4444" }}>{t.action}</td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{t.strategy ?? "—"}</td>
+                    <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{t.qty}</td>
+                    <td className="px-3 py-2 text-gray-700 dark:text-gray-300">${t.price?.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-gray-500">{t.exit_price != null ? `$${t.exit_price.toFixed(2)}` : "—"}</td>
+                    <td className="px-3 py-2 font-semibold" style={{ color: pnlC }}>
+                      {pnl == null ? "—" : `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-2">
+                        {isOpen(t) && (
+                          <button
+                            onClick={() => setClosing(t)}
+                            className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-100 transition"
+                          >
+                            Close
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteMut.mutate(t.id)}
+                          className="text-xs px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
