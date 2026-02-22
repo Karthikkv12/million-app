@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timezone
 import os
-from datetime import timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
 
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -511,6 +509,19 @@ def fill_order_external(order_id: int, req: OrderFillRequest, user=Depends(get_c
     return {"status": "ok", "trade_id": int(trade_id)}
 
 
+@app.get("/orders/{order_id}/events", response_model=List[Dict[str, Any]])
+def order_events(order_id: int, user=Depends(get_current_user), limit: int = 200) -> List[Dict[str, Any]]:
+    rows = services.list_order_events(user_id=int(user["sub"]), order_id=int(order_id), limit=int(limit))
+    cleaned: List[Dict[str, Any]] = []
+    for r in rows:
+        rec: Dict[str, Any] = dict(r)
+        v = rec.get("created_at")
+        if isinstance(v, (pd.Timestamp, datetime)):
+            rec["created_at"] = pd.to_datetime(v).to_pydatetime().isoformat()
+        cleaned.append(rec)
+    return cleaned
+
+
 @app.get("/trades", response_model=List[Dict[str, Any]])
 def list_trades(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
     trades, _, _ = services.load_data(user_id=int(user["sub"]))
@@ -606,6 +617,34 @@ def create_budget(req: BudgetCreateRequest, user=Depends(get_current_user)) -> D
 def ledger_cash_balance(user=Depends(get_current_user)) -> Dict[str, Any]:
     bal = services.get_cash_balance(user_id=int(user["sub"]), currency="USD")
     return {"currency": "USD", "balance": float(bal)}
+
+
+@app.get("/options/gamma-exposure/{symbol}", response_model=Dict[str, Any])
+def gamma_exposure(symbol: str, _user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Compute and return Gamma Exposure (GEX) for a given symbol.
+    Auth-gated so only logged-in users can call it; no user-specific data returned.
+    """
+    from logic.gamma import compute_gamma_exposure
+
+    result = compute_gamma_exposure(symbol.upper())
+    return {
+        "symbol": result.symbol,
+        "spot": result.spot,
+        "expiries": result.expiries,
+        "strikes": result.strikes,
+        "gex_by_strike": result.gex_by_strike,
+        "call_gex_by_strike": result.call_gex_by_strike,
+        "put_gex_by_strike": result.put_gex_by_strike,
+        "heatmap_expiries": result.heatmap_expiries,
+        "heatmap_strikes": result.heatmap_strikes,
+        "heatmap_values": result.heatmap_values,
+        "zero_gamma": result.zero_gamma,
+        "max_call_wall": result.max_call_wall,
+        "max_put_wall": result.max_put_wall,
+        "max_gex_strike": result.max_gex_strike,
+        "net_gex": result.net_gex,
+        "error": result.error,
+    }
 
 
 @app.get("/ledger/entries", response_model=List[Dict[str, Any]])

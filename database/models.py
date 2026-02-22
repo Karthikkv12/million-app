@@ -272,6 +272,28 @@ Index(
     unique=True,
 )
 
+
+class OrderEvent(Base):
+    __tablename__ = "order_events"
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey('orders.id'), nullable=False, index=True)
+    # Append-only event type: CREATED, SUBMITTED, SYNCED, CANCELLED, FILLED, etc.
+    event_type = Column(String, nullable=False, index=True)
+    # Snapshot fields for convenience/debugging.
+    order_status = Column(String, nullable=True, index=True)
+    external_status = Column(String, nullable=True, index=True)
+    note = Column(String, nullable=True)
+
+
+Index(
+    "ix_order_events_user_order_created_at",
+    OrderEvent.user_id,
+    OrderEvent.order_id,
+    OrderEvent.created_at,
+)
+
 # Database Connection Setup
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:

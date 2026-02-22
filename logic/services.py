@@ -240,6 +240,32 @@ def _apply_holding_delta(
         session.delete(h)
 
 
+def _order_status_str(v) -> str:
+    return str(getattr(v, "value", v) or "")
+
+
+def _append_order_event(
+    session,
+    *,
+    user_id: int,
+    order: Order,
+    event_type: str,
+    note: str | None = None,
+) -> None:
+    from database.models import OrderEvent
+
+    ev = OrderEvent(
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        user_id=int(user_id),
+        order_id=int(getattr(order, "id")),
+        event_type=str(event_type).upper(),
+        order_status=(_order_status_str(getattr(order, "status", None)) or None),
+        external_status=(str(getattr(order, "external_status", "") or "") or None),
+        note=(str(note)[:500] if note else None),
+    )
+    session.add(ev)
+
+
 def create_order(
     *,
     user_id: int,
@@ -290,10 +316,11 @@ def create_order(
             client_order_id=coid,
         )
         session.add(o)
+        session.flush()  # assign order id for event history (and broker submission)
+        _append_order_event(session, user_id=int(user_id), order=o, event_type="CREATED")
 
         # Execution-capable mode: submit to configured broker/OMS and persist linkage.
         if _broker_enabled():
-            session.flush()  # assign order id before submission
             broker = get_broker()
             resp = broker.submit_order(
                 user_id=int(user_id),
@@ -311,6 +338,7 @@ def create_order(
             o.external_status = str(resp.external_status)
             o.last_synced_at = getattr(resp, "submitted_at", None)
             session.add(o)
+            _append_order_event(session, user_id=int(user_id), order=o, event_type="SUBMITTED")
 
         session.commit()
         return int(o.id)
@@ -359,6 +387,36 @@ def list_orders(*, user_id: int, limit: int = 100) -> list[dict]:
         session.close()
 
 
+def list_order_events(*, user_id: int, order_id: int, limit: int = 200) -> list[dict]:
+    session = get_session()
+    try:
+        from database.models import OrderEvent
+
+        rows = (
+            session.query(OrderEvent)
+            .filter(OrderEvent.user_id == int(user_id))
+            .filter(OrderEvent.order_id == int(order_id))
+            .order_by(OrderEvent.created_at.asc())
+            .limit(int(limit))
+            .all()
+        )
+        out: list[dict] = []
+        for r in rows:
+            out.append(
+                {
+                    "id": int(getattr(r, "id")),
+                    "created_at": getattr(r, "created_at", None),
+                    "event_type": str(getattr(r, "event_type", "") or ""),
+                    "order_status": (str(getattr(r, "order_status", "") or "") or None),
+                    "external_status": (str(getattr(r, "external_status", "") or "") or None),
+                    "note": (str(getattr(r, "note", "") or "") or None),
+                }
+            )
+        return out
+    finally:
+        session.close()
+
+
 def cancel_order(*, user_id: int, order_id: int) -> bool:
     session = get_session()
     try:
@@ -381,6 +439,7 @@ def cancel_order(*, user_id: int, order_id: int) -> bool:
 
         o.status = OrderStatus.CANCELLED
         session.add(o)
+        _append_order_event(session, user_id=int(user_id), order=o, event_type="CANCELLED")
         session.commit()
         return True
     except Exception:
@@ -414,6 +473,7 @@ def sync_order_status(*, user_id: int, order_id: int) -> bool:
         o.external_status = str(resp.external_status)
         o.last_synced_at = resp.last_synced_at
         session.add(o)
+        _append_order_event(session, user_id=int(user_id), order=o, event_type="SYNCED")
         session.commit()
         return True
     except Exception:
@@ -553,6 +613,7 @@ def fill_order(*, user_id: int, order_id: int, filled_price: float, filled_at=No
             o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
             o.trade_id = int(getattr(existing_trade, "id"))
             session.add(o)
+            _append_order_event(session, user_id=int(user_id), order=o, event_type="FILLED")
             session.commit()
             return int(getattr(existing_trade, "id"))
 
@@ -592,6 +653,7 @@ def fill_order(*, user_id: int, order_id: int, filled_price: float, filled_at=No
         o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
         o.trade_id = int(getattr(new_trade, "id"))
         session.add(o)
+        _append_order_event(session, user_id=int(user_id), order=o, event_type="FILLED")
         session.commit()
         return int(getattr(new_trade, "id"))
     except Exception:

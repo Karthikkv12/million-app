@@ -31,10 +31,16 @@ def test_orders_create_list_cancel_and_fill(db_engine_and_session):
     assert len(rows) == 1
     assert rows[0]["status"] == "PENDING"
 
+    ev1 = services.list_order_events(user_id=uid, order_id=int(oid1), limit=50)
+    assert [e["event_type"] for e in ev1] == ["CREATED"]
+
     # Cancel
     assert services.cancel_order(user_id=uid, order_id=int(oid1)) is True
     rows2 = services.list_orders(user_id=uid, limit=10)
     assert rows2[0]["status"] == "CANCELLED"
+
+    ev2 = services.list_order_events(user_id=uid, order_id=int(oid1), limit=50)
+    assert [e["event_type"] for e in ev2] == ["CREATED", "CANCELLED"]
 
     # New order -> fill creates a trade
     oid3 = services.create_order(
@@ -50,6 +56,9 @@ def test_orders_create_list_cancel_and_fill(db_engine_and_session):
 
     trade_id = services.fill_order(user_id=uid, order_id=int(oid3), filled_price=250.0, filled_at="2025-01-02")
     assert isinstance(trade_id, int)
+
+    ev3 = services.list_order_events(user_id=uid, order_id=int(oid3), limit=50)
+    assert [e["event_type"] for e in ev3] == ["CREATED", "FILLED"]
 
     orders = services.list_orders(user_id=uid, limit=10)
     filled = [o for o in orders if int(o["id"]) == int(oid3)][0]

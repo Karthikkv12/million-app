@@ -23,6 +23,7 @@ from ui.trades import trade_sidebar_form, render_live_positions, render_profit_a
 from ui.budget import budget_entry_form
 from ui.search import render_stock_page
 from ui.utils import canonical_action, canonical_instrument, canonical_budget_type
+from ui.gamma_exposure import render_gamma_exposure_page
 from frontend_client import load_data as api_load_data, update_trade as api_update_trade, get_cash_balance as api_get_cash_balance
 
 
@@ -239,6 +240,7 @@ _sid = _get_query_param("sid")
 _sid_q = f"sid={quote(_sid)}&" if _sid else ""
 _home_href = f"?{_sid_q}page=main"
 _investment_href = f"?{_sid_q}page=investment"
+_gamma_href = f"?{_sid_q}page=gamma"
 _budget_href = f"?{_sid_q}page=budget"
 _settings_href = f"?{_sid_q}page=settings"
 _logout_href = f"?{_sid_q}action=logout"
@@ -248,6 +250,7 @@ st.markdown(
         f'<a class="brand" href="{_home_href}" target="_self">Million</a>'
         '<div class="nav">'
         f'<a href="{_investment_href}" target="_self">Investment</a>'
+        f'<a href="{_gamma_href}" target="_self">Gamma</a>'
         f'<a href="{_budget_href}" target="_self">Budget &amp; Cash Flow</a>'
         f'<a href="{_settings_href}" target="_self">Settings</a>'
         f'<a href="{_logout_href}" target="_self">Logout</a>'
@@ -297,7 +300,7 @@ if not budget_df.empty:
 total_nw = portfolio_val + cash_balance + other_assets
 
 page = (_get_query_param("page") or "main").lower()
-if page not in {"main", "investment", "stock", "budget", "settings", "pnl"}:
+if page not in {"main", "investment", "stock", "budget", "settings", "pnl", "gamma"}:
     page = "main"
 
 if page == "main":
@@ -353,6 +356,8 @@ elif page == "stock":
     render_stock_page(symbol=str(sym), ticker_map=TICKER_MAP)
 elif page == "pnl":
     render_profit_and_loss_page(trades_df)
+elif page == "gamma":
+    render_gamma_exposure_page()
 elif page == "budget":
     budget_entry_form(budget_df)
 elif page == "settings":

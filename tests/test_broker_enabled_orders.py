@@ -37,6 +37,9 @@ def test_broker_enabled_create_order_sets_external_fields(db_engine_and_session,
         state = json.loads(Path(os.environ["PAPER_BROKER_STATE_FILE"]).read_text("utf-8"))
         assert "orders" in state
         assert o.external_order_id in state["orders"]
+
+        ev = services.list_order_events(user_id=1, order_id=int(order_id), limit=50)
+        assert [e["event_type"] for e in ev] == ["CREATED", "SUBMITTED"]
     finally:
         os.environ.pop("BROKER_ENABLED", None)
         os.environ.pop("BROKER_PROVIDER", None)
@@ -66,6 +69,9 @@ def test_broker_enabled_cancel_order_sets_external_status(db_engine_and_session,
         assert o.status.name == "CANCELLED"
         assert o.external_status == "CANCELLED"
         assert o.last_synced_at is not None
+
+        ev = services.list_order_events(user_id=1, order_id=int(order_id), limit=50)
+        assert [e["event_type"] for e in ev][-1] == "CANCELLED"
     finally:
         os.environ.pop("BROKER_ENABLED", None)
         os.environ.pop("BROKER_PROVIDER", None)
@@ -100,6 +106,9 @@ def test_broker_enabled_sync_updates_last_synced_at(db_engine_and_session, tmp_p
             assert after.last_synced_at is not None
             if before_ts is not None:
                 assert after.last_synced_at >= before_ts
+
+        ev = services.list_order_events(user_id=1, order_id=int(order_id), limit=50)
+        assert "SYNCED" in [e["event_type"] for e in ev]
     finally:
         os.environ.pop("BROKER_ENABLED", None)
         os.environ.pop("BROKER_PROVIDER", None)
@@ -168,6 +177,9 @@ def test_broker_enabled_fill_via_broker_creates_trade_and_fills_order(db_engine_
             assert o.trade_id == trade_id
             assert o.external_status == "FILLED"
             assert o.last_synced_at is not None
+
+        ev = services.list_order_events(user_id=1, order_id=int(order_id), limit=50)
+        assert [e["event_type"] for e in ev][-1] == "FILLED"
     finally:
         os.environ.pop("BROKER_ENABLED", None)
         os.environ.pop("BROKER_PROVIDER", None)
