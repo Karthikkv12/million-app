@@ -2,10 +2,16 @@
 Gamma Exposure (GEX) calculations.
 
 Dealer GEX model:
-  - For calls:  dealer is SHORT gamma  → GEX contribution = -Gamma × OI × 100 × Spot
-  - For puts:   dealer is LONG gamma   → GEX contribution = +Gamma × OI × 100 × Spot
+  - For calls:  dealer is SHORT gamma  → GEX contribution = -Gamma × OI × lot_size × Spot
+  - For puts:   dealer is LONG gamma   → GEX contribution = +Gamma × OI × lot_size × Spot
   Net GEX > 0  →  dealers long gamma  → they sell rallies / buy dips  → mean-reverting market
   Net GEX < 0  →  dealers short gamma → they buy rallies / sell dips  → trending / volatile market
+
+Lot sizes:
+  US options:            100 contracts per lot (standard)
+  Indian index options:  NIFTY=75, BANKNIFTY=30, FINNIFTY=40, MIDCPNIFTY=75, SENSEX=20, BANKEX=20
+  Indian equity options: 1 lot = varies, but yfinance reports OI in contracts already — use 1
+                         (yfinance NSE equity OI is already in shares, not lots)
 """
 from __future__ import annotations
 
@@ -15,6 +21,104 @@ from typing import List, Optional
 import warnings
 
 import pandas as pd
+
+# ---------------------------------------------------------------------------
+# Indian contract lot sizes (NSE F&O)
+# ---------------------------------------------------------------------------
+
+# Key: base symbol (without .NS/.BO suffix, upper-cased)
+_INDIA_LOT_SIZES: dict[str, int] = {
+    "NIFTY":        75,
+    "BANKNIFTY":    30,
+    "FINNIFTY":     40,
+    "MIDCPNIFTY":   75,
+    "SENSEX":       20,
+    "BANKEX":       20,
+    "NIFTYNXT50":   25,
+    # Popular equity lots (NSE F&O)
+    "RELIANCE":     250,
+    "TCS":          150,
+    "INFY":         300,
+    "HDFCBANK":     550,
+    "ICICIBANK":    700,
+    "SBIN":         1500,
+    "WIPRO":        1500,
+    "AXISBANK":     625,
+    "KOTAKBANK":    400,
+    "LT":           175,
+    "ITC":          3200,
+    "BHARTIARTL":   950,
+    "HCLTECH":      350,
+    "SUNPHARMA":    350,
+    "TITAN":        175,
+    "BAJFINANCE":   125,
+    "BAJAJFINSV":   125,
+    "MARUTI":       100,
+    "NESTLEIND":    40,
+    "ULTRACEMCO":   100,
+    "ASIANPAINT":   200,
+    "HINDUNILVR":   300,
+    "POWERGRID":    2700,
+    "NTPC":         2700,
+    "ONGC":         1900,
+    "COALINDIA":    2700,
+    "ADANIENT":     625,
+    "ADANIPORTS":   1250,
+    "TATAMOTORS":   1425,
+    "TATASTEEL":    5500,
+    "JSWSTEEL":     1350,
+    "HINDALCO":     2150,
+    "VEDL":         2756,
+    "CIPLA":        650,
+    "DRREDDY":      125,
+    "DIVISLAB":     200,
+    "APOLLOHOSP":   250,
+    "EICHERMOT":    175,
+    "GRASIM":       475,
+    "HEROMOTOCO":   300,
+    "M&M":          700,
+    "TECHM":        600,
+    "LTIM":         150,
+    "HDFCLIFE":     1100,
+    "SBILIFE":      750,
+    "ICICIPRULI":   2000,
+    "BPCL":         1800,
+    "IOC":          4750,
+    "GAIL":         5775,
+    "TATACONSUM":   1100,
+    "INDUSINDBK":   500,
+    "PNB":          8000,
+    "CANBK":        1875,
+    "BANDHANBNK":   3600,
+    "IDFCFIRSTB":   10000,
+    "MUTHOOTFIN":   750,
+    "CHOLAFIN":     1250,
+    "PFC":          2700,
+    "RECLTD":       3000,
+    "SIEMENS":      275,
+    "ABB":          250,
+    "HAL":          300,
+    "BEL":          3700,
+    "IRFC":         10000,
+    "ZOMATO":       4500,
+    "PAYTM":        2000,
+    "NYKAA":        1400,
+    "POLICYBZR":    937,
+    "DELHIVERY":    4000,
+}
+
+
+def _get_lot_size(symbol: str) -> int:
+    """Return the lot size for a given symbol.
+    Indian (.NS / .BO) symbols use NSE lot sizes; US symbols use 100.
+    """
+    sym_upper = symbol.upper()
+    # Strip exchange suffix
+    base = sym_upper.replace(".NS", "").replace(".BO", "").replace(".BSE", "")
+    is_indian = sym_upper.endswith((".NS", ".BO", ".BSE"))
+    if is_indian:
+        return _INDIA_LOT_SIZES.get(base, 1)   # equity lots default to 1 (OI already in shares)
+    return 100  # US standard
 
 # ---------------------------------------------------------------------------
 # Black-Scholes helpers (pure Python – no heavy deps)
@@ -78,6 +182,7 @@ class GEXResult:
     max_put_wall: Optional[float] = None
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
+    lot_size: int = 100   # contract multiplier used (100 for US, varies for India)
     error: Optional[str] = None
 
 
@@ -171,15 +276,15 @@ def _fetch_chain_yfinance(symbol: str) -> tuple[float, pd.DataFrame]:
     return spot, pd.DataFrame(rows)
 
 
-def _compute_gex(df: pd.DataFrame, spot: float) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _compute_gex(df: pd.DataFrame, spot: float, lot_size: int = 100) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Compute dealer GEX per row.
     Calls: dealer short gamma → negative GEX.
     Puts:  dealer long gamma  → positive GEX.
-    GEX notional = ±gamma × oi × 100 × spot
+    GEX notional = ±gamma × oi × lot_size × spot
     """
     df = df.copy()
-    df["gex_raw"] = df["gamma"] * df["oi"] * 100 * spot
+    df["gex_raw"] = df["gamma"] * df["oi"] * lot_size * spot
     df["gex"] = df.apply(
         lambda r: -r["gex_raw"] if r["otype"] == "call" else r["gex_raw"], axis=1
     )
@@ -245,7 +350,9 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         expiries = sorted(df["expiry"].unique().tolist())
         result.expiries = expiries
 
-        df, by_strike, by_strike_call, by_strike_put = _compute_gex(df, spot)
+        lot_size = _get_lot_size(sym)
+        df, by_strike, by_strike_call, by_strike_put = _compute_gex(df, spot, lot_size=lot_size)
+        result.lot_size = lot_size
 
         result.strikes = by_strike["strike"].tolist()
         result.gex_by_strike = by_strike["gex"].tolist()

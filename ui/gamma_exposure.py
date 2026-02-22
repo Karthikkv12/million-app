@@ -92,11 +92,33 @@ def _cached_gex(symbol: str) -> dict:
         "max_gex_strike": r.max_gex_strike,
         "net_gex": r.net_gex,
         "error": r.error,
+        "lot_size": r.lot_size,
         # per-expiry heatmap slices
         "heatmap_expiries": r.heatmap_expiries,
         "heatmap_strikes": r.heatmap_strikes,
         "heatmap_values": r.heatmap_values,
     }
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _search_suggestions(query: str, max_results: int = 6) -> list[dict]:
+    """Use yfinance Search to find matching symbols for a query string."""
+    try:
+        import yfinance as yf
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            results = yf.Search(query, max_results=max_results)
+        out = []
+        for q in (results.quotes or [])[:max_results]:
+            sym  = q.get("symbol", "")
+            name = q.get("longname") or q.get("shortname") or sym
+            exch = q.get("exchDisp", "")
+            qt   = q.get("quoteType", "")
+            if sym:
+                out.append({"symbol": sym, "name": name, "exchange": exch, "type": qt})
+        return out
+    except Exception:
+        return []
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -131,10 +153,10 @@ def _fetch_price_info(symbol: str) -> dict:
 # Mode B: multi-ticker   → [STRIKE|GEX] [STRIKE|GEX] … (panels side-by-side, one expiry)
 # ──────────────────────────────────────────────
 
-def _single_ticker_table_html(d: dict, max_rows: int = 80, expiry_filter: list | None = None) -> str:
+def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list | None = None) -> str:
     """
     Mode A — one ticker, multiple expiries as columns.
-    Rows = strikes descending (±20% of spot).
+    Rows = n_strikes centred on spot (n_strikes//2 above, n_strikes//2 below).
     Cols = STRIKE | expiry-1 | expiry-2 | …
     Gold ► row = nearest spot strike.
     ★ = king node per expiry column.
@@ -174,9 +196,21 @@ def _single_ticker_table_html(d: dict, max_rows: int = 80, expiry_filter: list |
     all_s: set = set()
     for _, _, gm, _, _ in exp_cols:
         all_s.update(s for s in gm if lo <= s <= hi)
-    sorted_strikes = sorted(all_s, reverse=True)[:max_rows]
-    if not sorted_strikes:
+    all_sorted = sorted(all_s)          # ascending
+    if not all_sorted:
         return "<p style='color:#888'>No strikes in ±20% range.</p>"
+    # Centre on spot: find nearest strike, take n//2 above and n//2 below
+    half = max(1, n_strikes // 2)
+    spot_idx = min(range(len(all_sorted)), key=lambda i: abs(all_sorted[i] - spot))
+    lo_idx = max(0, spot_idx - half)
+    hi_idx = min(len(all_sorted), spot_idx + half)
+    # expand if we hit an edge
+    if hi_idx - lo_idx < n_strikes:
+        if lo_idx == 0:
+            hi_idx = min(len(all_sorted), n_strikes)
+        else:
+            lo_idx = max(0, hi_idx - n_strikes)
+    sorted_strikes = sorted(all_sorted[lo_idx:hi_idx], reverse=True)
 
     nearest_spot = min(sorted_strikes, key=lambda s: abs(s - spot))
 
@@ -190,6 +224,12 @@ def _single_ticker_table_html(d: dict, max_rows: int = 80, expiry_filter: list |
     net_c = "#00cc44" if net >= 0 else "#ff4444"
     zg    = d.get("zero_gamma")
     zg_s  = f"${zg:.2f}" if zg else "—"
+    lot   = d.get("lot_size", 100)
+    lot_badge = (
+        f"&nbsp;&nbsp;<span style='font-size:9px;background:#1a1a1a;color:#888;"
+        f"border:1px solid #333;border-radius:3px;padding:1px 5px'>lot×{lot}</span>"
+        if lot != 100 else ""
+    )
 
     # ── header ────────────────────────────────────────────────────────────
     TH = "background:#0d0d0d;padding:3px 8px;font-size:10px;font-weight:700;" \
@@ -204,6 +244,7 @@ def _single_ticker_table_html(d: dict, max_rows: int = 80, expiry_filter: list |
         f"&nbsp;<span style='font-size:11px;color:{chg_c}'>{arr}{chg:.2f} ({arr}{chg_p:.2f}%)</span>"
         f"&nbsp;&nbsp;<span style='font-size:9px;color:#555'>ZG <span style='color:#aaa'>{zg_s}</span></span>"
         f"&nbsp;&nbsp;<span style='font-size:9px;color:#555'>Net <span style='color:{net_c};font-weight:700'>{_fmt_gex(net)}</span></span>"
+        f"{lot_badge}"
         f"</th></tr>"
     )
     # Row B: column headers
@@ -261,11 +302,11 @@ def _single_ticker_table_html(d: dict, max_rows: int = 80, expiry_filter: list |
     )
 
 
-def _compare_table_html(datasets: list, expiry: str, max_rows: int = 80) -> str:
+def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str:
     """
     Mode B — multiple tickers, one shared expiry.
     Each ticker = its own STRIKE | GEX panel, side by side.
-    Each ticker uses its own strike range (±20% of its spot).
+    Each ticker uses n_strikes centred on its own spot (n_strikes//2 above, n_strikes//2 below).
     """
     import datetime as _dt
 
@@ -307,7 +348,20 @@ def _compare_table_html(datasets: list, expiry: str, max_rows: int = 80) -> str:
             gex_map = {k: v for k, v in zip(d.get("strikes", []), d.get("gex_by_strike", []))}
 
         lo, hi = spot * 0.80, spot * 1.20
-        strikes = sorted([s for s in gex_map if lo <= s <= hi], reverse=True)[:max_rows]
+        all_s = sorted(s for s in gex_map if lo <= s <= hi)  # ascending
+        if not all_s:
+            continue
+        # Centre on spot
+        half = max(1, n_strikes // 2)
+        spot_idx = min(range(len(all_s)), key=lambda i: abs(all_s[i] - spot))
+        lo_idx = max(0, spot_idx - half)
+        hi_idx = min(len(all_s), spot_idx + half)
+        if hi_idx - lo_idx < n_strikes:
+            if lo_idx == 0:
+                hi_idx = min(len(all_s), n_strikes)
+            else:
+                lo_idx = max(0, hi_idx - n_strikes)
+        strikes = sorted(all_s[lo_idx:hi_idx], reverse=True)
         if not strikes:
             continue
 
@@ -627,15 +681,35 @@ def _king_node_chart(d: dict, expiry: str) -> "go.Figure":
 
 
 # ──────────────────────────────────────────────
-#  Presets
+#  Symbol resolution
 # ──────────────────────────────────────────────
 
-_PRESETS: dict = {
-    "— custom —": [],
-    "Index ETFs  (SPY · QQQ · IWM)": ["SPY", "QQQ", "IWM"],
-    "Mag-7": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"],
-    "Volatility": ["SPY", "SPX", "VIX"],
+# Known Indian index/equity names → auto-resolve to correct yfinance symbol
+_INDIA_SYMBOL_MAP: dict[str, str] = {
+    "NIFTY":        "^NSEI",
+    "NIFTY50":      "^NSEI",
+    "BANKNIFTY":    "^NSEBANK",
+    "FINNIFTY":     "NIFTY_FIN_SERVICE.NS",
+    "MIDCPNIFTY":   "NIFTY_MIDCAP_100.NS",
+    "SENSEX":       "^BSESN",
 }
+
+_INDIA_EQUITY_SUFFIXES = {".NS", ".BO"}
+
+def _resolve_symbol(raw: str) -> str:
+    """Normalise a ticker string entered by the user.
+    - Known Indian index shorthands (NIFTY, BANKNIFTY…) → yfinance index symbol
+    - Bare NSE equity names (e.g. RELIANCE) → RELIANCE.NS
+    - Everything else passes through unchanged.
+    """
+    up = raw.strip().upper()
+    # Already has exchange suffix or is a yfinance index (^) → no change
+    if up.startswith("^") or any(up.endswith(s) for s in _INDIA_EQUITY_SUFFIXES):
+        return up
+    # Known Indian index shorthand
+    if up in _INDIA_SYMBOL_MAP:
+        return _INDIA_SYMBOL_MAP[up]
+    return up  # US ticker — pass through
 
 
 # ──────────────────────────────────────────────
@@ -644,32 +718,34 @@ _PRESETS: dict = {
 
 def render_gamma_exposure_page() -> None:
     st.markdown(
-        "<h2 style='color:#e0e0e0;margin-bottom:4px'>Gamma Exposure (GEX)</h2>"
-        "<p style='color:#888;font-size:12px;margin-top:0'>Dealer net gamma by strike — "
-        "green = dealers long gamma (pinning), red = dealers short gamma (amplifying)</p>",
+        "<h2 style='color:#e0e0e0;margin-bottom:4px'>Gamma Exposure (GEX)</h2>",
         unsafe_allow_html=True,
     )
 
-    col_preset, col_input, col_btn = st.columns([2, 3, 1])
-    with col_preset:
-        preset_choice = st.selectbox(
-            "Preset", list(_PRESETS.keys()), key="gex_preset", label_visibility="collapsed"
-        )
+    # If a suggestion button set a pending ticker, pre-seed the input value
+    # before the widget is rendered (avoids the "cannot modify after instantiation" error).
+    if "gex_tickers_pending" in st.session_state:
+        st.session_state["gex_tickers"] = st.session_state.pop("gex_tickers_pending")
+
+    col_input, col_btn = st.columns([5, 1])
     with col_input:
-        default_tickers = ", ".join(_PRESETS[preset_choice]) if _PRESETS[preset_choice] else "SPY"
         raw_input = st.text_input(
-            "Tickers", value=default_tickers, key="gex_tickers",
-            placeholder="e.g. SPY QQQ IWM  — space or comma separated, up to 5",
+            "Tickers",
+            key="gex_tickers",
+            placeholder="Search tickers — e.g.  SPY  RELIANCE.NS  BANKNIFTY  (up to 5, space or comma separated)",
             label_visibility="collapsed",
-            help="Type up to 5 ticker symbols separated by spaces or commas. "
-                 "Each ticker appears as its own panel in the Strike Table for side-by-side comparison.",
         )
     with col_btn:
         fetch = st.button("Refresh", use_container_width=True, key="gex_fetch")
 
-    tickers = [t.strip().upper() for t in raw_input.replace(",", " ").split() if t.strip()][:5]
+    tickers = [_resolve_symbol(t) for t in raw_input.replace(",", " ").split() if t.strip()][:5]
     if not tickers:
-        st.info("Enter at least one ticker symbol.")
+        st.markdown(
+            "<div style='margin-top:24px;text-align:center;color:#444;font-size:13px'>"
+            "🔍&nbsp; Search a ticker above to load GEX data"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         return
 
     datasets: list = []
@@ -690,8 +766,43 @@ def render_gamma_exposure_page() -> None:
         prog.progress((i + 1) / len(tickers), text=f"Loaded {sym}")
     prog.empty()
 
-    for e in errors:
-        st.warning(e)
+    # ── Show suggestions for any failed tickers ───────────────────────────
+    failed_syms = [d["symbol"] for d in datasets if d.get("error") or not d.get("spot")]
+    for sym in failed_syms:
+        suggestions = _search_suggestions(sym)
+        if not suggestions:
+            st.warning(f"**{sym}** — no data found and no suggestions available.")
+            continue
+
+        st.markdown(
+            f"<div style='background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;"
+            f"padding:10px 16px 6px 16px;margin-bottom:8px'>"
+            f"<div style='font-size:11px;color:#888;margin-bottom:8px'>"
+            f"⚠️&nbsp; No options data for <b style='color:#fff'>{sym}</b>"
+            f" — did you mean one of these?"
+            f"</div></div>",
+            unsafe_allow_html=True,
+        )
+        btn_cols = st.columns(len(suggestions))
+        for col, s in zip(btn_cols, suggestions):
+            label   = s["symbol"]
+            name    = s["name"][:28] + "…" if len(s["name"]) > 28 else s["name"]
+            exch    = s["exchange"]
+            btn_lbl = f"{label}\n{name} · {exch}" if exch else f"{label}\n{name}"
+            if col.button(btn_lbl, key=f"sugg_{sym}_{label}", use_container_width=True):
+                # Write to a pending key — the widget reads it on the next rerun
+                # before st.text_input is instantiated, avoiding the Streamlit error.
+                current = st.session_state.get("gex_tickers", "")
+                parts   = [t.strip() for t in current.replace(",", " ").split() if t.strip()]
+                resolved_failed = sym
+                new_parts = [label if _resolve_symbol(p) == resolved_failed else p for p in parts]
+                if label not in new_parts:
+                    new_parts = [label if p.upper() == sym.upper() else p for p in new_parts]
+                if label not in new_parts:
+                    new_parts.append(label)
+                st.session_state["gex_tickers_pending"] = " ".join(new_parts)
+                _cached_gex.clear()
+                st.rerun()
 
     valid = [d for d in datasets if not d.get("error") and d.get("spot")]
 
@@ -784,51 +895,106 @@ def render_gamma_exposure_page() -> None:
 
             is_multi = len(valid) > 1  # auto-detect mode
 
+            # ── Shared inline control bar ─────────────────────────────────
+            st.markdown(
+                "<style>"
+                "div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {"
+                "  padding-right: 4px !important; padding-left: 4px !important;"
+                "}"
+                "div.gex-ctrl-bar div[data-baseweb='select'] > div,"
+                "div.gex-ctrl-bar input[type='number'] {"
+                "  background: #111 !important; border: 1px solid #2a2a2a !important;"
+                "  border-radius: 6px !important; color: #ccc !important; font-size:12px !important;"
+                "}"
+                "</style>",
+                unsafe_allow_html=True,
+            )
+
+            _STRIKE_OPTIONS = [5, 10, 20, 30, 40, 50, "Custom"]
+
             if not is_multi:
                 # ── MODE A: single ticker — expiries as columns ────────────
-                st.caption("Single ticker — select one or more expiries to show as columns.")
-                ctrl_left, ctrl_right = st.columns([3, 1])
-                with ctrl_left:
-                    # seed session state only on first visit so removals aren't overridden
-                    if "gex_exp_filter" not in st.session_state:
-                        st.session_state["gex_exp_filter"] = (
-                            all_expiries[:4] if len(all_expiries) >= 4 else list(all_expiries)
+                with st.container():
+                    st.markdown("<div class='gex-ctrl-bar'>", unsafe_allow_html=True)
+                    ca, cb, cc = st.columns([5, 2, 2])
+                    with ca:
+                        if "gex_exp_filter" not in st.session_state:
+                            st.session_state["gex_exp_filter"] = (
+                                all_expiries[:4] if len(all_expiries) >= 4 else list(all_expiries)
+                            )
+                        st.session_state["gex_exp_filter"] = [
+                            e for e in st.session_state["gex_exp_filter"] if e in all_expiries
+                        ]
+                        selected_expiries = st.multiselect(
+                            "Expiries",
+                            options=all_expiries,
+                            key="gex_exp_filter",
+                            placeholder="Expiry dates…",
+                            label_visibility="collapsed",
                         )
-                    # keep only expiries that are still valid options
-                    st.session_state["gex_exp_filter"] = [
-                        e for e in st.session_state["gex_exp_filter"] if e in all_expiries
-                    ]
-                    selected_expiries = st.multiselect(
-                        "Expiries (columns)",
-                        options=all_expiries,
-                        key="gex_exp_filter",
-                        placeholder="Select one or more expiry dates…",
-                    )
-                with ctrl_right:
-                    max_rows = st.slider("Max strikes", 40, 200, 80, step=10, key="gex_maxrows")
+                    with cb:
+                        _strike_sel = st.selectbox(
+                            "Strikes", _STRIKE_OPTIONS,
+                            index=2, key="gex_strikes_sel",
+                            label_visibility="collapsed",
+                        )
+                    with cc:
+                        if _strike_sel == "Custom":
+                            n_strikes = int(st.number_input(
+                                "N", min_value=2, max_value=200, value=20, step=2,
+                                key="gex_strikes_custom", label_visibility="collapsed",
+                            ))
+                        else:
+                            n_strikes = int(_strike_sel)
+                            st.markdown(
+                                f"<div style='height:38px;display:flex;align-items:center;"
+                                f"font-size:11px;color:#555'>±{n_strikes//2} around spot</div>",
+                                unsafe_allow_html=True,
+                            )
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 expiry_filter = selected_expiries if selected_expiries else None
                 st.markdown(
-                    _single_ticker_table_html(valid[0], max_rows=max_rows, expiry_filter=expiry_filter),
+                    _single_ticker_table_html(valid[0], n_strikes=n_strikes, expiry_filter=expiry_filter),
                     unsafe_allow_html=True,
                 )
 
             else:
                 # ── MODE B: multi-ticker — one expiry, panels side by side ─
-                st.caption("Multiple tickers — select one expiry to compare all tickers side by side.")
-                ctrl_left, ctrl_right = st.columns([3, 1])
-                with ctrl_left:
-                    selected_expiry = st.selectbox(
-                        "Expiry for comparison",
-                        options=all_expiries,
-                        index=0,
-                        key="gex_cmp_expiry",
-                    )
-                with ctrl_right:
-                    max_rows = st.slider("Max strikes", 40, 200, 80, step=10, key="gex_maxrows")
+                with st.container():
+                    st.markdown("<div class='gex-ctrl-bar'>", unsafe_allow_html=True)
+                    ca, cb, cc = st.columns([5, 2, 2])
+                    with ca:
+                        selected_expiry = st.selectbox(
+                            "Expiry",
+                            options=all_expiries,
+                            index=0,
+                            key="gex_cmp_expiry",
+                            label_visibility="collapsed",
+                        )
+                    with cb:
+                        _strike_sel = st.selectbox(
+                            "Strikes", _STRIKE_OPTIONS,
+                            index=2, key="gex_strikes_sel",
+                            label_visibility="collapsed",
+                        )
+                    with cc:
+                        if _strike_sel == "Custom":
+                            n_strikes = int(st.number_input(
+                                "N", min_value=2, max_value=200, value=20, step=2,
+                                key="gex_strikes_custom", label_visibility="collapsed",
+                            ))
+                        else:
+                            n_strikes = int(_strike_sel)
+                            st.markdown(
+                                f"<div style='height:38px;display:flex;align-items:center;"
+                                f"font-size:11px;color:#555'>±{n_strikes//2} around spot</div>",
+                                unsafe_allow_html=True,
+                            )
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown(
-                    _compare_table_html(valid, expiry=selected_expiry, max_rows=max_rows),
+                    _compare_table_html(valid, expiry=selected_expiry, n_strikes=n_strikes),
                     unsafe_allow_html=True,
                 )
 
@@ -1044,7 +1210,7 @@ def render_gamma_exposure_page() -> None:
                         unsafe_allow_html=True,
                     )
                     st.markdown(
-                        _compare_table_html(cmp_valid, expiry=selected_cmp_exp, max_rows=80),
+                        _compare_table_html(cmp_valid, expiry=selected_cmp_exp, n_strikes=20),
                         unsafe_allow_html=True,
                     )
                     st.markdown(

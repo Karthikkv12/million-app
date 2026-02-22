@@ -249,9 +249,7 @@ st.markdown(
         '<div class="top-band">'
         f'<a class="brand" href="{_home_href}" target="_self">Million</a>'
         '<div class="nav">'
-        f'<a href="{_investment_href}" target="_self">Investment</a>'
         f'<a href="{_gamma_href}" target="_self">Gamma</a>'
-        f'<a href="{_budget_href}" target="_self">Budget &amp; Cash Flow</a>'
         f'<a href="{_settings_href}" target="_self">Settings</a>'
         f'<a href="{_logout_href}" target="_self">Logout</a>'
         '</div>'
@@ -300,7 +298,11 @@ if not budget_df.empty:
 total_nw = portfolio_val + cash_balance + other_assets
 
 page = (_get_query_param("page") or "main").lower()
+# Hidden pages — keep routing logic intact but redirect to main if accessed directly
+_HIDDEN_PAGES = {"investment", "stock", "budget", "pnl"}
 if page not in {"main", "investment", "stock", "budget", "settings", "pnl", "gamma"}:
+    page = "main"
+if page in _HIDDEN_PAGES:
     page = "main"
 
 if page == "main":
