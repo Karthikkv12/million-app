@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/lib/sidebar";
 import { clsx } from "clsx";
 import {
-  LayoutDashboard, Zap, Search, BarChart2, ClipboardList,
+  LayoutDashboard, Zap, BarChart2, ClipboardList,
   Wallet, PiggyBank, BookOpen, Settings, LogOut, Menu, X,
   ChevronRight, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
@@ -14,7 +14,6 @@ import {
 const NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { href: "/options-flow", label: "Options Flow", icon: Zap             },
-  { href: "/search",       label: "Search",       icon: Search          },
   { href: "/trades",       label: "Trades",       icon: BarChart2       },
   { href: "/orders",       label: "Orders",       icon: ClipboardList   },
   { href: "/accounts",     label: "Accounts",     icon: Wallet          },
