@@ -7,9 +7,12 @@ import { clsx } from "clsx";
 const NAV = [
   { href: "/dashboard",    label: "Dashboard"     },
   { href: "/options-flow", label: "Options Flow"  },
+  { href: "/search",       label: "Search"        },
   { href: "/trades",       label: "Trades"        },
   { href: "/orders",       label: "Orders"        },
   { href: "/accounts",     label: "Accounts"      },
+  { href: "/budget",       label: "Budget"        },
+  { href: "/settings",     label: "Settings"      },
 ];
 
 export default function Navbar() {

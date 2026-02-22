@@ -196,3 +196,48 @@ export interface Account {
 export const fetchAccounts = () => api.get<Account[]>("/accounts");
 export const fetchCashBalance = (currency = "USD") =>
   api.get<{ currency: string; balance: number }>(`/cash/balance?currency=${currency}`);
+
+// ── Budget ────────────────────────────────────────────────────────────────────
+
+export interface BudgetEntry {
+  id?: number;
+  category: string;
+  type: "EXPENSE" | "INCOME" | "ASSET" | string;
+  amount: number;
+  date: string;
+  description?: string;
+}
+
+export const fetchBudget = () => api.get<BudgetEntry[]>("/budget");
+export const saveBudget = (body: Omit<BudgetEntry, "id">) => api.post("/budget", body);
+
+// ── Auth: sessions + events + change-password ─────────────────────────────────
+
+export interface AuthSession {
+  id: number;
+  created_at: string;
+  last_used_at?: string;
+  user_agent?: string;
+  ip_address?: string;
+  is_current?: boolean;
+}
+
+export interface AuthEvent {
+  id: number;
+  event_type: string;
+  success: boolean;
+  created_at: string;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export const fetchAuthSessions = () => api.get<AuthSession[]>("/auth/sessions");
+export const revokeSession = (id: number) => api.post(`/auth/sessions/${id}/revoke`);
+export const fetchAuthEvents = () => api.get<AuthEvent[]>("/auth/events");
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+
+// ── Cash ─────────────────────────────────────────────────────────────────────
+
+export const addCash = (amount: number, direction: "deposit" | "withdrawal", note?: string) =>
+  api.post("/cash", { amount, direction, note });
