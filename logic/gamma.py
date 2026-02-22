@@ -187,6 +187,7 @@ class GEXResult:
     call_premium: float = 0.0       # total call premium (OI × mid × lot_size)
     put_premium: float = 0.0        # total put premium (OI × mid × lot_size)
     net_flow: float = 0.0           # call_premium - put_premium (+ = bullish)
+    total_volume: int = 0           # total options volume (call + put) from chain
     # flow_by_expiry: [{expiry, call_prem, put_prem, net}]
     flow_by_expiry: List[dict] = field(default_factory=list)
     # top_flow_strikes: [{strike, call_prem, put_prem, net, otype_bias}]
@@ -266,11 +267,15 @@ def _fetch_chain_yfinance(symbol: str) -> tuple[float, pd.DataFrame]:
                     else:
                         gamma = 0.0
 
+                    vol_raw = opt.get("volume", 0)
+                    vol = int(float(vol_raw)) if vol_raw is not None and not (isinstance(vol_raw, float) and math.isnan(vol_raw)) else 0
+
                     rows.append({
                         "strike": strike,
                         "expiry": exp,
                         "otype": otype,
                         "oi": oi,
+                        "volume": vol,
                         "iv": iv,
                         "mid": mid,
                         "gamma": gamma,
@@ -416,6 +421,7 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         result.call_premium = float(call_df["premium"].sum())
         result.put_premium  = float(put_df["premium"].sum())
         result.net_flow     = result.call_premium - result.put_premium
+        result.total_volume = int(df["volume"].sum())
 
         # Flow by expiry (nearest 12 expiries, sorted)
         flow_rows = []

@@ -1,19 +1,19 @@
 "use client";
 
-import React, { useMemo, useEffect, useState, useRef } from "react";
+import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import {
   ComposedChart,
   Area,
   Line,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
   CartesianGrid,
-  BarChart,
-  Bar,
   Cell,
+  BarChart,
   Legend,
 } from "recharts";
 import { GexResult, TopFlowStrike, api } from "@/lib/api";
@@ -29,8 +29,14 @@ interface Snapshot {
   call_prem: number;
   put_prem: number;
   net_flow: number;
+  total_prem: number;
+  volume: number;
 }
 
+type DayRange = 1 | 2 | 3 | 7 | 14 | 30;
+const DAY_RANGES: DayRange[] = [1, 2, 3, 7, 14, 30];
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 function fmt(n: number): string {
   const abs = Math.abs(n);
   if (abs >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
@@ -38,7 +44,11 @@ function fmt(n: number): string {
   if (abs >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
   return `$${n.toFixed(0)}`;
 }
-
+function fmtVol(n: number): string {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+  return `${n}`;
+}
 function fmtAxis(n: number): string {
   const abs = Math.abs(n);
   if (abs >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
@@ -52,31 +62,43 @@ const PUT_COLOR   = "#f87171";
 const PRICE_COLOR = "#facc15";
 const NET_CALL    = "#22c55e";
 const NET_PUT     = "#ef4444";
+const VOL_CALL    = "#22c55e99";
+const VOL_PUT     = "#ef444499";
 
+// ── Tooltip ────────────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0f1117] px-3 py-2 text-[11px] shadow-xl space-y-0.5 min-w-[160px]">
-      <p className="text-white/50 font-semibold mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.stroke ?? p.fill ?? p.color }}>
-          {p.name}: {p.name === "Price" ? `$${Number(p.value).toFixed(2)}` : fmt(p.value)}
-        </p>
-      ))}
+    <div className="rounded-lg border border-white/10 bg-[#0d0f17] px-3 py-2 text-[11px] shadow-2xl space-y-0.5 min-w-[180px]">
+      <p className="text-white/50 font-semibold mb-1.5">{label}</p>
+      {payload.map((p: any) => {
+        const val = p.value;
+        let display: string;
+        if (p.name === "Price")   display = `$${Number(val).toFixed(2)}`;
+        else if (p.name === "Vol") display = fmtVol(val);
+        else                       display = fmt(val);
+        return (
+          <div key={p.name} className="flex justify-between gap-4">
+            <span style={{ color: p.stroke ?? p.fill ?? "#fff" }}>{p.name}</span>
+            <span className="text-white/80 tabular-nums">{display}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
+// ── SVG gradient defs ─────────────────────────────────────────────────────────
 function FlowGradients() {
   return (
     <defs>
-      <linearGradient id="gradCall" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%"  stopColor={NET_CALL} stopOpacity={0.45} />
-        <stop offset="95%" stopColor={NET_CALL} stopOpacity={0.03} />
+      <linearGradient id="gCall" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%"  stopColor={NET_CALL} stopOpacity={0.5} />
+        <stop offset="95%" stopColor={NET_CALL} stopOpacity={0.04} />
       </linearGradient>
-      <linearGradient id="gradPut" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%"  stopColor={NET_PUT} stopOpacity={0.03} />
-        <stop offset="95%" stopColor={NET_PUT} stopOpacity={0.45} />
+      <linearGradient id="gPut" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%"  stopColor={NET_PUT} stopOpacity={0.04} />
+        <stop offset="95%" stopColor={NET_PUT} stopOpacity={0.5} />
       </linearGradient>
     </defs>
   );
@@ -85,10 +107,11 @@ function FlowGradients() {
 export default function NetFlowPanel({ data }: Props) {
   const {
     symbol,
-    spot,
+    spot        = 0,
     call_premium     = 0,
     put_premium      = 0,
     net_flow         = 0,
+    total_volume     = 0,
     flow_by_expiry   = [],
     top_flow_strikes = [],
   } = data;
@@ -98,64 +121,84 @@ export default function NetFlowPanel({ data }: Props) {
   const putPct     = 100 - callPct;
   const isCallBias = net_flow >= 0;
 
-  // ── Intraday history ────────────────────────────────────────────────────
+  // ── Day-range selector ────────────────────────────────────────────────────
+  const [days, setDays] = useState<DayRange>(1);
+
+  // ── Hover crosshair state for stats bar ──────────────────────────────────
+  const [hovered, setHovered] = useState<Snapshot | null>(null);
+
+  // ── History fetch ─────────────────────────────────────────────────────────
   const [history, setHistory] = useState<Snapshot[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async (d: DayRange) => {
     try {
-      const snapshots = await api.get<Snapshot[]>(`/options/net-flow-history/${symbol}`);
-      if (snapshots?.length) setHistory(snapshots);
+      const snaps = await api.get<Snapshot[]>(`/options/net-flow-history/${symbol}?days=${d}`);
+      if (snaps?.length) setHistory(snaps);
     } catch { /* ignore */ }
-  };
+  }, [symbol]);
 
   useEffect(() => {
     if (!symbol) return;
-    fetchHistory();
-    timerRef.current = setInterval(fetchHistory, 60_000);
+    setHistory([]);
+    fetchHistory(days);
+    timerRef.current = setInterval(() => fetchHistory(days), 60_000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol]);
+  }, [symbol, days, fetchHistory]);
 
   // Seed with current snapshot while history loads
   const chartData: Snapshot[] = useMemo(() => {
     if (history.length > 0) return history;
     if (!spot) return [];
     const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    return [{ t: now, price: spot, call_prem: call_premium, put_prem: put_premium, net_flow }];
-  }, [history, spot, call_premium, put_premium, net_flow]);
+    return [{ t: now, price: spot, call_prem: call_premium, put_prem: put_premium,
+              net_flow, total_prem: total, volume: total_volume }];
+  }, [history, spot, call_premium, put_premium, net_flow, total, total_volume]);
 
+  // Domains
   const [priceMin, priceMax] = useMemo(() => {
-    if (!chartData.length) return [0, 0];
-    const p = chartData.map((d) => d.price);
+    if (!chartData.length) return [0, 1];
+    const p = chartData.map(d => d.price);
     const mn = Math.min(...p), mx = Math.max(...p);
     const pad = (mx - mn) * 0.15 || mx * 0.005;
     return [mn - pad, mx + pad];
   }, [chartData]);
 
-  const premDomain = useMemo((): [number, number] => {
-    if (!chartData.length) return [-1, 1];
-    const vals = chartData.flatMap((d) => [d.call_prem, d.put_prem]);
-    const absMax = Math.max(...vals.map(Math.abs), 1);
-    return [0, absMax * 1.2];
+  const premMax = useMemo(() => {
+    if (!chartData.length) return 1;
+    return Math.max(...chartData.flatMap(d => [d.call_prem, d.put_prem])) * 1.25;
   }, [chartData]);
 
-  // ── Expiry bar data ──────────────────────────────────────────────────────
+  const volMax = useMemo(() => {
+    if (!chartData.length) return 1;
+    return Math.max(...chartData.map(d => d.volume)) * 4; // push vol bars to bottom quarter
+  }, [chartData]);
+
+  // Stats to show in the header — live or hovered
+  const stats = hovered ?? {
+    price:      spot,
+    volume:     total_volume,
+    total_prem: total,
+    net_flow,
+    call_prem:  call_premium,
+  };
+
+  // ── Expiry bar data ───────────────────────────────────────────────────────
   const expiryData = useMemo(() =>
     [...flow_by_expiry]
       .sort((a, b) => a.expiry.localeCompare(b.expiry))
       .slice(0, 8)
-      .map((r) => ({ expiry: r.expiry, Calls: r.call_prem, Puts: r.put_prem })),
+      .map(r => ({ expiry: r.expiry, Calls: r.call_prem, Puts: r.put_prem })),
   [flow_by_expiry]);
 
-  // ── Strike diverging bar data ────────────────────────────────────────────
+  // ── Strike diverging bar data ─────────────────────────────────────────────
   const strikeData = useMemo(() =>
     [...top_flow_strikes]
       .sort((a, b) => a.strike - b.strike)
-      .map((s) => ({ strike: s.strike.toLocaleString(), Net: s.net, bias: s.bias })),
+      .map(s => ({ strike: s.strike.toLocaleString(), Net: s.net, bias: s.bias })),
   [top_flow_strikes]);
 
-  // ── Table ────────────────────────────────────────────────────────────────
+  // ── Table ─────────────────────────────────────────────────────────────────
   const tableStrikes: TopFlowStrike[] = useMemo(() =>
     [...top_flow_strikes].sort((a, b) => b.call_prem + b.put_prem - (a.call_prem + a.put_prem)),
   [top_flow_strikes]);
@@ -163,27 +206,17 @@ export default function NetFlowPanel({ data }: Props) {
   return (
     <div className="rounded-xl border border-white/10 bg-[#0d0f17] p-4 space-y-5">
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-white/90">{symbol} Net Flow</h3>
-          {spot > 0 && (
-            <p className="text-[10px] text-white/40 mt-0.5 space-x-2">
-              <span>Price: <span className="text-yellow-400 font-semibold">${spot.toFixed(2)}</span></span>
-              <span>· NFP: <span className={isCallBias ? "text-emerald-400" : "text-red-400"}>{fmt(net_flow)}</span></span>
-              <span>· NCP: <span className="text-green-400">{fmt(call_premium)}</span></span>
-              <span>· {chartData.length} pts</span>
-            </p>
-          )}
-        </div>
-        <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+      {/* ── Top header: symbol + bias badge ─────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-white/90 tracking-tight">{symbol} Net Flow</h3>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
           isCallBias ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
         }`}>
           {isCallBias ? "▲ CALL BIAS" : "▼ PUT BIAS"}
         </span>
       </div>
 
-      {/* ── Summary cards ───────────────────────────────────────────────── */}
+      {/* ── Summary cards ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2">
           <p className="text-[10px] text-emerald-400/70 uppercase font-semibold mb-0.5">Call Premium</p>
@@ -211,71 +244,128 @@ export default function NetFlowPanel({ data }: Props) {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          MAIN CHART — Unusual Whales style
-          Yellow price line (left axis) + green/red premium areas (right axis)
-          ══════════════════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          MAIN CHART  (Unusual Whales "Net Premium" layout)
+          ══════════════════════════════════════════════════════════════════════ */}
       <div className="rounded-lg border border-white/5 bg-black/20 p-3">
-        {/* Legend row */}
-        <div className="flex items-center gap-5 mb-3">
-          <span className="flex items-center gap-1.5 text-[10px] text-white/50">
-            <span className="inline-block w-5 border-t-2 border-yellow-400" />
-            {symbol}
+
+        {/* ── Day-range pills ────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex gap-1">
+            {DAY_RANGES.map(d => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                  days === d
+                    ? "bg-white/15 text-white"
+                    : "text-white/35 hover:text-white/60"
+                }`}
+              >
+                {d}D
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-white/30">{chartData.length} pts</span>
+        </div>
+
+        {/* ── Stats bar (Vol · Prem · Net Prem · NCP) ──────────────────── */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mb-3 text-[11px]">
+          <span className="text-white/40">
+            {hovered ? hovered.t : new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}
+            {spot > 0 && <span className="ml-1 text-yellow-400 font-semibold"> ${stats.price?.toFixed(2)}</span>}
           </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-white/50">
-            <span className="inline-block w-5 border-t-2 border-red-400 border-dashed" />
-            Net Put Prem
+          <span className="text-white/40">
+            Vol <span className="text-white/70 font-semibold">{fmtVol(stats.volume ?? 0)}</span>
           </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-white/50">
-            <span className="inline-block w-5 border-t-2 border-green-400" />
-            Net Call Prem
+          <span className="text-white/40">
+            Prem: <span className="text-white/70 font-semibold">{fmt(stats.total_prem ?? 0)}</span>
+          </span>
+          <span className="text-white/40">
+            Net Prem: <span className={`font-semibold ${(stats.net_flow ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {fmt(stats.net_flow ?? 0)}
+            </span>
+          </span>
+          <span className="text-white/40">
+            NCP: <span className="text-green-400 font-semibold">{fmt(stats.call_prem ?? 0)}</span>
           </span>
         </div>
 
-        <ResponsiveContainer width="100%" height={240}>
-          <ComposedChart data={chartData} margin={{ top: 4, right: 52, left: 0, bottom: 4 }}>
+        {/* ── Legend ────────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-5 mb-2">
+          <span className="flex items-center gap-1.5 text-[10px] text-white/45">
+            <span className="inline-block w-5 border-t-2 border-yellow-400" />{symbol}
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-white/45">
+            <span className="inline-block w-5 border-t-2 border-red-400 border-dashed" />Net Put Prem
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-white/45">
+            <span className="inline-block w-5 border-t-2 border-green-400" />Net Call Prem
+          </span>
+        </div>
+
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 4, right: 52, left: 0, bottom: 4 }}
+            onMouseMove={(e: any) => {
+              const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined;
+              if (pt) setHovered(pt);
+            }}
+            onMouseLeave={() => setHovered(null)}
+          >
             <FlowGradients />
             <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" />
 
             <XAxis
               dataKey="t"
               tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-              minTickGap={48}
+              axisLine={false} tickLine={false}
+              minTickGap={52}
             />
 
-            {/* Left axis — price */}
+            {/* Left: price */}
             <YAxis
               yAxisId="price"
               orientation="left"
               domain={[priceMin, priceMax]}
-              tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
+              tickFormatter={v => `$${Number(v).toFixed(0)}`}
               tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-              width={54}
+              axisLine={false} tickLine={false} width={54}
             />
 
-            {/* Right axis — premium */}
+            {/* Right: premium */}
             <YAxis
               yAxisId="prem"
               orientation="right"
-              domain={premDomain}
+              domain={[0, premMax]}
               tickFormatter={fmtAxis}
               tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-              width={44}
+              axisLine={false} tickLine={false} width={44}
             />
+
+            {/* Hidden axis for volume bars (bottom quarter) */}
+            <YAxis yAxisId="vol" orientation="right" domain={[0, volMax]} hide />
 
             <Tooltip
               content={<ChartTooltip />}
-              cursor={{ stroke: "rgba(255,255,255,0.12)", strokeWidth: 1 }}
+              cursor={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }}
             />
-            <ReferenceLine yAxisId="prem" y={0} stroke="rgba(255,255,255,0.1)" />
 
-            {/* Call premium — green area */}
+            {/* Volume bars — rendered FIRST so they appear behind the lines */}
+            <Bar
+              yAxisId="vol"
+              dataKey="volume"
+              name="Vol"
+              maxBarSize={8}
+              isAnimationActive={false}
+            >
+              {chartData.map((d, i) => (
+                <Cell key={`vc-${i}`} fill={d.net_flow >= 0 ? VOL_CALL : VOL_PUT} />
+              ))}
+            </Bar>
+
+            {/* Call premium area */}
             <Area
               yAxisId="prem"
               type="monotone"
@@ -283,13 +373,13 @@ export default function NetFlowPanel({ data }: Props) {
               name="Net Call Prem"
               stroke={NET_CALL}
               strokeWidth={1.5}
-              fill="url(#gradCall)"
+              fill="url(#gCall)"
               dot={false}
               activeDot={{ r: 3, fill: NET_CALL }}
               isAnimationActive={false}
             />
 
-            {/* Put premium — red area (also positive, read from right axis) */}
+            {/* Put premium area */}
             <Area
               yAxisId="prem"
               type="monotone"
@@ -297,13 +387,13 @@ export default function NetFlowPanel({ data }: Props) {
               name="Net Put Prem"
               stroke={NET_PUT}
               strokeWidth={1.5}
-              fill="url(#gradPut)"
+              fill="url(#gPut)"
               dot={false}
               activeDot={{ r: 3, fill: NET_PUT }}
               isAnimationActive={false}
             />
 
-            {/* Price — yellow line on top */}
+            {/* Price line — on top */}
             <Line
               yAxisId="price"
               type="monotone"
@@ -319,7 +409,7 @@ export default function NetFlowPanel({ data }: Props) {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Flow by Expiry ────────────────────────────────────────────────── */}
+      {/* ── Flow by Expiry ─────────────────────────────────────────────────── */}
       {expiryData.length > 0 && (
         <div>
           <p className="text-[10px] text-white/40 uppercase font-semibold mb-3">Flow by Expiry</p>
@@ -337,7 +427,7 @@ export default function NetFlowPanel({ data }: Props) {
         </div>
       )}
 
-      {/* ── Net Flow by Strike ────────────────────────────────────────────── */}
+      {/* ── Net Flow by Strike ─────────────────────────────────────────────── */}
       {strikeData.length > 0 && (
         <div>
           <p className="text-[10px] text-white/40 uppercase font-semibold mb-3">Net Flow by Strike</p>
@@ -374,7 +464,7 @@ export default function NetFlowPanel({ data }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {tableStrikes.map((s) => (
+                {tableStrikes.map(s => (
                   <tr key={s.strike} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1 pr-2 font-semibold text-white/80 tabular-nums">{s.strike.toLocaleString()}</td>
                     <td className="py-1 pr-2 text-right text-emerald-400 tabular-nums">{fmt(s.call_prem)}</td>

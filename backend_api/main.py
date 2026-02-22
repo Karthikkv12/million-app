@@ -110,14 +110,41 @@ def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-# ── Net-flow intraday snapshot store ─────────────────────────────────────────
-# A simple in-memory ring buffer per symbol.  Each time gamma-exposure is
-# fetched we record one snapshot so the chart builds up a time-series.
+# ── Net-flow persistent snapshot store ───────────────────────────────────────
+# Snapshots are written to SQLite so history survives server restarts and
+# supports multi-day range queries (1D / 2D / 3D / 7D / 14D / 30D).
+import sqlite3 as _sqlite3
 from collections import deque
-from datetime import timezone as _tz
+from datetime import timezone as _tz, timedelta as _td
+from pathlib import Path as _Path
 
-_MAX_SNAPSHOTS = 390  # one full 6.5-hour trading day at 1-min resolution
-_flow_history: Dict[str, deque] = {}
+_FLOW_DB = _Path(__file__).parent.parent / "trading_journal.db"
+
+def _flow_db() -> _sqlite3.Connection:
+    con = _sqlite3.connect(str(_FLOW_DB))
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS net_flow_snapshots (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol     TEXT    NOT NULL,
+            ts         TEXT    NOT NULL,          -- ISO-8601 UTC
+            price      REAL    NOT NULL,
+            call_prem  REAL    NOT NULL,
+            put_prem   REAL    NOT NULL,
+            net_flow   REAL    NOT NULL,
+            total_prem REAL    NOT NULL DEFAULT 0,
+            volume     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    # Add columns if DB was created before volume/total_prem existed
+    for col, typ in [("total_prem", "REAL NOT NULL DEFAULT 0"),
+                     ("volume",     "INTEGER NOT NULL DEFAULT 0")]:
+        try:
+            con.execute(f"ALTER TABLE net_flow_snapshots ADD COLUMN {col} {typ}")
+        except _sqlite3.OperationalError:
+            pass
+    con.execute("CREATE INDEX IF NOT EXISTS idx_nf_sym_ts ON net_flow_snapshots (symbol, ts)")
+    con.commit()
+    return con
 
 
 def _record_flow_snapshot(
@@ -126,27 +153,53 @@ def _record_flow_snapshot(
     call_prem: float,
     put_prem: float,
     net_flow: float,
+    total_prem: float = 0.0,
+    volume: int = 0,
 ) -> None:
-    if symbol not in _flow_history:
-        _flow_history[symbol] = deque(maxlen=_MAX_SNAPSHOTS)
-    _flow_history[symbol].append(
-        {
-            "t": datetime.now(_tz.utc).strftime("%H:%M"),
-            "price": round(spot, 2),
-            "call_prem": round(call_prem, 0),
-            "put_prem": round(put_prem, 0),
-            "net_flow": round(net_flow, 0),
-        }
-    )
+    ts = datetime.now(_tz.utc).isoformat(timespec="seconds")
+    with _flow_db() as con:
+        con.execute(
+            "INSERT INTO net_flow_snapshots (symbol,ts,price,call_prem,put_prem,net_flow,total_prem,volume) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (symbol, ts, round(spot, 2), round(call_prem, 0), round(put_prem, 0),
+             round(net_flow, 0), round(total_prem, 0), int(volume)),
+        )
 
+
+_DAYS_LABEL = {1: "%H:%M", 2: "%m/%d %H:%M", 3: "%m/%d %H:%M",
+               7: "%m/%d", 14: "%m/%d", 30: "%m/%d"}
 
 @app.get("/options/net-flow-history/{symbol}", response_model=List[Dict[str, Any]])
-def net_flow_history(symbol: str, _user=Depends(get_current_user)) -> List[Dict[str, Any]]:
-    """Return the intraday net-flow snapshot history for a symbol.
-    Snapshots are recorded each time gamma-exposure is fetched.
+def net_flow_history(symbol: str, days: int = 1, _user=Depends(get_current_user)) -> List[Dict[str, Any]]:
+    """Return net-flow snapshot history for a symbol.
+    ?days= controls how many calendar days of history to return (1‥30).
     """
+    days = max(1, min(days, 30))
     sym = symbol.upper()
-    return list(_flow_history.get(sym, []))
+    since = (datetime.now(_tz.utc) - _td(days=days)).isoformat(timespec="seconds")
+    fmt_str = _DAYS_LABEL.get(days, "%m/%d")
+    with _flow_db() as con:
+        rows = con.execute(
+            "SELECT ts,price,call_prem,put_prem,net_flow,total_prem,volume "
+            "FROM net_flow_snapshots WHERE symbol=? AND ts>=? ORDER BY ts",
+            (sym, since),
+        ).fetchall()
+    result = []
+    for ts, price, cp, pp, nf, tp, vol in rows:
+        try:
+            dt = datetime.fromisoformat(ts)
+        except ValueError:
+            dt = datetime.now(_tz.utc)
+        result.append({
+            "t":          dt.strftime(fmt_str),
+            "price":      price,
+            "call_prem":  cp,
+            "put_prem":   pp,
+            "net_flow":   nf,
+            "total_prem": tp,
+            "volume":     vol,
+        })
+    return result
 
 
 @app.get("/market/quotes")
@@ -734,6 +787,8 @@ def gamma_exposure(symbol: str, _user=Depends(get_current_user)) -> Dict[str, An
         call_prem=result.call_premium,
         put_prem=result.put_premium,
         net_flow=result.net_flow,
+        total_prem=result.call_premium + result.put_premium,
+        volume=result.total_volume,
     )
     return {
         "symbol": result.symbol,
@@ -754,6 +809,7 @@ def gamma_exposure(symbol: str, _user=Depends(get_current_user)) -> Dict[str, An
         "call_premium": result.call_premium,
         "put_premium": result.put_premium,
         "net_flow": result.net_flow,
+        "total_volume": result.total_volume,
         "flow_by_expiry": result.flow_by_expiry,
         "top_flow_strikes": result.top_flow_strikes,
         "error": result.error,

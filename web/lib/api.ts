@@ -172,6 +172,7 @@ export interface GexResult {
   call_premium: number;
   put_premium: number;
   net_flow: number;
+  total_volume: number;
   flow_by_expiry: FlowByExpiry[];
   top_flow_strikes: TopFlowStrike[];
   error: string | null;
