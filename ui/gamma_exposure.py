@@ -241,27 +241,27 @@ def _single_ticker_table_html(d: dict, n_strikes: int = 20, expiry_filter: list 
     regime_label = "Long \u03b3" if net >= 0 else "Short \u03b3"
     regime_color = "#00cc44" if net >= 0 else "#ff4444"
 
-    LBL_S = "font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px"
+    LBL_S = "font-size:10px;font-weight:600;color:#888888;margin-right:4px"
     VAL_S = "font-size:13px;font-weight:800;"
 
     rowA = (
         f"<tr><th colspan='{ncols}' style='{TH};text-align:left;"
-        f"padding:8px 12px;border-bottom:2px solid var(--gex-border2)'>"
-        f"<span style='font-size:17px;font-weight:900;color:var(--gex-text);"
+        f"padding:8px 12px;border-bottom:2px solid var(--gex-border2);color:inherit'>"
+        f"<span style='font-size:17px;font-weight:900;color:#111111 !important;"
         f"letter-spacing:0.5px;margin-right:8px'>{sym}</span>"
-        f"<span style='font-size:15px;font-weight:700;color:var(--gex-text);"
+        f"<span style='font-size:15px;font-weight:700;color:#111111 !important;"
         f"margin-right:14px'>${lp:.2f}</span>"
-        f"<span style='{VAL_S};color:{chg_c};"
+        f"<span style='font-size:13px;font-weight:800;color:{chg_c} !important;"
         f"margin-right:18px'>{arr}{chg:.2f}&nbsp;({arr}{chg_p:.2f}%)</span>"
-        f"<span style='color:var(--gex-border2);margin-right:18px;font-size:13px'>|</span>"
+        f"<span style='color:#cccccc;margin-right:18px;font-size:13px'>|</span>"
         f"<span style='{LBL_S}'>Net GEX</span>"
-        f"<span style='{VAL_S};color:{net_c};"
+        f"<span style='font-size:13px;font-weight:800;color:{net_c} !important;"
         f"margin-right:18px'>{_fmt_gex(net)}</span>"
         f"<span style='{LBL_S}'>Regime</span>"
-        f"<span style='{VAL_S};color:{regime_color};"
+        f"<span style='font-size:13px;font-weight:800;color:{regime_color} !important;"
         f"margin-right:18px'>{regime_label}</span>"
         f"<span style='{LBL_S}'>Zero \u03b3</span>"
-        f"<span style='{VAL_S};color:var(--gex-text2);"
+        f"<span style='font-size:13px;font-weight:800;color:#444444 !important;"
         f"margin-right:14px'>{zg_s}</span>"
         + (f"<span style='font-size:9px;background:var(--gex-bg);color:var(--gex-text3);"
            f"border:1px solid var(--gex-border2);border-radius:3px;padding:1px 5px'>"
@@ -423,23 +423,22 @@ def _compare_table_html(datasets: list, expiry: str, n_strikes: int = 20) -> str
         regime_label = "Long \u03b3" if p["net"] >= 0 else "Short \u03b3"
         regime_color = "#00cc44" if p["net"] >= 0 else "#ff4444"
 
-        C_LBL = "font-size:10px;font-weight:600;color:var(--gex-text3);margin-right:4px"
-        C_VAL = "font-size:13px;font-weight:800;"
+        C_LBL = "font-size:10px;font-weight:600;color:#888888;margin-right:4px"
         th_style = (f"background:var(--gex-bg2);padding:8px 14px;font-size:11px;font-weight:700;"
                     f"position:sticky;top:0;z-index:3;border-bottom:2px solid var(--gex-border2);"
-                    f"white-space:nowrap;text-align:left{sep}")
+                    f"white-space:nowrap;text-align:left;color:inherit{sep}")
         rowA += (
             f"<th colspan='2' style='{th_style}'>"
-            f"<span style='font-size:17px;font-weight:900;color:var(--gex-text);margin-right:8px'>{p['sym']}</span>"
-            f"<span style='font-size:15px;font-weight:700;color:var(--gex-text);margin-right:14px'>${p['lp']:.2f}</span>"
-            f"<span style='{C_VAL};color:{chg_c};margin-right:18px'>{arr}{p['chg']:.2f} ({arr}{p['chg_p']:.2f}%)</span>"
-            f"<span style='color:var(--gex-border2);margin-right:18px;font-size:13px'>|</span>"
+            f"<span style='font-size:17px;font-weight:900;color:#111111 !important;margin-right:8px'>{p['sym']}</span>"
+            f"<span style='font-size:15px;font-weight:700;color:#111111 !important;margin-right:14px'>${p['lp']:.2f}</span>"
+            f"<span style='font-size:13px;font-weight:800;color:{chg_c} !important;margin-right:18px'>{arr}{p['chg']:.2f} ({arr}{p['chg_p']:.2f}%)</span>"
+            f"<span style='color:#cccccc;margin-right:18px;font-size:13px'>|</span>"
             f"<span style='{C_LBL}'>Net GEX</span>"
-            f"<span style='{C_VAL};color:{net_c};margin-right:18px'>{_fmt_gex(p['net'])}</span>"
+            f"<span style='font-size:13px;font-weight:800;color:{net_c} !important;margin-right:18px'>{_fmt_gex(p['net'])}</span>"
             f"<span style='{C_LBL}'>Regime</span>"
-            f"<span style='{C_VAL};color:{regime_color};margin-right:18px'>{regime_label}</span>"
+            f"<span style='font-size:13px;font-weight:800;color:{regime_color} !important;margin-right:18px'>{regime_label}</span>"
             f"<span style='{C_LBL}'>Zero \u03b3</span>"
-            f"<span style='{C_VAL};color:var(--gex-text2)'>{zg_s}</span>"
+            f"<span style='font-size:13px;font-weight:800;color:#444444 !important'>{zg_s}</span>"
             f"</th>"
         )
         col_th = f"{TH};font-size:9px;font-weight:700;color:var(--gex-text3);border-top:2px solid var(--gex-border2);border-bottom:2px solid var(--gex-border2)"
@@ -785,6 +784,8 @@ def render_gamma_exposure_page() -> None:
             --gex-head:    #e0e0e0;
         }
     }
+    /* stop Streamlit from forcing its own color on th/td children */
+    .gex-a th span, .gex-b th span { color: unset; }
     </style>
     """, unsafe_allow_html=True)
 
