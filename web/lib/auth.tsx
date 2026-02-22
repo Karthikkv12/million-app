@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getTokens, clearTokens, login as apiLogin, logout as apiLogout } from "./api";
+import { getTokens, clearTokens, login as apiLogin, logout as apiLogout, signup as apiSignup } from "./api";
 
 interface AuthUser { user_id: number; username: string; }
 
@@ -9,6 +9,7 @@ interface AuthCtx {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  signup: (username: string, password: string) => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -43,7 +44,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
+  const signup = async (username: string, password: string) => {
+    const data = await apiSignup(username, password);
+    setUser({ user_id: data.user_id, username: data.username });
+  };
+
+  return <Ctx.Provider value={{ user, loading, login, logout, signup }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {
