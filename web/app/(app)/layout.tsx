@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { SidebarProvider } from "@/lib/sidebar";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 
@@ -26,10 +27,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      <Navbar />
-      <main className="flex-1 min-w-0 pb-nav lg:pb-0 animate-fade-up">{children}</main>
-      <BottomNav />
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex flex-col lg:flex-row">
+        <Navbar />
+        <main className="flex-1 min-w-0 pb-nav lg:pb-0 animate-fade-up">{children}</main>
+        <BottomNav />
+      </div>
+    </SidebarProvider>
   );
 }
+
