@@ -43,20 +43,20 @@ function CashModal({ onClose }: { onClose: () => void }) {
     onError: (e: Error) => setErr(e.message),
   });
 
-  const inputCls = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-gray-200 dark:border-gray-700">
-        <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-gray-700 mx-auto mb-5 sm:hidden" />
+      <div className="bg-[var(--surface)] rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-[var(--border)]">
+        <div className="w-10 h-1 rounded-full bg-[var(--surface-2)] mx-auto mb-5 sm:hidden" />
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-900 dark:text-white text-lg">Cash Transaction</h3>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
         </div>
         <div className="flex gap-2 mb-4">
           {(["deposit","withdrawal"] as const).map((t) => (
             <button key={t} onClick={() => setType(t)}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold capitalize transition ${type === t ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold capitalize transition ${type === t ? "bg-blue-600 text-white" : "bg-[var(--surface-2)] text-gray-500 hover:bg-[var(--surface-2)]"}`}>
               {t}
             </button>
           ))}
@@ -126,7 +126,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {/* P&L + sparkline */}
-          <div className="col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 card-hover">
+          <div className="col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Realized P/L</p>
@@ -154,7 +154,7 @@ export default function DashboardPage() {
 
           {/* Cash */}
           <button onClick={() => setShowCash(true)}
-            className="text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition group card-hover">
+            className="text-left bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition group card-hover">
             <div className="flex items-start justify-between mb-2">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Cash</p>
               <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30"><DollarSign size={15} className="text-blue-500" /></span>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
           </button>
 
           {/* Positions */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 card-hover">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover">
             <div className="flex items-start justify-between mb-2">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Positions</p>
               <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30"><Activity size={15} className="text-purple-500" /></span>
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                 ? (t.action?.toUpperCase() === "SELL" ? t.price - ep : ep - t.price) * t.qty
                 : null;
               return (
-                <div key={t.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 flex items-center justify-between">
+                <div key={t.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-gray-900 dark:text-white text-sm">{t.symbol}</span>
@@ -236,10 +236,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden sm:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+          <div className="hidden sm:block bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                   {["Date", "Ticker", "Action", "Qty", "Entry", "Exit", "P/L"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                   ))}
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                     ? (t.action?.toUpperCase() === "SELL" ? t.price - ep : ep - t.price) * t.qty
                     : null;
                   return (
-                    <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                    <tr key={t.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                       <td className="px-4 py-3 text-gray-400 text-xs">{String(t.date ?? "").slice(0, 10)}</td>
                       <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{t.symbol}</td>
                       <td className="px-4 py-3">

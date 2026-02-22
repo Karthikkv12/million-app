@@ -56,13 +56,13 @@ function OrderForm({ symbol, onDone }: { symbol: string; onDone: () => void }) {
     onError: (e: Error) => setErr(e.message),
   });
 
-  const inputCls = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mt-4">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mt-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-gray-900 dark:text-white text-sm">Place Order — {symbol}</h3>
-        <button onClick={onDone} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+        <button onClick={onDone} className="p-1 rounded-lg text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         <div>
@@ -109,8 +109,8 @@ function StockDetail({ symbol }: { symbol: string }) {
 
   if (isLoading) return (
     <div className="mt-5 space-y-3">
-      <div className="h-20 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
-      <div className="h-64 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+      <div className="h-20 rounded-2xl bg-[var(--surface-2)] animate-pulse" />
+      <div className="h-64 rounded-2xl bg-[var(--surface-2)] animate-pulse" />
     </div>
   );
 
@@ -150,13 +150,13 @@ function StockDetail({ symbol }: { symbol: string }) {
         </div>
         <button onClick={() => setShowOrder((v) => !v)}
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition shrink-0 ${
-            showOrder ? "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
+            showOrder ? "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
           }`}>
           {showOrder ? "Cancel" : "Trade"}
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
         <PriceChart bars={data.bars} />
       </div>
 
@@ -186,7 +186,7 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ticker — e.g. AAPL, SPY, TSLA"
-            className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-3 border border-[var(--border)] rounded-2xl text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <button type="submit" disabled={!trimmed}

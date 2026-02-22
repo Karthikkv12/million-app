@@ -14,7 +14,7 @@ const EVENT_COLOR: Record<string, string> = {
   failed_login:    "text-red-500",
 };
 
-const inp = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function ChangePasswordSection() {
   const [current, setCurrent] = useState("");
@@ -34,7 +34,7 @@ function ChangePasswordSection() {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
       <div className="flex items-center gap-3 mb-4">
         <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30"><Key size={16} className="text-blue-500" /></span>
         <h2 className="font-bold text-gray-900 dark:text-white">Change Password</h2>
@@ -70,8 +70,8 @@ function SessionsSection() {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
         <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30"><Monitor size={16} className="text-purple-500" /></span>
         <div>
           <h2 className="font-bold text-gray-900 dark:text-white text-sm">Active Sessions</h2>
@@ -114,7 +114,7 @@ function SessionsSection() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                   {["Created", "Last Used", "IP", "Device", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                   ))}
@@ -122,7 +122,7 @@ function SessionsSection() {
               </thead>
               <tbody>
                 {sessions.map((s) => (
-                  <tr key={s.id} className={`border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
+                  <tr key={s.id} className={`border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
                     <td className="px-4 py-3 text-gray-400 text-xs">{s.created_at.slice(0, 16).replace("T", " ")}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{s.last_used_at ? s.last_used_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs font-mono">{s.ip_address ?? "—"}</td>
@@ -153,8 +153,8 @@ function EventsSection() {
   const { data: events = [], isLoading } = useQuery<AuthEvent[]>({ queryKey: ["auth-events"], queryFn: fetchAuthEvents, staleTime: 60_000 });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
         <span className="p-2 rounded-xl bg-yellow-50 dark:bg-yellow-900/30"><Shield size={16} className="text-yellow-500" /></span>
         <div>
           <h2 className="font-bold text-gray-900 dark:text-white text-sm">Auth Event Log</h2>
@@ -188,7 +188,7 @@ function EventsSection() {
           <div className="hidden md:block overflow-y-auto max-h-[320px]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-white dark:bg-gray-900 bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-[var(--surface)] bg-[var(--surface-2)]">
                   {["Time", "Event", "Result", "IP"].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
                   ))}
@@ -196,7 +196,7 @@ function EventsSection() {
               </thead>
               <tbody>
                 {events.map((e) => (
-                  <tr key={e.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                  <tr key={e.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                     <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{e.created_at.slice(0, 16).replace("T", " ")}</td>
                     <td className={`px-4 py-2.5 font-mono text-xs font-semibold ${EVENT_COLOR[e.event_type] ?? "text-gray-500"}`}>{e.event_type}</td>
                     <td className="px-4 py-2.5">

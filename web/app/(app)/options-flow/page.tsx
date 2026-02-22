@@ -56,7 +56,7 @@ export default function OptionsFlowPage() {
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         {/* Ticker search — pill style */}
-        <form onSubmit={handleSearch} className="flex flex-1 items-center gap-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 transition">
+        <form onSubmit={handleSearch} className="flex flex-1 items-center gap-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 transition">
           <span className="pl-4 pr-2 text-gray-400 shrink-0">
             <Search size={15} />
           </span>
@@ -78,7 +78,7 @@ export default function OptionsFlowPage() {
         {/* Strikes — segmented pill group */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide shrink-0">Strikes</span>
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 gap-0.5">
+          <div className="flex items-center bg-[var(--surface-2)] rounded-xl p-0.5 gap-0.5">
             {STRIKE_OPTIONS.map((n) => (
               <button
                 key={n}
@@ -107,7 +107,7 @@ export default function OptionsFlowPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             {summaryItems.map(({ label, value, pos }) => (
-              <div key={label} className="card-hover bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5">
+              <div key={label} className="card-hover bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3.5">
                 <p className="text-xs text-gray-400 mb-1">{label}</p>
                 <p className={`text-lg font-black ${
                   pos === null
@@ -130,7 +130,7 @@ export default function OptionsFlowPage() {
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition shrink-0 ${
                     expiryFilter === null
                       ? "bg-purple-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      : "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300 hover:bg-[var(--surface-2)]"
                   }`}>
                   All
                 </button>
@@ -141,7 +141,7 @@ export default function OptionsFlowPage() {
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition shrink-0 ${
                       expiryFilter?.includes(d)
                         ? "bg-purple-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        : "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300 hover:bg-[var(--surface-2)]"
                     }`}>
                     {d}
                   </button>
@@ -151,8 +151,8 @@ export default function OptionsFlowPage() {
           )}
 
           {/* Strike table */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--border)]">
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">Strike-Level GEX — {ticker}</h2>
             </div>
             <div className="overflow-x-auto">

@@ -26,10 +26,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       <Navbar />
-      {/* pb-nav adds padding equal to bottom nav height + safe-area on mobile */}
-      <main className="flex-1 pb-nav lg:pb-0">{children}</main>
+      <main className="flex-1 min-w-0 pb-nav lg:pb-0 animate-fade-up">{children}</main>
       <BottomNav />
     </div>
   );

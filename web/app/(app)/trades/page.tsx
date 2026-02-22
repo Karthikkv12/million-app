@@ -2,9 +2,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchTrades, Trade, api } from "@/lib/api";
-import { clsx } from "clsx";
 import { BarChart2, X } from "lucide-react";
-import { PageHeader, EmptyState, SkeletonCard } from "@/components/ui";
+import { PageHeader, EmptyState, SkeletonCard, Tabs } from "@/components/ui";
 
 function isOpen(t: Trade) { return t.exit_price == null; }
 
@@ -26,18 +25,18 @@ function CloseModal({ trade, onDone }: { trade: Trade; onDone: () => void }) {
     onError: (e: Error) => setErr(e.message),
   });
 
-  const inp = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-gray-200 dark:border-gray-700">
-        <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-gray-700 mx-auto mb-5 sm:hidden" />
+      <div className="bg-[var(--surface)] rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-[var(--border)]">
+        <div className="w-10 h-1 rounded-full bg-[var(--surface-2)] mx-auto mb-5 sm:hidden" />
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white text-lg">Close {trade.symbol}</h3>
             <p className="text-xs text-gray-400">{trade.qty} shares · entry ${trade.price?.toFixed(2)}</p>
           </div>
-          <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+          <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
         </div>
         <label className="block text-xs text-gray-500 mb-1">Exit Price ($)</label>
         <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={`${inp} mb-3`} />
@@ -50,7 +49,7 @@ function CloseModal({ trade, onDone }: { trade: Trade; onDone: () => void }) {
             {mut.isPending ? "Closing…" : "Confirm Close"}
           </button>
           <button onClick={onDone}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-sm text-gray-600 dark:text-gray-300 hover:bg-[var(--surface-2)] transition">
             Cancel
           </button>
         </div>
@@ -70,7 +69,7 @@ function useDeleteTrade() {
 function TradeCard({ t, onClose, onDelete }: { t: Trade; onClose: () => void; onDelete: () => void }) {
   const pnl = calcPnl(t);
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 transition hover:border-gray-300 dark:hover:border-gray-700">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 transition hover:border-blue-200 dark:hover:border-blue-900/50">
       <div className="flex items-start justify-between mb-2">
         <div>
           <div className="flex items-center gap-2">
@@ -127,18 +126,15 @@ export default function TradesPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-gray-200 dark:border-gray-800">
-        {(["open", "closed"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={clsx("px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors capitalize",
-              tab === t ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"
-            )}>
-            {t}
-            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${tab === t ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
-              {t === "open" ? open.length : closed.length}
-            </span>
-          </button>
-        ))}
+      <div className="mb-5">
+        <Tabs
+          active={tab}
+          onChange={(k) => setTab(k as "open" | "closed")}
+          tabs={[
+            { key: "open",   label: <span>Open <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300">{open.length}</span></span> },
+            { key: "closed", label: <span>Closed <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface-2)] text-gray-500">{closed.length}</span></span> },
+          ]}
+        />
       </div>
 
       {isLoading && (
@@ -161,10 +157,10 @@ export default function TradesPage() {
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto">
+          <div className="hidden md:block bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                   {["Date", "Symbol", "Action", "Strategy", "Qty", "Entry", "Exit", "P/L", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap">{h}</th>
                   ))}
@@ -174,7 +170,7 @@ export default function TradesPage() {
                 {shown.map((t) => {
                   const pnl = calcPnl(t);
                   return (
-                    <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                    <tr key={t.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{String(t.date ?? "").slice(0, 10)}</td>
                       <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{t.symbol}</td>
                       <td className="px-4 py-3">

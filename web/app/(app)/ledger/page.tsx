@@ -57,7 +57,7 @@ export default function LedgerPage() {
             {Object.entries(totals).map(([acct, { debit, credit }]) => {
               const net = credit - debit;
               return (
-                <div key={acct} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 card-hover">
+                <div key={acct} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 card-hover">
                   <div className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mb-1 truncate">{acct}</div>
                   <div className={`text-xl font-black ${net >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt(net)}</div>
                   <div className="flex gap-2 mt-1.5 text-[10px]">
@@ -87,7 +87,7 @@ export default function LedgerPage() {
             {rows.map((r, i) => {
               const side = (r.side ?? "").toLowerCase();
               return (
-                <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 flex items-center justify-between">
+                <div key={i} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-gray-900 dark:text-white">{r.account_name ?? "—"}</span>
@@ -107,10 +107,10 @@ export default function LedgerPage() {
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto">
+          <div className="hidden md:block bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                   {["Effective", "Account", "Side", "Amount", "Description"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                   ))}
@@ -120,7 +120,7 @@ export default function LedgerPage() {
                 {rows.map((r, i) => {
                   const side = (r.side ?? "").toLowerCase();
                   return (
-                    <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                    <tr key={i} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                         {(r.effective_at ?? r.entry_effective_at ?? r.created_at ?? "").slice(0, 10)}
                       </td>

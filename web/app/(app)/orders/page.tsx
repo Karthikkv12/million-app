@@ -18,7 +18,7 @@ function Badge({ status }: { status: string }) {
   return <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full uppercase", STATUS_COLOR[s] ?? "bg-gray-100 text-gray-500")}>{s}</span>;
 }
 
-const inputCls = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputCls = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function NewOrderForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
@@ -39,10 +39,10 @@ function NewOrderForm({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mb-5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mb-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-gray-900 dark:text-white">New Order</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         {[
@@ -85,14 +85,14 @@ function FillModal({ order, onDone }: { order: Order; onDone: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-gray-200 dark:border-gray-700">
-        <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-gray-700 mx-auto mb-5 sm:hidden" />
+      <div className="bg-[var(--surface)] rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-[var(--border)]">
+        <div className="w-10 h-1 rounded-full bg-[var(--surface-2)] mx-auto mb-5 sm:hidden" />
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white text-lg">Order #{order.id}</h3>
             <p className="text-xs text-gray-400">{order.symbol} · {order.action} × {order.quantity}</p>
           </div>
-          <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+          <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
         </div>
         <label className="block text-xs text-gray-500 mb-1">Fill Price ($)</label>
         <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
@@ -108,7 +108,7 @@ function FillModal({ order, onDone }: { order: Order; onDone: () => void }) {
             {cancelMut.isPending ? "Cancelling…" : "Cancel Order"}
           </button>
           <button onClick={onDone}
-            className="py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            className="py-2.5 rounded-xl border border-[var(--border)] text-sm text-gray-500 hover:bg-[var(--surface-2)] transition">
             Close
           </button>
         </div>
@@ -119,7 +119,7 @@ function FillModal({ order, onDone }: { order: Order; onDone: () => void }) {
 
 function OrderCard({ o, onFill }: { o: Order; onFill: () => void }) {
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 transition hover:border-gray-300 dark:hover:border-gray-700">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 transition hover:border-blue-200 dark:hover:border-blue-900/50">
       <div className="flex items-start justify-between mb-2">
         <div>
           <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export default function OrdersPage() {
         action={
           <button onClick={() => setShowNew((v) => !v)}
             className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition",
-              showNew ? "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
+              showNew ? "bg-[var(--surface-2)] text-gray-600 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"
             )}>
             {showNew ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Order</>}
           </button>
@@ -177,7 +177,7 @@ export default function OrdersPage() {
         {statuses.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={clsx("px-3 py-1 rounded-full text-xs font-semibold border transition",
-              filter === s ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 dark:border-gray-700 text-gray-500 hover:border-blue-400"
+              filter === s ? "bg-blue-600 text-white border-blue-600" : "border-[var(--border)] text-gray-500 hover:border-blue-400"
             )}>
             {s}
           </button>
@@ -202,10 +202,10 @@ export default function OrdersPage() {
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto">
+          <div className="hidden md:block bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                   {["ID", "Date", "Symbol", "Action", "Qty", "Limit", "Status", "Filled At", "Fill Price", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap">{h}</th>
                   ))}
@@ -213,7 +213,7 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {[...shown].reverse().map((o) => (
-                  <tr key={o.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                  <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                     <td className="px-4 py-3 text-gray-400 font-mono text-xs">#{o.id}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{String(o.created_at ?? "").slice(0, 10)}</td>
                     <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{o.symbol}</td>

@@ -14,7 +14,7 @@ const TYPE_COLOR: Record<string, string> = {
 };
 const fmt = (v: number) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 });
 
-const inp = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function NewEntryForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
@@ -32,10 +32,10 @@ function NewEntryForm({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mb-5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mb-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-gray-900 dark:text-white">New Entry</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         <div>
@@ -92,7 +92,7 @@ export default function BudgetPage() {
         title="Budget"
         action={
           <button onClick={() => setShowNew((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showNew ? "bg-gray-100 dark:bg-gray-800 text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showNew ? "bg-[var(--surface-2)] text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
             {showNew ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Entry</>}
           </button>
         }
@@ -111,7 +111,7 @@ export default function BudgetPage() {
             { label: "Assets",   value: fmt(totalAssets),  cls: "text-blue-500"  },
             { label: "Net",      value: fmt(net),          cls: net >= 0 ? "text-green-500" : "text-red-500" },
           ].map(({ label, value, cls }) => (
-            <div key={label} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 card-hover">
+            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 card-hover">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
               <p className={`text-xl sm:text-2xl font-black ${cls}`}>{value}</p>
             </div>
@@ -122,7 +122,7 @@ export default function BudgetPage() {
       {/* Chart + Entries */}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Pie chart */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 lg:w-80 shrink-0">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 lg:w-80 shrink-0">
           <SectionLabel>Expense Breakdown</SectionLabel>
           {pieData.length === 0 ? (
             <p className="text-sm text-gray-400">No expenses recorded yet.</p>
@@ -141,12 +141,12 @@ export default function BudgetPage() {
         </div>
 
         {/* Entries */}
-        <div className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+        <div className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
           {/* Filter chips */}
-          <div className="flex gap-1.5 flex-wrap p-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex gap-1.5 flex-wrap p-3 border-b border-[var(--border)]">
             {["ALL", "EXPENSE", "INCOME", "ASSET"].map((t) => (
               <button key={t} onClick={() => setTypeFilter(t)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${typeFilter === t ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>{t}</button>
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${typeFilter === t ? "bg-blue-600 text-white" : "bg-[var(--surface-2)] text-gray-500 hover:bg-[var(--surface-2)]"}`}>{t}</button>
             ))}
           </div>
 
@@ -180,7 +180,7 @@ export default function BudgetPage() {
               <div className="hidden sm:block overflow-y-auto max-h-[340px]">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-white dark:bg-gray-900">
+                    <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide sticky top-0 bg-[var(--surface)]">
                       {["Date", "Category", "Type", "Amount", "Desc"].map((h) => (
                         <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
                       ))}
@@ -188,7 +188,7 @@ export default function BudgetPage() {
                   </thead>
                   <tbody>
                     {filtered.map((e, i) => (
-                      <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                      <tr key={i} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                         <td className="px-4 py-2.5 text-gray-400 text-xs">{e.date.slice(0, 10)}</td>
                         <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">{e.category}</td>
                         <td className="px-4 py-2.5">

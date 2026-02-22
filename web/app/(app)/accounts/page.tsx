@@ -19,7 +19,7 @@ function useHoldings(accountId: number | null) {
   });
 }
 
-const inp = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function NewAccountForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
@@ -35,10 +35,10 @@ function NewAccountForm({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mb-5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mb-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-gray-900 dark:text-white">Add Account</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         {[
@@ -77,10 +77,10 @@ function UpsertHoldingForm({ accountId, onDone }: { accountId: number; onDone: (
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 mt-4">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mt-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-gray-900 dark:text-white text-sm">Add / Update Holding</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><X size={16} /></button>
+        <button onClick={onDone} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         {[
@@ -131,7 +131,7 @@ export default function AccountsPage() {
         sub={cashQ.data?.balance != null ? `Cash balance: $${cashQ.data.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : undefined}
         action={
           <button onClick={() => setShowAddAcct((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showAddAcct ? "bg-gray-100 dark:bg-gray-800 text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showAddAcct ? "bg-[var(--surface-2)] text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
             {showAddAcct ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Account</>}
           </button>
         }
@@ -154,7 +154,7 @@ export default function AccountsPage() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition ${
                   (selectedId === a.id) || (!selectedId && a.id === accounts[0]?.id)
                     ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                    : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-blue-400"
+                    : "bg-[var(--surface)] border-[var(--border)] text-gray-600 dark:text-gray-300 hover:border-blue-400"
                 }`}>
                 <Wallet size={13} />
                 {a.name}
@@ -165,14 +165,14 @@ export default function AccountsPage() {
 
           {/* Holdings for selected account */}
           {activeId != null && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
                 <div>
                   <h2 className="font-bold text-gray-900 dark:text-white text-sm">{selected?.name ?? "Holdings"}</h2>
                   <p className="text-xs text-gray-400">{holdings.length} position{holdings.length !== 1 ? "s" : ""}</p>
                 </div>
                 <button onClick={() => setShowHolding((v) => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${showHolding ? "bg-gray-100 dark:bg-gray-800 text-gray-500" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100"}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${showHolding ? "bg-[var(--surface-2)] text-gray-500" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100"}`}>
                   {showHolding ? <><X size={12} /> Cancel</> : <><Plus size={12} /> Add Holding</>}
                 </button>
               </div>
@@ -217,7 +217,7 @@ export default function AccountsPage() {
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 uppercase tracking-wide bg-gray-50/50 dark:bg-gray-800/30">
+                        <tr className="border-b border-[var(--border)] text-[11px] text-gray-400 uppercase tracking-wide bg-[var(--surface-2)]">
                           {["Symbol", "Qty", "Avg Cost", "Last Updated", ""].map((h) => (
                             <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                           ))}
@@ -225,7 +225,7 @@ export default function AccountsPage() {
                       </thead>
                       <tbody>
                         {holdings.map((h) => (
-                          <tr key={h.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                          <tr key={h.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                             <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{h.symbol}</td>
                             <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{h.quantity}</td>
                             <td className="px-4 py-3 text-gray-500">{h.avg_cost != null ? `$${h.avg_cost.toFixed(2)}` : "—"}</td>

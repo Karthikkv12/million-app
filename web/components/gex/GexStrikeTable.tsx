@@ -65,14 +65,14 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
   }
 
   return (
-    <div className="overflow-x-auto overflow-y-auto max-h-[640px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-black font-mono text-[11px]">
+    <div className="overflow-x-auto overflow-y-auto max-h-[640px] rounded-md border border-[var(--border)] bg-[var(--surface)] font-mono text-[11px]">
       <table className="border-collapse w-full">
         <thead>
           {/* ── Row A: summary header ── */}
           <tr>
             <th
               colSpan={1 + cols.length}
-              className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 text-left px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 whitespace-nowrap"
+              className="sticky top-0 z-10 bg-[var(--surface-2)] text-left px-3 py-2 border-b-2 border-[var(--border)] whitespace-nowrap"
             >
               <span className="text-[17px] font-black text-gray-900 dark:text-gray-100 mr-2">
                 {data.symbol}
@@ -96,7 +96,7 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
           </tr>
           {/* ── Row B: column labels ── */}
           <tr>
-            <th className="sticky top-[37px] z-10 bg-gray-50 dark:bg-gray-900 text-left px-2 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wide border-b border-t border-gray-200 dark:border-gray-700 min-w-[90px]">
+            <th className="sticky top-[37px] z-10 bg-[var(--surface-2)] text-left px-2 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wide border-b border-t border-[var(--border)] min-w-[90px]">
               STRIKE
             </th>
             {cols.map(({ exp, short, kingStrike, netGex }) => {
@@ -106,7 +106,7 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
               return (
                 <th
                   key={exp}
-                  className="sticky top-[37px] z-10 bg-gray-50 dark:bg-gray-900 text-right px-2 py-1 text-[9px] font-bold text-gray-500 uppercase border-b border-t border-l border-gray-200 dark:border-gray-700 min-w-[100px]"
+                  className="sticky top-[37px] z-10 bg-[var(--surface-2)] text-right px-2 py-1 text-[9px] font-bold text-gray-500 uppercase border-b border-t border-l border-[var(--border)] min-w-[100px]"
                 >
                   <div className="flex flex-col items-end gap-0.5">
                     <span>
@@ -141,7 +141,7 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
                 {/* Strike cell */}
                 <td
                   className={clsx(
-                    "px-2 py-[1px] text-left border-b border-gray-100 dark:border-gray-800 whitespace-nowrap",
+                    "px-2 py-[1px] text-left border-b border-[var(--border)] whitespace-nowrap",
                     isSpot ? "font-extrabold text-gray-900" : "text-gray-500 dark:text-gray-400",
                   )}
                 >
@@ -166,7 +166,7 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
                   return (
                     <td
                       key={exp}
-                      className="px-2 py-[1px] text-right border-b border-l border-gray-100 dark:border-gray-800"
+                      className="px-2 py-[1px] text-right border-b border-l border-[var(--border)]"
                       style={{ background: bg, color: fg }}
                     >
                       {showBadge && (
