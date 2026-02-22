@@ -45,7 +45,8 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
         (best, [k, v]) => (Math.abs(v) > Math.abs(best[1]) ? [k, v] : best),
         ["0", 0],
       )[0];
-      return { exp, short: shortExpiry(exp), gexMap, vmax, kingStrike: Number(kingStrike) };
+      const netGex = Object.values(gexMap).reduce((sum, v) => sum + v, 0);
+      return { exp, short: shortExpiry(exp), gexMap, vmax, kingStrike: Number(kingStrike), netGex };
     });
   }, [expiries, heatmap_strikes, heatmap_values]);
 
@@ -98,20 +99,28 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter }: Props) 
             <th className="sticky top-[37px] z-10 bg-gray-50 dark:bg-gray-900 text-left px-2 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wide border-b border-t border-gray-200 dark:border-gray-700 min-w-[90px]">
               STRIKE
             </th>
-            {cols.map(({ exp, short, kingStrike }) => {
+            {cols.map(({ exp, short, kingStrike, netGex }) => {
               const allStrikes = heatmap_strikes ?? [];
               const hasKing = allStrikes.some((s) => s === kingStrike && strikes.includes(s));
+              const gexColor = netGex >= 0 ? "#00cc44" : "#ff4444";
               return (
                 <th
                   key={exp}
                   className="sticky top-[37px] z-10 bg-gray-50 dark:bg-gray-900 text-right px-2 py-1 text-[9px] font-bold text-gray-500 uppercase border-b border-t border-l border-gray-200 dark:border-gray-700 min-w-[100px]"
                 >
-                  {short}
-                  {hasKing && (
-                    <span className="inline-block ml-1 bg-amber-700 text-white text-[7px] font-bold rounded px-1 align-middle">
-                      ★
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span>
+                      {short}
+                      {hasKing && (
+                        <span className="inline-block ml-1 bg-amber-700 text-white text-[7px] font-bold rounded px-1 align-middle">
+                          ★
+                        </span>
+                      )}
                     </span>
-                  )}
+                    <span className="text-[8px] font-extrabold tracking-tight" style={{ color: gexColor }}>
+                      {netGex >= 0 ? "+" : ""}{fmtGex(netGex)}
+                    </span>
+                  </div>
                 </th>
               );
             })}
