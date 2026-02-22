@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchGex, GexResult } from "@/lib/api";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
 import { fmtGex as fmtGexUtil } from "@/lib/gex";
-import { ChevronDown } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import { PageHeader, SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 
 const STRIKE_OPTIONS = [10, 20, 30, 40, 50] as const;
@@ -54,29 +54,44 @@ export default function OptionsFlowPage() {
       <PageHeader title="Options Flow" sub={`GEX analysis — ${ticker}`} />
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        {/* Ticker search — pill style */}
+        <form onSubmit={handleSearch} className="flex flex-1 items-center gap-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 transition">
+          <span className="pl-4 pr-2 text-gray-400 shrink-0">
+            <Search size={15} />
+          </span>
           <input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ticker — e.g. SPY, QQQ"
-            className="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            onChange={(e) => setInput(e.target.value.toUpperCase())}
+            placeholder="SPY, QQQ, AAPL…"
+            className="flex-1 py-2.5 text-sm bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
           />
-          <button type="submit"
-            className="px-4 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition">
+          <button
+            type="submit"
+            className="m-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold tracking-wide transition flex items-center gap-1.5 shrink-0"
+          >
+            <TrendingUp size={13} />
             Load
           </button>
         </form>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Strikes</label>
-          <div className="relative">
-            <select
-              value={nStrikes}
-              onChange={(e) => setNStrikes(parseInt(e.target.value, 10))}
-              className="appearance-none border border-gray-200 dark:border-gray-700 rounded-xl pl-3 pr-8 py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500">
-              {STRIKE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+
+        {/* Strikes — segmented pill group */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide shrink-0">Strikes</span>
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 gap-0.5">
+            {STRIKE_OPTIONS.map((n) => (
+              <button
+                key={n}
+                onClick={() => setNStrikes(n)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  nStrikes === n
+                    ? "bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
           </div>
         </div>
       </div>
