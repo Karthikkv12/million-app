@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGex, GexResult } from "@/lib/api";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
+import NetFlowPanel from "@/components/gex/NetFlowPanel";
 import { fmtGex as fmtGexUtil } from "@/lib/gex";
 import { Search, TrendingUp, X, Plus } from "lucide-react";
 import { PageHeader, SkeletonStatGrid, ErrorBanner, RefreshButton } from "@/components/ui";
@@ -116,6 +117,8 @@ function TickerPanel({
       {data && (
         <>
           <SummaryCards data={data} panelCount={panelCount} />
+
+          <NetFlowPanel data={data} accentColor={accentColor} />
 
           {/* Expiry filter chips */}
           {expiryDates.length > 1 && (

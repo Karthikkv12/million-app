@@ -183,6 +183,14 @@ class GEXResult:
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
     lot_size: int = 100   # contract multiplier used (100 for US, varies for India)
+    # ── Net flow fields ──────────────────────────────────────────────────────
+    call_premium: float = 0.0       # total call premium (OI × mid × lot_size)
+    put_premium: float = 0.0        # total put premium (OI × mid × lot_size)
+    net_flow: float = 0.0           # call_premium - put_premium (+ = bullish)
+    # flow_by_expiry: [{expiry, call_prem, put_prem, net}]
+    flow_by_expiry: List[dict] = field(default_factory=list)
+    # top_flow_strikes: [{strike, call_prem, put_prem, net, otype_bias}]
+    top_flow_strikes: List[dict] = field(default_factory=list)
     error: Optional[str] = None
 
 
@@ -398,6 +406,48 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         else:
             idx = by_strike["gex"].abs().idxmax()
             result.max_gex_strike = float(by_strike.loc[idx, "strike"])
+
+        # ── Net flow: premium dollars changing hands ──────────────────────────
+        # premium = OI × mid × lot_size  (proxy for committed capital)
+        df["premium"] = df["oi"] * df["mid"] * lot_size
+        call_df = df[df["otype"] == "call"]
+        put_df  = df[df["otype"] == "put"]
+
+        result.call_premium = float(call_df["premium"].sum())
+        result.put_premium  = float(put_df["premium"].sum())
+        result.net_flow     = result.call_premium - result.put_premium
+
+        # Flow by expiry (nearest 12 expiries, sorted)
+        flow_rows = []
+        for exp in expiries[:12]:
+            c_prem = float(df[(df["expiry"] == exp) & (df["otype"] == "call")]["premium"].sum())
+            p_prem = float(df[(df["expiry"] == exp) & (df["otype"] == "put")]["premium"].sum())
+            flow_rows.append({
+                "expiry":     exp,
+                "call_prem":  round(c_prem, 2),
+                "put_prem":   round(p_prem, 2),
+                "net":        round(c_prem - p_prem, 2),
+            })
+        result.flow_by_expiry = flow_rows
+
+        # Top 10 strikes by total premium (near spot ±30%)
+        df_near = df[(df["strike"] >= spot * 0.7) & (df["strike"] <= spot * 1.3)]
+        strike_flow = df_near.groupby(["strike", "otype"])["premium"].sum().unstack(fill_value=0)
+        if "call" not in strike_flow.columns: strike_flow["call"] = 0.0
+        if "put"  not in strike_flow.columns: strike_flow["put"]  = 0.0
+        strike_flow["total"] = strike_flow["call"] + strike_flow["put"]
+        strike_flow["net"]   = strike_flow["call"] - strike_flow["put"]
+        top10 = strike_flow.nlargest(10, "total").reset_index()
+        result.top_flow_strikes = [
+            {
+                "strike":     float(row["strike"]),
+                "call_prem":  round(float(row["call"]), 2),
+                "put_prem":   round(float(row["put"]), 2),
+                "net":        round(float(row["net"]), 2),
+                "bias":       "call" if row["net"] >= 0 else "put",
+            }
+            for _, row in top10.iterrows()
+        ]
 
         # --- Heatmap data: GEX by expiry × strike ---
         # Only keep top N strikes near spot for readability

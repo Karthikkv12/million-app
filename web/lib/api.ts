@@ -137,6 +137,21 @@ export async function signup(username: string, password: string): Promise<AuthTo
 
 // ── GEX ──────────────────────────────────────────────────────────────────────
 
+export interface FlowByExpiry {
+  expiry: string;
+  call_prem: number;
+  put_prem: number;
+  net: number;
+}
+
+export interface TopFlowStrike {
+  strike: number;
+  call_prem: number;
+  put_prem: number;
+  net: number;
+  bias: "call" | "put";
+}
+
 export interface GexResult {
   symbol: string;
   spot: number;
@@ -153,6 +168,12 @@ export interface GexResult {
   max_put_wall: number | null;
   max_gex_strike: number | null;
   net_gex: number | null;
+  // net flow
+  call_premium: number;
+  put_premium: number;
+  net_flow: number;
+  flow_by_expiry: FlowByExpiry[];
+  top_flow_strikes: TopFlowStrike[];
   error: string | null;
 }
 
