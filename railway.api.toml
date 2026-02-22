@@ -1,0 +1,10 @@
+# Railway API service config
+[build]
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+startCommand = "/entrypoint_api.sh"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+healthcheckPath = "/health"
+healthcheckTimeout = 30

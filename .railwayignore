@@ -1,0 +1,20 @@
+# Development / local files — not needed on Railway
+*.db
+*.sqlite3
+*.sqlite
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.DS_Store
+snapshots/
+*.log
+.devcontainer/
+AGENTS.md
+CONTRIBUTING.md
+MAINTENANCE.md
+MASTER_PLAN.md
+SECURITY.md
