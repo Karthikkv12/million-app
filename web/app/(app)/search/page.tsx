@@ -33,7 +33,7 @@ function PriceChart({ bars }: { bars: QuoteBar[] }) {
           axisLine={false} width={60} tickFormatter={fmt} />
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <Tooltip formatter={(v: any) => [fmt(Number(v)), "Close"]}
-          contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 12 }}
+          contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "inherit" }}
           labelStyle={{ color: "#9ca3af", fontSize: 11 }} />
         <Line type="monotone" dataKey="close" dot={false} stroke={color} strokeWidth={2} />
       </LineChart>

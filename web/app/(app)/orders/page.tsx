@@ -4,16 +4,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchOrders, Order, api } from "@/lib/api";
 import { clsx } from "clsx";
 import { Plus, X, ClipboardList } from "lucide-react";
-import { PageHeader, EmptyState, SkeletonCard } from "@/components/ui";
+import { PageHeader, EmptyState, SkeletonCard, Badge } from "@/components/ui";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING:   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   FILLED:    "bg-green-100  text-green-700  dark:bg-green-900/30  dark:text-green-400",
-  CANCELLED: "bg-gray-100   text-gray-500   dark:bg-gray-800      dark:text-gray-400",
+  CANCELLED: "bg-[var(--surface-2)] text-gray-500 dark:text-gray-400",
   REJECTED:  "bg-red-100    text-red-600    dark:bg-red-900/30    dark:text-red-400",
 };
 
-function Badge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: string }) {
   const s = status?.toUpperCase() ?? "";
   return <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full uppercase", STATUS_COLOR[s] ?? "bg-gray-100 text-gray-500")}>{s}</span>;
 }
@@ -124,11 +124,11 @@ function OrderCard({ o, onFill }: { o: Order; onFill: () => void }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-black text-gray-900 dark:text-white">{o.symbol}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{o.action}</span>
+            <Badge variant={o.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{o.action}</Badge>
           </div>
           <p className="text-xs text-gray-400 mt-0.5">#{o.id} · {String(o.created_at ?? "").slice(0, 10)}</p>
         </div>
-        <Badge status={o.status} />
+        <StatusBadge status={o.status} />
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs mb-3">
         <div><p className="text-gray-400">Qty</p><p className="font-semibold text-gray-900 dark:text-white">{o.quantity}</p></div>
@@ -218,11 +218,11 @@ export default function OrdersPage() {
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{String(o.created_at ?? "").slice(0, 10)}</td>
                     <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{o.symbol}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{o.action}</span>
+                      <Badge variant={o.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{o.action}</Badge>
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{o.quantity}</td>
                     <td className="px-4 py-3 text-gray-500">{o.limit_price != null ? `$${o.limit_price.toFixed(2)}` : "Market"}</td>
-                    <td className="px-4 py-3"><Badge status={o.status} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{o.filled_at ? String(o.filled_at).slice(0, 10) : "—"}</td>
                     <td className="px-4 py-3 text-gray-500">{o.filled_price != null ? `$${o.filled_price.toFixed(2)}` : "—"}</td>
                     <td className="px-4 py-3">

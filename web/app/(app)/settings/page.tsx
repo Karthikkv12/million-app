@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchAuthSessions, fetchAuthEvents, revokeSession, changePassword, AuthSession, AuthEvent } from "@/lib/api";
 import { Shield, Monitor, Key, CheckCircle, XCircle } from "lucide-react";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Badge } from "@/components/ui";
 
 const EVENT_COLOR: Record<string, string> = {
   login:           "text-green-500",
@@ -89,12 +89,12 @@ function SessionsSection() {
       {sessions.length > 0 && (
         <>
           {/* Mobile */}
-          <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 md:hidden">
+          <div className="flex flex-col divide-y divide-[var(--border)] md:hidden">
             {sessions.map((s) => (
               <div key={s.id} className={`p-4 ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div>
-                    {s.is_current && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded font-bold mr-1">current</span>}
+                    {s.is_current && <Badge variant="info" className="mr-1">current</Badge>}
                     <span className="text-xs font-mono text-gray-500">{s.ip_address ?? "—"}</span>
                     <p className="text-xs text-gray-400 mt-1 truncate max-w-[240px]">{s.user_agent ? s.user_agent.slice(0, 50) : "—"}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">Created {s.created_at.slice(0, 16).replace("T", " ")}</p>
@@ -127,7 +127,7 @@ function SessionsSection() {
                     <td className="px-4 py-3 text-gray-400 text-xs">{s.last_used_at ? s.last_used_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs font-mono">{s.ip_address ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs truncate max-w-[200px]">
-                      {s.is_current && <span className="mr-1 text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded font-bold">current</span>}
+                      {s.is_current && <Badge variant="info" className="mr-1">current</Badge>}
                       {s.user_agent ? s.user_agent.slice(0, 60) : "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -172,7 +172,7 @@ function EventsSection() {
       {events.length > 0 && (
         <>
           {/* Mobile */}
-          <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 md:hidden overflow-y-auto max-h-[320px]">
+          <div className="flex flex-col divide-y divide-[var(--border)] md:hidden overflow-y-auto max-h-[320px]">
             {events.map((e) => (
               <div key={e.id} className="flex items-center justify-between p-3">
                 <div>
@@ -199,11 +199,9 @@ function EventsSection() {
                   <tr key={e.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                     <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{e.created_at.slice(0, 16).replace("T", " ")}</td>
                     <td className={`px-4 py-2.5 font-mono text-xs font-semibold ${EVENT_COLOR[e.event_type] ?? "text-gray-500"}`}>{e.event_type}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${e.success ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"}`}>
-                        {e.success ? "OK" : "FAIL"}
-                      </span>
-                    </td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant={e.success ? "success" : "danger"}>{e.success ? "OK" : "FAIL"}</Badge>
+                      </td>
                     <td className="px-4 py-2.5 text-gray-400 font-mono text-xs">{e.ip_address ?? "—"}</td>
                   </tr>
                 ))}

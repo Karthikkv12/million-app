@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchTrades, Trade, api } from "@/lib/api";
 import { BarChart2, X } from "lucide-react";
-import { PageHeader, EmptyState, SkeletonCard, Tabs } from "@/components/ui";
+import { PageHeader, EmptyState, SkeletonCard, Tabs, Badge } from "@/components/ui";
 
 function isOpen(t: Trade) { return t.exit_price == null; }
 
@@ -74,13 +74,13 @@ function TradeCard({ t, onClose, onDelete }: { t: Trade; onClose: () => void; on
         <div>
           <div className="flex items-center gap-2">
             <span className="font-black text-gray-900 dark:text-white text-base">{t.symbol}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{t.action}</span>
+            <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
           </div>
           <p className="text-xs text-gray-400 mt-0.5">{t.strategy ?? "—"} · {String(t.date ?? "").slice(0, 10)}</p>
         </div>
         <div className={`text-base font-black ${pnl == null ? "" : pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
           {pnl == null
-            ? <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">Open</span>
+            ? <Badge variant="warning">Open</Badge>
             : `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`}
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function TradesPage() {
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{String(t.date ?? "").slice(0, 10)}</td>
                       <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{t.symbol}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{t.action}</span>
+                        <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{t.strategy ?? "—"}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{t.qty}</td>

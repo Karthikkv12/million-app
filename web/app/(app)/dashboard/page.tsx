@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import {
   Plus, X, TrendingUp, TrendingDown, DollarSign, Activity, Clock, ArrowRight,
 } from "lucide-react";
-import { PageHeader, SectionLabel, SkeletonStatGrid } from "@/components/ui";
+import { PageHeader, SectionLabel, SkeletonStatGrid, Tabs, Badge } from "@/components/ui";
 
 const QUICK = [
   { href: "/search",       label: "New Trade",   sub: "Search & place order", color: "from-blue-500 to-blue-700" },
@@ -53,14 +53,15 @@ function CashModal({ onClose }: { onClose: () => void }) {
           <h3 className="font-bold text-gray-900 dark:text-white text-lg">Cash Transaction</h3>
           <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
         </div>
-        <div className="flex gap-2 mb-4">
-          {(["deposit","withdrawal"] as const).map((t) => (
-            <button key={t} onClick={() => setType(t)}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold capitalize transition ${type === t ? "bg-blue-600 text-white" : "bg-[var(--surface-2)] text-gray-500 hover:bg-[var(--surface-2)]"}`}>
-              {t}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          tabs={[
+            { key: "deposit",    label: "Deposit"    },
+            { key: "withdrawal", label: "Withdrawal" },
+          ]}
+          active={type}
+          onChange={(k) => setType(k as "deposit" | "withdrawal")}
+          className="w-full mb-4 [&>button]:flex-1"
+        />
         <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
         <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className={`${inputCls} mb-3`} />
         <label className="block text-xs text-gray-500 mb-1">Account (optional)</label>
@@ -146,7 +147,7 @@ export default function DashboardPage() {
                     fill={pnlUp ? "#22c55e22" : "#ef444422"} strokeWidth={2} dot={false} />
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P/L"]}
-                    contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }} />
+                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "inherit" }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -212,7 +213,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Mobile card list */}
-          <div className="flex flex-col gap-2 sm:hidden">
+          <div className="flex flex-col gap-2 sm:hidden divide-y divide-[var(--border)]">
             {[...trades].reverse().slice(0, 6).map((t) => {
               const ep = t.exit_price;
               const rowPnl = ep != null
@@ -223,7 +224,7 @@ export default function DashboardPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-gray-900 dark:text-white text-sm">{t.symbol}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${t.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{t.action}</span>
+                      <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">{t.qty} × ${t.price?.toFixed(2)} · {String(t.date ?? "").slice(0, 10)}</p>
                   </div>
@@ -256,7 +257,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 text-gray-400 text-xs">{String(t.date ?? "").slice(0, 10)}</td>
                       <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{t.symbol}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.action?.toUpperCase() === "BUY" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>{t.action}</span>
+                        <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.qty}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">${t.price?.toFixed(2)}</td>

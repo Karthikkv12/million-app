@@ -4,15 +4,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { fetchBudget, saveBudget, BudgetEntry } from "@/lib/api";
 import { Plus, X, PiggyBank } from "lucide-react";
-import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid } from "@/components/ui";
+import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid, Tabs, Badge } from "@/components/ui";
 
 const PIE_COLORS = ["#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#84cc16","#f97316"];
-const TYPE_COLOR: Record<string, string> = {
-  EXPENSE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  INCOME:  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  ASSET:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-};
 const fmt = (v: number) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 });
+const TYPE_VARIANT: Record<string, "danger" | "success" | "info"> = {
+  EXPENSE: "danger",
+  INCOME:  "success",
+  ASSET:   "info",
+};
 
 const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
@@ -133,7 +133,7 @@ export default function BudgetPage() {
                   {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <Tooltip formatter={(v: any) => [fmt(Number(v)), "Amount"]} contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 12 }} />
+                <Tooltip formatter={(v: any) => [fmt(Number(v)), "Amount"]} contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "inherit" }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -142,12 +142,13 @@ export default function BudgetPage() {
 
         {/* Entries */}
         <div className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-          {/* Filter chips */}
-          <div className="flex gap-1.5 flex-wrap p-3 border-b border-[var(--border)]">
-            {["ALL", "EXPENSE", "INCOME", "ASSET"].map((t) => (
-              <button key={t} onClick={() => setTypeFilter(t)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${typeFilter === t ? "bg-blue-600 text-white" : "bg-[var(--surface-2)] text-gray-500 hover:bg-[var(--surface-2)]"}`}>{t}</button>
-            ))}
+          {/* Filter tabs */}
+          <div className="p-3 border-b border-[var(--border)]">
+            <Tabs
+              tabs={["ALL", "EXPENSE", "INCOME", "ASSET"].map((t) => ({ key: t, label: t }))}
+              active={typeFilter}
+              onChange={setTypeFilter}
+            />
           </div>
 
           {isLoading && <div className="p-4 space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-10 rounded-xl" />)}</div>}
@@ -159,13 +160,13 @@ export default function BudgetPage() {
           {filtered.length > 0 && (
             <>
               {/* Mobile */}
-              <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 sm:hidden overflow-y-auto max-h-[400px]">
+              <div className="flex flex-col divide-y divide-[var(--border)] sm:hidden overflow-y-auto max-h-[400px]">
                 {filtered.map((e, i) => (
                   <div key={i} className="flex items-center justify-between p-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-gray-900 dark:text-white">{e.category}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${TYPE_COLOR[e.type.toUpperCase()] ?? ""}`}>{e.type.toUpperCase()}</span>
+                        <Badge variant={TYPE_VARIANT[e.type.toUpperCase()] ?? "default"}>{e.type.toUpperCase()}</Badge>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">{e.date.slice(0, 10)} {e.description ? `· ${e.description}` : ""}</p>
                     </div>
@@ -192,9 +193,9 @@ export default function BudgetPage() {
                         <td className="px-4 py-2.5 text-gray-400 text-xs">{e.date.slice(0, 10)}</td>
                         <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">{e.category}</td>
                         <td className="px-4 py-2.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${TYPE_COLOR[e.type.toUpperCase()] ?? ""}`}>
+                          <Badge variant={TYPE_VARIANT[e.type.toUpperCase()] ?? "default"}>
                             {e.type.toUpperCase()}
-                          </span>
+                          </Badge>
                         </td>
                         <td className={`px-4 py-2.5 font-bold text-xs ${e.type.toUpperCase() === "EXPENSE" ? "text-red-500" : e.type.toUpperCase() === "INCOME" ? "text-green-500" : "text-blue-500"}`}>
                           {fmt(e.amount)}

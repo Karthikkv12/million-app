@@ -196,7 +196,7 @@ export default function AccountsPage() {
               {holdings.length > 0 && (
                 <>
                   {/* Mobile */}
-                  <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 md:hidden">
+                  <div className="flex flex-col divide-y divide-[var(--border)] md:hidden">
                     {holdings.map((h) => (
                       <div key={h.id} className="flex items-center justify-between p-4">
                         <div>
