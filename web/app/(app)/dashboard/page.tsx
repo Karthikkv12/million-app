@@ -1,15 +1,16 @@
 "use client";
 import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AreaChart, Area, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
-import { fetchTrades, fetchOrders, fetchCashBalance, Trade, api } from "@/lib/api";
+import { fetchTrades, fetchOrders, fetchCashBalance, Trade } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
-  Plus, X, TrendingUp, TrendingDown, DollarSign, Activity, Clock, ArrowRight,
+  TrendingUp, TrendingDown, DollarSign, Activity, Clock, ArrowRight,
   Search,
 } from "lucide-react";
-import { PageHeader, SectionLabel, SkeletonStatGrid, Tabs, Badge, RefreshButton } from "@/components/ui";
+import { PageHeader, SectionLabel, SkeletonStatGrid, Badge, RefreshButton } from "@/components/ui";
 import MarketCards from "@/components/dashboard/MarketCards";
 import VixPanel from "@/components/dashboard/VixPanel";
 import EconomicCalendar from "@/components/dashboard/EconomicCalendar";
@@ -36,6 +37,7 @@ const fmt = (v: number) => "$" + Math.abs(v).toLocaleString("en-US", { minimumFr
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [lookupQuery, setLookupQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 

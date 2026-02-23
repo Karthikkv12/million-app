@@ -26,9 +26,9 @@ Rules:
 ## Ledger (source of truth)
 - [x] ~~Cash-only double-entry ledger tables (`ledger_accounts`, `ledger_entries`, `ledger_lines`)~~
 - [x] ~~Post cash deposits/withdrawals into ledger (balanced lines)~~
-- [ ] Derive API cash balance from ledger everywhere (remove cash_flow-as-source)
-- [ ] Add position ledger (lots / cost basis) as the source of holdings
-- [ ] Post trades into ledger (cash, positions, fees)
+- [ ] **TODO** Derive `GET /cash/balance` from ledger (replace `cash_flow` as source)
+- [ ] **TODO** Post trades into ledger on close (realized P&L entry)
+- [ ] **TODO** Add position ledger (lots / cost basis) as the source of holdings
 - [ ] Corporate actions support (splits/dividends) posted into ledger
 - [ ] Reconciliation tooling (compare broker vs internal ledger)
 
@@ -36,20 +36,20 @@ Rules:
 - [x] ~~Order idempotency key (client_order_id)~~
 - [x] ~~Provider-agnostic broker adapter + paper broker~~
 - [x] ~~Order external linkage fields + sync/fill paths~~
-- [ ] Full order state machine (NEW/VALIDATED/ROUTED/PARTIAL/FILLED/CANCELLED/REJECTED)
-- [ ] Immutable order event history table (append-only)
+- [ ] **TODO** Full order state machine (NEW/VALIDATED/ROUTED/PARTIAL/FILLED/CANCELLED/REJECTED)
+- [ ] **TODO** Immutable order event history table (append-only)
 - [ ] Retries + idempotency on all write endpoints (server-side keys)
 
 ## Market data
 - [x] ~~Stock search + stock detail page (history + current price)~~
+- [ ] **TODO** Quote snapshots cache (local DB table + TTL expiry, stop hitting yfinance live)
 - [ ] Symbol master table + refresh job
-- [ ] Quote snapshots cache (local DB) + expiry
 - [ ] Corporate actions data feed (later)
 
 ## Risk + controls
-- [ ] Buying power derived from ledger (cash + margin rules)
-- [ ] Pre-trade checks (trading hours/halts, position limits)
-- [ ] Reject/hold orders with reasons (persisted)
+- [ ] **TODO** Buying power derived from ledger (cash + margin rules)
+- [ ] **TODO** Pre-trade checks (buying power, position limits) — reject with reason persisted on order
+- [ ] Trading hours / halt checks (later)
 
 ## Reliability
 - [ ] Background job queue (RQ/Celery/APS) for sync, refresh, reconciliation
