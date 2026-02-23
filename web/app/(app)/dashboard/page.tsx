@@ -225,8 +225,14 @@ export default function DashboardPage() {
       {/* ── VIX ── */}
       <div className="mb-6 sm:mb-8">
         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Volatility</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <VixPanel />
+          <VixPanel
+            symbol="%5EINVIX"
+            title="India VIX"
+            sublabel="NSE India Volatility Index"
+            gradId="indiaVixGrad"
+          />
         </div>
       </div>
 

@@ -11,6 +11,13 @@ import { api } from "@/lib/api";
 
 interface Bar { date: string; close: number; }
 
+interface Props {
+  symbol?:   string;  // yfinance symbol, URL-encoded. Default: %5EVIX
+  title?:    string;  // Card heading. Default: "VIX"
+  sublabel?: string;  // Sub-heading. Default: "CBOE Volatility Index"
+  gradId?:   string;  // Unique gradient id to avoid SVG conflicts. Default: "vixGrad"
+}
+
 type DayRange = 1 | 2 | 3 | 7 | 14 | 30;
 const DAY_RANGES: DayRange[] = [1, 2, 3, 7, 14, 30];
 
@@ -43,7 +50,12 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function VixPanel() {
+export default function VixPanel({
+  symbol   = "%5EVIX",
+  title    = "VIX",
+  sublabel = "CBOE Volatility Index",
+  gradId   = "vixGrad",
+}: Props) {
   const [bars, setBars]       = useState<Bar[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
@@ -54,7 +66,7 @@ export default function VixPanel() {
       setLoading(true);
       setError(false);
       const { period } = PERIOD_MAP[d];
-      const data = await api.get<{ symbol: string; bars: Bar[] }>(`/stocks/%5EVIX/history?period=${period}`);
+      const data = await api.get<{ symbol: string; bars: Bar[] }>(`/stocks/${symbol}/history?period=${period}`);
       // For day ranges < 7 slice to approximate the right number of bars
       let result = data.bars ?? [];
       if (d <= 3 && result.length > d * 78) {
@@ -93,8 +105,8 @@ export default function VixPanel() {
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">VIX</p>
-          <p className="text-[10px] text-gray-400/70 mt-0.5">CBOE Volatility Index</p>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{title}</p>
+          <p className="text-[10px] text-gray-400/70 mt-0.5">{sublabel}</p>
         </div>
         {regime && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${regime.bg} ${regime.color}`}>
@@ -129,7 +141,7 @@ export default function VixPanel() {
         <ResponsiveContainer width="100%" height={90}>
           <AreaChart data={bars} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <defs>
-              <linearGradient id="vixGrad" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.25} />
                 <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
               </linearGradient>
@@ -143,7 +155,7 @@ export default function VixPanel() {
               dataKey="close"
               stroke={strokeColor}
               strokeWidth={2}
-              fill="url(#vixGrad)"
+              fill={`url(#${gradId})`}
               dot={false}
               isAnimationActive={false}
             />
