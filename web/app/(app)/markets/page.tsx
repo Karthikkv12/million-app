@@ -54,29 +54,31 @@ function BreadthBar({ quotes }: { quotes: QuoteMap }) {
   const uncPct = (unc / total) * 100;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Market Breadth</p>
-      <div className="flex items-center gap-4 mb-3">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-          <span className="text-xs font-bold text-green-500">{adv} Advancing</span>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 flex flex-col gap-3 overflow-hidden">
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Market Breadth</p>
+      {/* Counts row — wraps on small sizes */}
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-base font-black text-green-500 leading-none">{adv}</span>
+          <span className="text-[9px] font-semibold text-green-500/80 uppercase tracking-wide">Up</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-          <span className="text-xs font-bold text-red-500">{dec} Declining</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-base font-black text-gray-400 leading-none">{unc}</span>
+          <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Flat</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
-          <span className="text-xs font-bold text-gray-400">{unc} Unchanged</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-base font-black text-red-500 leading-none">{dec}</span>
+          <span className="text-[9px] font-semibold text-red-500/80 uppercase tracking-wide">Down</span>
         </div>
       </div>
-      <div className="h-3 rounded-full overflow-hidden flex gap-0.5">
-        <div style={{ width: `${advPct}%` }} className="bg-green-500 rounded-l-full" />
-        <div style={{ width: `${uncPct}%` }} className="bg-gray-600" />
-        <div style={{ width: `${decPct}%` }} className="bg-red-500 rounded-r-full" />
+      {/* Bar */}
+      <div className="h-2.5 rounded-full overflow-hidden flex">
+        <div style={{ width: `${advPct}%` }} className="bg-green-500 transition-all duration-700" />
+        <div style={{ width: `${uncPct}%` }} className="bg-gray-600 transition-all duration-700" />
+        <div style={{ width: `${decPct}%` }} className="bg-red-500 transition-all duration-700" />
       </div>
-      <p className="text-[10px] text-gray-400 mt-1.5">
-        {advPct.toFixed(0)}% advancing across {total} tracked symbols
+      <p className="text-[10px] text-gray-500 leading-snug">
+        {advPct.toFixed(0)}% advancing · {total} symbols
       </p>
     </div>
   );
@@ -314,7 +316,7 @@ export default function MarketsPage() {
 
       {/* ── Sector heatmaps ────────────────────────────────────── */}
       <div className="mb-6 sm:mb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
           {(Object.keys(SECTORS) as SectorKey[]).map((key) => (
             <SectorCard
               key={key}

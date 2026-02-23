@@ -13,8 +13,8 @@ import {
 
 const NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/markets",      label: "Markets",      icon: Globe           },
   { href: "/options-flow", label: "Options Flow", icon: Zap             },
+  { href: "/markets",      label: "Markets",      icon: Globe           },
   { href: "/trades",       label: "Trades",       icon: BarChart2       },
   { href: "/orders",       label: "Orders",       icon: ClipboardList   },
   { href: "/accounts",     label: "Accounts",     icon: Wallet          },
@@ -62,16 +62,27 @@ export default function Navbar() {
         {active && collapsed && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-blue-500" />
         )}
-        <Icon
-          size={17}
-          strokeWidth={active ? 2.2 : 1.8}
-          className={clsx(
-            "shrink-0 transition-colors",
-            active
-              ? "text-blue-500 dark:text-blue-400"
-              : "text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300",
-          )}
-        />
+        {Icon === Zap ? (
+          <svg
+            width={17} height={17}
+            viewBox="0 0 24 24"
+            fill="#F59E0B"
+            className="shrink-0 transition-colors drop-shadow-[0_0_4px_rgba(245,158,11,0.6)]"
+          >
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+        ) : (
+          <Icon
+            size={17}
+            strokeWidth={active ? 2.2 : 1.8}
+            className={clsx(
+              "shrink-0 transition-colors",
+              active
+                ? "text-blue-500 dark:text-blue-400"
+                : "text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300",
+            )}
+          />
+        )}
         {!collapsed && (
           <>
             <span className="flex-1">{label}</span>
@@ -99,14 +110,18 @@ export default function Navbar() {
           {!collapsed && (
             <Link href="/dashboard" className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Zap size={15} className="text-white" strokeWidth={2.5} />
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="#F59E0B" className="drop-shadow-[0_0_3px_rgba(245,158,11,0.8)]">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
               </span>
               <span className="text-[15px] font-black tracking-tight text-gray-900 dark:text-white">OptionFlow</span>
             </Link>
           )}
           {collapsed && (
             <Link href="/dashboard" title="Dashboard" className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Zap size={15} className="text-white" strokeWidth={2.5} />
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="#F59E0B" className="drop-shadow-[0_0_3px_rgba(245,158,11,0.8)]">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
             </Link>
           )}
           {/* Collapse toggle — only shown when not collapsed (appears at right) */}

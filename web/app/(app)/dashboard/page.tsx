@@ -32,62 +32,10 @@ function calcPnl(trades: Trade[]) {
   return { pnl, openCount: open, closedCount: closed };
 }
 
-function CashModal({ onClose }: { onClose: () => void }) {
-  const qc = useQueryClient();
-  const [amount, setAmount]   = useState("");
-  const [type, setType]       = useState<"deposit" | "withdrawal">("deposit");
-  const [account, setAccount] = useState("");
-  const [err, setErr]         = useState("");
-
-  const accountsQ = useQuery({ queryKey: ["accounts"], queryFn: () => api.get<{id:number;name:string}[]>("/accounts"), staleTime: 30_000 });
-
-  const mut = useMutation({
-    mutationFn: () => api.post("/cash/add", { amount: parseFloat(amount), type, account_id: account ? parseInt(account) : null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cash-balance"] }); onClose(); },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const inputCls = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-[var(--surface)] rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-[var(--border)]">
-        <div className="w-10 h-1 rounded-full bg-[var(--surface-2)] mx-auto mb-5 sm:hidden" />
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-gray-900 dark:text-white text-lg">Cash Transaction</h3>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
-        </div>
-        <Tabs
-          tabs={[
-            { key: "deposit",    label: "Deposit"    },
-            { key: "withdrawal", label: "Withdrawal" },
-          ]}
-          active={type}
-          onChange={(k) => setType(k as "deposit" | "withdrawal")}
-          className="w-full mb-4 [&>button]:flex-1"
-        />
-        <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
-        <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className={`${inputCls} mb-3`} />
-        <label className="block text-xs text-gray-500 mb-1">Account (optional)</label>
-        <select value={account} onChange={(e) => setAccount(e.target.value)} className={`${inputCls} mb-4`}>
-          <option value="">— Any —</option>
-          {(accountsQ.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !amount}
-          className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
-          {mut.isPending ? "Processing…" : `Confirm ${type}`}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const fmt = (v: number) => "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [showCash, setShowCash]       = useState(false);
   const [lookupQuery, setLookupQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -126,7 +74,6 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-      {showCash && <CashModal onClose={() => setShowCash(false)} />}
 
       <PageHeader
         title={user?.username ? `Hey, ${user.username} 👋` : "Dashboard"}
@@ -134,11 +81,6 @@ export default function DashboardPage() {
         action={
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={handleRefresh} isRefreshing={isRefreshing} />
-            <button onClick={() => setShowCash(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition shadow-sm">
-              <Plus size={15} strokeWidth={2.5} />
-              <span className="hidden sm:inline">Cash</span>
-            </button>
           </div>
         }
       />
@@ -194,15 +136,15 @@ export default function DashboardPage() {
           </div>
 
           {/* Cash */}
-          <button onClick={() => setShowCash(true)}
+          <Link href="/accounts"
             className="text-left bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition group card-hover">
             <div className="flex items-start justify-between mb-2">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Cash</p>
               <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30"><DollarSign size={15} className="text-blue-500" /></span>
             </div>
             <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{cash == null ? "—" : fmt(cash)}</p>
-            <p className="text-xs text-gray-400 mt-1 group-hover:text-blue-500 transition">tap to transact</p>
-          </button>
+            <p className="text-xs text-gray-400 mt-1 group-hover:text-blue-500 transition">manage in accounts</p>
+          </Link>
 
           {/* Positions */}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover">

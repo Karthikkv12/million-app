@@ -9,7 +9,7 @@ const TABS = [
   { href: "/options-flow", label: "Flow",    icon: Zap             },
   { href: "/search",       label: "Search",  icon: Search          },
   { href: "/trades",       label: "Trades",  icon: BarChart2       },
-  { href: "/markets",     label: "Markets", icon: Globe           },
+  { href: "/markets",      label: "Markets", icon: Globe           },
 ];
 
 export default function BottomNav() {
@@ -37,10 +37,21 @@ export default function BottomNav() {
                 {active && (
                   <span className="absolute inset-0 bg-gradient-to-b from-blue-500/8 to-transparent rounded-2xl" />
                 )}
-                <Icon
-                  size={20}
-                  strokeWidth={active ? 2.5 : 1.8}
-                />
+                {Icon === Zap ? (
+                  <svg
+                    width={20} height={20}
+                    viewBox="0 0 24 24"
+                    fill="#F59E0B"
+                    className="drop-shadow-[0_0_4px_rgba(245,158,11,0.6)]"
+                  >
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                  </svg>
+                ) : (
+                  <Icon
+                    size={20}
+                    strokeWidth={active ? 2.5 : 1.8}
+                  />
+                )}
                 {label}
               </Link>
             );

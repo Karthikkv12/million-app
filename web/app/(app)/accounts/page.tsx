@@ -2,12 +2,63 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchAccounts, fetchCashBalance, Account, api } from "@/lib/api";
-import { Plus, X, Wallet, TrendingUp } from "lucide-react";
-import { PageHeader, EmptyState, RefreshButton } from "@/components/ui";
+import { Plus, X, Wallet, TrendingUp, DollarSign } from "lucide-react";
+import { PageHeader, EmptyState, RefreshButton, Tabs } from "@/components/ui";
 
 interface Holding {
   id: number; account_id: number; symbol: string;
   quantity: number; avg_cost?: number; updated_at?: string;
+}
+
+function CashModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [amount, setAmount]   = useState("");
+  const [type, setType]       = useState<"deposit" | "withdrawal">("deposit");
+  const [account, setAccount] = useState("");
+  const [err, setErr]         = useState("");
+
+  const accountsQ = useQuery({ queryKey: ["accounts"], queryFn: () => api.get<{id:number;name:string}[]>("/accounts"), staleTime: 30_000 });
+
+  const mut = useMutation({
+    mutationFn: () => api.post("/cash/add", { amount: parseFloat(amount), type, account_id: account ? parseInt(account) : null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cash-balance"] }); onClose(); },
+    onError: (e: Error) => setErr(e.message),
+  });
+
+  const inputCls = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-[var(--surface)] rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl border border-[var(--border)]">
+        <div className="w-10 h-1 rounded-full bg-[var(--surface-2)] mx-auto mb-5 sm:hidden" />
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-gray-900 dark:text-white text-lg">Cash Transaction</h3>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
+        </div>
+        <Tabs
+          tabs={[
+            { key: "deposit",    label: "Deposit"    },
+            { key: "withdrawal", label: "Withdrawal" },
+          ]}
+          active={type}
+          onChange={(k) => setType(k as "deposit" | "withdrawal")}
+          className="w-full mb-4 [&>button]:flex-1"
+        />
+        <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
+        <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className={`${inputCls} mb-3`} />
+        <label className="block text-xs text-gray-500 mb-1">Account (optional)</label>
+        <select value={account} onChange={(e) => setAccount(e.target.value)} className={`${inputCls} mb-4`}>
+          <option value="">— Any —</option>
+          {(accountsQ.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
+        <button onClick={() => mut.mutate()} disabled={mut.isPending || !amount}
+          className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
+          {mut.isPending ? "Processing…" : `Confirm ${type}`}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function useHoldings(accountId: number | null) {
@@ -112,6 +163,7 @@ export default function AccountsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAddAcct, setShowAddAcct] = useState(false);
   const [showHolding, setShowHolding] = useState(false);
+  const [showCash,    setShowCash]    = useState(false);
 
   const selected = accounts.find((a) => a.id === selectedId) ?? accounts[0] ?? null;
   const activeId = selectedId ?? selected?.id ?? null;
@@ -129,12 +181,18 @@ export default function AccountsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+      {showCash && <CashModal onClose={() => setShowCash(false)} />}
       <PageHeader
         title="Accounts"
         sub={cashQ.data?.balance != null ? `Cash balance: $${cashQ.data.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : undefined}
         action={
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+            <button onClick={() => setShowCash(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 active:scale-95 transition shadow-sm">
+              <DollarSign size={14} strokeWidth={2.5} />
+              <span>Cash</span>
+            </button>
             <button onClick={() => setShowAddAcct((v) => !v)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showAddAcct ? "bg-[var(--surface-2)] text-gray-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
               {showAddAcct ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Account</>}
