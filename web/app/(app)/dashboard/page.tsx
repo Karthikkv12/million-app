@@ -228,7 +228,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <VixPanel />
           <VixPanel
-            symbol="%5EINVIX"
+            symbol="%5EINDIAVIX"
             title="India VIX"
             sublabel="NSE India Volatility Index"
             gradId="indiaVixGrad"

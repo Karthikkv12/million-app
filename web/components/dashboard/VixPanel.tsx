@@ -21,14 +21,14 @@ interface Props {
 type DayRange = 1 | 2 | 3 | 7 | 14 | 30;
 const DAY_RANGES: DayRange[] = [1, 2, 3, 7, 14, 30];
 
-// Map day range → yfinance period string + intraday interval
-const PERIOD_MAP: Record<DayRange, { period: string; interval: string }> = {
-  1:  { period: "1d",  interval: "5m"  },
-  2:  { period: "2d",  interval: "15m" },
-  3:  { period: "5d",  interval: "30m" },
-  7:  { period: "5d",  interval: "1d"  },
-  14: { period: "1mo", interval: "1d"  },
-  30: { period: "1mo", interval: "1d"  },
+// Map day range → yfinance period (all daily bars, then slice to N days)
+const PERIOD_MAP: Record<DayRange, string> = {
+  1:  "5d",
+  2:  "5d",
+  3:  "5d",
+  7:  "1mo",
+  14: "1mo",
+  30: "1mo",
 };
 
 function vixRegime(v: number): { label: string; color: string; bg: string } {
@@ -65,24 +65,18 @@ export default function VixPanel({
     try {
       setLoading(true);
       setError(false);
-      const { period } = PERIOD_MAP[d];
+      const period = PERIOD_MAP[d];
       const data = await api.get<{ symbol: string; bars: Bar[] }>(`/stocks/${symbol}/history?period=${period}`);
-      // For day ranges < 7 slice to approximate the right number of bars
       let result = data.bars ?? [];
-      if (d <= 3 && result.length > d * 78) {
-        result = result.slice(-(d * 78));
-      } else if (d === 7 && result.length > 7) {
-        result = result.slice(-7);
-      } else if (d === 14 && result.length > 14) {
-        result = result.slice(-14);
-      }
+      // Slice to the requested number of trading days (approx)
+      if (result.length > d) result = result.slice(-d);
       setBars(result);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [symbol]);
 
   useEffect(() => { load(days); }, [load, days]);
 
