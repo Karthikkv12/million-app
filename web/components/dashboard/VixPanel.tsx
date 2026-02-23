@@ -1,11 +1,6 @@
 "use client";
 /**
- * VixPanel — CBOE VIX sparkline + level badge.
- * Fetches 1-month of daily VIX history from the backend and shows:
- *   - Current VIX level (large number)
- *   - Regime badge: Low / Elevated / High / Extreme
- *   - 30-day sparkline (area chart)
- *   - Day change + %
+ * VixPanel — CBOE VIX sparkline + level badge with day-range pills.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -16,12 +11,25 @@ import { api } from "@/lib/api";
 
 interface Bar { date: string; close: number; }
 
+type DayRange = 1 | 2 | 3 | 7 | 14 | 30;
+const DAY_RANGES: DayRange[] = [1, 2, 3, 7, 14, 30];
+
+// Map day range → yfinance period string + intraday interval
+const PERIOD_MAP: Record<DayRange, { period: string; interval: string }> = {
+  1:  { period: "1d",  interval: "5m"  },
+  2:  { period: "2d",  interval: "15m" },
+  3:  { period: "5d",  interval: "30m" },
+  7:  { period: "5d",  interval: "1d"  },
+  14: { period: "1mo", interval: "1d"  },
+  30: { period: "1mo", interval: "1d"  },
+};
+
 function vixRegime(v: number): { label: string; color: string; bg: string } {
-  if (v < 15) return { label: "Low",      color: "text-green-500",  bg: "bg-green-50 dark:bg-green-900/30"  };
-  if (v < 20) return { label: "Normal",   color: "text-blue-500",   bg: "bg-blue-50 dark:bg-blue-900/30"   };
+  if (v < 15) return { label: "Low",      color: "text-green-500",  bg: "bg-green-50 dark:bg-green-900/30"   };
+  if (v < 20) return { label: "Normal",   color: "text-blue-500",   bg: "bg-blue-50 dark:bg-blue-900/30"    };
   if (v < 30) return { label: "Elevated", color: "text-yellow-500", bg: "bg-yellow-50 dark:bg-yellow-900/30" };
   if (v < 40) return { label: "High",     color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/30" };
-  return               { label: "Extreme", color: "text-red-500",    bg: "bg-red-50 dark:bg-red-900/30"     };
+  return               { label: "Extreme", color: "text-red-500",    bg: "bg-red-50 dark:bg-red-900/30"      };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,12 +47,24 @@ export default function VixPanel() {
   const [bars, setBars]       = useState<Bar[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
+  const [days, setDays]       = useState<DayRange>(30);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (d: DayRange) => {
     try {
+      setLoading(true);
       setError(false);
-      const data = await api.get<{ symbol: string; bars: Bar[] }>("/stocks/%5EVIX/history?period=1mo");
-      setBars(data.bars ?? []);
+      const { period } = PERIOD_MAP[d];
+      const data = await api.get<{ symbol: string; bars: Bar[] }>(`/stocks/%5EVIX/history?period=${period}`);
+      // For day ranges < 7 slice to approximate the right number of bars
+      let result = data.bars ?? [];
+      if (d <= 3 && result.length > d * 78) {
+        result = result.slice(-(d * 78));
+      } else if (d === 7 && result.length > 7) {
+        result = result.slice(-7);
+      } else if (d === 14 && result.length > 14) {
+        result = result.slice(-14);
+      }
+      setBars(result);
     } catch {
       setError(true);
     } finally {
@@ -52,16 +72,15 @@ export default function VixPanel() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(days); }, [load, days]);
 
-  const current  = bars.length ? bars[bars.length - 1].close : null;
-  const prev     = bars.length > 1 ? bars[bars.length - 2].close : null;
-  const change   = current != null && prev != null ? current - prev : null;
-  const changePct= change != null && prev ? (change / prev) * 100 : null;
-  const up       = (change ?? 0) >= 0;
-  const regime   = current != null ? vixRegime(current) : null;
+  const current   = bars.length ? bars[bars.length - 1].close : null;
+  const prev      = bars.length > 1 ? bars[bars.length - 2].close : null;
+  const change    = current != null && prev != null ? current - prev : null;
+  const changePct = change != null && prev ? (change / prev) * 100 : null;
+  const up        = (change ?? 0) >= 0;
+  const regime    = current != null ? vixRegime(current) : null;
 
-  // Area stroke color based on regime
   const strokeColor = current == null ? "#6b7280"
     : current < 15 ? "#22c55e"
     : current < 20 ? "#3b82f6"
@@ -107,7 +126,7 @@ export default function VixPanel() {
 
       {/* Sparkline */}
       {!loading && bars.length > 1 && (
-        <ResponsiveContainer width="100%" height={80}>
+        <ResponsiveContainer width="100%" height={90}>
           <AreaChart data={bars} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="vixGrad" x1="0" y1="0" x2="0" y2="1">
@@ -132,14 +151,33 @@ export default function VixPanel() {
         </ResponsiveContainer>
       )}
 
-      {/* Reference lines legend */}
-      <div className="flex items-center gap-3 mt-2">
-        <span className="flex items-center gap-1 text-[9px] text-yellow-500/80">
-          <span className="inline-block w-4 border-t border-dashed border-yellow-400" />20
-        </span>
-        <span className="flex items-center gap-1 text-[9px] text-orange-500/80">
-          <span className="inline-block w-4 border-t border-dashed border-orange-400" />30
-        </span>
+      {/* Day-range pills + reference legend */}
+      <div className="flex items-center justify-between mt-3">
+        {/* Pills */}
+        <div className="flex items-center gap-1">
+          {DAY_RANGES.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition ${
+                days === d
+                  ? "bg-white/15 text-white"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-white/10"
+              }`}
+            >
+              {d}D
+            </button>
+          ))}
+        </div>
+        {/* Reference lines legend */}
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-[9px] text-yellow-500/80">
+            <span className="inline-block w-4 border-t border-dashed border-yellow-400" />20
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-orange-500/80">
+            <span className="inline-block w-4 border-t border-dashed border-orange-400" />30
+          </span>
+        </div>
       </div>
     </div>
   );
