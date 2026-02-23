@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis,
+  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis, XAxis,
 } from "recharts";
 import { api } from "@/lib/api";
 
@@ -40,12 +40,12 @@ function vixRegime(v: number): { label: string; color: string; bg: string } {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, chartTitle }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs shadow-lg">
       <p className="text-gray-400 mb-0.5">{label}</p>
-      <p className="font-bold text-gray-900 dark:text-white">VIX {Number(payload[0].value).toFixed(2)}</p>
+      <p className="font-bold text-gray-900 dark:text-white">{chartTitle ?? "VIX"} {Number(payload[0].value).toFixed(2)}</p>
     </div>
   );
 }
@@ -132,18 +132,37 @@ export default function VixPanel({
 
       {/* Sparkline */}
       {!loading && bars.length > 1 && (
-        <ResponsiveContainer width="100%" height={90}>
-          <AreaChart data={bars} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+        <ResponsiveContainer width="100%" height={130}>
+          <AreaChart data={bars} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.25} />
                 <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
               </linearGradient>
             </defs>
-            <YAxis domain={["auto", "auto"]} hide />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 9, fill: "#9ca3af" }}
+              tickFormatter={(v: string) => {
+                const d = new Date(v);
+                return `${d.getMonth() + 1}/${d.getDate()}`;
+              }}
+              interval="preserveStartEnd"
+              minTickGap={32}
+            />
+            <YAxis
+              domain={["auto", "auto"]}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 9, fill: "#9ca3af" }}
+              tickFormatter={(v: number) => v.toFixed(0)}
+              width={28}
+            />
             <ReferenceLine y={20} stroke="#eab30844" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="#f9731644" strokeDasharray="3 3" />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip chartTitle={title} />} />
             <Area
               type="monotone"
               dataKey="close"
