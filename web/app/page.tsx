@@ -134,8 +134,19 @@ function Hero() {
           Options Flow · Trade Journal · Market Intelligence
         </div>
 
+        {/* Brand name — big */}
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="#F59E0B"
+            className="drop-shadow-[0_0_12px_rgba(245,158,11,0.8)] shrink-0">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+          <span className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white">
+            Option<span className="text-amber-400">Flow</span>
+          </span>
+        </div>
+
         {/* Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6">
+        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white leading-[1.1] tracking-tight mb-6">
           Trade smarter with{" "}
           <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-amber-400 bg-clip-text text-transparent">
             real edge
