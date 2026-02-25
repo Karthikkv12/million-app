@@ -5,7 +5,9 @@
  * - Auto-refreshes the token on 401 responses
  */
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Use the Next.js /api rewrite proxy so requests stay same-origin (HTTPS on tunnel, HTTP locally).
+// Set NEXT_PUBLIC_API_URL to override (e.g. for production deployment).
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 // ── token storage (client-side only) ────────────────────────────────────────
 
