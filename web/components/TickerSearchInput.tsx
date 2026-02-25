@@ -174,7 +174,7 @@ export default function TickerSearchInput({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
-          className="flex-1 min-w-0 py-2 text-sm font-bold bg-transparent text-foreground placeholder-gray-400 focus:outline-none"
+          className="flex-1 min-w-0 py-2 text-sm font-bold bg-transparent text-foreground placeholder:text-foreground/40 focus:outline-none"
         />
         <button
           type="submit"
@@ -188,7 +188,7 @@ export default function TickerSearchInput({
       {/* Dropdown */}
       {open && suggestions.length > 0 && (
         <div
-          className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden"
+          className="absolute z-[200] top-full left-0 right-0 mt-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden"
           style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.35)" }}
         >
           {suggestions.map((s, i) => {

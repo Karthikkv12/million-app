@@ -91,14 +91,14 @@ function TickerPanel({
 
   return (
     <div
-      className="flex flex-col rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)] shadow-xl"
+      className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl"
       style={{ boxShadow: `0 0 0 1px ${accentColor}30, 0 8px 32px rgba(0,0,0,0.18)` }}
     >
       {/* ── Thick accent bar with gradient glow ──────────────────────── */}
-      <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}55, transparent)` }} />
+      <div className="h-[3px] w-full rounded-t-2xl overflow-hidden" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}55, transparent)` }} />
 
       {/* ── Header: search + status ──────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)] overflow-visible relative z-10">
         <TickerSearchInput
           value={slot.input}
           onChange={onInputChange}

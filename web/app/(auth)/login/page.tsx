@@ -54,7 +54,7 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 placeholder="your username"
-                className="w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface-2)] text-foreground placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition"
+                className="w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface-2)] text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition"
               />
             </div>
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full border border-[var(--border)] rounded-xl px-3 py-2.5 pr-10 text-sm bg-[var(--surface-2)] text-foreground placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition"
+                  className="w-full border border-[var(--border)] rounded-xl px-3 py-2.5 pr-10 text-sm bg-[var(--surface-2)] text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition"
                 />
                 <button
                   type="button"
