@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -851,9 +851,8 @@ function TickerDetail({ symbol }: { symbol: string }) {
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
-export default function StockPage({ params }: { params: Promise<{ symbol: string }> }) {
-  const { symbol: rawSymbol } = use(params);
-  const symbol = rawSymbol.toUpperCase();
+export default function StockPage({ params }: { params: { symbol: string } }) {
+  const symbol = params.symbol.toUpperCase();
   const router = useRouter();
   const [searchVal, setSearchVal] = useState(symbol);
 
