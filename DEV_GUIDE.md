@@ -1,14 +1,87 @@
 # OptionFlow — Developer Setup & Workflow Guide
 
 ## Table of Contents
-1. [Project Structure](#project-structure)
-2. [Local Development Setup](#local-development-setup)
-3. [Running the Servers](#running-the-servers)
-4. [The Two-Server Setup (main vs develop)](#the-two-server-setup)
-5. [How optflw.com Works](#how-optflwcom-works)
-6. [Git Branch Workflow](#git-branch-workflow)
-7. [Releasing to Production](#releasing-to-production)
-8. [Checking What's Unreleased](#checking-whats-unreleased)
+1. [Session Start Checklist](#session-start-checklist)
+2. [Project Structure](#project-structure)
+3. [Local Development Setup](#local-development-setup)
+4. [Running the Servers](#running-the-servers)
+5. [The Two-Server Setup (main vs develop)](#the-two-server-setup)
+6. [How optflw.com Works](#how-optflwcom-works)
+7. [Git Branch Workflow](#git-branch-workflow)
+8. [Releasing to Production](#releasing-to-production)
+9. [Checking What's Unreleased](#checking-whats-unreleased)
+
+---
+
+## Session Start Checklist
+
+Run through this every time you sit down to work. Takes ~60 seconds.
+
+### ✅ 1 — Confirm you're on `develop`
+```bash
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
+git branch --show-current
+# must print: develop
+# if not: git checkout develop
+```
+
+### ✅ 2 — Pull latest changes from GitHub
+```bash
+git pull origin develop
+```
+
+### ✅ 3 — Start the backend (FastAPI on port 8000)
+```bash
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
+source .venv/bin/activate
+python -m uvicorn backend_api.main:app --reload --port 8000 &
+```
+Verify it's running:
+```bash
+curl -s http://localhost:8000/health
+# should return: {"status":"ok"}
+```
+
+### ✅ 4 — Start the main server (port 3000 — production reference)
+```bash
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_main/web
+npx next dev -p 3000 &
+```
+→ open **http://localhost:3000** — this is the last released version (`main` branch)
+
+### ✅ 5 — Start the develop server (port 3002 — your working copy)
+```bash
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1/web
+npx next dev -p 3002 &
+```
+→ open **http://localhost:3002** — this is your active development branch
+
+### ✅ 6 — Verify what's unreleased
+```bash
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
+git log --oneline origin/main..develop
+# empty = nothing unreleased, some lines = commits staged for next release
+```
+
+### ✅ 7 — Ready to work
+- All code changes go in `~/Desktop/OptionFlow_V1/OptionFlow_V1/`
+- **Never edit files in `~/Desktop/OptionFlow_main/`** — that folder is read-only production reference
+- `localhost:3002` will hot-reload automatically as you save files
+- `localhost:3000` and `optflw.com` stay on the last release until you explicitly release
+
+---
+
+### 🛑 Before you start — quick sanity check
+
+| Check | Command | Expected |
+|---|---|---|
+| On correct branch | `git branch --show-current` | `develop` |
+| Backend running | `curl localhost:8000/health` | `{"status":"ok"}` |
+| No uncommitted mess | `git status` | clean or intentional WIP |
+| Port 3000 alive | open browser | last released version loads |
+| Port 3002 alive | open browser | develop version loads |
 
 ---
 
