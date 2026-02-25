@@ -42,12 +42,8 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter, accentCol
         gexMap[s] = (heatmap_values?.[ei]?.[si]) ?? 0;
       });
       const vmax = Math.max(...Object.values(gexMap).map(Math.abs), 1);
-      const kingStrike = Object.entries(gexMap).reduce(
-        (best, [k, v]) => (Math.abs(v) > Math.abs(best[1]) ? [k, v] : best),
-        ["0", 0],
-      )[0];
       const netGex = Object.values(gexMap).reduce((sum, v) => sum + v, 0);
-      return { exp, short: shortExpiry(exp), gexMap, vmax, kingStrike: Number(kingStrike), netGex };
+      return { exp, short: shortExpiry(exp), gexMap, vmax, netGex };
     });
   }, [expiries, heatmap_strikes, heatmap_values]);
 
@@ -59,6 +55,19 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter, accentCol
       short: shortExpiry(exp),
     }));
   }, [heatmap_expiries]);
+
+  // King node per expiry: highest |GEX| among DISPLAYED strikes only
+  const kingMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!strikes.length) return map;
+    cols.forEach(({ exp, gexMap }) => {
+      map[exp] = strikes.reduce(
+        (best, s) => (Math.abs(gexMap[s] ?? 0) > Math.abs(gexMap[best] ?? 0) ? s : best),
+        strikes[0],
+      );
+    });
+    return map;
+  }, [cols, strikes]);
 
   const nearestSpot = strikes.reduce(
     (best, s) => (Math.abs(s - spot) < Math.abs(best - spot) ? s : best),
@@ -191,9 +200,9 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter, accentCol
                       />
                     );
                   }
-                  const { gexMap, vmax, kingStrike } = colData;
+                  const { gexMap, vmax } = colData;
                   const v = gexMap[strike] ?? 0;
-                  const isKing = strike === kingStrike;
+                  const isKing = strike === kingMap[exp];
                   const bg = heatBg(v, vmax);
                   const fg = fgColor(bg);
                   const pct = vmax > 0 ? Math.round((v / vmax) * 100) : 0;
@@ -217,9 +226,9 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter, accentCol
                       {fmtGex(v)}
                       {isKing && (
                         <span
-                          className="ml-1 align-middle text-[15px]"
-                          style={{ color: "#111111" }}
-                          title="King Node"
+                          className="ml-1 align-middle text-[13px]"
+                          style={{ color: "#f59e0b", textShadow: "0 0 4px rgba(0,0,0,0.8)" }}
+                          title="King Node — highest GEX in visible window"
                         >
                           ★
                         </span>
@@ -258,8 +267,8 @@ export default function GexStrikeTable({ data, nStrikes, expiryFilter, accentCol
 
         {/* Star = king node */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[13px] leading-none" style={{ color: "#00cc44" }}>★</span>
-          <span className="text-[9px] text-foreground/50 font-semibold">King node — highest GEX in that expiry</span>
+          <span className="text-[13px] leading-none" style={{ color: "#f59e0b" }}>★</span>
+          <span className="text-[9px] text-foreground/50 font-semibold">King node — highest |GEX| in visible window</span>
         </div>
 
         {/* Column net GEX */}
