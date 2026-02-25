@@ -233,10 +233,10 @@ export default function NetFlowPanel({ data }: Props) {
   const hasEnoughData = chartData.length >= 5;
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-xl">
+    <div className="rounded-2xl border border-white/10 bg-[#0d0f18] overflow-hidden shadow-2xl">
 
       {/* ══ HEADER BAND ══════════════════════════════════════════════════════ */}
-      <div className="relative flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-gradient-to-r from-[var(--surface-2)] to-[var(--surface)]">
+      <div className="relative flex items-center justify-between px-5 py-4 border-b border-white/8 bg-gradient-to-r from-[#181b28] to-[#0d0f18]">
         {/* Ambient glow behind bias badge */}
         <div className={`absolute right-0 top-0 w-32 h-full opacity-10 pointer-events-none ${isCallBias ? "bg-emerald-500" : "bg-red-500"}`}
           style={{ maskImage: "linear-gradient(to left, black, transparent)" }} />
@@ -247,12 +247,12 @@ export default function NetFlowPanel({ data }: Props) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Net Flow</span>
+              <span className="text-[10px] text-gray-300 uppercase tracking-widest font-semibold">Net Flow</span>
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[var(--border)] text-gray-500 uppercase tracking-wide">{symbol}</span>
             </div>
             {spot > 0 && (
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl font-black text-yellow-400 tabular-nums leading-none">${spot.toFixed(2)}</span>
+                <span className="text-2xl font-black text-white tabular-nums leading-none drop-shadow-[0_0_12px_rgba(250,204,21,0.8)]" style={{textShadow:'0 0 20px rgba(250,204,21,0.6)'}}>${spot.toFixed(2)}</span>
               </div>
             )}
           </div>
@@ -273,38 +273,38 @@ export default function NetFlowPanel({ data }: Props) {
         {/* ══ KPI ROW ══════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-3 gap-2">
           {/* Call Premium */}
-          <div className="relative rounded-xl overflow-hidden bg-emerald-500/[0.06] border border-emerald-500/20 px-3 py-3">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/8 to-transparent pointer-events-none" />
-            <p className="text-[9px] text-emerald-500/70 uppercase tracking-widest font-bold mb-1.5">Call Prem</p>
-            <p className="text-[15px] font-black text-emerald-400 tabular-nums leading-none">{fmt(call_premium)}</p>
-            <p className="text-[8px] text-emerald-500/50 mt-1 font-semibold">{callPct.toFixed(1)}% of total</p>
+          <div className="relative rounded-xl overflow-hidden bg-emerald-500/10 border border-emerald-500/30 px-3 py-3">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 to-transparent pointer-events-none" />
+            <p className="text-[9px] text-emerald-300 uppercase tracking-widest font-bold mb-1.5">Call Prem</p>
+            <p className="text-[16px] font-black text-emerald-300 tabular-nums leading-none">{fmt(call_premium)}</p>
+            <p className="text-[8px] text-emerald-400/70 mt-1 font-semibold">{callPct.toFixed(1)}% of total</p>
           </div>
           {/* Net Flow */}
           <div className={`relative rounded-xl overflow-hidden border px-3 py-3 ${
-            isCallBias ? "bg-emerald-500/[0.06] border-emerald-500/20" : "bg-red-500/[0.06] border-red-500/20"
+            isCallBias ? "bg-emerald-500/10 border-emerald-500/30" : "bg-red-500/10 border-red-500/30"
           }`}>
-            <div className={`absolute inset-0 bg-gradient-to-br pointer-events-none ${isCallBias ? "from-emerald-500/8 to-transparent" : "from-red-500/8 to-transparent"}`} />
-            <p className={`text-[9px] uppercase tracking-widest font-bold mb-1.5 ${isCallBias ? "text-emerald-500/70" : "text-red-500/70"}`}>Net Flow</p>
-            <p className={`text-[15px] font-black tabular-nums leading-none ${isCallBias ? "text-emerald-400" : "text-red-400"}`}>{fmt(net_flow)}</p>
-            <p className={`text-[8px] mt-1 font-semibold ${isCallBias ? "text-emerald-500/50" : "text-red-500/50"}`}>{isCallBias ? "call dominant" : "put dominant"}</p>
+            <div className={`absolute inset-0 bg-gradient-to-br pointer-events-none ${isCallBias ? "from-emerald-500/15 to-transparent" : "from-red-500/15 to-transparent"}`} />
+            <p className={`text-[9px] uppercase tracking-widest font-bold mb-1.5 ${isCallBias ? "text-emerald-300" : "text-red-300"}`}>Net Flow</p>
+            <p className={`text-[16px] font-black tabular-nums leading-none ${isCallBias ? "text-emerald-300" : "text-red-300"}`}>{fmt(net_flow)}</p>
+            <p className={`text-[8px] mt-1 font-semibold ${isCallBias ? "text-emerald-400/70" : "text-red-400/70"}`}>{isCallBias ? "call dominant" : "put dominant"}</p>
           </div>
           {/* Put Premium */}
-          <div className="relative rounded-xl overflow-hidden bg-red-500/[0.06] border border-red-500/20 px-3 py-3">
-            <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 to-transparent pointer-events-none" />
-            <p className="text-[9px] text-red-500/70 uppercase tracking-widest font-bold mb-1.5">Put Prem</p>
-            <p className="text-[15px] font-black text-red-400 tabular-nums leading-none">{fmt(put_premium)}</p>
-            <p className="text-[8px] text-red-500/50 mt-1 font-semibold">{putPct.toFixed(1)}% of total</p>
+          <div className="relative rounded-xl overflow-hidden bg-red-500/10 border border-red-500/30 px-3 py-3">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/15 to-transparent pointer-events-none" />
+            <p className="text-[9px] text-red-300 uppercase tracking-widest font-bold mb-1.5">Put Prem</p>
+            <p className="text-[16px] font-black text-red-300 tabular-nums leading-none">{fmt(put_premium)}</p>
+            <p className="text-[8px] text-red-400/70 mt-1 font-semibold">{putPct.toFixed(1)}% of total</p>
           </div>
         </div>
 
         {/* ══ CALL / PUT SPLIT BAR ═════════════════════════════════════════ */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
+        <div className="rounded-xl border border-white/10 bg-[#181b28] px-3 py-2.5">
           <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest mb-2">
             <span className="flex items-center gap-1.5 text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
               Calls {callPct.toFixed(1)}%
             </span>
-            <span className="text-gray-400 text-[8px] font-semibold tabular-nums">Total {fmt(call_premium + put_premium)}</span>
+            <span className="text-gray-200 text-[8px] font-semibold tabular-nums">Total {fmt(call_premium + put_premium)}</span>
             <span className="flex items-center gap-1.5 text-red-400">
               Puts {putPct.toFixed(1)}%
               <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
@@ -320,7 +320,7 @@ export default function NetFlowPanel({ data }: Props) {
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] overflow-hidden">
 
           {/* Chart controls row */}
-          <div className="flex items-center justify-between px-3 pt-2.5 pb-2 border-b border-[var(--border)]/50">
+          <div className="flex items-center justify-between px-3 pt-2.5 pb-2 border-b border-white/8">
             <div className="flex items-center gap-3 text-[10px]">
               {spot > 0 && (
                 <span className="flex items-center gap-1">
@@ -328,20 +328,20 @@ export default function NetFlowPanel({ data }: Props) {
                   <span className="text-yellow-400 font-black tabular-nums">${(stats.price ?? spot).toFixed(2)}</span>
                 </span>
               )}
-              <span className="text-gray-500">
-                Prem <span className="text-gray-300 font-bold tabular-nums">{fmt(stats.total_prem ?? 0)}</span>
+              <span className="text-gray-400">
+                Prem <span className="text-white font-bold tabular-nums">{fmt(stats.total_prem ?? 0)}</span>
               </span>
               <span className={`font-black tabular-nums ${(stats.net_flow ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                 {(stats.net_flow ?? 0) >= 0 ? "▲" : "▼"} {fmt(Math.abs(stats.net_flow ?? 0))}
               </span>
             </div>
-            <div className="flex items-center bg-[var(--surface)] rounded-lg p-0.5 gap-0.5 border border-[var(--border)]">
+            <div className="flex items-center bg-[#181b28] rounded-lg p-0.5 gap-0.5 border border-white/10">
               {DAY_RANGES.map(d => (
                 <button key={d} onClick={() => setDays(d)}
                   className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
                     days === d
-                      ? "bg-[var(--border)] text-white shadow-sm"
-                      : "text-gray-500 hover:text-gray-300"
+                      ? "bg-white/15 text-white shadow-sm"
+                      : "text-gray-400 hover:text-white"
                   }`}>{d}D</button>
               ))}
             </div>
@@ -380,16 +380,16 @@ export default function NetFlowPanel({ data }: Props) {
                     onMouseMove={(e: any) => { const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined; if (pt) setHovered(pt); }}
                     onMouseLeave={() => setHovered(null)}>
                     <FlowGradients />
-                    <CartesianGrid stroke="rgba(128,128,128,0.07)" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="t" hide />
                     <YAxis
                       yAxisId="price"
                       orientation="right"
                       domain={[priceMin, priceMax]}
-                      tickFormatter={v => `$${Number(v).toFixed(0)}`}
-                      tick={{ fill: "#facc15", fontSize: 9, fontWeight: 700 }}
-                      axisLine={false} tickLine={false} width={52}
-                      tickCount={4}
+                      tickFormatter={v => `$${Number(v).toFixed(2)}`}
+                      tick={{ fill: "#fde68a", fontSize: 10, fontWeight: 800 }}
+                      axisLine={false} tickLine={false} width={58}
+                      tickCount={5}
                     />
                     <Tooltip content={<ChartTooltip />}
                       cursor={{ stroke: "rgba(255,255,255,0.12)", strokeWidth: 1, strokeDasharray: "3 3" }} />
@@ -427,9 +427,9 @@ export default function NetFlowPanel({ data }: Props) {
                   <ComposedChart data={chartData} margin={{ top: 4, right: 54, left: 0, bottom: 0 }}
                     onMouseMove={(e: any) => { const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined; if (pt) setHovered(pt); }}
                     onMouseLeave={() => setHovered(null)}>
-                    <CartesianGrid stroke="rgba(128,128,128,0.07)" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="t"
-                      tick={{ fill: "#6b7280", fontSize: 8 }}
+                      tick={{ fill: "#9ca3af", fontSize: 9, fontWeight: 600 }}
                       axisLine={false} tickLine={false}
                       interval="preserveStartEnd"
                     />
@@ -438,7 +438,7 @@ export default function NetFlowPanel({ data }: Props) {
                       orientation="right"
                       domain={[0, premMax]}
                       tickFormatter={fmtAxis}
-                      tick={{ fill: "#9ca3af", fontSize: 9 }}
+                      tick={{ fill: "#d1d5db", fontSize: 9, fontWeight: 600 }}
                       axisLine={false} tickLine={false} width={52}
                       tickCount={4}
                     />
@@ -473,26 +473,26 @@ export default function NetFlowPanel({ data }: Props) {
 
             {/* Flow by Expiry */}
             {expiryData.length > 0 && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3">
+              <div className="rounded-xl border border-white/10 bg-[#0d0f18] p-3">
                 <div className="flex items-center gap-1.5 mb-3">
                   <div className="w-1 h-3 rounded-full bg-gradient-to-b from-emerald-400 to-red-400" />
-                  <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Flow by Expiry</p>
+                  <p className="text-[9px] text-gray-200 uppercase tracking-widest font-bold">Flow by Expiry</p>
                 </div>
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart data={expiryData} barCategoryGap="28%" barGap={2} margin={{ top: 2, right: 2, left: 0, bottom: 2 }}>
-                    <CartesianGrid vertical={false} stroke="rgba(128,128,128,0.08)" />
-                    <XAxis dataKey="expiry" tick={{ fill: "#6b7280", fontSize: 8 }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={fmtAxis} tick={{ fill: "#9ca3af", fontSize: 8 }} axisLine={false} tickLine={false} width={36} />
+                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" />
+                    <XAxis dataKey="expiry" tick={{ fill: "#d1d5db", fontSize: 8, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={fmtAxis} tick={{ fill: "#d1d5db", fontSize: 8, fontWeight: 600 }} axisLine={false} tickLine={false} width={36} />
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                     <Bar dataKey="Calls" fill={CALL_COLOR} radius={[3, 3, 0, 0]} maxBarSize={14} />
                     <Bar dataKey="Puts"  fill={PUT_COLOR}  radius={[3, 3, 0, 0]} maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[var(--border)]/50">
-                  <span className="flex items-center gap-1 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/10">
+                  <span className="flex items-center gap-1 text-[8px] text-emerald-300 uppercase tracking-wide font-semibold">
                     <span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Calls
                   </span>
-                  <span className="flex items-center gap-1 text-[8px] text-gray-400 uppercase tracking-wide font-semibold">
+                  <span className="flex items-center gap-1 text-[8px] text-red-300 uppercase tracking-wide font-semibold">
                     <span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Puts
                   </span>
                 </div>
@@ -501,16 +501,16 @@ export default function NetFlowPanel({ data }: Props) {
 
             {/* Net Flow by Strike */}
             {strikeData.length > 0 && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3">
+              <div className="rounded-xl border border-white/10 bg-[#0d0f18] p-3">
                 <div className="flex items-center gap-1.5 mb-3">
                   <div className="w-1 h-3 rounded-full bg-gradient-to-b from-emerald-400 to-red-400" />
-                  <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Net by Strike</p>
+                  <p className="text-[9px] text-gray-200 uppercase tracking-widest font-bold">Net by Strike</p>
                 </div>
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart data={strikeData} layout="vertical" margin={{ top: 2, right: 2, left: 0, bottom: 2 }}>
-                    <CartesianGrid horizontal={false} stroke="rgba(128,128,128,0.08)" />
-                    <XAxis type="number" tickFormatter={fmtAxis} tick={{ fill: "#9ca3af", fontSize: 8 }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="strike" tick={{ fill: "#6b7280", fontSize: 8 }} axisLine={false} tickLine={false} width={46} />
+                    <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.07)" />
+                    <XAxis type="number" tickFormatter={fmtAxis} tick={{ fill: "#d1d5db", fontSize: 8, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="strike" tick={{ fill: "#f9fafb", fontSize: 9, fontWeight: 700 }} axisLine={false} tickLine={false} width={52} />
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                     <ReferenceLine x={0} stroke="rgba(128,128,128,0.25)" strokeDasharray="3 3" />
                     <Bar dataKey="Net" radius={[0, 3, 3, 0]} maxBarSize={12}>
@@ -527,21 +527,21 @@ export default function NetFlowPanel({ data }: Props) {
 
         {/* ══ TOP FLOW STRIKES TABLE ════════════════════════════════════════ */}
         {tableStrikes.length > 0 && (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-2">
+          <div className="rounded-xl border border-white/10 bg-[#0d0f18] overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-white/8 flex items-center gap-2">
               <div className="w-1 h-3 rounded-full bg-gradient-to-b from-purple-400 to-blue-400" />
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Top Flow Strikes</p>
+              <p className="text-[9px] text-gray-200 uppercase tracking-widest font-bold">Top Flow Strikes</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-[11px] border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)]">
-                    <th className="text-left px-4 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-500">Strike</th>
-                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-emerald-500/80">Call $</th>
-                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-red-500/80">Put $</th>
-                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-500">Net</th>
-                    <th className="text-center px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-500">Split</th>
-                    <th className="text-center px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-500">Bias</th>
+                    <th className="text-left px-4 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-300">Strike</th>
+                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-emerald-300">Call $</th>
+                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-red-300">Put $</th>
+                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-300">Net</th>
+                    <th className="text-center px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-300">Split</th>
+                    <th className="text-center px-3 py-2 font-bold tracking-wide text-[9px] uppercase text-gray-300">Bias</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -549,11 +549,11 @@ export default function NetFlowPanel({ data }: Props) {
                     const total = s.call_prem + s.put_prem;
                     const cPct  = total > 0 ? (s.call_prem / total) * 100 : 50;
                     return (
-                    <tr key={s.strike} className={`border-b border-[var(--border)]/50 hover:bg-[var(--surface)] transition-colors ${i % 2 === 0 ? "" : "bg-[var(--surface)]/30"}`}>
-                      <td className="px-4 py-2 font-black text-gray-200 tabular-nums">${s.strike.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-emerald-400 tabular-nums font-semibold">{fmt(s.call_prem)}</td>
-                      <td className="px-3 py-2 text-right text-red-400 tabular-nums font-semibold">{fmt(s.put_prem)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-black ${s.net >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmt(s.net)}</td>
+                    <tr key={s.strike} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${i % 2 === 0 ? "" : "bg-white/[0.03]"}`}>
+                      <td className="px-4 py-2 font-black text-white tabular-nums">${s.strike.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-emerald-300 tabular-nums font-semibold">{fmt(s.call_prem)}</td>
+                      <td className="px-3 py-2 text-right text-red-300 tabular-nums font-semibold">{fmt(s.put_prem)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-black ${s.net >= 0 ? "text-emerald-300" : "text-red-300"}`}>{fmt(s.net)}</td>
                       <td className="px-3 py-2">
                         <div className="w-full h-1.5 rounded-full overflow-hidden flex bg-[var(--border)] min-w-[48px]">
                           <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-l-full" style={{ width: `${cPct}%` }} />
