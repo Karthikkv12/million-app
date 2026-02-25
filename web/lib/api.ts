@@ -181,6 +181,10 @@ export interface GexResult {
 export const fetchGex = (symbol: string) =>
   api.get<GexResult>(`/options/gamma-exposure/${symbol.toUpperCase()}`);
 
+/** Register watched symbols so the server-side background poller fetches them continuously. */
+export const watchSymbols = (symbols: string[]) =>
+  api.post<void>("/options/watch", { symbols });
+
 // ── Trades ───────────────────────────────────────────────────────────────────
 
 export interface Trade {

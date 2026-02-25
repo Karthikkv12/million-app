@@ -3,6 +3,43 @@ import Link from "next/link";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TODO: PAYWALL
+//
+// Gate authenticated app routes behind a subscription check.
+// Suggested implementation:
+//
+//  1. Plans & Pricing
+//     - Free tier  : landing page only (read-only demo data)
+//     - Pro  ($X/mo): full platform access (live flow, GEX, heatmap, journal)
+//     - Team ($Y/mo): multi-user seats + API access
+//
+//  2. Payment provider
+//     - Stripe Checkout / Stripe Billing (subscriptions + webhooks)
+//     - Store `stripe_customer_id`, `plan`, `status`, `period_end` on the User model
+//
+//  3. Backend (FastAPI / app.py)
+//     - POST /billing/checkout  → create Stripe Checkout session, return URL
+//     - POST /billing/portal    → create Stripe Customer Portal session
+//     - POST /billing/webhook   → handle checkout.session.completed,
+//                                  customer.subscription.updated/deleted
+//     - GET  /billing/status    → return { plan, status, period_end }
+//
+//  4. Frontend middleware (web/middleware.ts)
+//     - On every request to /(app)/* check subscription status via JWT claim or
+//       a quick /billing/status fetch; redirect to /pricing if not subscribed.
+//
+//  5. Pricing page  (web/app/pricing/page.tsx)
+//     - Show plan cards with feature lists and "Subscribe" CTA
+//     - On click → call /billing/checkout → redirect to Stripe-hosted page
+//     - After payment → Stripe webhook updates DB → user lands on /dashboard
+//
+//  6. Account / billing settings  (web/app/(app)/settings/billing/page.tsx)
+//     - Show current plan + renewal date
+//     - "Manage Subscription" → call /billing/portal → redirect to Stripe portal
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Animation helpers ─────────────────────────────────────────────────────────
 
 function FadeUp({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
@@ -33,15 +70,15 @@ function FadeIn({ children, delay = 0, className = "" }: { children: React.React
 
 // ── Particle field ────────────────────────────────────────────────────────────
 
-const PARTICLES = Array.from({ length: 36 }, (_, i) => ({
+const PARTICLES = Array.from({ length: 120 }, (_, i) => ({
   id: i,
   x:  (i * 37 + 11) % 100,   // deterministic spread, no Math.random (SSR safe)
   y:  (i * 53 + 7)  % 100,
-  r:  1 + (i % 3) * 0.7,     // 1px / 1.7px / 2.4px
-  dur: 6 + (i % 7) * 2.2,    // 6-18s orbit
-  dx:  ((i % 5) - 2) * 18,   // -36 to +36 px drift
-  dy:  ((i % 4) - 1.5) * 14, // -21 to +21 px drift
-  delay: (i * 0.41) % 4,
+  r:  0.8 + (i % 4) * 0.5,   // 0.8px / 1.3px / 1.8px / 2.3px
+  dur: 5 + (i % 9) * 1.8,    // 5-19s orbit
+  dx:  ((i % 7) - 3) * 16,   // -48 to +48 px drift
+  dy:  ((i % 5) - 2) * 13,   // -26 to +26 px drift
+  delay: (i * 0.27) % 5,
 }));
 
 function ParticleField() {
