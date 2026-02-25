@@ -166,6 +166,7 @@ function TopMovers({ quotes }: { quotes: QuoteMap }) {
         </div>
         {gainers.length === 0
           ? <p className="text-xs text-foreground/60">No data yet</p>
+          : gainers.map(([sym, q]) => <Row key={sym} sym={sym} q={q} variant="gain" />)
         }
       </div>
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
@@ -175,6 +176,7 @@ function TopMovers({ quotes }: { quotes: QuoteMap }) {
         </div>
         {losers.length === 0
           ? <p className="text-xs text-foreground/60">No data yet</p>
+          : losers.map(([sym, q]) => <Row key={sym} sym={sym} q={q} variant="loss" />)
         }
       </div>
     </div>
