@@ -18,6 +18,11 @@ import { ExpiryFilter } from "./ExpiryFilter";
 import { PremiumFlow } from "./PremiumFlow";
 import { TopFlowStrikes } from "./TopFlowStrikes";
 import { FlowByExpiry } from "./FlowByExpiry";
+import { KeyLevelsRuler } from "./KeyLevelsRuler";
+import { GexProfileChart } from "./GexProfileChart";
+import { GammaConcentration } from "./GammaConcentration";
+import { DealerNarrative } from "./DealerNarrative";
+import { FlowMomentumChart } from "./FlowMomentumChart";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
 export interface Slot {
@@ -215,6 +220,18 @@ export function TickerPanel({
               {/* Flow by expiry */}
               <FlowByExpiry data={data} />
 
+              {/* Key levels ruler */}
+              <KeyLevelsRuler data={data} />
+
+              {/* GEX profile chart */}
+              <GexProfileChart data={data} accentColor={accentColor} />
+
+              {/* Gamma concentration */}
+              <GammaConcentration data={data} />
+
+              {/* Dealer narrative */}
+              <DealerNarrative data={data} />
+
               {/* GEX Strike Table */}
               <div className="border-b border-[var(--border)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[var(--surface-2)]">
@@ -254,9 +271,12 @@ export function TickerPanel({
 
           {/* ── Net Flow Tab ─────────────────────────────────────────── */}
           {activeTab === "flow" && (
-            <div className="p-4">
-              <NetFlowPanel data={data} accentColor={accentColor} />
-            </div>
+            <>
+              <div className="p-4">
+                <NetFlowPanel data={data} accentColor={accentColor} />
+              </div>
+              <FlowMomentumChart symbol={slot.ticker} accentColor={accentColor} />
+            </>
           )}
         </>
       )}
