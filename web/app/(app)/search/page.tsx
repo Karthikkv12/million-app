@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line,
+  AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  ReferenceLine, Cell, ComposedChart,
+  ReferenceLine, Cell, ComposedChart, Line,
 } from "recharts";
 import {
   fetchStockInfo, fetchStockHistory, fetchNetFlowHistory, fetchGex,
-  StockInfo, QuoteBar, FlowSnapshot, GexResult,
+  StockInfo, FlowSnapshot, GexResult,
 } from "@/lib/api";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { isToday } from "@/lib/gex";
+import TradingChart from "@/components/chart/TradingChart";
 import {
   TrendingUp, TrendingDown, Activity, BarChart2, Zap,
   Globe, Users, DollarSign, Shield, ArrowUpRight, ArrowDownRight,
@@ -75,8 +76,8 @@ function StatCard({
 function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-purple-500/10">
-        <span className="text-purple-500">{icon}</span>
+      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-[var(--surface-2)]">
+        <span className="text-foreground/70">{icon}</span>
       </div>
       <div>
         <h3 className="text-sm font-bold text-foreground leading-none">{title}</h3>
@@ -86,143 +87,24 @@ function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: str
   );
 }
 
-// ─── custom tooltip for price chart ──────────────────────────────────────────
+// ─── price chart panel — delegates to TradingChart ───────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function PriceTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload as QuoteBar;
+function PriceChartPanel({
+  symbol,
+  earningsDate,
+  gexLevels,
+}: {
+  symbol: string;
+  earningsDate?: number | null;
+  gexLevels?: { callWall?: number; putWall?: number; zeroGamma?: number };
+}) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 text-xs shadow-xl space-y-1">
-      <p className="text-foreground/70 font-mono">{label?.slice(0, 19)?.replace("T", " ")}</p>
-      {d.open != null  && <p className="text-foreground/70">O: <span className="text-foreground font-bold">{fmt$(d.open)}</span></p>}
-      {d.high != null  && <p className="text-emerald-400">H: <span className="font-bold">{fmt$(d.high)}</span></p>}
-      {d.low  != null  && <p className="text-red-400">L: <span className="font-bold">{fmt$(d.low)}</span></p>}
-      <p className="text-purple-400">C: <span className="font-bold">{fmt$(d.close)}</span></p>
-      {d.volume != null && <p className="text-foreground/70">Vol: <span className="text-foreground font-bold">{fmtVol(d.volume)}</span></p>}
-    </div>
-  );
-}
-
-// ─── period / interval selector ──────────────────────────────────────────────
-
-const PERIOD_CFG: { label: string; period: string; interval: string }[] = [
-  { label: "1D",  period: "1d",  interval: "5m"  },
-  { label: "5D",  period: "5d",  interval: "15m" },
-  { label: "1M",  period: "1mo", interval: "1h"  },
-  { label: "3M",  period: "3mo", interval: "1d"  },
-  { label: "6M",  period: "6mo", interval: "1d"  },
-  { label: "1Y",  period: "1y",  interval: "1d"  },
-  { label: "5Y",  period: "5y",  interval: "1wk" },
-];
-
-// ─── price chart panel ────────────────────────────────────────────────────────
-
-function PriceChartPanel({ symbol }: { symbol: string }) {
-  const [pIdx, setPIdx] = useState(0);
-  const cfg = PERIOD_CFG[pIdx];
-
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["stockHistory", symbol, cfg.period, cfg.interval],
-    queryFn: () => fetchStockHistory(symbol, cfg.period, cfg.interval),
-    staleTime: 30_000,
-    refetchInterval: cfg.period === "1d" ? 15_000 : undefined,
-  });
-
-  const bars = data?.bars ?? [];
-  const first = bars[0]?.close;
-  const last  = bars[bars.length - 1]?.close;
-  const up    = last != null && first != null && last >= first;
-  const color = up ? "#22c55e" : "#ef4444";
-
-  const tickFmt = (d: string) => {
-    if (cfg.period === "1d" || cfg.period === "5d") return d.slice(11, 16);
-    return d.slice(5, 10);
-  };
-
-  // volume bars
-  const maxVol = Math.max(...bars.map((b) => b.volume ?? 0), 1);
-
-  return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
-      <SectionHeader icon={<BarChart2 size={13} />} title="Price Chart" sub={`${symbol} · ${cfg.interval} bars`} />
-
-      {/* period pills */}
-      <div className="flex items-center gap-1 mb-4 flex-wrap">
-        {PERIOD_CFG.map((p, i) => (
-          <button
-            key={p.label}
-            onClick={() => setPIdx(i)}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-              i === pIdx
-                ? "bg-purple-500 text-white"
-                : "bg-[var(--surface-2)] text-foreground/70 hover:text-foreground dark:hover:text-white"
-            }`}
-          >{p.label}</button>
-        ))}
-        <button
-          onClick={() => refetch()}
-          className="ml-auto p-1.5 rounded-lg text-foreground/70 hover:text-foreground dark:hover:text-foreground hover:bg-[var(--surface-2)] transition"
-        >
-          <RefreshCw size={12} className={isFetching ? "animate-spin" : ""} />
-        </button>
-      </div>
-
-      {isLoading ? (
-        <div className="h-64 rounded-xl bg-[var(--surface-2)] animate-pulse" />
-      ) : bars.length === 0 ? (
-        <div className="h-64 flex items-center justify-center text-foreground/70 text-sm">No chart data available</div>
-      ) : (
-        <>
-          {/* main price chart */}
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={bars} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={color} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis
-                dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false}
-                interval={Math.floor(bars.length / 7)}
-                tickFormatter={tickFmt}
-              />
-              <YAxis
-                domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false}
-                axisLine={false} width={62}
-                tickFormatter={(v) => fmt$(v)}
-              />
-              <Tooltip content={<PriceTooltip />} />
-              <Area
-                type="monotone" dataKey="close" stroke={color} strokeWidth={2}
-                fill="url(#priceGrad)" dot={false}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-
-          {/* volume bars */}
-          {bars.some((b) => b.volume) && (
-            <div className="mt-2">
-              <ResponsiveContainer width="100%" height={50}>
-                <BarChart data={bars} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-                  <YAxis domain={[0, maxVol * 1.1]} hide />
-                  <Bar dataKey="volume" radius={[1, 1, 0, 0]}>
-                    {bars.map((b, i) => {
-                      const prevClose = i > 0 ? bars[i - 1].close : b.close;
-                      const barUp = b.close >= prevClose;
-                      return <Cell key={i} fill={barUp ? "#22c55e60" : "#ef444460"} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <p className="text-[9px] text-foreground/70 text-right pr-2">Volume</p>
-            </div>
-          )}
-        </>
-      )}
-    </div>
+    <TradingChart
+      symbol={symbol}
+      earningsDate={earningsDate}
+      gexLevels={gexLevels}
+      initialPeriod="1D"
+    />
   );
 }
 
@@ -234,7 +116,7 @@ function KeyLevelsRuler({ gex }: { gex: GexResult }) {
   const levels: { label: string; value: number; color: string }[] = [];
   if (max_put_wall  != null) levels.push({ label: "Put Wall",   value: max_put_wall,  color: "#ef4444" });
   if (zero_gamma    != null) levels.push({ label: "Zero Γ",     value: zero_gamma,    color: "#f59e0b" });
-  if (spot          != null) levels.push({ label: "SPOT",        value: spot,          color: "#a855f7" });
+  if (spot          != null) levels.push({ label: "SPOT",        value: spot,          color: "#f59e0b" });
   if (max_call_wall != null) levels.push({ label: "Call Wall",   value: max_call_wall, color: "#22c55e" });
   levels.sort((a, b) => a.value - b.value);
 
@@ -366,7 +248,7 @@ function IVDistributionChart({ gex }: { gex: GexResult }) {
           const pct = (r.weight / max) * 100;
           return (
             <div key={r.strike} className="flex items-center gap-3">
-              <span className={`text-[10px] font-bold tabular-nums w-14 text-right shrink-0 ${isSpot ? "text-purple-500" : "text-foreground"}`}>
+              <span className={`text-[10px] font-bold tabular-nums w-14 text-right shrink-0 ${isSpot ? "text-amber-400" : "text-foreground"}`}>
                 ${r.strike}
               </span>
               <div className="flex-1 h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
@@ -374,7 +256,8 @@ function IVDistributionChart({ gex }: { gex: GexResult }) {
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${pct}%`,
-                    background: isSpot ? "#a855f7" : "linear-gradient(90deg, #6366f1, #a855f7)",
+                    background: isSpot ? "#f59e0b" : "var(--foreground)",
+                    opacity: isSpot ? 1 : 0.5,
                   }}
                 />
               </div>
@@ -422,7 +305,7 @@ function FlowMomentumChart({ symbol }: { symbol: string }) {
               key={d}
               onClick={() => setDays(d)}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
-                d === days ? "bg-purple-500 text-white" : "bg-[var(--surface-2)] text-foreground/70 hover:text-foreground dark:hover:text-foreground"
+                d === days ? "bg-[var(--foreground)] text-[var(--background)]" : "bg-[var(--surface-2)] text-foreground/70 hover:text-foreground"
               }`}
             >{d}D</button>
           ))}
@@ -457,7 +340,7 @@ function FlowMomentumChart({ symbol }: { symbol: string }) {
             <ReferenceLine y={0} stroke="var(--border)" strokeWidth={1.5} />
             <Bar dataKey="call" fill="#22c55e60" maxBarSize={6} name="call" />
             <Bar dataKey="put"  fill="#ef444460" maxBarSize={6} name="put" />
-            <Line type="monotone" dataKey="net" stroke="#a855f7" strokeWidth={2} dot={false} name="net" />
+            <Line type="monotone" dataKey="net" stroke="var(--foreground)" strokeWidth={2} dot={false} name="net" />
           </ComposedChart>
         </ResponsiveContainer>
       )}
@@ -699,7 +582,7 @@ function FundamentalsPanel({ info }: { info: StockInfo }) {
             {info.employees  && <span className="flex items-center gap-1"><Users size={11} /> {fmtNum(info.employees)} employees</span>}
             {info.website    && (
               <a href={info.website} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1 text-purple-500 hover:underline">
+                className="flex items-center gap-1 text-foreground/70 hover:text-foreground hover:underline">
                 <ExternalLink size={11} /> Website
               </a>
             )}
@@ -783,7 +666,7 @@ function QuickLinks({ symbol }: { symbol: string }) {
             href={lk.url}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-foreground hover:border-purple-400 hover:text-purple-500 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-foreground hover:border-[var(--foreground)]/40 hover:text-foreground transition"
           >
             {lk.label} <ChevronRight size={11} className="opacity-50" />
           </a>
@@ -851,6 +734,28 @@ function OverviewTab({ symbol, info, gex }: { symbol: string; info?: StockInfo; 
         )}
       </div>
 
+      {/* earnings date banner */}
+      {info?.earnings_date && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5">
+          <Calendar size={13} className="text-amber-400 shrink-0" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wide">Next Earnings</span>
+            <span className="text-sm font-black text-foreground tabular-nums">
+              {new Date(info.earnings_date * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </span>
+            <span className="text-[10px] text-foreground/50">
+              {(() => {
+                const days = Math.round((info.earnings_date * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+                if (days < 0) return "passed";
+                if (days === 0) return "today";
+                if (days === 1) return "tomorrow";
+                return `in ${days} days`;
+              })()}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* mini chart */}
       {bars.length > 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
@@ -889,7 +794,7 @@ function OverviewTab({ symbol, info, gex }: { symbol: string; info?: StockInfo; 
       {gex && (
         <>
           <KeyLevelsRuler gex={gex} />
-          <GexProfileChart gex={gex} accentColor="#a855f7" />
+          <GexProfileChart gex={gex} accentColor="var(--foreground)" />
           <IVDistributionChart gex={gex} />
           <FlowMomentumChart symbol={symbol} />
           <DealerNarrative gex={gex} />
@@ -908,8 +813,8 @@ function OverviewTab({ symbol, info, gex }: { symbol: string; info?: StockInfo; 
 function OptionsFlowTab({ symbol }: { symbol: string }) {
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col items-center gap-4">
-      <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
-        <Activity size={24} className="text-purple-500" />
+      <div className="w-12 h-12 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+        <Activity size={24} className="text-foreground/70" />
       </div>
       <div className="text-center">
         <h3 className="text-base font-bold text-foreground mb-1">Full Options Flow</h3>
@@ -919,7 +824,7 @@ function OptionsFlowTab({ symbol }: { symbol: string }) {
       </div>
       <a
         href={`/options-flow?ticker=${symbol}`}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-500 text-white text-sm font-bold hover:bg-purple-600 transition"
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-bold hover:opacity-90 transition"
       >
         Open Options Flow <ChevronRight size={14} />
       </a>
@@ -985,7 +890,7 @@ function TickerDetail({ symbol }: { symbol: string }) {
               <h2 className="text-3xl font-black text-foreground">{symbol}</h2>
               {info?.name && <span className="text-base text-foreground/70 font-medium">{info.name}</span>}
               {info?.quote_type && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-2)] text-foreground/70 border border-[var(--border)]">
                   {info.quote_type}
                 </span>
               )}
@@ -1033,8 +938,8 @@ function TickerDetail({ symbol }: { symbol: string }) {
             onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition ${
               t === tab
-                ? "bg-purple-500 text-white shadow-sm"
-                : "bg-[var(--surface)] border border-[var(--border)] text-foreground/70 hover:text-foreground dark:hover:text-white"
+                ? "bg-[var(--foreground)] text-[var(--background)] shadow-sm"
+                : "bg-[var(--surface)] border border-[var(--border)] text-foreground/70 hover:text-foreground"
             }`}
           >{t}</button>
         ))}
@@ -1042,7 +947,17 @@ function TickerDetail({ symbol }: { symbol: string }) {
 
       {/* tab content */}
       {tab === "Overview"     && <OverviewTab symbol={symbol} info={info} gex={gex} />}
-      {tab === "Price Chart"  && <PriceChartPanel symbol={symbol} />}
+      {tab === "Price Chart"  && (
+        <PriceChartPanel
+          symbol={symbol}
+          earningsDate={info?.earnings_date ?? null}
+          gexLevels={gex ? {
+            callWall:  gex.max_call_wall  ?? undefined,
+            putWall:   gex.max_put_wall   ?? undefined,
+            zeroGamma: gex.zero_gamma     ?? undefined,
+          } : undefined}
+        />
+      )}
       {tab === "Options Flow" && <OptionsFlowTab symbol={symbol} />}
       {tab === "Fundamentals" && (info ? <FundamentalsPanel info={info} /> : (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-foreground/70">
@@ -1082,9 +997,8 @@ function SearchContent() {
         <div className="w-full px-4 sm:px-6 py-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 shrink-0">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: "linear-gradient(135deg, #a855f7, #6366f1)" }}>
-                <TrendingUp size={14} className="text-white" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[var(--surface-2)] border border-[var(--border)]">
+                <TrendingUp size={14} className="text-foreground/70" />
               </div>
               <span className="font-bold text-sm text-foreground hidden sm:block">Ticker Research</span>
             </div>
@@ -1099,7 +1013,7 @@ function SearchContent() {
             {symbol && (
               <a
                 href={`/options-flow?ticker=${symbol}`}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-xs font-bold text-purple-500 hover:border-purple-400 transition shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-xs font-bold text-foreground hover:border-[var(--foreground)]/40 transition shrink-0"
               >
                 <Activity size={12} />
                 Options Flow
@@ -1113,9 +1027,8 @@ function SearchContent() {
       <div className="w-full px-4 sm:px-6 py-5">
         {!symbol ? (
           <div className="flex flex-col items-center justify-center gap-4 pt-24 text-center">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #a855f750, #6366f150)" }}>
-              <TrendingUp size={28} className="text-purple-400" />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--surface-2)] border border-[var(--border)]">
+              <TrendingUp size={28} className="text-foreground/50" />
             </div>
             <h2 className="text-xl font-bold text-foreground">Ticker Research</h2>
             <p className="text-sm text-foreground/70 max-w-md">
@@ -1127,7 +1040,7 @@ function SearchContent() {
                 <button
                   key={s}
                   onClick={() => { setSymbol(s); setInputVal(s); }}
-                  className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-foreground hover:border-purple-400 hover:text-purple-500 transition"
+                  className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-foreground hover:border-[var(--foreground)]/40 hover:text-foreground transition"
                 >{s}</button>
               ))}
             </div>
@@ -1144,7 +1057,7 @@ export default function SearchPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <RefreshCw size={24} className="text-purple-400 animate-spin" />
+        <RefreshCw size={24} className="text-foreground/40 animate-spin" />
       </div>
     }>
       <SearchContent />
