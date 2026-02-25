@@ -3,10 +3,8 @@
  * TickerPanel — assembles all GEX sub-sections for a single ticker.
  * TickerPanelWithQuery — wraps TickerPanel with its own react-query data fetch.
  */
-import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGex, GexResult } from "@/lib/api";
-import { isToday } from "@/lib/gex";
 import { BarChart2 } from "lucide-react";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
