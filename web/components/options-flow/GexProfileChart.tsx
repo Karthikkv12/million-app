@@ -60,8 +60,9 @@ export function GexProfileChart({ data, accentColor = "var(--foreground)" }: Pro
             tickFormatter={(v) => `$${v}`}
           />
           <Tooltip
-            formatter={(v: number, name: string) => [
-              `${Math.abs(v).toFixed(3)}B`,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            formatter={(v: any, name: any) => [
+              `${Math.abs(Number(v)).toFixed(3)}B`,
               name === "call" ? "Call GEX" : "Put GEX",
             ]}
             contentStyle={{

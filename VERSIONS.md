@@ -5,6 +5,51 @@
 
 ---
 
+## v1.2.0 — GEX Components, UI Polish & Mobile Responsiveness
+**Released:** 2026-02-25
+**Branch:** `develop`
+
+### ✨ New Features
+- **5 new standalone GEX/flow components** in `web/components/options-flow/`:
+  - `GexProfileChart` — horizontal bar chart of call (green) vs put (red) GEX by strike
+  - `GammaConcentration` — horizontal bar chart of total |GEX| per strike across all expiries
+  - `FlowMomentumChart` — time-series net flow with 1D/3D/7D/14D day selector
+  - `DealerNarrative` — plain-English interpretation of GEX regime
+  - `KeyLevelsRuler` — visual pin ruler: Put Wall → Zero γ → Spot → Call Wall
+- **GEX strike heatmap promoted to top** of GEX tab — primary component is now first
+- **Isolated 3002 sandbox** — `OptionFlow_main/web` runs on port 3002, separate from stable 3000
+
+### 🎨 Design & UX
+- `GexKeyLevels`: all 5 pills use red/green only; Zero-γ logic: above spot = red, below = green
+- `GexStrikeTable`: spot row = black bg + white text, legend footer added, vertical scroll removed
+- All nav/auth/landing purple accents replaced with neutral system colors
+- `BottomNav`: neutral active state (no blue)
+- Login page: neutral badge, focus rings, submit button
+- Options Flow page: neutral activity badge and add button
+
+### 📱 Mobile Responsiveness
+- `GexKeyLevels`: `grid-cols-2` on mobile, `sm:grid-cols-5`
+- `GexStrikeTable`: summary header wraps on mobile; Regime/Zero-γ columns hidden on small screens
+- `TickerPanel`: GEX section header flex-wraps on mobile
+- `PanelHeader`: tighter gap on mobile
+- Viewport meta: `width=device-width, initial-scale=1`, no user scaling
+- `html` + `body` + app layout: `overflow-x: hidden` at all levels (no horizontal pan)
+- Body: removed hardcoded `bg-white dark:bg-gray-950` (uses CSS vars)
+
+### 🐛 Bug Fixes
+- `StockInfo.company_name` → `name` (field rename fix in stock sheet page)
+- `GexProfileChart` Recharts Tooltip formatter — `any` cast to fix strict TypeScript type error
+- `Navbar`: fixed corrupted `className` (stray `nter>` fragment) in collapsed/mobile avatars
+- `Navbar`: logout now redirects to `/` (welcome page) instead of `/login`
+- App layout: unauthenticated guard redirects to `/`
+- Launchd service `com.optflw.nextjs` discovered and documented — manages port 3000 auto-restart
+
+### 🔧 Internal
+- `web/components/options-flow/index.ts` barrel exports all 5 new components
+- `OptionFlow_main/web` synced as isolated sandbox for UI experimentation (port 3002)
+
+---
+
 ## v1.1.0 — TradingView Chart + Search Page Overhaul
 **Released:** 2025-02-25  
 **Commit:** `c60cfbc`  

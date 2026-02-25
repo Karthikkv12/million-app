@@ -378,8 +378,8 @@ function TickerDetail({ symbol }: { symbol: string }) {
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-black text-foreground">{symbol}</h1>
-            {info?.company_name && (
-              <span className="text-base font-semibold text-foreground/70">{info.company_name}</span>
+            {info?.name && (
+              <span className="text-base font-semibold text-foreground/70">{info.name}</span>
             )}
           </div>
           {info?.sector && (
