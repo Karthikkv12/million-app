@@ -7,6 +7,25 @@ import threading
 from typing import Any, Dict, List, Optional, Set
 from datetime import datetime, timezone, timedelta as _td
 
+# ── Load .env if present (before anything else reads env vars) ────────────────
+def _load_dotenv() -> None:
+    """Minimal .env loader — no extra dependencies required."""
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_path = os.path.normpath(env_path)
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:   # don't override existing env
+                os.environ[key] = val
+_load_dotenv()
+
 # ── GEX response cache ────────────────────────────────────────────────────────
 # yfinance refreshes options data roughly every 15s; caching here prevents
 # hammering yfinance on rapid polls and keeps response times fast.
@@ -1213,6 +1232,7 @@ def gamma_exposure(symbol: str, _user=Depends(get_current_user)) -> Dict[str, An
         "total_volume": result.total_volume,
         "flow_by_expiry": result.flow_by_expiry,
         "top_flow_strikes": result.top_flow_strikes,
+        "data_source": getattr(result, "data_source", "yfinance"),
         "error": result.error,
     }
 

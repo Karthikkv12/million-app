@@ -111,6 +111,15 @@ function TickerPanel({
 
         {/* Live status */}
         <div className="flex items-center gap-2 ml-auto text-gray-400">
+          {data && (
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+              data.data_source === "tradier"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-500"
+            }`}>
+              {data.data_source === "tradier" ? "● LIVE" : "◌ 15min delay"}
+            </span>
+          )}
           <span className={`w-1.5 h-1.5 rounded-full ${isFetching ? "bg-amber-400 animate-pulse" : "bg-emerald-500 animate-pulse"}`} />
           {lastUpdated && <span className="text-[10px] font-mono tabular-nums hidden sm:block">{lastUpdated}</span>}
           <button onClick={onRefresh} className="hover:text-gray-600 dark:hover:text-gray-200 transition" title="Refresh">

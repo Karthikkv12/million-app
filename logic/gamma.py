@@ -7,6 +7,10 @@ Dealer GEX model:
   Net GEX > 0  →  dealers long gamma  → they sell rallies / buy dips  → mean-reverting market
   Net GEX < 0  →  dealers short gamma → they buy rallies / sell dips  → trending / volatile market
 
+Data sources (in priority order):
+  1. Tradier  — real-time OPRA feed, greeks included (set TRADIER_TOKEN env var)
+  2. yfinance — 15-min delayed fallback (always available, no key needed)
+
 Lot sizes:
   US options:            100 contracts per lot (standard)
   Indian index options:  NIFTY=75, BANKNIFTY=30, FINNIFTY=40, MIDCPNIFTY=75, SENSEX=20, BANKEX=20
@@ -16,6 +20,7 @@ Lot sizes:
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 import warnings
@@ -192,6 +197,7 @@ class GEXResult:
     flow_by_expiry: List[dict] = field(default_factory=list)
     # top_flow_strikes: [{strike, call_prem, put_prem, net, otype_bias}]
     top_flow_strikes: List[dict] = field(default_factory=list)
+    data_source: str = "yfinance"   # "tradier" | "yfinance"
     error: Optional[str] = None
 
 
@@ -254,6 +260,129 @@ def _parse_chain_rows(exp: str, chain: "object", spot: float, T: float) -> list[
             except Exception:
                 continue
     return rows
+
+
+def _tradier_token() -> str | None:
+    """Return the Tradier API token from env, or None if not set."""
+    tok = os.environ.get("TRADIER_TOKEN", "").strip()
+    return tok if tok else None
+
+
+def _fetch_chain_tradier(symbol: str) -> tuple[float, pd.DataFrame]:
+    """Fetch options chain from Tradier (real-time OPRA).
+
+    Returns (spot_price, options_df) in the same shape as _fetch_chain_yfinance.
+    Raises RuntimeError if Tradier is unavailable or token is missing.
+    """
+    import urllib.request, urllib.error, json
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from datetime import datetime as _dt
+
+    token = _tradier_token()
+    if not token:
+        raise RuntimeError("TRADIER_TOKEN not set")
+
+    base = "https://api.tradier.com/v1/markets"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+
+    def _get(url: str) -> dict:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+
+    # ── 1. Spot price ─────────────────────────────────────────────────────────
+    quote_url = f"{base}/quotes?symbols={symbol.upper()}&greeks=false"
+    qd = _get(quote_url)
+    q = qd.get("quotes", {}).get("quote", {})
+    # For indices Tradier may return last=None during after-hours; fall back to close
+    spot = float(q.get("last") or q.get("prevclose") or q.get("close") or 0.0)
+    if spot <= 0:
+        raise RuntimeError(f"Tradier returned no price for {symbol}")
+
+    # ── 2. Expirations ────────────────────────────────────────────────────────
+    exp_url = f"{base}/options/expirations?symbol={symbol.upper()}&includeAllRoots=false&strikes=false"
+    ed = _get(exp_url)
+    expirations = ed.get("expirations", {}).get("date", []) or []
+    if isinstance(expirations, str):
+        expirations = [expirations]
+
+    try:
+        import zoneinfo
+        _ET = zoneinfo.ZoneInfo("America/New_York")
+    except Exception:
+        import pytz  # type: ignore[import]
+        _ET = pytz.timezone("America/New_York")
+
+    today = pd.Timestamp(_dt.now(_ET).date())
+    valid_exps = [e for e in expirations if (pd.to_datetime(e) - today).days >= 0]
+    if not valid_exps:
+        raise RuntimeError(f"No valid expirations from Tradier for {symbol}")
+
+    # ── 3. Fetch all expiries in parallel ─────────────────────────────────────
+    def _fetch_one_exp(exp: str) -> list[dict]:
+        url = f"{base}/options/chains?symbol={symbol.upper()}&expiration={exp}&greeks=true"
+        try:
+            data = _get(url)
+            options = data.get("options", {}).get("option", []) or []
+            if isinstance(options, dict):
+                options = [options]
+        except Exception:
+            return []
+
+        T_days = (pd.to_datetime(exp) - today).days
+        T = max(T_days, 1) / 365.0
+
+        rows = []
+        for opt in options:
+            try:
+                strike = float(opt.get("strike") or 0)
+                if strike <= 0:
+                    continue
+                otype = "call" if str(opt.get("option_type", "")).lower().startswith("c") else "put"
+                oi = int(opt.get("open_interest") or 0)
+                if oi <= 0:
+                    continue
+                bid = float(opt.get("bid") or 0)
+                ask = float(opt.get("ask") or 0)
+                mid = (bid + ask) / 2.0
+                vol = int(opt.get("volume") or 0)
+
+                # Tradier provides greeks directly — use them if present
+                greeks = opt.get("greeks") or {}
+                gamma = float(greeks.get("gamma") or 0)
+                iv_raw = greeks.get("mid_iv") or greeks.get("smv_vol") or 0
+                iv = float(iv_raw)
+
+                # If gamma missing, compute via BS
+                if gamma <= 0 and iv > 0 and spot > 0:
+                    gamma = bs_gamma(S=spot, K=strike, T=T, r=0.045, sigma=iv)
+
+                rows.append({
+                    "strike": strike,
+                    "expiry": exp,
+                    "otype":  otype,
+                    "oi":     oi,
+                    "volume": vol,
+                    "iv":     iv,
+                    "mid":    mid,
+                    "gamma":  gamma,
+                    "T":      T,
+                })
+            except Exception:
+                continue
+        return rows
+
+    all_rows: list[dict] = []
+    max_workers = min(len(valid_exps), 16)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_fetch_one_exp, exp): exp for exp in valid_exps}
+        for fut in as_completed(futures):
+            all_rows.extend(fut.result())
+
+    if not all_rows:
+        raise RuntimeError(f"Tradier returned empty chain for {symbol}")
+
+    return spot, pd.DataFrame(all_rows)
 
 
 def _fetch_chain_yfinance(symbol: str) -> tuple[float, pd.DataFrame]:
@@ -398,11 +527,24 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
     result = GEXResult(symbol=display_sym, spot=0.0, expiries=[])
 
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            spot, df = _fetch_chain_yfinance(sym)
+        # ── Try Tradier first (real-time) ─────────────────────────────────────
+        _source = "yfinance"
+        if _tradier_token():
+            try:
+                spot, df = _fetch_chain_tradier(sym)
+                _source = "tradier"
+            except Exception as _te:
+                warnings.warn(f"Tradier fetch failed ({_te}), falling back to yfinance")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    spot, df = _fetch_chain_yfinance(sym)
+        else:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                spot, df = _fetch_chain_yfinance(sym)
 
         result.spot = round(spot, 2)
+        result.data_source = _source
 
         if df.empty:
             result.error = f"No options data found for {sym}."
