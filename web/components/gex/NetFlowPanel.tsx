@@ -23,8 +23,8 @@ interface Props {
 }
 
 interface Snapshot {
-  ts: string;   // raw ISO-8601 UTC from backend
-  t?: string;   // formatted label (computed on frontend)
+  ts: string;
+  t?: string;
   price: number;
   call_prem: number;
   put_prem: number;
@@ -36,19 +36,13 @@ interface Snapshot {
 type DayRange = 1 | 2 | 3 | 7 | 14 | 30;
 const DAY_RANGES: DayRange[] = [1, 2, 3, 7, 14, 30];
 
-// Parse an ISO-8601 UTC string robustly across all browsers.
-// Handles: "2026-02-24T14:30:00Z", "2026-02-24T14:30:00+00:00",
-//          "2026-02-24 14:30:00+00:00" (pandas space format), bare no-tz strings.
 function parseIso(isoUtc: string): Date {
-  // Normalise: space → T, +00:00 or +0000 → Z
   let s = isoUtc.replace(" ", "T");
   s = s.replace(/[+-]00:?00$/, "Z");
-  // If still no tz indicator, treat as UTC
   if (!s.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(s)) s += "Z";
   return new Date(s);
 }
 
-// Format a raw ISO-8601 UTC string into a human label in the browser's local timezone
 function fmtSnapTime(isoUtc: string, days: DayRange): string {
   try {
     const d = parseIso(isoUtc);
@@ -60,12 +54,9 @@ function fmtSnapTime(isoUtc: string, days: DayRange): string {
     if (days === 1)  return `${hh}:${mm}`;
     if (days <= 3)   return `${mo}/${dy} ${hh}:${mm}`;
     return `${mo}/${dy}`;
-  } catch {
-    return "--";
-  }
+  } catch { return "--"; }
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
 function fmt(n: number): string {
   const abs = Math.abs(n);
   if (abs >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
@@ -117,18 +108,30 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
-// ── SVG gradient defs ─────────────────────────────────────────────────────────
+// ── SVG gradient defs (used in both sub-charts) ───────────────────────────────
 function FlowGradients() {
   return (
     <defs>
       <linearGradient id="gCall" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%"  stopColor={NET_CALL} stopOpacity={0.5} />
+        <stop offset="5%"  stopColor={NET_CALL} stopOpacity={0.45} />
         <stop offset="95%" stopColor={NET_CALL} stopOpacity={0.04} />
       </linearGradient>
       <linearGradient id="gPut" x1="0" y1="0" x2="0" y2="1">
         <stop offset="5%"  stopColor={NET_PUT} stopOpacity={0.04} />
-        <stop offset="95%" stopColor={NET_PUT} stopOpacity={0.5} />
+        <stop offset="95%" stopColor={NET_PUT} stopOpacity={0.45} />
       </linearGradient>
+      <linearGradient id="gPrice" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%"  stopColor={PRICE_COLOR} stopOpacity={0.22} />
+        <stop offset="95%" stopColor={PRICE_COLOR} stopOpacity={0.02} />
+      </linearGradient>
+      {/* glow filter for price line */}
+      <filter id="priceGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2.5" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
     </defs>
   );
 }
@@ -136,7 +139,7 @@ function FlowGradients() {
 export default function NetFlowPanel({ data }: Props) {
   const {
     symbol,
-    spot        = 0,
+    spot             = 0,
     call_premium     = 0,
     put_premium      = 0,
     net_flow         = 0,
@@ -150,13 +153,8 @@ export default function NetFlowPanel({ data }: Props) {
   const putPct     = 100 - callPct;
   const isCallBias = net_flow >= 0;
 
-  // ── Day-range selector ────────────────────────────────────────────────────
   const [days, setDays] = useState<DayRange>(1);
-
-  // ── Hover crosshair state for stats bar ──────────────────────────────────
   const [hovered, setHovered] = useState<Snapshot | null>(null);
-
-  // ── History fetch ─────────────────────────────────────────────────────────
   const [history, setHistory] = useState<Snapshot[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -175,7 +173,6 @@ export default function NetFlowPanel({ data }: Props) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [symbol, days, fetchHistory]);
 
-  // Seed with current snapshot while history loads
   const chartData = useMemo(() => {
     if (history.length > 0) {
       return history.map(s => ({ ...s, t: fmtSnapTime(s.ts, days) }));
@@ -186,32 +183,32 @@ export default function NetFlowPanel({ data }: Props) {
               put_prem: put_premium, net_flow, total_prem: total, volume: total_volume }];
   }, [history, days, spot, call_premium, put_premium, net_flow, total, total_volume]);
 
-  // Domains
+  // ── Price domain — tight around actual range ──────────────────────────────
   const [priceMin, priceMax] = useMemo(() => {
     if (!chartData.length) return [0, 1];
-    const p = chartData.map(d => d.price);
+    const p = chartData.map(d => d.price).filter(v => v > 0);
+    if (!p.length) return [0, 1];
     const mn = Math.min(...p), mx = Math.max(...p);
-    const pad = (mx - mn) * 0.15 || mx * 0.005;
-    return [mn - pad, mx + pad];
+    // Pad by at least 0.3% each side so the line never touches the edge
+    const pad = Math.max((mx - mn) * 0.25, mx * 0.003);
+    return [parseFloat((mn - pad).toFixed(2)), parseFloat((mx + pad).toFixed(2))];
   }, [chartData]);
 
+  // ── Premium domain — symmetric so call/put areas are visually comparable ─
   const premMax = useMemo(() => {
     if (!chartData.length) return 1;
-    return Math.max(...chartData.flatMap(d => [d.call_prem, d.put_prem])) * 1.25;
+    const mx = Math.max(...chartData.flatMap(d => [d.call_prem, d.put_prem]));
+    return mx * 1.15;
   }, [chartData]);
 
   const volMax = useMemo(() => {
     if (!chartData.length) return 1;
-    return Math.max(...chartData.map(d => d.volume)) * 4; // push vol bars to bottom quarter
+    return Math.max(...chartData.map(d => d.volume)) * 4;
   }, [chartData]);
 
-  // Stats to show in the header — live or hovered
   const stats = hovered ?? {
-    price:      spot,
-    volume:     total_volume,
-    total_prem: total,
-    net_flow,
-    call_prem:  call_premium,
+    price: spot, volume: total_volume,
+    total_prem: total, net_flow, call_prem: call_premium,
   };
 
   // ── Expiry bar data ───────────────────────────────────────────────────────
@@ -222,17 +219,17 @@ export default function NetFlowPanel({ data }: Props) {
       .map(r => ({ expiry: r.expiry, Calls: r.call_prem, Puts: r.put_prem })),
   [flow_by_expiry]);
 
-  // ── Strike diverging bar data ─────────────────────────────────────────────
   const strikeData = useMemo(() =>
     [...top_flow_strikes]
       .sort((a, b) => a.strike - b.strike)
       .map(s => ({ strike: s.strike.toLocaleString(), Net: s.net, bias: s.bias })),
   [top_flow_strikes]);
 
-  // ── Table ─────────────────────────────────────────────────────────────────
   const tableStrikes: TopFlowStrike[] = useMemo(() =>
     [...top_flow_strikes].sort((a, b) => b.call_prem + b.put_prem - (a.call_prem + a.put_prem)),
   [top_flow_strikes]);
+
+  const hasEnoughData = chartData.length >= 5;
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
@@ -265,21 +262,16 @@ export default function NetFlowPanel({ data }: Props) {
 
         {/* ══ KPI ROW ══════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-3 gap-2">
-          {/* Call Premium */}
           <div className="rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 px-3 py-2.5">
             <p className="text-[9px] text-emerald-600 dark:text-emerald-400 opacity-70 uppercase tracking-widest font-semibold mb-1">Call Prem</p>
             <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums leading-none">{fmt(call_premium)}</p>
           </div>
-          {/* Net Flow */}
           <div className={`rounded-xl border px-3 py-2.5 ${
-            isCallBias
-              ? "bg-emerald-500/[0.08] border-emerald-500/20"
-              : "bg-red-500/[0.08] border-red-500/20"
+            isCallBias ? "bg-emerald-500/[0.08] border-emerald-500/20" : "bg-red-500/[0.08] border-red-500/20"
           }`}>
             <p className={`text-[9px] uppercase tracking-widest font-semibold mb-1 opacity-70 ${isCallBias ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>Net Flow</p>
             <p className={`text-sm font-bold tabular-nums leading-none ${isCallBias ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{fmt(net_flow)}</p>
           </div>
-          {/* Put Premium */}
           <div className="rounded-xl bg-red-500/[0.08] border border-red-500/20 px-3 py-2.5">
             <p className="text-[9px] text-red-600 dark:text-red-400 opacity-70 uppercase tracking-widest font-semibold mb-1">Put Prem</p>
             <p className="text-sm font-bold text-red-600 dark:text-red-400 tabular-nums leading-none">{fmt(put_premium)}</p>
@@ -303,12 +295,10 @@ export default function NetFlowPanel({ data }: Props) {
 
           {/* Chart controls row */}
           <div className="flex items-center justify-between px-3 pt-3 pb-2">
-
-            {/* Live stats */}
             <div className="flex items-center gap-3 text-[10px]">
               {spot > 0 && (
                 <span className="text-gray-500">
-                  <span className="text-yellow-500 dark:text-yellow-400 font-bold tabular-nums">${(stats.price ?? spot).toFixed(2)}</span>
+                  <span className="text-yellow-400 font-bold tabular-nums">${(stats.price ?? spot).toFixed(2)}</span>
                 </span>
               )}
               <span className="text-gray-400">
@@ -323,122 +313,128 @@ export default function NetFlowPanel({ data }: Props) {
                 Vol <span className="text-gray-600 dark:text-gray-300 font-semibold tabular-nums">{fmtVol(stats.volume ?? 0)}</span>
               </span>
             </div>
-
-            {/* Range pills */}
             <div className="flex gap-0.5">
               {DAY_RANGES.map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDays(d)}
+                <button key={d} onClick={() => setDays(d)}
                   className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
                     days === d
                       ? "bg-[var(--surface)] text-gray-900 dark:text-white shadow-sm border border-[var(--border)]"
                       : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {d}D
-                </button>
+                  }`}>{d}D</button>
               ))}
             </div>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 px-3 pb-2">
-            <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-              <span className="inline-block w-4 h-0.5 bg-yellow-400 rounded-full" />{symbol}
-            </span>
-            <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-              <span className="inline-block w-4 h-0.5 bg-emerald-500 rounded-full" />Call Prem
-            </span>
-            <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
-              <span className="inline-block w-4 h-0.5 bg-red-500 rounded-full" />Put Prem
-            </span>
-          </div>
-
-          {/* Chart */}
-          {chartData.length < 5 ? (
-          <div className="flex flex-col items-center justify-center h-[260px] gap-2.5 text-gray-300 dark:text-gray-600">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 17l4-8 4 5 3-4 4 6"/>
-              <path d="M21 21H3" strokeWidth="1" opacity="0.4"/>
-            </svg>
-            <p className="text-[11px] font-semibold text-gray-400">Building history…</p>
-            <p className="text-[9px] text-gray-400 text-center max-w-[180px] leading-relaxed">
-                {chartData.length} snapshot{chartData.length !== 1 ? "s" : ""} collected.
-                Updates every 15s.
+          {!hasEnoughData ? (
+            <div className="flex flex-col items-center justify-center h-[340px] gap-2.5 text-gray-300 dark:text-gray-600">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 17l4-8 4 5 3-4 4 6"/><path d="M21 21H3" strokeWidth="1" opacity="0.4"/>
+              </svg>
+              <p className="text-[11px] font-semibold text-gray-400">Building history…</p>
+              <p className="text-[9px] text-gray-400 text-center max-w-[180px] leading-relaxed">
+                {chartData.length} snapshot{chartData.length !== 1 ? "s" : ""} collected. Updates every 15s.
               </p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 4, right: 52, left: 0, bottom: 0 }}
-                onMouseMove={(e: any) => {
-                  const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined;
-                  if (pt) setHovered(pt);
-                }}
-                onMouseLeave={() => setHovered(null)}
-              >
-                <FlowGradients />
-                <CartesianGrid stroke="rgba(128,128,128,0.12)" strokeDasharray="4 4" vertical={false} />
+            <>
+              {/* ── TOP PANEL: Price (gold line) — own dedicated chart ──── */}
+              <div className="px-1 pt-1">
+                <div className="flex items-center gap-2 px-2 pb-1">
+                  <span className="w-5 h-[2.5px] rounded-full bg-yellow-400 inline-block" />
+                  <span className="text-[9px] text-yellow-400 font-bold uppercase tracking-widest">{symbol} Price</span>
+                </div>
+                <ResponsiveContainer width="100%" height={130}>
+                  <ComposedChart data={chartData} margin={{ top: 6, right: 52, left: 0, bottom: 0 }}
+                    onMouseMove={(e: any) => { const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined; if (pt) setHovered(pt); }}
+                    onMouseLeave={() => setHovered(null)}>
+                    <FlowGradients />
+                    <CartesianGrid stroke="rgba(128,128,128,0.1)" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="t" hide />
+                    <YAxis
+                      yAxisId="price"
+                      orientation="right"
+                      domain={[priceMin, priceMax]}
+                      tickFormatter={v => `$${Number(v).toFixed(0)}`}
+                      tick={{ fill: "#facc15", fontSize: 9 }}
+                      axisLine={false} tickLine={false} width={50}
+                      tickCount={4}
+                    />
+                    <Tooltip content={<ChartTooltip />}
+                      cursor={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }} />
+                    {/* Subtle fill under price */}
+                    <Area yAxisId="price" type="monotone" dataKey="price" name="Price"
+                      stroke={PRICE_COLOR} strokeWidth={2.5}
+                      fill="url(#gPrice)"
+                      dot={false} activeDot={{ r: 4, fill: PRICE_COLOR, stroke: "#000", strokeWidth: 1 }}
+                      isAnimationActive={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
 
-                {/* No XAxis — timestamps removed */}
-                <XAxis dataKey="t" hide />
+              {/* Divider */}
+              <div className="mx-3 border-t border-dashed border-[var(--border)] opacity-50" />
 
-                {/* Left: price */}
-                <YAxis
-                  yAxisId="price"
-                  orientation="left"
-                  domain={[priceMin, priceMax]}
-                  tickFormatter={v => `$${Number(v).toFixed(0)}`}
-                  tick={{ fill: "#9ca3af", fontSize: 9 }}
-                  axisLine={false} tickLine={false} width={50}
-                />
+              {/* ── BOTTOM PANEL: Call + Put premium + volume bars ──────── */}
+              <div className="px-1 pb-1">
+                <div className="flex items-center gap-4 px-2 py-1">
+                  <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
+                    <span className="w-4 h-0.5 bg-emerald-500 rounded-full inline-block" />Call Prem
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
+                    <span className="w-4 h-0.5 bg-red-500 rounded-full inline-block" />Put Prem
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-wide font-semibold">
+                    <span className="w-3 h-2.5 bg-emerald-500/40 rounded-sm inline-block border border-emerald-500/30" />Vol
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <ComposedChart data={chartData} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}
+                    onMouseMove={(e: any) => { const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined; if (pt) setHovered(pt); }}
+                    onMouseLeave={() => setHovered(null)}>
+                    <CartesianGrid stroke="rgba(128,128,128,0.1)" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="t"
+                      tick={{ fill: "#6b7280", fontSize: 8 }}
+                      axisLine={false} tickLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      yAxisId="prem"
+                      orientation="right"
+                      domain={[0, premMax]}
+                      tickFormatter={fmtAxis}
+                      tick={{ fill: "#9ca3af", fontSize: 9 }}
+                      axisLine={false} tickLine={false} width={50}
+                      tickCount={4}
+                    />
+                    <YAxis yAxisId="vol" orientation="left" domain={[0, volMax]} hide />
+                    <Tooltip content={<ChartTooltip />}
+                      cursor={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }} />
 
-                {/* Right: premium */}
-                <YAxis
-                  yAxisId="prem"
-                  orientation="right"
-                  domain={[0, premMax]}
-                  tickFormatter={fmtAxis}
-                  tick={{ fill: "#9ca3af", fontSize: 9 }}
-                  axisLine={false} tickLine={false} width={42}
-                />
+                    {/* Volume bars — behind areas */}
+                    <Bar yAxisId="vol" dataKey="volume" name="Vol" maxBarSize={5} isAnimationActive={false}>
+                      {chartData.map((d, i) => (
+                        <Cell key={`vc-${i}`} fill={d.net_flow >= 0 ? VOL_CALL : VOL_PUT} />
+                      ))}
+                    </Bar>
 
-                {/* Hidden axis for volume bars (bottom quarter) */}
-                <YAxis yAxisId="vol" orientation="right" domain={[0, volMax]} hide />
+                    {/* Put area — drawn first (behind calls) */}
+                    <Area yAxisId="prem" type="monotone" dataKey="put_prem" name="Put Prem"
+                      stroke={NET_PUT} strokeWidth={2}
+                      fill="url(#gPut)"
+                      dot={false} activeDot={{ r: 3, fill: NET_PUT }} isAnimationActive={false}
+                    />
 
-                <Tooltip
-                  content={<ChartTooltip />}
-                  cursor={{ stroke: "rgba(255,255,255,0.12)", strokeWidth: 1 }}
-                />
-
-                {/* Volume bars */}
-                <Bar yAxisId="vol" dataKey="volume" name="Vol" maxBarSize={6} isAnimationActive={false}>
-                  {chartData.map((d, i) => (
-                    <Cell key={`vc-${i}`} fill={d.net_flow >= 0 ? VOL_CALL : VOL_PUT} />
-                  ))}
-                </Bar>
-
-                {/* Call premium area */}
-                <Area yAxisId="prem" type="linear" dataKey="call_prem" name="Net Call Prem"
-                  stroke={NET_CALL} strokeWidth={1.5} fill="url(#gCall)"
-                  dot={false} activeDot={{ r: 3, fill: NET_CALL }} isAnimationActive={false}
-                />
-
-                {/* Put premium area */}
-                <Area yAxisId="prem" type="linear" dataKey="put_prem" name="Net Put Prem"
-                  stroke={NET_PUT} strokeWidth={1.5} fill="url(#gPut)"
-                  dot={false} activeDot={{ r: 3, fill: NET_PUT }} isAnimationActive={false}
-                />
-
-                {/* Price line */}
-                <Line yAxisId="price" type="linear" dataKey="price" name="Price"
-                  stroke={PRICE_COLOR} strokeWidth={2}
-                  dot={false} activeDot={{ r: 3, fill: PRICE_COLOR }} isAnimationActive={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+                    {/* Call area — drawn on top */}
+                    <Area yAxisId="prem" type="monotone" dataKey="call_prem" name="Call Prem"
+                      stroke={NET_CALL} strokeWidth={2}
+                      fill="url(#gCall)"
+                      dot={false} activeDot={{ r: 3, fill: NET_CALL }} isAnimationActive={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </>
           )}
         </div>
 
@@ -537,3 +533,4 @@ export default function NetFlowPanel({ data }: Props) {
     </div>
   );
 }
+
