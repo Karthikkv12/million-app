@@ -188,8 +188,10 @@ export default function NetFlowPanel({ data }: Props) {
     const p = chartData.map(d => d.price).filter(v => v > 0);
     if (!p.length) return [0, 1];
     const mn = Math.min(...p), mx = Math.max(...p);
-    // Pad by at least 0.3% each side so the line never touches the edge
-    const pad = Math.max((mx - mn) * 0.25, mx * 0.003);
+    const range = mx - mn;
+    // Pad by 50% of actual range each side — line fills middle ~50% of chart.
+    // Tiny absolute fallback (0.03% of price) for single-snapshot flat case.
+    const pad = range > 0 ? range * 0.5 : mx * 0.0003;
     return [parseFloat((mn - pad).toFixed(2)), parseFloat((mx + pad).toFixed(2))];
   }, [chartData]);
 
@@ -373,7 +375,7 @@ export default function NetFlowPanel({ data }: Props) {
                   <span className="w-4 h-[2px] rounded-full bg-yellow-400 inline-block shadow-[0_0_6px_rgba(250,204,21,0.6)]" />
                   <span className="text-[9px] text-yellow-400/80 font-bold uppercase tracking-widest">{symbol} Price</span>
                 </div>
-                <ResponsiveContainer width="100%" height={130}>
+                <ResponsiveContainer width="100%" height={160}>
                   <ComposedChart data={chartData} margin={{ top: 6, right: 54, left: 0, bottom: 0 }}
                     onMouseMove={(e: any) => { const pt = e?.activePayload?.[0]?.payload as Snapshot | undefined; if (pt) setHovered(pt); }}
                     onMouseLeave={() => setHovered(null)}>
