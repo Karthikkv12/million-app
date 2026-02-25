@@ -91,8 +91,16 @@ function TickerPanel({
 
   return (
     <div
-      className="flex flex-col rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)] shadow-xl"
-      style={{ boxShadow: `0 0 0 1px ${accentColor}30, 0 8px 32px rgba(0,0,0,0.18)` }}
+      className="flex flex-col rounded-2xl overflow-hidden border shadow-xl"
+      style={{
+        borderColor: `${accentColor}30`,
+        background: "#0d0f18",
+        boxShadow: `0 0 0 1px ${accentColor}30, 0 8px 32px rgba(0,0,0,0.28)`,
+        "--surface": "#0d0f18",
+        "--surface-2": "#13151f",
+        "--border": "rgba(255,255,255,0.08)",
+        "--foreground": "#e8eaf2",
+      } as React.CSSProperties}
     >
       {/* ── Thick accent bar with gradient glow ──────────────────────── */}
       <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}55, transparent)` }} />
@@ -140,14 +148,14 @@ function TickerPanel({
             {/* Top row: spot price + regime */}
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-black tabular-nums text-white leading-none" style={{ textShadow: "0 0 20px rgba(250,204,21,0.2)" }}>
+                <span className="text-[28px] font-black tabular-nums leading-none" style={{ color: "#fff", textShadow: "0 0 24px rgba(250,204,21,0.55)" }}>
                   {data.spot != null ? `$${data.spot.toFixed(2)}` : "—"}
                 </span>
-                <span className="text-[11px] text-gray-500 font-bold tracking-wide">{slot.ticker}</span>
+                <span className="text-[11px] text-gray-300 font-bold tracking-wide">{slot.ticker}</span>
               </div>
               <GexRegimeBadge netGex={netGex} />
               {impliedMove != null && (
-                <span className="text-[9px] text-gray-500 border border-[var(--border)] rounded-full px-2.5 py-1 font-bold tracking-wide">
+                <span className="text-[9px] text-gray-300 border border-white/15 rounded-full px-2.5 py-1 font-bold tracking-wide">
                   {impliedMove.toFixed(1)}% to zero-γ
                 </span>
               )}
@@ -156,29 +164,29 @@ function TickerPanel({
             {/* Key level cards */}
             <div className="grid grid-cols-5 gap-2">
               {/* Net GEX */}
-              <div className={`rounded-xl border px-2.5 py-2 ${isCallBias ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"}`}>
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold mb-1">Net GEX</p>
-                <p className={`text-[13px] font-black tabular-nums leading-none ${isCallBias ? "text-emerald-400" : "text-red-400"}`}>{fmtGexUtil(netGex)}</p>
+              <div className={`rounded-xl border px-2.5 py-2 ${isCallBias ? "bg-emerald-500/10 border-emerald-500/30" : "bg-red-500/10 border-red-500/30"}`}>
+                <p className="text-[8px] text-gray-300 uppercase tracking-widest font-bold mb-1">Net GEX</p>
+                <p className={`text-[13px] font-black tabular-nums leading-none ${isCallBias ? "text-emerald-300" : "text-red-300"}`}>{fmtGexUtil(netGex)}</p>
               </div>
               {/* Zero Gamma */}
-              <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-2.5 py-2">
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold mb-1">Zero γ</p>
-                <p className="text-[13px] font-black tabular-nums text-yellow-400 leading-none">{data.zero_gamma != null ? `$${data.zero_gamma.toFixed(0)}` : "—"}</p>
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-2">
+                <p className="text-[8px] text-gray-300 uppercase tracking-widest font-bold mb-1">Zero γ</p>
+                <p className="text-[13px] font-black tabular-nums text-yellow-300 leading-none">{data.zero_gamma != null ? `$${data.zero_gamma.toFixed(0)}` : "—"}</p>
               </div>
               {/* Call Wall */}
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-2">
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold mb-1">Call Wall</p>
-                <p className="text-[13px] font-black tabular-nums text-emerald-400 leading-none">{data.max_call_wall != null ? `$${data.max_call_wall.toFixed(0)}` : "—"}</p>
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2">
+                <p className="text-[8px] text-gray-300 uppercase tracking-widest font-bold mb-1">Call Wall</p>
+                <p className="text-[13px] font-black tabular-nums text-emerald-300 leading-none">{data.max_call_wall != null ? `$${data.max_call_wall.toFixed(0)}` : "—"}</p>
               </div>
               {/* Put Wall */}
-              <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-2.5 py-2">
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold mb-1">Put Wall</p>
-                <p className="text-[13px] font-black tabular-nums text-red-400 leading-none">{data.max_put_wall != null ? `$${data.max_put_wall.toFixed(0)}` : "—"}</p>
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-2.5 py-2">
+                <p className="text-[8px] text-gray-300 uppercase tracking-widest font-bold mb-1">Put Wall</p>
+                <p className="text-[13px] font-black tabular-nums text-red-300 leading-none">{data.max_put_wall != null ? `$${data.max_put_wall.toFixed(0)}` : "—"}</p>
               </div>
               {/* Max GEX */}
-              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 px-2.5 py-2">
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold mb-1">Max GEX</p>
-                <p className="text-[13px] font-black tabular-nums text-purple-400 leading-none">{data.max_gex_strike != null ? `$${data.max_gex_strike.toFixed(0)}` : "—"}</p>
+              <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-2.5 py-2">
+                <p className="text-[8px] text-gray-300 uppercase tracking-widest font-bold mb-1">Max GEX</p>
+                <p className="text-[13px] font-black tabular-nums text-purple-300 leading-none">{data.max_gex_strike != null ? `$${data.max_gex_strike.toFixed(0)}` : "—"}</p>
               </div>
             </div>
           </div>
@@ -186,7 +194,7 @@ function TickerPanel({
           {/* ── Insight bar ───────────────────────────────────────────────── */}
           {data.spot != null && data.max_call_wall != null && data.max_put_wall != null && (
             <div className={`px-4 py-2.5 border-b border-[var(--border)] ${ isCallBias ? "bg-emerald-500/[0.04]" : "bg-red-500/[0.04]"}`}>
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex items-center gap-2 text-[10px] text-gray-200">
                 {isCallBias ? <TrendingDown size={11} className="text-emerald-400 shrink-0" /> : <TrendingUp size={11} className="text-red-400 shrink-0" />}
                 <span>
                   Price <strong className="text-gray-200">{data.spot > data.zero_gamma! ? "above" : "below"} zero-gamma</strong>
@@ -243,7 +251,7 @@ function TickerPanel({
             <div className="px-4 py-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2 mb-3">
                 <Zap size={10} className="text-gray-500" />
-                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black">Premium Flow</span>
+                <span className="text-[9px] text-gray-200 uppercase tracking-widest font-black">Premium Flow</span>
               </div>
               <div className="flex items-center gap-3">
                 {/* Call premium bar */}
@@ -284,7 +292,7 @@ function TickerPanel({
             <div className="px-4 py-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2 mb-2.5">
                 <BarChart2 size={10} className="text-gray-500" />
-                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black">Top Flow Strikes</span>
+                <span className="text-[9px] text-gray-200 uppercase tracking-widest font-black">Top Flow Strikes</span>
               </div>
               <div className="flex flex-col gap-1.5">
                 {data.top_flow_strikes.slice(0, 5).map((tf) => {
@@ -293,7 +301,7 @@ function TickerPanel({
                   const isCallBias = tf.bias === "call";
                   return (
                     <div key={tf.strike} className="flex items-center gap-2 text-[10px]">
-                      <span className="w-[52px] font-black tabular-nums text-gray-200 shrink-0">${tf.strike.toFixed(0)}</span>
+                      <span className="w-[52px] font-black tabular-nums text-white shrink-0">${tf.strike.toFixed(0)}</span>
                       <div className="flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--border)] min-w-0">
                         <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-l-full" style={{ width: `${callPct}%` }} />
                         <div className="h-full bg-gradient-to-l from-red-600 to-red-400 rounded-r-full" style={{ width: `${100 - callPct}%` }} />
@@ -315,7 +323,7 @@ function TickerPanel({
             <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
               <div className="flex items-center gap-2 mb-2.5">
                 <Activity size={10} className="text-gray-500" />
-                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black">Flow by Expiry</span>
+                <span className="text-[9px] text-gray-200 uppercase tracking-widest font-black">Flow by Expiry</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1.5">
                 {data.flow_by_expiry.slice(0, 6).map((fe) => {
@@ -343,7 +351,7 @@ function TickerPanel({
             <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--surface-2)]">
               <div className="flex items-center gap-2">
                 <BarChart2 size={11} className="text-gray-500" />
-                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black">GEX by Strike</span>
+                <span className="text-[9px] text-gray-200 uppercase tracking-widest font-black">GEX by Strike</span>
                 <span className="text-[9px] font-black px-2 py-0.5 rounded-md ml-1"
                   style={{ background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}30` }}>
                   {slot.ticker}
@@ -351,7 +359,7 @@ function TickerPanel({
               </div>
               {/* Strikes depth selector — lives here, not in the page header */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold hidden sm:block">Strikes</span>
+                <span className="text-[9px] text-gray-300 uppercase tracking-widest font-semibold hidden sm:block">Strikes</span>
                 <div className="flex items-center bg-[var(--surface)] rounded-lg p-0.5 gap-0.5 border border-[var(--border)]">
                   {STRIKE_OPTIONS.map((n) => (
                     <button
