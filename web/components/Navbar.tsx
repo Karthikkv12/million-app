@@ -102,7 +102,7 @@ export default function Navbar() {
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
       <aside
         className={clsx(
-          "hidden lg:flex flex-col h-screen sticky top-0 border-r border-[var(--border)] bg-[var(--surface)] z-30 shrink-0 transition-[width] duration-200 ease-in-out overflow-hidden",
+          "hidden lg:flex flex-col fixed top-0 left-0 h-screen border-r border-[var(--border)] bg-[var(--surface)] z-30 shrink-0 transition-[width] duration-200 ease-in-out overflow-hidden",
           collapsed ? "w-[64px]" : "w-[240px]",
         )}
       >

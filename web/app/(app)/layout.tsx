@@ -2,9 +2,27 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { SidebarProvider } from "@/lib/sidebar";
+import { SidebarProvider, useSidebar } from "@/lib/sidebar";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+
+function AppShell({ children }: { children: React.ReactNode }) {
+  const { collapsed } = useSidebar();
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden">
+      <Navbar />
+      <main
+        className={[
+          "min-w-0 pb-nav lg:pb-0 animate-fade-up transition-[padding-left] duration-200 ease-in-out",
+          collapsed ? "lg:pl-[64px]" : "lg:pl-[240px]",
+        ].join(" ")}
+      >
+        {children}
+      </main>
+      <BottomNav />
+    </div>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -28,11 +46,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex flex-col lg:flex-row lg:items-stretch w-full overflow-x-hidden">
-        <Navbar />
-        <main className="flex-1 min-w-0 pb-nav lg:pb-0 animate-fade-up">{children}</main>
-        <BottomNav />
-      </div>
+      <AppShell>{children}</AppShell>
     </SidebarProvider>
   );
 }
