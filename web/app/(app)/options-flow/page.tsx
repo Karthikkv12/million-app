@@ -5,7 +5,7 @@ import { fetchGex, watchSymbols, GexResult } from "@/lib/api";
 import GexStrikeTable from "@/components/gex/GexStrikeTable";
 import NetFlowPanel from "@/components/gex/NetFlowPanel";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { fmtGex as fmtGexUtil } from "@/lib/gex";
+import { fmtGex as fmtGexUtil, isToday } from "@/lib/gex";
 import { X, Plus, RefreshCw, TrendingUp, TrendingDown, Activity, BarChart2, Shield, ChevronDown, Zap, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 
@@ -73,6 +73,9 @@ function TickerPanel({
   const expiryDates: string[] = data
     ? Array.from(new Set(data.heatmap_expiries ?? [])).sort()
     : [];
+
+  // Auto-select today's expiry (0DTE) when data first loads
+  const todayExp = expiryDates.find(isToday);
 
   const lastUpdated = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -198,18 +201,20 @@ function TickerPanel({
               <span className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold shrink-0">Expiry</span>
               <div className="relative flex-1 max-w-[220px]">
                 <select
-                  value={slot.expiryFilter?.[0] ?? ""}
+                  value={slot.expiryFilter?.[0] ?? (todayExp ?? "")}
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "") onClearExpiry();
                     else onToggleExpiry(v);
                   }}
                   className="w-full appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[11px] font-bold text-gray-700 dark:text-gray-200 pl-3 pr-7 py-1.5 focus:outline-none cursor-pointer"
-                  style={{ color: slot.expiryFilter ? accentColor : undefined }}
+                  style={{ color: slot.expiryFilter ?? todayExp ? accentColor : undefined }}
                 >
                   <option value="">All expiries ({expiryDates.length})</option>
                   {expiryDates.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d} value={d}>
+                      {isToday(d) ? `⚡ 0DTE · ${d}` : d}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -304,9 +309,12 @@ function TickerPanel({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
                 {data.flow_by_expiry.slice(0, 6).map((fe) => {
                   const isPos = fe.net >= 0;
+                  const dte0 = isToday(fe.expiry);
                   return (
                     <div key={fe.expiry} className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] text-gray-500 dark:text-gray-400 font-mono truncate">{fe.expiry}</span>
+                      <span className={`text-[9px] font-mono truncate ${dte0 ? "text-amber-500 font-bold" : "text-gray-500 dark:text-gray-400"}`}>
+                        {dte0 ? "⚡ 0DTE" : fe.expiry}
+                      </span>
                       <span className={`text-[10px] font-bold tabular-nums shrink-0 ${ isPos ? "text-emerald-500" : "text-red-400" }`}>
                         {isPos ? "+" : ""}{(fe.net / 1e6).toFixed(1)}M
                       </span>

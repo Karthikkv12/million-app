@@ -37,8 +37,18 @@ export function fmtGex(v: number | null | undefined): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
+/** Returns true if exp (YYYY-MM-DD) is today in local time. */
+export function isToday(exp: string): boolean {
+  try {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return exp === today;
+  } catch { return false; }
+}
+
 export function shortExpiry(exp: string): string {
-  // "2026-02-23" → "Feb 23"
+  // "2026-02-23" → "Feb 23", today → "0DTE"
+  if (isToday(exp)) return "0DTE";
   try {
     const d = new Date(exp + "T12:00:00");
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });

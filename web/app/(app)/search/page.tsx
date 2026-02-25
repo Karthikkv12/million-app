@@ -13,6 +13,7 @@ import {
   StockInfo, QuoteBar, FlowSnapshot, GexResult,
 } from "@/lib/api";
 import TickerSearchInput from "@/components/TickerSearchInput";
+import { isToday } from "@/lib/gex";
 import {
   TrendingUp, TrendingDown, Activity, BarChart2, Zap,
   Globe, Users, DollarSign, Shield, ArrowUpRight, ArrowDownRight,
@@ -594,7 +595,7 @@ function FlowByExpiryChart({ gex }: { gex: GexResult }) {
     .sort((a, b) => a.expiry.localeCompare(b.expiry))
     .slice(0, 12)
     .map((f) => ({
-      exp:  f.expiry.slice(5),
+      exp:  isToday(f.expiry) ? "⚡0DTE" : f.expiry.slice(5),
       call: f.call_prem / 1e6,
       put:  -(f.put_prem / 1e6),
       net:  f.net / 1e6,
