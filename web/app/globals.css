@@ -115,23 +115,22 @@ input[type="number"] { -moz-appearance: textfield; }
   100% { background-position: -200% 0; }
 }
 
-/* ── Light-mode grey text → near-black ────────────────────────────────────── */
-/* Overrides text-gray-300 through text-gray-700 AND all their dark: variants  */
-/* so every label, section heading, table cell etc. is readable on white bg.   */
-@media (prefers-color-scheme: light) {
-  .text-gray-300,
-  .text-gray-400,
-  .text-gray-500,
-  .text-gray-600,
-  .text-gray-700,
-  .dark\:text-gray-100,
-  .dark\:text-gray-200,
-  .dark\:text-gray-300,
-  .dark\:text-gray-400,
-  .dark\:text-gray-500,
-  .dark\:text-gray-600 {
-    color: #1a1d27 !important;
-  }
+/* ── Grey text → near-black everywhere (light mode default) ──────────────── */
+/* These classes are washed-out on white backgrounds. Override them globally.  */
+/* The dark: variants are handled via the dark-mode media query below.         */
+.text-gray-300 { color: #1a1d27; }
+.text-gray-400 { color: #1a1d27; }
+.text-gray-500 { color: #1a1d27; }
+.text-gray-600 { color: #1a1d27; }
+.text-gray-700 { color: #1a1d27; }
+
+@media (prefers-color-scheme: dark) {
+  .text-gray-300 { color: #d1d5db; }
+  .text-gray-400 { color: #9ca3af; }
+  .text-gray-500 { color: #6b7280; }
+  .text-gray-600 { color: #4b5563; }
+  .text-gray-700 { color: #374151; }
+  /* dark: prefixed variants stay as Tailwind emits them — no override needed */
 }
 
 @keyframes refresh-pulse {
