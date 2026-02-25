@@ -115,6 +115,19 @@ input[type="number"] { -moz-appearance: textfield; }
   100% { background-position: -200% 0; }
 }
 
+/* ── Light-mode grey text → near-black ────────────────────────────────────── */
+/* All the gray-3xx through gray-6xx classes that look washed out on white     */
+/* backgrounds are overridden to render as the foreground colour in light mode. */
+/* Dark mode keeps Tailwind's original grey palette unchanged.                  */
+@media (prefers-color-scheme: light) {
+  .text-gray-300,
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600 {
+    color: #1a1d27;
+  }
+}
+
 @keyframes refresh-pulse {
   0%   { box-shadow: 0 0 0 0   rgba(99, 130, 251, 0.55); }
   70%  { box-shadow: 0 0 0 8px rgba(99, 130, 251, 0);    }
