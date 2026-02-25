@@ -279,12 +279,13 @@ def _fetch_chain_yfinance(symbol: str) -> tuple[float, pd.DataFrame]:
 
     today = pd.Timestamp.today().normalize()
 
-    # Build list of (exp, T) pairs — skip expired
+    # Build list of (exp, T) pairs — skip expired (include today = 0-DTE)
     valid: list[tuple[str, float]] = []
     for exp in expiries:
         T_days = (pd.to_datetime(exp) - today).days
-        if T_days > 0:
-            valid.append((exp, T_days / 365.0))
+        if T_days >= 0:
+            T = max(T_days, 1) / 365.0   # floor at 1 day to avoid T=0 div errors
+            valid.append((exp, T))
 
     if not valid:
         return spot, pd.DataFrame()
