@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  test:
+    name: Backend Tests (Python)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: OptionFlow_V1
+        run: |
+          python -m pytest tests/ -v --tb=short
+        env:
+          # No Tradier token in CI → yfinance fallback used for any live tests
+          TRADIER_TOKEN: ""
