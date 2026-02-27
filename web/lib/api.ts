@@ -460,7 +460,11 @@ export interface StockHolding {
   company_name: string | null;
   shares: number;
   cost_basis: number;
-  adjusted_cost_basis: number;
+  adjusted_cost_basis: number;   // stored: only closed/expired positions applied
+  live_adj_basis: number;        // live: includes in-flight premium from ACTIVE positions
+  upside_basis: number | null;   // lowest active CC strike (ceiling if called away)
+  downside_basis: number;        // live_adj_basis = true breakeven
+  pending_premium: number;       // total premium still in-flight (not yet closed)
   acquired_date: string | null;
   status: "ACTIVE" | "CLOSED";
   notes: string | null;
@@ -470,6 +474,7 @@ export interface StockHolding {
   total_original_cost: number;
   total_adjusted_cost: number;
   basis_reduction: number;
+  basis_reduction_stored: number;
 }
 
 export type HoldingEventType = "CC_EXPIRED" | "CC_ASSIGNED" | "CSP_ASSIGNED" | "MANUAL";

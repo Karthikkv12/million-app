@@ -26,23 +26,84 @@ from database.models import (
 
 # ── Serialisers ───────────────────────────────────────────────────────────────
 
-def _holding_to_dict(h: StockHolding) -> dict:
+def _holding_to_dict(h: StockHolding, session=None) -> dict:
+    """
+    Serialize a StockHolding.
+
+    When `session` is provided, fetches all linked OptionPositions to compute:
+
+      live_adj_basis   — adjusted_cost_basis MINUS in-flight premium from ACTIVE
+                         positions not yet closed.  This is what you effectively
+                         own the stock at right now.
+
+      downside_basis   — same as live_adj_basis (your true breakeven if price → 0).
+
+      upside_basis     — strike of the lowest-strike ACTIVE covered call linked
+                         to this holding.  If shares get called away you sell there.
+                         None when no active CC is written.
+
+      pending_premium  — total premium still "in flight" (ACTIVE positions)
+                         per share; reduces from live_adj_basis once they close.
+    """
+    adj = h.adjusted_cost_basis
+    live_adj = adj
+    upside_basis: float | None = None
+    pending_premium_total = 0.0
+
+    if session is not None and h.id:
+        active_positions = (
+            session.query(OptionPosition)
+            .filter(
+                OptionPosition.holding_id == h.id,
+                OptionPosition.status == OptionPositionStatus.ACTIVE,
+            )
+            .all()
+        )
+        if active_positions and h.shares > 0:
+            cc_strikes: list[float] = []
+            for p in active_positions:
+                prem = (p.premium_in or 0.0)
+                # Net of any roll debit
+                net_prem_per_contract = prem + (p.premium_out or 0.0)
+                # Total collected for this position
+                prem_total = net_prem_per_contract * p.contracts * 100
+                pending_premium_total += prem_total
+
+                # Track strikes of active CCs for upside ceiling
+                if (p.option_type or "").upper() == "CALL":
+                    cc_strikes.append(float(p.strike))
+
+            # live adj basis = stored adj basis minus in-flight premium per share
+            live_adj = max(0.0, adj - (pending_premium_total / h.shares))
+
+            # Upside ceiling = lowest active CC strike
+            if cc_strikes:
+                upside_basis = min(cc_strikes)
+
+    basis_reduction_stored = round((h.cost_basis - adj) * h.shares, 2)
+    basis_reduction_live   = round((h.cost_basis - live_adj) * h.shares, 2)
+
     return {
-        "id":                  h.id,
-        "symbol":              h.symbol,
-        "company_name":        h.company_name,
-        "shares":              h.shares,
-        "cost_basis":          h.cost_basis,
-        "adjusted_cost_basis": h.adjusted_cost_basis,
-        "acquired_date":       h.acquired_date.isoformat() if h.acquired_date else None,
-        "status":              h.status,
-        "notes":               h.notes,
-        "created_at":          h.created_at.isoformat(),
-        "updated_at":          h.updated_at.isoformat(),
+        "id":                   h.id,
+        "symbol":               h.symbol,
+        "company_name":         h.company_name,
+        "shares":               h.shares,
+        "cost_basis":           h.cost_basis,
+        "adjusted_cost_basis":  adj,          # stored (only closed/expired positions)
+        "live_adj_basis":       round(live_adj, 4),   # includes in-flight premium
+        "upside_basis":         round(upside_basis, 2) if upside_basis is not None else None,
+        "downside_basis":       round(live_adj, 4),   # breakeven if stock → 0
+        "pending_premium":      round(pending_premium_total, 2),
+        "acquired_date":        h.acquired_date.isoformat() if h.acquired_date else None,
+        "status":               h.status,
+        "notes":                h.notes,
+        "created_at":           h.created_at.isoformat(),
+        "updated_at":           h.updated_at.isoformat(),
         # Computed
-        "total_original_cost": round(h.cost_basis * h.shares, 2),
-        "total_adjusted_cost": round(h.adjusted_cost_basis * h.shares, 2),
-        "basis_reduction":     round((h.cost_basis - h.adjusted_cost_basis) * h.shares, 2),
+        "total_original_cost":  round(h.cost_basis * h.shares, 2),
+        "total_adjusted_cost":  round(live_adj * h.shares, 2),
+        "basis_reduction":      basis_reduction_live,
+        "basis_reduction_stored": basis_reduction_stored,
     }
 
 
@@ -71,7 +132,7 @@ def list_holdings(*, user_id: int) -> list[dict]:
             .order_by(StockHolding.symbol, StockHolding.acquired_date)
             .all()
         )
-        return [_holding_to_dict(h) for h in rows]
+        return [_holding_to_dict(h, session) for h in rows]
     finally:
         session.close()
 
@@ -97,7 +158,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
         session.add(h)
         session.commit()
         session.refresh(h)
-        return _holding_to_dict(h)
+        return _holding_to_dict(h, session)
     finally:
         session.close()
 
@@ -121,7 +182,7 @@ def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
         h.updated_at = datetime.utcnow()
         session.commit()
         session.refresh(h)
-        return _holding_to_dict(h)
+        return _holding_to_dict(h, session)
     finally:
         session.close()
 
@@ -302,7 +363,7 @@ def apply_position_status_change(
             session.add(event)
             session.commit()
             session.refresh(h)
-            return _holding_to_dict(h)
+            return _holding_to_dict(h, session)
 
         return None
     finally:
@@ -376,7 +437,7 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
                 )
                 session.add(h)
                 session.flush()  # populate h.id before linking
-                created.append(_holding_to_dict(h))
+                created.append(_holding_to_dict(h, session))
 
             for p in pos_list:
                 p.holding_id = h.id
