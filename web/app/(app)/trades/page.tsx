@@ -428,7 +428,10 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
               </button>
             )}
             <button onClick={onEdit} className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 transition">Edit</button>
-            <button onClick={onDelete} className="text-[10px] px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition">Del</button>
+            <button
+              onClick={() => { if (window.confirm(`Delete ${pos.symbol} $${pos.strike} ${pos.option_type}?`)) onDelete(); }}
+              className="text-[10px] px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition"
+            >Del</button>
           </div>
         </td>
       </tr>
@@ -522,11 +525,17 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
 
       {showComplete && <CompleteWeekModal week={week} onDone={() => setShowComplete(false)} />}
 
-      {(showForm || editing) && !week.is_complete && (
+      {(showForm && !week.is_complete) && (
         <PositionForm
           weekId={week.id}
-          editPos={editing ?? undefined}
-          onDone={() => { setShowForm(false); setEditing(null); }}
+          onDone={() => { setShowForm(false); }}
+        />
+      )}
+      {editing && (
+        <PositionForm
+          weekId={week.id}
+          editPos={editing}
+          onDone={() => { setEditing(null); }}
         />
       )}
 
@@ -646,12 +655,18 @@ function YearTab() {
   if (isLoading) return <div className="space-y-3">{[1,2,3].map(i => <SkeletonCard key={i} rows={2} />)}</div>;
   if (!s) return <EmptyState icon={BarChart2} title="No data yet" body="Complete a week to see your yearly summary." />;
 
+  // Guard: backend may be an older process without these fields yet
+  const weeksBreakdown: WeekBreakdown[] = s.weeks_breakdown ?? [];
+  const monthlyPremium: Record<string, number> = s.monthly_premium ?? {};
+  const winRate: number = s.win_rate ?? 0;
+  const completeWeeks: number = s.complete_weeks ?? 0;
+
   const monthNames: Record<string, string> = {
     "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
     "07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec",
   };
 
-  const monthlyEntries = Object.entries(s.monthly_premium ?? {}).sort(([a],[b]) => a.localeCompare(b));
+  const monthlyEntries = Object.entries(monthlyPremium).sort(([a],[b]) => a.localeCompare(b));
   const maxMonthlyPremium = Math.max(...monthlyEntries.map(([,v]) => v), 1);
 
   return (
@@ -669,8 +684,8 @@ function YearTab() {
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Win Rate</p>
-          <p className="text-xl font-black text-blue-500">{s.win_rate}%</p>
-          <p className="text-[10px] text-foreground/50">{s.complete_weeks}/{s.total_weeks} weeks</p>
+          <p className="text-xl font-black text-blue-500">{winRate}%</p>
+          <p className="text-[10px] text-foreground/50">{completeWeeks}/{s.total_weeks} weeks</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Est. Tax ({(s.cap_gains_tax_rate*100).toFixed(0)}%)</p>
@@ -735,7 +750,7 @@ function YearTab() {
       )}
 
       {/* ── Week-by-week table ── */}
-      {s.weeks_breakdown.length > 0 && (
+      {weeksBreakdown.length > 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
           <div className="px-4 py-3 border-b border-[var(--border)]">
             <h3 className="text-sm font-bold text-foreground">Week-by-Week</h3>
@@ -749,7 +764,7 @@ function YearTab() {
               </tr>
             </thead>
             <tbody>
-              {s.weeks_breakdown.map((w: WeekBreakdown) => (
+              {weeksBreakdown.map((w: WeekBreakdown) => (
                 <tr key={w.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
                   <td className="px-4 py-2.5 font-semibold text-foreground">{w.week_end}</td>
                   <td className="px-4 py-2.5">
@@ -775,7 +790,7 @@ function YearTab() {
         </div>
       )}
 
-      {s.weeks_breakdown.length === 0 && (
+      {weeksBreakdown.length === 0 && (
         <EmptyState icon={Calendar} title="No completed weeks yet" body="Mark a week complete to populate your yearly summary." />
       )}
     </div>
