@@ -142,7 +142,7 @@ export default function Navbar() {
 
         {/* Nav links */}
         <nav className={clsx(
-          "flex-1 overflow-y-auto py-4 space-y-0.5",
+          "flex-1 overflow-y-auto overscroll-contain py-4 space-y-0.5",
           collapsed ? "px-2" : "px-3",
         )}>
           {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => (
@@ -240,7 +240,7 @@ export default function Navbar() {
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative w-72 h-full bg-[var(--surface)] border-r border-[var(--border)] flex flex-col shadow-2xl">
+          <div className="relative w-72 h-full max-h-full bg-[var(--surface)] border-r border-[var(--border)] flex flex-col shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--border)] shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center">
@@ -261,7 +261,7 @@ export default function Navbar() {
                 <X size={18} />
               </button>
             </div>
-            <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+            <nav className="flex-1 overflow-y-auto overscroll-contain py-4 px-3 space-y-0.5" style={{ WebkitOverflowScrolling: 'touch' }}>
               {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => (
                 <NavLink
                   key={item.href}

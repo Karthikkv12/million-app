@@ -9,7 +9,7 @@ import BottomNav from "@/components/BottomNav";
 function AppShell({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
   return (
-    <div className="min-h-screen w-full overflow-x-hidden">
+    <div className="min-h-screen w-full">
       <Navbar />
       <main
         className={[

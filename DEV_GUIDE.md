@@ -1,100 +1,166 @@
 # OptionFlow — Developer Setup & Workflow Guide
 
 ## Table of Contents
-1. [Session Start Checklist](#session-start-checklist)
-2. [Project Structure](#project-structure)
-3. [Local Development Setup](#local-development-setup)
-4. [Running the Servers](#running-the-servers)
-5. [The Two-Server Setup (main vs develop)](#the-two-server-setup)
-6. [How optflw.com Works](#how-optflwcom-works)
-7. [Git Branch Workflow](#git-branch-workflow)
-8. [Releasing to Production](#releasing-to-production)
-9. [Checking What's Unreleased](#checking-whats-unreleased)
+1. [🚀 Startup Checklist (After Every Reboot)](#-startup-checklist-after-every-reboot--new-session)
+2. [🔧 Restart Commands](#-restart-commands-when-a-server-dies-mid-session)
+3. [Project Structure](#project-structure)
+4. [Local Development Setup](#local-development-setup)
+5. [Running the Servers](#running-the-servers)
+6. [The Two-Server Setup (main vs develop)](#the-two-server-setup)
+7. [How optflw.com Works](#how-optflwcom-works)
+8. [Git Branch Workflow](#git-branch-workflow)
+9. [Releasing to Production](#releasing-to-production)
+10. [Checking What's Unreleased](#checking-whats-unreleased)
 
 ---
 
-## Session Start Checklist
+## 🚀 Startup Checklist (After Every Reboot / New Session)
 
-Run through this every time you sit down to work. Takes ~60 seconds.
+> Run this top-to-bottom every time you open the laptop or start a new session.  
+> All servers are killed on shutdown — none survive a reboot automatically.  
+> Takes ~60 seconds.
 
-### ✅ 1 — Confirm you're on `develop`
+---
+
+### STEP 1 — Open VS Code & terminal, go to the right folder
+
 ```bash
 cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
+```
+
+---
+
+### STEP 2 — Confirm you're on `develop`
+
+```bash
 git branch --show-current
 # must print: develop
 # if not: git checkout develop
 ```
 
-### ✅ 2 — Pull latest changes from GitHub
+---
+
+### STEP 3 — Pull latest from GitHub
+
 ```bash
 git pull origin develop
 ```
 
-### ✅ 3 — Start the backend (FastAPI on port 8000)
+---
+
+### STEP 4 — Start the Backend (FastAPI — port 8000)
+
 ```bash
 cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
-source .venv/bin/activate
-python -m uvicorn backend_api.main:app --reload --port 8000 &
+source ~/Desktop/OptionFlow_V1/.venv/bin/activate
+PYTHONPATH=/Users/karthikkondajjividyaranya/Desktop/OptionFlow_V1/OptionFlow_V1 \
+  python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000 --reload &
 ```
-Verify it's running:
+
+✅ Verify it's up:
 ```bash
 curl -s http://localhost:8000/health
-# should return: {"status":"ok"}
+# → {"status":"ok"}
 ```
-> ⚠️ **After any backend code change** (e.g. new endpoint, schema change), the backend must be restarted — it does NOT hot-reload unless started with `--reload`.
-> Frontend (Next.js) hot-reloads automatically; backend does not.
->
-> Restart command:
-> ```bash
-> kill -9 $(lsof -ti :8000) && cd ~/Desktop/OptionFlow_V1/OptionFlow_V1 && source ~/Desktop/OptionFlow_V1/.venv/bin/activate && python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000 &
-> ```
-
-### ✅ 4 — Start the main server (port 3000 — production reference)
-```bash
-export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
-cd ~/Desktop/OptionFlow_main/web
-npx next dev -p 3000 &
-```
-→ open **http://localhost:3000** — this is the last released version (`main` branch)
-
-### ✅ 5 — Start the develop server (port 3002 — your working copy)
-```bash
-export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
-cd ~/Desktop/OptionFlow_V1/OptionFlow_V1/web
-npx next dev -p 3002 &
-```
-→ open **http://localhost:3002** — this is your active development branch
-
-### ✅ 6 — Verify what's unreleased
-```bash
-cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
-git log --oneline origin/main..develop
-# empty = nothing unreleased, some lines = commits staged for next release
-```
-
-### ✅ 7 — Ready to work
-- All code changes go in `~/Desktop/OptionFlow_V1/OptionFlow_V1/`
-- **Never edit files in `~/Desktop/OptionFlow_main/`** — that folder is read-only production reference
-- `localhost:3002` will hot-reload automatically as you save files
-- `localhost:3000` and `optflw.com` stay on the last release until you explicitly release
 
 ---
 
-### 🛑 Before you start — quick sanity check
+### STEP 5 — Start the Main (Stable) Frontend — port 3000
 
-| Check | Command | Expected |
-|---|---|---|
-| On correct branch | `git branch --show-current` | `develop` |
-| Backend running | `curl localhost:8000/health` | `{"status":"ok"}` |
-| No uncommitted mess | `git status` | clean or intentional WIP |
-| Port 3000 alive | open browser | last released version loads |
-| Port 3002 alive | open browser | develop version loads |
+> This serves the last released `main` branch and powers **optflw.com** via Cloudflare tunnel.
 
-> 💡 **Backend not responding / changes not taking effect?**
-> The backend does not hot-reload. Run:
-> ```bash
-> kill -9 $(lsof -ti :8000) && cd ~/Desktop/OptionFlow_V1/OptionFlow_V1 && source ~/Desktop/OptionFlow_V1/.venv/bin/activate && python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000 &
-> ```
+```bash
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_main/web
+node node_modules/.bin/next dev --port 3000 &
+```
+
+✅ Verify: open **http://localhost:3000** — should load the stable version.
+
+---
+
+### STEP 6 — Start the Develop Frontend — port 3002
+
+> This is your active working copy. All code changes hot-reload here.
+
+```bash
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1/web
+node node_modules/.bin/next dev --port 3002 &
+```
+
+✅ Verify: open **http://localhost:3002** — should load with your latest changes.
+
+---
+
+### STEP 7 — Quick Sanity Check Table
+
+Run these to confirm everything is healthy before starting work:
+
+| # | Check | Command | Expected result |
+|---|---|---|---|
+| 1 | Correct branch | `git branch --show-current` | `develop` |
+| 2 | Backend alive | `curl -s localhost:8000/health` | `{"status":"ok"}` |
+| 3 | Port 3000 alive | `curl -s -o /dev/null -w "%{http_code}" localhost:3000` | `200` |
+| 4 | Port 3002 alive | `curl -s -o /dev/null -w "%{http_code}" localhost:3002` | `200` |
+| 5 | No lost work | `git status` | clean or intentional WIP |
+
+---
+
+### STEP 8 — Ready to Work ✅
+
+- Edit files in `~/Desktop/OptionFlow_V1/OptionFlow_V1/` only
+- **Never edit `~/Desktop/OptionFlow_main/`** — read-only production reference
+- `localhost:3002` hot-reloads on every save
+- `localhost:3000` and `optflw.com` are frozen until you explicitly release
+
+---
+
+## 🔧 Restart Commands (when a server dies mid-session)
+
+### Restart backend only
+```bash
+kill -9 $(lsof -ti :8000) 2>/dev/null
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1
+source ~/Desktop/OptionFlow_V1/.venv/bin/activate
+PYTHONPATH=/Users/karthikkondajjividyaranya/Desktop/OptionFlow_V1/OptionFlow_V1 \
+  python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000 --reload &
+```
+
+### Restart port 3000 (stable) only
+```bash
+kill -9 $(lsof -ti :3000) 2>/dev/null; sleep 1
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_main/web
+node node_modules/.bin/next dev --port 3000 &
+```
+
+### Restart port 3002 (develop) only
+```bash
+kill -9 $(lsof -ti :3002) 2>/dev/null; sleep 1
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1/web
+node node_modules/.bin/next dev --port 3002 &
+```
+
+### Restart everything at once
+```bash
+kill -9 $(lsof -ti :8000 :3000 :3002) 2>/dev/null; sleep 1
+
+# Backend
+source ~/Desktop/OptionFlow_V1/.venv/bin/activate
+PYTHONPATH=/Users/karthikkondajjividyaranya/Desktop/OptionFlow_V1/OptionFlow_V1 \
+  python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8000 --reload &
+
+# Stable frontend
+export PATH="/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin:$PATH"
+cd ~/Desktop/OptionFlow_main/web && node node_modules/.bin/next dev --port 3000 &
+
+# Develop frontend
+cd ~/Desktop/OptionFlow_V1/OptionFlow_V1/web && node node_modules/.bin/next dev --port 3002 &
+
+echo "All servers starting..."
+```
 
 ---
 

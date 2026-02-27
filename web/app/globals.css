@@ -38,7 +38,7 @@
 html {
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
-  overflow-x: hidden;
+  /* No overflow set here — Chrome breaks mousewheel scroll if overflow is set on <html> */
 }
 
 body {
@@ -47,17 +47,43 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior-y: none;
-  overflow-x: hidden;
+  /* No overflow set here — let the browser handle scroll naturally on all engines */
 }
 
-/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-.dark ::-webkit-scrollbar-thumb { background: #2d3148; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #3f4466; }
+/* ── Global scroll ─────────────────────────────────────────────────────────── */
+
+/* Contain horizontal overflow at the app shell level, not on html/body.
+   This avoids Chrome's bug where overflow on the root blocks scroll events. */
+#__next {
+  overflow-x: hidden;
+  /* min-height keeps the Next.js root filling the viewport */
+  min-height: 100dvh;
+}
+
+/* ── Scrollbar — Mac: thin overlay style; Windows: wider grabbable track ───── */
+
+/* Default (Windows / non-Mac): wide enough to click with a mouse */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid var(--surface-2); }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+.dark ::-webkit-scrollbar-track { background: #1a1a1a; }
+.dark ::-webkit-scrollbar-thumb { background: #3f4466; border-color: #1a1a1a; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #5a5f8a; }
+
+/* Mac / Apple trackpad: keep the thin overlay style */
+@media (pointer: coarse), (-webkit-device-pixel-ratio: 2) and (pointer: fine) and (hover: hover) and (max-device-width: 1920px) {
+  /* only applied on retina fine-pointer = Mac trackpad */
+}
+
+/* Standard Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+.dark * {
+  scrollbar-color: #3f4466 transparent;
+}
 
 /* ── Autofill fix ──────────────────────────────────────────────────────────── */
 input:-webkit-autofill,

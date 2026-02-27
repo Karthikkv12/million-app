@@ -5,6 +5,25 @@
 
 ---
 
+## v1.3.0 — Scroll Fix, Dev Tooling & Startup Guide
+**Released:** 2026-02-27
+**Tag:** `v1.3.0`
+**Branch:** `main` (production)
+
+### 🐛 Bug Fixes
+- **Scroll broken on Chrome/Windows** — root cause was `overflow-x: hidden/clip` on `<html>`/`<body>`, which Chrome uses to hijack the scroll container, making mousewheel scroll non-functional. Fixed by moving horizontal overflow control to `#__next` wrapper only; `html` and `body` are now overflow-clean
+- **Scroll broken on macOS** — removed `overflow-x-hidden` from AppShell wrapper div and `<body>` className that were blocking scroll event delegation
+- **Mobile sidebar not scrollable** — added `overflow-hidden` bound + `overscroll-contain` + `-webkit-overflow-scrolling: touch` to the mobile drawer panel and nav list
+- **Desktop sidebar nav** — added `overscroll-contain` so sidebar scroll doesn't bleed into page scroll
+- **Scrollbar too thin for mouse users (Windows)** — increased from 4px to 8px with a visible track; added Firefox `scrollbar-width` + `scrollbar-color` support
+
+### 🔧 Developer Experience
+- **Startup checklist** added to `DEV_GUIDE.md` — step-by-step guide (8 steps) for after every reboot/new session, covering git branch check, pull, backend start, port 3000, port 3002, sanity check table
+- **Restart commands** section added — individual and combined one-liners for restarting backend, port 3000, port 3002, or all three at once
+- **Launchd agent fix** — `com.optflw.nextjs` plist was pointing at `OptionFlow_V1/web` instead of `OptionFlow_main/web`; corrected `~/bin/optflw-nextjs.sh` and reloaded agent
+
+---
+
 ## v1.2.0 — GEX Components, UI Polish & Mobile Responsiveness
 **Released:** 2026-02-25
 **Branch:** `develop`
