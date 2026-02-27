@@ -405,12 +405,73 @@ def apply_position_status_change(
                 created_at   = now,
             )
 
+        # ── PUT expired / closed (CSP kept premium, no assignment) ──
+        elif option_type == "PUT" and status in ("EXPIRED", "CLOSED"):
+            upsert_ledger_row(user_id=user_id, position_id=position_id, session=session)
+            if h.shares > 0:
+                summary = get_premium_summary(holding_id=h.id, session=session)
+                realized_per_share = summary["realized_premium"] / h.shares
+                new_adj = max(0.0, h.cost_basis - realized_per_share)
+                old_adj = h.adjusted_cost_basis
+                h.adjusted_cost_basis = round(new_adj, 4)
+                h.updated_at = now
+
+                prem_in  = (pos.premium_in  or 0.0) * pos.contracts * 100
+                prem_out = (pos.premium_out or 0.0) * pos.contracts * 100
+                net_prem = max(0.0, prem_in + prem_out)
+                basis_reduction_per_share = net_prem / h.shares
+
+                event = HoldingEvent(
+                    user_id      = user_id,
+                    holding_id   = h.id,
+                    position_id  = position_id,
+                    event_type   = HoldingEventType.CC_EXPIRED,  # reuse type for PUT expired
+                    shares_delta = 0.0,
+                    basis_delta  = round(-(basis_reduction_per_share), 4),
+                    realized_gain= None,
+                    description  = (
+                        f"{pos.symbol} PUT ${pos.strike} x{pos.contracts} {status.lower()} — "
+                        f"net ${net_prem:.2f} realized, basis ${old_adj:.4f} → ${new_adj:.4f}/share"
+                    ),
+                    created_at   = now,
+                )
+
+        # ── Reverting to ACTIVE (undoing a premature close/expire/assign) ──
+        elif status == "ACTIVE":
+            # Move premium back to unrealized and recompute adj_basis from scratch
+            upsert_ledger_row(user_id=user_id, position_id=position_id, session=session)
+            if h.shares > 0:
+                summary = get_premium_summary(holding_id=h.id, session=session)
+                realized_per_share = summary["realized_premium"] / h.shares
+                old_adj = h.adjusted_cost_basis
+                new_adj = max(0.0, h.cost_basis - realized_per_share)
+                h.adjusted_cost_basis = round(new_adj, 4)
+                h.updated_at = now
+
+                event = HoldingEvent(
+                    user_id      = user_id,
+                    holding_id   = h.id,
+                    position_id  = position_id,
+                    event_type   = HoldingEventType.MANUAL,
+                    shares_delta = 0.0,
+                    basis_delta  = round(new_adj - old_adj, 4),
+                    realized_gain= None,
+                    description  = (
+                        f"{pos.symbol} position reverted to ACTIVE — "
+                        f"premium moved back to unrealized. "
+                        f"adj basis ${old_adj:.4f} → ${new_adj:.4f}/share"
+                    ),
+                    created_at   = now,
+                )
+
         if event:
             session.add(event)
             session.commit()
             session.refresh(h)
             return _holding_to_dict(h, session)
 
+        # Always commit ledger upserts even when no event is created (e.g. ROLLED)
+        session.commit()
         return None
     finally:
         session.close()
