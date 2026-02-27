@@ -6,9 +6,10 @@ on:
   pull_request:
     branches: [develop, main]
 
+# ── Job 1: Unit + integration tests (runs on every push) ─────────────────────
 jobs:
   test:
-    name: Backend Tests (Python)
+    name: "🧪 Test Suite (all branches)"
     runs-on: ubuntu-latest
 
     steps:
@@ -23,10 +24,72 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run pytest
+      - name: Run full test suite
         working-directory: OptionFlow_V1
         run: |
-          python -m pytest tests/ -v --tb=short
+          python -m pytest tests/ -v --tb=short \
+            --ignore=tests/test_gex_live.py
         env:
-          # No Tradier token in CI → yfinance fallback used for any live tests
           TRADIER_TOKEN: ""
+          JWT_SECRET: "ci-test-secret"
+          JWT_AUDIENCE: "million-app"
+          JWT_ISSUER: "million-api"
+
+      - name: Coverage report
+        working-directory: OptionFlow_V1
+        run: |
+          pip install pytest-cov -q
+          python -m pytest tests/ -q --tb=no \
+            --cov=logic --cov=backend_api \
+            --cov-report=term-missing \
+            --ignore=tests/test_gex_live.py
+        env:
+          TRADIER_TOKEN: ""
+          JWT_SECRET: "ci-test-secret"
+          JWT_AUDIENCE: "million-app"
+          JWT_ISSUER: "million-api"
+
+# ── Job 2: Pre-release gate (blocks develop → main merges) ───────────────────
+  pre-release-gate:
+    name: "🚦 Pre-release Gate (develop → main)"
+    runs-on: ubuntu-latest
+    # Only run when a PR targets main — this is what blocks a release
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: test   # Gate only passes if the test job passed first
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: GEX symbol sweep (all UI symbols, mocked)
+        working-directory: OptionFlow_V1
+        run: |
+          python -m pytest tests/test_gex_symbols.py tests/test_api_gex.py \
+            -v --tb=short
+        env:
+          TRADIER_TOKEN: ""
+          JWT_SECRET: "ci-test-secret"
+          JWT_AUDIENCE: "million-app"
+          JWT_ISSUER: "million-api"
+
+      - name: Verify no test is skipped or xfailed
+        working-directory: OptionFlow_V1
+        run: |
+          python -m pytest tests/ -q --tb=line \
+            --ignore=tests/test_gex_live.py \
+            -p no:randomly 2>&1 | tee /tmp/results.txt
+          # Fail if any tests were errors (not just failures)
+          grep -E "error" /tmp/results.txt && exit 1 || true
+        env:
+          TRADIER_TOKEN: ""
+          JWT_SECRET: "ci-test-secret"
+          JWT_AUDIENCE: "million-app"
+          JWT_ISSUER: "million-api"
