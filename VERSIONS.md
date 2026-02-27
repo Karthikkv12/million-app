@@ -5,6 +5,36 @@
 
 ---
 
+## v1.4.0 — Premium Ledger Fix & Premium Tab
+**Released:** 2026-02-27
+**Branch:** `develop`
+
+### 🐛 Bug Fixes
+- **Adj basis double-counting** — `sync_ledger_from_positions()` was creating a `PremiumLedger` row for both original positions *and* their carry-forward copies (positions created when completing a week, with `carried_from_id` set). This doubled every premium figure (e.g. $487 appeared as $974). Fix: added `carried_from_id == None` filter so only originals get ledger rows. `upsert_ledger_row()` also updated to redirect any carry-forward call to the original position's row. Stale carry-forward rows deleted from DB (14 → 7 rows)
+
+### ✨ New Features
+- **Premium tab** (`Trades → Premium`) — full breakdown of all collected premium:
+  - **3 stat cards** — Total Collected · Realized (locked in, closed/expired options) · In-Flight (active options, settles on close/expiry)
+  - **By-symbol table** — Avg Cost · Adj Basis (stored) · Live Adj Basis · Sold $ · Realized $ · In-Flight $ · # Positions, with a footer total row and a Sync Ledger button
+  - **By-week section** — collapsible rows per week showing per-symbol premium breakdown
+  - **Legend** explaining realized vs in-flight distinction
+- **`GET /portfolio/premium-dashboard`** — new API endpoint powering the tab; returns `by_symbol`, `by_week`, and `grand_total`
+- **`fetchPremiumDashboard`** + TypeScript types (`PremiumDashboard`, `PremiumSymbolRow`, `PremiumWeekRow`) added to `web/lib/api.ts`
+
+### 📊 Correct Data After Fix
+| Symbol | Sold | Live Adj |
+|--------|------|----------|
+| SMCI   | $109 | $31.20   |
+| BMNR   | $85  | $18.11   |
+| BBAI   | $66  | $3.65    |
+| SMR    | $65  | $12.12   |
+| HIMS   | $59  | $14.24   |
+| TSLL   | $58  | $13.90   |
+| SOFI   | $45  | $16.89   |
+| **Total** | **$487** | — |
+
+---
+
 ## v1.3.1 — GEX Accuracy Fix & Test Suite Green
 **Released:** 2026-02-27
 **Tag:** `v1.3.1`
