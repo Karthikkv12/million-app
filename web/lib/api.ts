@@ -493,6 +493,8 @@ export const updateHolding = (id: number, body: Partial<StockHolding>) =>
 export const deleteHolding = (id: number) => api.del(`/portfolio/holdings/${id}`);
 export const fetchHoldingEvents = (holding_id: number) =>
   api.get<HoldingEvent[]>(`/portfolio/holdings/${holding_id}/events`);
+export const seedHoldingsFromPositions = () =>
+  api.post<{ created: StockHolding[]; linked: number }>("/portfolio/holdings/seed-from-positions", {});
 
 // ── Orders ───────────────────────────────────────────────────────────────────
 

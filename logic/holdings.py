@@ -309,6 +309,85 @@ def apply_position_status_change(
         session.close()
 
 
+# ── Seed holdings from existing positions ────────────────────────────────────
+
+def seed_holdings_from_positions(*, user_id: int) -> dict:
+    """
+    For every OptionPosition that has no holding_id, create (or reuse) one
+    StockHolding per unique symbol using the position's strike as cost_basis
+    and contracts * 100 as shares. Then link each position back via holding_id.
+
+    If a symbol already has an ACTIVE StockHolding for this user, the positions
+    are linked to that existing holding (no duplicate created).
+
+    Returns:
+        {"created": [<holding_dict>, ...], "linked": N}
+    """
+    session = get_session()
+    try:
+        positions = (
+            session.query(OptionPosition)
+            .filter(
+                OptionPosition.user_id == user_id,
+                OptionPosition.holding_id == None,  # noqa: E711
+            )
+            .all()
+        )
+
+        # Group unlinked positions by symbol
+        by_symbol: dict[str, list] = {}
+        for p in positions:
+            sym = (p.symbol or "").upper().strip()
+            if sym:
+                by_symbol.setdefault(sym, []).append(p)
+
+        created = []
+        linked = 0
+        now = datetime.utcnow()
+
+        for symbol, pos_list in by_symbol.items():
+            # Re-use existing ACTIVE holding if one exists for this symbol
+            existing = (
+                session.query(StockHolding)
+                .filter(
+                    StockHolding.user_id == user_id,
+                    StockHolding.symbol == symbol,
+                    StockHolding.status == "ACTIVE",
+                )
+                .first()
+            )
+
+            if existing:
+                h = existing
+            else:
+                # Use the strike of the first position as cost_basis
+                strike = float(pos_list[0].strike or 0.0)
+                total_shares = float(sum(p.contracts * 100 for p in pos_list))
+                h = StockHolding(
+                    user_id             = user_id,
+                    symbol              = symbol,
+                    company_name        = None,
+                    shares              = total_shares,
+                    cost_basis          = strike,
+                    adjusted_cost_basis = strike,
+                    status              = "ACTIVE",
+                    created_at          = now,
+                    updated_at          = now,
+                )
+                session.add(h)
+                session.flush()  # populate h.id before linking
+                created.append(_holding_to_dict(h))
+
+            for p in pos_list:
+                p.holding_id = h.id
+                linked += 1
+
+        session.commit()
+        return {"created": created, "linked": linked}
+    finally:
+        session.close()
+
+
 # ── Utility ───────────────────────────────────────────────────────────────────
 
 def _parse_dt(val: Any) -> datetime | None:

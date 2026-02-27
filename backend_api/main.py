@@ -1189,6 +1189,14 @@ def create_holding(body: Dict[str, Any], user=Depends(get_current_user)) -> Dict
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/portfolio/holdings/seed-from-positions", response_model=Dict[str, Any])
+def seed_holdings_from_positions(user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Create one StockHolding per unlinked symbol using strike as cost basis,
+    then link each position's holding_id back to the new (or existing) holding."""
+    from logic.holdings import seed_holdings_from_positions as _seed
+    return _seed(user_id=int(user["sub"]))
+
+
 @app.patch("/portfolio/holdings/{holding_id}", response_model=Dict[str, Any])
 def update_holding(holding_id: int, body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
     from logic.holdings import update_holding as _update

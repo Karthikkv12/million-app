@@ -7,6 +7,7 @@ import {
   createAssignment, fetchAssignment, updateAssignment,
   fetchPortfolioSummary, fetchSymbolSummary, fetchStockHistory,
   fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHoldingEvents,
+  seedHoldingsFromPositions,
   WeeklySnapshot, OptionPosition, StockAssignment, PositionStatus, WeekBreakdown,
   StockHolding, HoldingEvent,
 } from "@/lib/api";
@@ -1054,6 +1055,21 @@ function HoldingsTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["holdings"] }),
   });
 
+  const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  const seedMut = useMutation({
+    mutationFn: seedHoldingsFromPositions,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      qc.invalidateQueries({ queryKey: ["positions"] });
+      setSeedMsg(
+        res.created.length > 0
+          ? `✓ Created ${res.created.length} holding${res.created.length > 1 ? "s" : ""}, linked ${res.linked} position${res.linked > 1 ? "s" : ""}.`
+          : `✓ ${res.linked} position${res.linked > 1 ? "s" : ""} linked to existing holdings.`
+      );
+      setTimeout(() => setSeedMsg(null), 5000);
+    },
+  });
+
   const saveMut = useMutation({
     mutationFn: () => {
       const body = {
@@ -1135,13 +1151,29 @@ function HoldingsTab() {
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search symbol or company…" className={`${inp} pl-8`} />
         </div>
-        <button
-          onClick={() => { setEditing(null); resetForm(); setShowForm(v => !v); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
-        >
-          <Plus size={12} /> Add Holding
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => seedMut.mutate()}
+            disabled={seedMut.isPending}
+            title="Create holdings from existing positions using strike as avg cost"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <TrendingUp size={12} /> {seedMut.isPending ? "Importing…" : "Import from Positions"}
+          </button>
+          <button
+            onClick={() => { setEditing(null); resetForm(); setShowForm(v => !v); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+          >
+            <Plus size={12} /> Add Holding
+          </button>
+        </div>
       </div>
+
+      {seedMsg && (
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-xs font-semibold">
+          {seedMsg}
+        </div>
+      )}
 
       {/* Add / Edit form */}
       {showForm && (
