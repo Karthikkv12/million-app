@@ -7,7 +7,7 @@ import {
   createAssignment, fetchAssignment, updateAssignment,
   fetchPortfolioSummary, fetchSymbolSummary, fetchStockHistory,
   fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHoldingEvents,
-  seedHoldingsFromPositions, recalculateHoldings,
+  seedHoldingsFromPositions, recalculateHoldings, syncPremiumLedger,
   WeeklySnapshot, OptionPosition, StockAssignment, PositionStatus, WeekBreakdown,
   StockHolding, HoldingEvent,
 } from "@/lib/api";
@@ -968,12 +968,19 @@ function YearTab() {
 
 function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => void; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  // Fallback for old cached responses that predate the live-basis fields
-  const liveAdj        = h.live_adj_basis     ?? h.adjusted_cost_basis;
-  const downsideBasis  = h.downside_basis      ?? liveAdj;
-  const upsideBasis    = h.upside_basis        ?? null;
-  const pendingPremium = h.pending_premium     ?? 0;
-  const basisReduction = h.basis_reduction     ?? 0;
+
+  const liveAdj          = h.live_adj_basis         ?? h.adjusted_cost_basis;
+  const storedAdj        = h.adjusted_cost_basis;
+  const downsideBasis    = h.downside_basis          ?? liveAdj;
+  const upsideBasis      = h.upside_basis            ?? null;
+  const realizedPrem     = h.realized_premium        ?? 0;
+  const unrealizedPrem   = h.unrealized_premium      ?? 0;
+  const totalPremSold    = h.total_premium_sold      ?? 0;
+  const basisReduction   = h.basis_reduction         ?? 0;
+
+  // Per-share breakdowns for tooltip-style display
+  const realizedPerShare   = h.shares > 0 ? realizedPrem   / h.shares : 0;
+  const unrealizedPerShare = h.shares > 0 ? unrealizedPrem / h.shares : 0;
 
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ["holdingEvents", h.id],
@@ -999,19 +1006,41 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
         <td className="px-3 py-2.5 text-foreground font-semibold">{h.shares.toLocaleString()}</td>
         {/* Avg cost */}
         <td className="px-3 py-2.5 text-foreground/70 text-sm">${h.cost_basis.toFixed(2)}</td>
-        {/* Adj basis */}
+        {/* Adj basis — full breakdown */}
         <td className="px-3 py-2.5 text-sm">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-blue-500">${liveAdj.toFixed(2)}</span>
-            {pendingPremium > 0 && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold" title="Premium in-flight from active positions">⏳ -${(pendingPremium / h.shares).toFixed(2)}/sh pending</span>
+          {/* Live adj basis (headline) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-blue-500">${liveAdj.toFixed(2)}</span>
+            <span className="text-[9px] text-foreground/40 font-normal">live</span>
+            {storedAdj !== liveAdj && (
+              <span className="text-[9px] text-foreground/40" title="Stored adj basis (unrealized premium not yet locked in)">(stored: ${storedAdj.toFixed(2)})</span>
             )}
           </div>
+          {/* Premium row: realized (locked) + unrealized (in-flight) */}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {realizedPrem > 0 && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-semibold"
+                title={`Realized premium locked in — reduces stored adj basis. Per share: -$${realizedPerShare.toFixed(4)}`}
+              >
+                ✓ -${realizedPerShare.toFixed(2)}/sh realized
+              </span>
+            )}
+            {unrealizedPrem > 0 && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold"
+                title={`Unrealized premium in-flight (active options). Will lock in when position closes. Per share: -$${unrealizedPerShare.toFixed(4)}`}
+              >
+                ⏳ -${unrealizedPerShare.toFixed(2)}/sh in-flight
+              </span>
+            )}
+          </div>
+          {/* Total basis saved */}
           {basisReduction > 0 && (
-            <div className="text-[9px] text-green-500 font-semibold">↓ ${basisReduction.toFixed(2)} saved total</div>
+            <div className="text-[9px] text-green-500 font-semibold mt-0.5">↓ ${basisReduction.toFixed(2)} total saved</div>
           )}
-          {/* Upside / Downside basis */}
-          <div className="flex items-center gap-2 mt-1">
+          {/* Upside / Downside */}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-[9px] text-foreground/50" title="Breakeven if stock goes to zero">▼ BE: <span className="text-red-400 font-semibold">${downsideBasis.toFixed(2)}</span></span>
             {upsideBasis != null && (
               <span className="text-[9px] text-foreground/50" title="Lowest active covered call strike — shares get called away here">▲ CC: <span className="text-green-500 font-semibold">${upsideBasis.toFixed(2)}</span></span>
@@ -1040,6 +1069,15 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
       {expanded && (
         <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/40">
           <td colSpan={6} className="px-4 pb-3 pt-2">
+            {/* Premium summary banner */}
+            {totalPremSold > 0 && (
+              <div className="flex items-center gap-4 mb-2 px-3 py-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 text-xs">
+                <span className="font-semibold text-foreground/70">Premium history for {h.symbol}:</span>
+                <span className="text-foreground/60">Total sold: <span className="font-bold text-foreground">${totalPremSold.toFixed(2)}</span></span>
+                <span className="text-green-600 dark:text-green-400">Realized: <span className="font-bold">${realizedPrem.toFixed(2)}</span></span>
+                <span className="text-amber-600 dark:text-amber-400">In-flight: <span className="font-bold">${unrealizedPrem.toFixed(2)}</span></span>
+              </div>
+            )}
             {eventsLoading ? (
               <p className="text-xs text-foreground/50">Loading history…</p>
             ) : events.length === 0 ? (
@@ -1158,6 +1196,16 @@ function HoldingsTab() {
     },
   });
 
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const syncMut = useMutation({
+    mutationFn: syncPremiumLedger,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      setSyncMsg(`✓ Synced ${res.synced_rows} premium rows, updated ${res.updated_holdings} holding${res.updated_holdings !== 1 ? "s" : ""}.`);
+      setTimeout(() => setSyncMsg(null), 5000);
+    },
+  });
+
   const saveMut = useMutation({
     mutationFn: () => {
       const body = {
@@ -1241,12 +1289,12 @@ function HoldingsTab() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => recalcMut.mutate()}
-            disabled={recalcMut.isPending}
-            title="Reset adj basis to cost basis, then replay closed/expired premium history"
+            onClick={() => syncMut.mutate()}
+            disabled={syncMut.isPending}
+            title="Sync premium ledger from all linked positions — rebuilds realized/unrealized premium and re-derives adj basis"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            <Activity size={12} /> {recalcMut.isPending ? "Recalculating…" : "Recalc Basis"}
+            <DollarSign size={12} /> {syncMut.isPending ? "Syncing…" : "Sync Ledger"}
           </button>
           <button
             onClick={() => seedMut.mutate()}
@@ -1273,6 +1321,11 @@ function HoldingsTab() {
       {recalcMsg && (
         <div className="mb-3 px-4 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-semibold">
           {recalcMsg}
+        </div>
+      )}
+      {syncMsg && (
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-xs font-semibold">
+          {syncMsg}
         </div>
       )}
 

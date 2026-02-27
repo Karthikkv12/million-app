@@ -454,17 +454,46 @@ export const fetchSymbolSummary = () => api.get<SymbolSummary[]>("/portfolio/sym
 
 // ── Stock Holdings ────────────────────────────────────────────────────────────
 
+export interface PremiumLedgerRow {
+  id: number;
+  holding_id: number;
+  position_id: number;
+  symbol: string;
+  week_id: number | null;
+  option_type: "CALL" | "PUT";
+  strike: number;
+  contracts: number;
+  expiry_date: string | null;
+  premium_sold: number;       // total credit when opened
+  realized_premium: number;   // locked-in (position closed/expired)
+  unrealized_premium: number; // in-flight (position still active)
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PremiumSummary {
+  holding_id: number;
+  realized_premium: number;
+  unrealized_premium: number;
+  total_premium_sold: number;
+  rows: PremiumLedgerRow[];
+}
+
 export interface StockHolding {
   id: number;
   symbol: string;
   company_name: string | null;
   shares: number;
   cost_basis: number;
-  adjusted_cost_basis: number;   // stored: only closed/expired positions applied
-  live_adj_basis: number;        // live: includes in-flight premium from ACTIVE positions
+  adjusted_cost_basis: number;   // stored: cost_basis − realized_premium/share (locked-in)
+  live_adj_basis: number;        // live: adj_basis − unrealized_premium/share (in-flight)
   upside_basis: number | null;   // lowest active CC strike (ceiling if called away)
   downside_basis: number;        // live_adj_basis = true breakeven
-  pending_premium: number;       // total premium still in-flight (not yet closed)
+  // Premium breakdown
+  realized_premium: number;      // total $ locked in from closed/expired options
+  unrealized_premium: number;    // total $ still in-flight (active options)
+  total_premium_sold: number;    // gross premium ever sold against this holding
   acquired_date: string | null;
   status: "ACTIVE" | "CLOSED";
   notes: string | null;
@@ -505,6 +534,10 @@ export const seedHoldingsFromPositions = () =>
   api.post<{ created: StockHolding[]; linked: number }>("/portfolio/holdings/seed-from-positions", {});
 export const recalculateHoldings = () =>
   api.post<{ updated: number; holdings: { symbol: string; cost_basis: number; old_adj: number; new_adj: number; corrected: boolean }[] }>("/portfolio/holdings/recalculate", {});
+export const syncPremiumLedger = () =>
+  api.post<{ synced_rows: number; updated_holdings: number }>("/portfolio/holdings/sync-ledger", {});
+export const fetchHoldingPremiumLedger = (holding_id: number) =>
+  api.get<PremiumSummary>(`/portfolio/holdings/${holding_id}/premium-ledger`);
 
 // ── Orders ───────────────────────────────────────────────────────────────────
 

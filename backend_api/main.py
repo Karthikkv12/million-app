@@ -1205,6 +1205,24 @@ def recalculate_holdings(user=Depends(get_current_user)) -> Dict[str, Any]:
     return _recalc(user_id=int(user["sub"]))
 
 
+@app.post("/portfolio/holdings/sync-ledger", response_model=Dict[str, Any])
+def sync_premium_ledger(user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Rebuild all PremiumLedger rows from existing OptionPosition data.
+    Idempotent — safe to call anytime. Also re-syncs adj_basis on all holdings."""
+    from logic.premium_ledger import sync_ledger_from_positions as _sync
+    from logic.holdings import recalculate_all_holdings as _recalc
+    sync_result = _sync(user_id=int(user["sub"]))
+    recalc_result = _recalc(user_id=int(user["sub"]))
+    return {"synced_rows": sync_result["upserted"], "updated_holdings": recalc_result["updated"]}
+
+
+@app.get("/portfolio/holdings/{holding_id}/premium-ledger", response_model=Dict[str, Any])
+def get_holding_premium_ledger(holding_id: int, user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Return the full premium ledger (all option positions) for a single holding."""
+    from logic.premium_ledger import get_premium_summary as _summary
+    return _summary(holding_id=holding_id)
+
+
 @app.patch("/portfolio/holdings/{holding_id}", response_model=Dict[str, Any])
 def update_holding(holding_id: int, body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
     from logic.holdings import update_holding as _update
@@ -1212,6 +1230,7 @@ def update_holding(holding_id: int, body: Dict[str, Any], user=Depends(get_curre
         return _update(user_id=int(user["sub"]), holding_id=holding_id, data=body)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
 
 
 @app.delete("/portfolio/holdings/{holding_id}")

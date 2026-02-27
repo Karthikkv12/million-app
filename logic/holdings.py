@@ -21,6 +21,7 @@ from database.models import (
     HoldingEventType,
     OptionPosition,
     OptionPositionStatus,
+    PremiumLedger,
 )
 
 
@@ -30,79 +31,78 @@ def _holding_to_dict(h: StockHolding, session=None) -> dict:
     """
     Serialize a StockHolding.
 
-    When `session` is provided, fetches all linked OptionPositions to compute:
+    Basis math (all from the PremiumLedger — single source of truth):
 
-      live_adj_basis   — adjusted_cost_basis MINUS in-flight premium from ACTIVE
-                         positions not yet closed.  This is what you effectively
-                         own the stock at right now.
+      adj_basis (stored)   = cost_basis − realized_premium_per_share
+          Only moves when an option CLOSES/EXPIRES/IS ASSIGNED.
+          This is the "locked-in" basis — permanent reductions from realized premium.
 
-      downside_basis   — same as live_adj_basis (your true breakeven if price → 0).
+      live_adj_basis       = adj_basis − unrealized_premium_per_share
+          Subtracts in-flight (ACTIVE) premium from the stored adj_basis.
+          Shows what you're effectively paying for the stock right now.
 
-      upside_basis     — strike of the lowest-strike ACTIVE covered call linked
-                         to this holding.  If shares get called away you sell there.
-                         None when no active CC is written.
-
-      pending_premium  — total premium still "in flight" (ACTIVE positions)
-                         per share; reduces from live_adj_basis once they close.
+      realized_premium     = total $ collected from closed/expired options
+      unrealized_premium   = total $ still in-flight (ACTIVE options)
+      upside_basis         = lowest active CC strike (ceiling if called away)
     """
-    adj = h.adjusted_cost_basis
+    adj = h.adjusted_cost_basis   # stored: cost_basis - realized_prem/share
     live_adj = adj
     upside_basis: float | None = None
-    pending_premium_total = 0.0
+    realized_prem_total   = 0.0
+    unrealized_prem_total = 0.0
+    total_prem_sold       = 0.0
 
     if session is not None and h.id:
-        active_positions = (
-            session.query(OptionPosition)
-            .filter(
-                OptionPosition.holding_id == h.id,
-                OptionPosition.status == OptionPositionStatus.ACTIVE,
-            )
+        # Pull aggregated premium totals from ledger (no double-counting)
+        ledger_rows = (
+            session.query(PremiumLedger)
+            .filter(PremiumLedger.holding_id == h.id)
             .all()
         )
-        if active_positions and h.shares > 0:
-            cc_strikes: list[float] = []
-            for p in active_positions:
-                prem = (p.premium_in or 0.0)
-                # Net of any roll debit
-                net_prem_per_contract = prem + (p.premium_out or 0.0)
-                # Total collected for this position
-                prem_total = net_prem_per_contract * p.contracts * 100
-                pending_premium_total += prem_total
+        realized_prem_total   = sum(r.realized_premium   for r in ledger_rows)
+        unrealized_prem_total = sum(r.unrealized_premium for r in ledger_rows)
+        total_prem_sold       = sum(r.premium_sold       for r in ledger_rows)
 
-                # Track strikes of active CCs for upside ceiling
-                if (p.option_type or "").upper() == "CALL":
-                    cc_strikes.append(float(p.strike))
+        if h.shares > 0:
+            unrealized_per_share = unrealized_prem_total / h.shares
+            live_adj = max(0.0, adj - unrealized_per_share)
 
-            # live adj basis = stored adj basis minus in-flight premium per share
-            live_adj = max(0.0, adj - (pending_premium_total / h.shares))
+        # Upside ceiling from active CC positions
+        active_cc_strikes = [
+            r.strike for r in ledger_rows
+            if r.status == "ACTIVE" and r.option_type == "CALL"
+        ]
+        if active_cc_strikes:
+            upside_basis = min(active_cc_strikes)
 
-            # Upside ceiling = lowest active CC strike
-            if cc_strikes:
-                upside_basis = min(cc_strikes)
-
-    basis_reduction_stored = round((h.cost_basis - adj) * h.shares, 2)
+    basis_reduction_stored = round((h.cost_basis - adj)      * h.shares, 2)
     basis_reduction_live   = round((h.cost_basis - live_adj) * h.shares, 2)
 
     return {
-        "id":                   h.id,
-        "symbol":               h.symbol,
-        "company_name":         h.company_name,
-        "shares":               h.shares,
-        "cost_basis":           h.cost_basis,
-        "adjusted_cost_basis":  adj,          # stored (only closed/expired positions)
-        "live_adj_basis":       round(live_adj, 4),   # includes in-flight premium
-        "upside_basis":         round(upside_basis, 2) if upside_basis is not None else None,
-        "downside_basis":       round(live_adj, 4),   # breakeven if stock → 0
-        "pending_premium":      round(pending_premium_total, 2),
-        "acquired_date":        h.acquired_date.isoformat() if h.acquired_date else None,
-        "status":               h.status,
-        "notes":                h.notes,
-        "created_at":           h.created_at.isoformat(),
-        "updated_at":           h.updated_at.isoformat(),
-        # Computed
-        "total_original_cost":  round(h.cost_basis * h.shares, 2),
-        "total_adjusted_cost":  round(live_adj * h.shares, 2),
-        "basis_reduction":      basis_reduction_live,
+        "id":                    h.id,
+        "symbol":                h.symbol,
+        "company_name":          h.company_name,
+        "shares":                h.shares,
+        "cost_basis":            h.cost_basis,
+        # Stored adj basis: only realized premium has been subtracted
+        "adjusted_cost_basis":   round(adj, 4),
+        # Live adj basis: realized + unrealized both subtracted (what you effectively own at)
+        "live_adj_basis":        round(live_adj, 4),
+        "upside_basis":          round(upside_basis, 2) if upside_basis is not None else None,
+        "downside_basis":        round(live_adj, 4),
+        # Premium breakdown
+        "realized_premium":      round(realized_prem_total,   2),
+        "unrealized_premium":    round(unrealized_prem_total, 2),
+        "total_premium_sold":    round(total_prem_sold,       2),
+        "acquired_date":         h.acquired_date.isoformat() if h.acquired_date else None,
+        "status":                h.status,
+        "notes":                 h.notes,
+        "created_at":            h.created_at.isoformat(),
+        "updated_at":            h.updated_at.isoformat(),
+        # Computed totals
+        "total_original_cost":   round(h.cost_basis * h.shares, 2),
+        "total_adjusted_cost":   round(live_adj     * h.shares, 2),
+        "basis_reduction":       basis_reduction_live,
         "basis_reduction_stored": basis_reduction_stored,
     }
 
@@ -123,28 +123,20 @@ def _event_to_dict(e: HoldingEvent) -> dict:
 
 def _recalculate_adj_basis(h: StockHolding, session) -> float:
     """
-    Replay all HoldingEvents for this holding to compute the correct
-    adjusted_cost_basis starting from cost_basis.
-    Only CC_EXPIRED / MANUAL events with a basis_delta are applied.
-    Returns the recalculated adjusted_cost_basis.
+    Compute correct adjusted_cost_basis from the PremiumLedger.
+    adj_basis = cost_basis - (total realized_premium / shares)
+    If no shares, returns cost_basis unchanged.
     """
-    events = (
-        session.query(HoldingEvent)
-        .filter(
-            HoldingEvent.holding_id == h.id,
-            HoldingEvent.event_type.in_([
-                HoldingEventType.CC_EXPIRED,
-                HoldingEventType.MANUAL,
-            ])
-        )
-        .order_by(HoldingEvent.created_at)
+    if h.shares <= 0:
+        return h.cost_basis
+    rows = (
+        session.query(PremiumLedger)
+        .filter(PremiumLedger.holding_id == h.id)
         .all()
     )
-    adj = h.cost_basis
-    for ev in events:
-        if ev.basis_delta is not None:
-            adj = max(0.0, adj + ev.basis_delta)  # basis_delta is negative for reductions
-    return round(adj, 4)
+    realized_total = sum(r.realized_premium for r in rows)
+    adj = h.cost_basis - (realized_total / h.shares)
+    return round(max(0.0, adj), 4)
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -263,11 +255,18 @@ def apply_position_status_change(
     Called whenever an OptionPosition status is changed.
     Returns the updated holding dict if a holding was affected, else None.
 
+    Flow:
+      1. Update the PremiumLedger row for this position (upsert).
+      2. Recompute holding.adjusted_cost_basis from ALL realized ledger rows.
+      3. Write a HoldingEvent for the audit log.
+
     Triggers:
-      CC + EXPIRED or CLOSED  → reduce adjusted_cost_basis
-      CC + ASSIGNED           → remove shares, record realized gain
+      CC + EXPIRED or CLOSED  → position realized → adj_basis decreases
+      CC + ASSIGNED           → shares called away, realized gain recorded
       PUT + ASSIGNED          → add shares, blend cost basis
     """
+    from logic.premium_ledger import upsert_ledger_row, get_premium_summary
+
     session = get_session()
     try:
         pos = session.query(OptionPosition).filter(
@@ -296,14 +295,23 @@ def apply_position_status_change(
 
         # ── CC expired worthless or bought back ──
         if option_type == "CALL" and status in ("EXPIRED", "CLOSED"):
+            # Step 1: upsert this position's ledger row (moves premium to realized)
+            upsert_ledger_row(user_id=user_id, position_id=position_id, session=session)
+
+            # Step 2: recompute adj_basis from ALL realized ledger rows
             if h.shares > 0:
-                # Premium collected = premium_in × contracts × 100
-                # Per-share reduction = total_premium / current_shares
-                premium_total = (pos.premium_in or 0.0) * pos.contracts * 100
-                basis_reduction_per_share = premium_total / h.shares
+                summary = get_premium_summary(holding_id=h.id, session=session)
+                realized_per_share = summary["realized_premium"] / h.shares
+                new_adj = max(0.0, h.cost_basis - realized_per_share)
                 old_adj = h.adjusted_cost_basis
-                h.adjusted_cost_basis = max(0.0, old_adj - basis_reduction_per_share)
+                h.adjusted_cost_basis = round(new_adj, 4)
                 h.updated_at = now
+
+                # Net premium for this specific close (for the event log)
+                prem_in  = (pos.premium_in  or 0.0) * pos.contracts * 100
+                prem_out = (pos.premium_out or 0.0) * pos.contracts * 100
+                net_prem = max(0.0, prem_in + prem_out)
+                basis_reduction_per_share = net_prem / h.shares
 
                 event = HoldingEvent(
                     user_id      = user_id,
@@ -311,18 +319,24 @@ def apply_position_status_change(
                     position_id  = position_id,
                     event_type   = HoldingEventType.CC_EXPIRED,
                     shares_delta = 0.0,
-                    basis_delta  = -(basis_reduction_per_share),
+                    basis_delta  = round(-(basis_reduction_per_share), 4),
                     realized_gain= None,
                     description  = (
                         f"{pos.symbol} CC ${pos.strike} x{pos.contracts} {status.lower()} — "
-                        f"basis reduced by ${basis_reduction_per_share:.4f}/share "
-                        f"(${premium_total:.2f} / {h.shares:.0f} shares)"
+                        f"net ${net_prem:.2f} realized, basis ${old_adj:.4f} → ${new_adj:.4f}/share"
                     ),
                     created_at   = now,
                 )
 
         # ── CC assigned (shares called away) ──
         elif option_type == "CALL" and status == "ASSIGNED":
+            # Upsert ledger (marks as realized)
+            upsert_ledger_row(user_id=user_id, position_id=position_id, session=session)
+            if h.shares > 0:
+                summary = get_premium_summary(holding_id=h.id, session=session)
+                realized_per_share = summary["realized_premium"] / h.shares
+                h.adjusted_cost_basis = max(0.0, round(h.cost_basis - realized_per_share, 4))
+
             shares_called = pos.contracts * 100
             realized_gain = (pos.strike - h.adjusted_cost_basis) * shares_called
             old_shares = h.shares

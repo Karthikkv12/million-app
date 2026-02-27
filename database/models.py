@@ -403,6 +403,54 @@ class HoldingEvent(Base):
     created_at          = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class PremiumLedger(Base):
+    """
+    One row per (holding × option_position) pair.
+
+    Captures the full premium story for every option sold against a holding:
+      - premium_sold:      total credit received when the position was opened
+                           (premium_in × contracts × 100)
+      - realized_premium:  portion that has been locked in (position CLOSED/EXPIRED/ASSIGNED).
+                           For a fully closed position = premium_sold (net of any buyback debit).
+                           For a partially rolled position = net credit on the closed leg.
+      - unrealized_premium: portion still in-flight (ACTIVE positions).
+                           = premium_sold when status is ACTIVE, 0 once realized.
+      - status:            mirrors OptionPosition.status (ACTIVE / CLOSED / EXPIRED / ASSIGNED / ROLLED)
+
+    adj_basis (stored) = cost_basis - SUM(realized_premium) / shares
+    live_adj_basis     = adj_basis  - SUM(unrealized_premium) / shares
+    """
+    __tablename__ = "premium_ledger"
+
+    id                  = Column(Integer, primary_key=True)
+    user_id             = Column(Integer, ForeignKey("users.id"),            nullable=False, index=True)
+    holding_id          = Column(Integer, ForeignKey("stock_holdings.id"),   nullable=False, index=True)
+    position_id         = Column(Integer, ForeignKey("option_positions.id"), nullable=False, index=True)
+    symbol              = Column(String,  nullable=False, index=True)
+    week_id             = Column(Integer, ForeignKey("weekly_snapshots.id"), nullable=True,  index=True)
+    option_type         = Column(String,  nullable=False)           # CALL | PUT
+    strike              = Column(Float,   nullable=False)
+    contracts           = Column(Integer, nullable=False, default=1)
+    expiry_date         = Column(DateTime, nullable=True)
+    # Premium amounts (total dollar value, not per-share)
+    premium_sold        = Column(Float,   nullable=False, default=0.0)  # credit when opened
+    realized_premium    = Column(Float,   nullable=False, default=0.0)  # locked-in (closed/expired)
+    unrealized_premium  = Column(Float,   nullable=False, default=0.0)  # still in-flight (active)
+    # Position status snapshot
+    status              = Column(String,  nullable=False, default="ACTIVE", index=True)
+    notes               = Column(String,  nullable=True)
+    created_at          = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at          = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+Index(
+    "ux_premium_ledger_holding_position",
+    PremiumLedger.holding_id,
+    PremiumLedger.position_id,
+    unique=True,
+)
+
+
 class StockAssignment(Base):
     """Tracks stock acquired via put assignment, plus any additional buys.
     Computes upside / downside breakeven automatically."""
