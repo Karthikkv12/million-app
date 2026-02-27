@@ -503,6 +503,8 @@ export const fetchHoldingEvents = (holding_id: number) =>
   api.get<HoldingEvent[]>(`/portfolio/holdings/${holding_id}/events`);
 export const seedHoldingsFromPositions = () =>
   api.post<{ created: StockHolding[]; linked: number }>("/portfolio/holdings/seed-from-positions", {});
+export const recalculateHoldings = () =>
+  api.post<{ updated: number; holdings: { symbol: string; cost_basis: number; old_adj: number; new_adj: number; corrected: boolean }[] }>("/portfolio/holdings/recalculate", {});
 
 // ── Orders ───────────────────────────────────────────────────────────────────
 

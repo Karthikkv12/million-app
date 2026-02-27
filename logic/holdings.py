@@ -121,6 +121,32 @@ def _event_to_dict(e: HoldingEvent) -> dict:
     }
 
 
+def _recalculate_adj_basis(h: StockHolding, session) -> float:
+    """
+    Replay all HoldingEvents for this holding to compute the correct
+    adjusted_cost_basis starting from cost_basis.
+    Only CC_EXPIRED / MANUAL events with a basis_delta are applied.
+    Returns the recalculated adjusted_cost_basis.
+    """
+    events = (
+        session.query(HoldingEvent)
+        .filter(
+            HoldingEvent.holding_id == h.id,
+            HoldingEvent.event_type.in_([
+                HoldingEventType.CC_EXPIRED,
+                HoldingEventType.MANUAL,
+            ])
+        )
+        .order_by(HoldingEvent.created_at)
+        .all()
+    )
+    adj = h.cost_basis
+    for ev in events:
+        if ev.basis_delta is not None:
+            adj = max(0.0, adj + ev.basis_delta)  # basis_delta is negative for reductions
+    return round(adj, 4)
+
+
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def list_holdings(*, user_id: int) -> list[dict]:
@@ -173,12 +199,18 @@ def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
         if h is None:
             raise ValueError("Holding not found")
         if "shares"               in data: h.shares               = float(data["shares"])
-        if "cost_basis"           in data: h.cost_basis           = float(data["cost_basis"])
-        if "adjusted_cost_basis"  in data: h.adjusted_cost_basis  = float(data["adjusted_cost_basis"])
         if "acquired_date"        in data: h.acquired_date        = _parse_dt(data["acquired_date"])
         if "notes"                in data: h.notes                = data["notes"]
         if "status"               in data: h.status               = data["status"]
         if "company_name"         in data: h.company_name         = data["company_name"]
+        # When cost_basis changes, recalculate adj basis from event history
+        # so accumulated premium reductions are preserved correctly.
+        if "cost_basis" in data:
+            h.cost_basis = float(data["cost_basis"])
+            h.adjusted_cost_basis = _recalculate_adj_basis(h, session)
+        elif "adjusted_cost_basis" in data:
+            # Allow direct override only if explicitly passed without cost_basis
+            h.adjusted_cost_basis = float(data["adjusted_cost_basis"])
         h.updated_at = datetime.utcnow()
         session.commit()
         session.refresh(h)
@@ -421,7 +453,10 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
             if existing:
                 h = existing
             else:
-                # Use the strike of the first position as cost_basis
+                # Use the strike of the first position as initial cost_basis placeholder
+                # (user should update cost_basis to their real avg cost).
+                # adjusted_cost_basis starts equal to cost_basis — it only decreases
+                # as premiums from linked positions are realized (closed/expired).
                 strike = float(pos_list[0].strike or 0.0)
                 total_shares = float(sum(p.contracts * 100 for p in pos_list))
                 h = StockHolding(
@@ -430,7 +465,7 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
                     company_name        = None,
                     shares              = total_shares,
                     cost_basis          = strike,
-                    adjusted_cost_basis = strike,
+                    adjusted_cost_basis = strike,  # will equal cost_basis; recalculates as events are added
                     status              = "ACTIVE",
                     created_at          = now,
                     updated_at          = now,
@@ -445,6 +480,48 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
 
         session.commit()
         return {"created": created, "linked": linked}
+    finally:
+        session.close()
+
+
+def recalculate_all_holdings(*, user_id: int) -> dict:
+    """
+    Repair / recalculate adjusted_cost_basis for every holding owned by user_id.
+
+    For each holding:
+      1. Start from cost_basis (the real avg cost the user entered).
+      2. Replay all CC_EXPIRED / MANUAL HoldingEvents (basis_delta reductions).
+      3. Save the corrected adjusted_cost_basis back to the DB.
+
+    This is idempotent — safe to call repeatedly.
+    Returns a summary of how many holdings were updated.
+    """
+    session = get_session()
+    try:
+        holdings = (
+            session.query(StockHolding)
+            .filter(StockHolding.user_id == user_id)
+            .all()
+        )
+        updated = 0
+        results = []
+        for h in holdings:
+            old_adj = h.adjusted_cost_basis
+            new_adj = _recalculate_adj_basis(h, session)
+            if abs(new_adj - old_adj) > 0.0001:
+                h.adjusted_cost_basis = new_adj
+                h.updated_at = datetime.utcnow()
+                updated += 1
+            results.append({
+                "id": h.id,
+                "symbol": h.symbol,
+                "cost_basis": h.cost_basis,
+                "old_adj": old_adj,
+                "new_adj": new_adj,
+                "corrected": abs(new_adj - old_adj) > 0.0001,
+            })
+        session.commit()
+        return {"updated": updated, "holdings": results}
     finally:
         session.close()
 

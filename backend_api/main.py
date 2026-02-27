@@ -1197,6 +1197,14 @@ def seed_holdings_from_positions(user=Depends(get_current_user)) -> Dict[str, An
     return _seed(user_id=int(user["sub"]))
 
 
+@app.post("/portfolio/holdings/recalculate", response_model=Dict[str, Any])
+def recalculate_holdings(user=Depends(get_current_user)) -> Dict[str, Any]:
+    """Repair adjusted_cost_basis for all holdings by replaying event history
+    from cost_basis. Safe to call repeatedly (idempotent)."""
+    from logic.holdings import recalculate_all_holdings as _recalc
+    return _recalc(user_id=int(user["sub"]))
+
+
 @app.patch("/portfolio/holdings/{holding_id}", response_model=Dict[str, Any])
 def update_holding(holding_id: int, body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
     from logic.holdings import update_holding as _update

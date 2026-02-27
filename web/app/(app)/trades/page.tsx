@@ -7,7 +7,7 @@ import {
   createAssignment, fetchAssignment, updateAssignment,
   fetchPortfolioSummary, fetchSymbolSummary, fetchStockHistory,
   fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHoldingEvents,
-  seedHoldingsFromPositions,
+  seedHoldingsFromPositions, recalculateHoldings,
   WeeklySnapshot, OptionPosition, StockAssignment, PositionStatus, WeekBreakdown,
   StockHolding, HoldingEvent,
 } from "@/lib/api";
@@ -1144,6 +1144,20 @@ function HoldingsTab() {
     },
   });
 
+  const [recalcMsg, setRecalcMsg] = useState<string | null>(null);
+  const recalcMut = useMutation({
+    mutationFn: recalculateHoldings,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      setRecalcMsg(
+        res.updated > 0
+          ? `✓ Recalculated ${res.updated} holding${res.updated > 1 ? "s" : ""} — adj basis now matches cost basis.`
+          : `✓ All adj bases already correct.`
+      );
+      setTimeout(() => setRecalcMsg(null), 5000);
+    },
+  });
+
   const saveMut = useMutation({
     mutationFn: () => {
       const body = {
@@ -1227,6 +1241,14 @@ function HoldingsTab() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => recalcMut.mutate()}
+            disabled={recalcMut.isPending}
+            title="Reset adj basis to cost basis, then replay closed/expired premium history"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <Activity size={12} /> {recalcMut.isPending ? "Recalculating…" : "Recalc Basis"}
+          </button>
+          <button
             onClick={() => seedMut.mutate()}
             disabled={seedMut.isPending}
             title="Create holdings from existing positions using strike as avg cost"
@@ -1246,6 +1268,11 @@ function HoldingsTab() {
       {seedMsg && (
         <div className="mb-3 px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-xs font-semibold">
           {seedMsg}
+        </div>
+      )}
+      {recalcMsg && (
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+          {recalcMsg}
         </div>
       )}
 
