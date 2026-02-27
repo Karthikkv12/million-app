@@ -356,6 +356,9 @@ export interface OptionPosition {
   // computed
   net_premium: number;
   total_premium: number;
+  // carry-forward: set when this position is ACTIVE from a prior week
+  carried?: boolean;
+  origin_week_label?: string | null;
 }
 
 export interface StockAssignment {

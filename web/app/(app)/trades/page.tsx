@@ -481,14 +481,18 @@ function AssignmentPanel({ pos }: { pos: OptionPosition }) {
 function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: () => void; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const isCarried = pos.carried_from_id != null;
+  const isCarriedForward = pos.carried === true;
 
   return (
     <>
-      <tr className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+      <tr className={`border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
         <td className="px-3 py-2.5 font-bold text-foreground">
           {pos.symbol}
-          {isCarried && (
-            <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 font-semibold">↩ carried</span>
+          {isCarriedForward && (
+            <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 font-semibold">↳ {pos.origin_week_label ?? "prior wk"}</span>
+          )}
+          {!isCarriedForward && isCarried && (
+            <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 font-semibold">↩ rolled</span>
           )}
         </td>
         <td className="px-3 py-2.5 text-foreground/80 text-sm text-center">{pos.contracts}</td>
@@ -568,17 +572,30 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["positions", week.id] }),
   });
 
+  const thisWeekPositions = useMemo(() => positions.filter(p => !p.carried), [positions]);
+  const carriedPositions   = useMemo(() => positions.filter(p => p.carried === true), [positions]);
+
   const bySymbol = useMemo(() => {
     const map = new Map<string, OptionPosition[]>();
-    for (const p of positions) {
+    for (const p of thisWeekPositions) {
       const arr = map.get(p.symbol) ?? [];
       arr.push(p);
       map.set(p.symbol, arr);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [positions]);
+  }, [thisWeekPositions]);
 
-  const totalPremium = positions.reduce((s, p) => s + (p.total_premium ?? 0), 0);
+  const bySymbolCarried = useMemo(() => {
+    const map = new Map<string, OptionPosition[]>();
+    for (const p of carriedPositions) {
+      const arr = map.get(p.symbol) ?? [];
+      arr.push(p);
+      map.set(p.symbol, arr);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [carriedPositions]);
+
+  const totalPremium = thisWeekPositions.reduce((s, p) => s + (p.total_premium ?? 0), 0);
   const activeCount  = positions.filter((p) => p.status === "ACTIVE").length;
 
   return (
@@ -662,28 +679,66 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
       )}
 
       {!isLoading && positions.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Roll", "Status", "Margin", "Actions"].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bySymbol.map(([, rows]) =>
-                rows.map((p) => (
-                  <PositionRow
-                    key={p.id}
-                    pos={p}
-                    onEdit={() => { setEditing(p); setShowForm(false); }}
-                    onDelete={() => deleteMut.mutate(p.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {/* This week's positions */}
+          {thisWeekPositions.length > 0 && (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                    {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Roll", "Status", "Margin", "Actions"].map((h) => (
+                      <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bySymbol.map(([, rows]) =>
+                    rows.map((p) => (
+                      <PositionRow
+                        key={p.id}
+                        pos={p}
+                        onEdit={() => { setEditing(p); setShowForm(false); }}
+                        onDelete={() => deleteMut.mutate(p.id)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Carried-forward positions from prior weeks */}
+          {carriedPositions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">↳ Carried from prior weeks</span>
+                <span className="text-[10px] text-foreground/40">— still open, P&amp;L realises when you close them</span>
+              </div>
+              <div className="bg-[var(--surface)] border border-amber-200 dark:border-amber-800/50 rounded-2xl overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">
+                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Roll", "Status", "Margin", "Actions"].map((h) => (
+                        <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bySymbolCarried.map(([, rows]) =>
+                      rows.map((p) => (
+                        <PositionRow
+                          key={p.id}
+                          pos={p}
+                          onEdit={() => { setEditing(p); setShowForm(false); }}
+                          onDelete={() => deleteMut.mutate(p.id)}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

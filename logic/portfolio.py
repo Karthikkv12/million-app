@@ -379,7 +379,8 @@ def reopen_week(*, user_id: int, week_id: int) -> dict:
 def list_positions(*, user_id: int, week_id: int) -> list[dict]:
     session = get_session()
     try:
-        positions = (
+        # Positions that belong to this week
+        this_week = (
             session.query(OptionPosition)
             .filter(
                 OptionPosition.user_id == user_id,
@@ -388,7 +389,42 @@ def list_positions(*, user_id: int, week_id: int) -> list[dict]:
             .order_by(OptionPosition.symbol, OptionPosition.sold_date)
             .all()
         )
-        return [_pos_to_dict(p) for p in positions]
+
+        # ACTIVE positions from prior weeks that haven't been resolved yet
+        # (still open — the user will close them in a future week)
+        carried = (
+            session.query(OptionPosition)
+            .filter(
+                OptionPosition.user_id == user_id,
+                OptionPosition.week_id != week_id,
+                OptionPosition.status == OptionPositionStatus.ACTIVE,
+            )
+            .order_by(OptionPosition.symbol, OptionPosition.sold_date)
+            .all()
+        )
+
+        # Build a lookup of week labels for carried positions
+        carried_week_ids = {p.week_id for p in carried}
+        week_labels: dict[int, str] = {}
+        if carried_week_ids:
+            snaps = (
+                session.query(WeeklySnapshot)
+                .filter(
+                    WeeklySnapshot.id.in_(carried_week_ids),
+                    WeeklySnapshot.user_id == user_id,
+                )
+                .all()
+            )
+            for s in snaps:
+                week_labels[s.id] = s.week_end.strftime("wk of %b %d")
+
+        result = [_pos_to_dict(p) for p in this_week]
+        for p in carried:
+            d = _pos_to_dict(p)
+            d["carried"] = True
+            d["origin_week_label"] = week_labels.get(p.week_id, "prior week")
+            result.append(d)
+        return result
     finally:
         session.close()
 
