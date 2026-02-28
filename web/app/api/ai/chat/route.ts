@@ -16,13 +16,13 @@ async function fetchContext(accessToken: string) {
     fetch(`${base}/portfolio/premium-dashboard`, { headers }).then((r) => r.json()),
   ]);
 
-  // Pull the latest week's positions
+  // Pull the latest ACTIVE (non-complete) week's positions, fall back to most recent
   let latestPositions: unknown[] = [];
   if (positions.status === "fulfilled" && Array.isArray(positions.value)) {
     const weeks = positions.value as { id: number; label: string; is_complete: boolean }[];
-    const latest = weeks[weeks.length - 1];
-    if (latest) {
-      const pos = await fetch(`${base}/portfolio/weeks/${latest.id}/positions`, { headers });
+    const activeWeek = weeks.slice().reverse().find((w) => !w.is_complete) ?? weeks[weeks.length - 1];
+    if (activeWeek) {
+      const pos = await fetch(`${base}/portfolio/weeks/${activeWeek.id}/positions`, { headers });
       latestPositions = await pos.json();
     }
   }
@@ -154,7 +154,10 @@ export async function POST(req: NextRequest) {
 
       const chat = model.startChat({
         history,
-        systemInstruction: systemPrompt,
+        systemInstruction: {
+          role: "user",
+          parts: [{ text: systemPrompt }],
+        },
       });
 
       const result = await chat.sendMessageStream(lastUserMessage);
