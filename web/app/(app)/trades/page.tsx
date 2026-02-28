@@ -2433,15 +2433,19 @@ function AccountTab() {
             <span className="text-[10px] text-foreground/40">{changes.filter(c => c.chg != null).length} weeks</span>
           </div>
           {/* Horizontally scrollable bar chart — each bar is a fixed width so all 54 fit */}
+          {(() => {
+            const maxChg = Math.max(...changes.filter(c => c.chg != null).map(c => Math.abs(c.chg!)), 1);
+            const n = changes.length;
+            const step = n <= 12 ? 1 : n <= 26 ? 2 : n <= 52 ? 4 : 8;
+            return (
           <div className="overflow-x-auto scrollbar-none -mx-1 px-1">
             <div
-              className="flex items-end gap-[3px] h-32"
-              style={{ minWidth: `${changes.length * 20}px` }}
+              className="flex items-end gap-[3px] h-52"
+              style={{ minWidth: `${n * 20}px` }}
             >
               {changes.map((r, i) => {
                 if (r.chg == null) return <div key={i} style={{ width: 16, minWidth: 16 }} className="shrink-0" />;
-                const maxChg = Math.max(...changes.filter(c => c.chg != null).map(c => Math.abs(c.chg!)), 1);
-                const pct = Math.max(6, Math.round((Math.abs(r.chg) / maxChg) * 88));
+                const pct = Math.max(4, Math.round((Math.abs(r.chg) / maxChg) * 96));
                 const isUp = r.chg >= 0;
                 return (
                   <div
@@ -2458,31 +2462,27 @@ function AccountTab() {
                 );
               })}
             </div>
-            {/* X-axis date labels — show every Nth label to avoid crowding */}
-            {(() => {
-              const n = changes.length;
-              const step = n <= 12 ? 1 : n <= 26 ? 2 : n <= 52 ? 4 : 8;
-              return (
-                <div
-                  className="flex gap-[3px] mt-1"
-                  style={{ minWidth: `${n * 20}px` }}
-                >
-                  {changes.map((r, i) => (
-                    <div key={i} className="shrink-0" style={{ width: 16, minWidth: 16 }}>
-                      {i % step === 0 && (
-                        <span
-                          className="block text-[8px] text-foreground/40 leading-tight"
-                          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", height: 36 }}
-                        >
-                          {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+            {/* X-axis date labels — every Nth label to avoid crowding */}
+            <div
+              className="flex gap-[3px] mt-1"
+              style={{ minWidth: `${n * 20}px` }}
+            >
+              {changes.map((r, i) => (
+                <div key={i} className="shrink-0" style={{ width: 16, minWidth: 16 }}>
+                  {i % step === 0 && (
+                    <span
+                      className="block text-[8px] text-foreground/40 leading-tight"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", height: 36 }}
+                    >
+                      {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                  )}
                 </div>
-              );
-            })()}
+              ))}
+            </div>
           </div>
+            );
+          })()}
           {/* Legend */}
           <div className="flex items-center gap-4 mt-3 pt-2 border-t border-[var(--border)]">
             <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-green-500" /><span className="text-[10px] text-foreground/50">Gain</span></div>
