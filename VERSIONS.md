@@ -5,6 +5,23 @@
 
 ---
 
+## v1.6.6 — iPad & Tablet Optimization
+**Released:** 2026-02-28
+**Tag:** `v1.6.6`
+**Branch:** `develop → main`
+
+### 📱 iPad / Tablet Layout (768px+)
+- Sidebar now shown at `md` (768px) instead of `lg` (1024px)
+  → iPad portrait and landscape both get the full sidebar, not hamburger menu
+- Bottom nav hidden at `md+` — iPad uses sidebar navigation
+- AI chat floating panel activates at `md+` — no fullscreen sheet on iPad
+- AI chat FAB positioned at bottom-right on `md+`
+- Viewport: `userScalable: true`, `maximumScale: 5` — pinch-zoom enabled on iPad
+- Added `.touch-scroll` utility (`-webkit-overflow-scrolling: touch`) on sidebar nav
+- `tailwind.config.ts`: added `xs: 480px` breakpoint alias + screen size comments
+
+---
+
 ## v1.6.5 — AI Chat Assistant (Gemini)
 **Released:** 2026-02-28
 **Tag:** `v1.6.5`
