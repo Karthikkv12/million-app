@@ -611,6 +611,16 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
     return { premOut, isLoss, netPL, isClosed };
   })();
 
+  // ── Per-trade metrics ────────────────────────────────────────────────────
+  const capitalAtRisk = pos.strike * pos.contracts * 100;
+  const premIn = pos.premium_in ?? 0;
+  const premPerK = capitalAtRisk > 0 ? (premIn / capitalAtRisk) * 1000 : null;
+  // ROI: use net P&L if closed, else prem_in as unrealised income
+  const netForRoi = premOutCell?.isClosed
+    ? premOutCell.netPL
+    : premIn * pos.contracts * 100;
+  const roi = capitalAtRisk > 0 ? (netForRoi / capitalAtRisk) * 100 : null;
+
   return (
     <>
       {/* ── Mobile card (< sm) ── */}
@@ -671,6 +681,18 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
             <div>
               <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Margin</span>
               <span className="text-sm text-foreground/60">${pos.margin.toFixed(0)}</span>
+            </div>
+          )}
+          {premPerK != null && (
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">/$1K</span>
+              <span className="text-sm font-semibold text-blue-500">${premPerK.toFixed(2)}</span>
+            </div>
+          )}
+          {roi != null && (
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">ROI</span>
+              <span className={`text-sm font-semibold ${roi >= 0 ? "text-green-500" : "text-red-500"}`}>{roi.toFixed(2)}%</span>
             </div>
           )}
         </div>
@@ -752,6 +774,16 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
             );
           })()}
         </td>
+        <td className="px-3 py-2.5 text-sm">
+          {premPerK != null
+            ? <span className="font-semibold text-blue-500">${premPerK.toFixed(2)}</span>
+            : <span className="text-foreground/30">—</span>}
+        </td>
+        <td className="px-3 py-2.5 text-sm">
+          {roi != null
+            ? <span className={`font-semibold ${roi >= 0 ? "text-green-500" : "text-red-500"}`}>{roi.toFixed(2)}%</span>
+            : <span className="text-foreground/30">—</span>}
+        </td>
         <td className="px-3 py-2.5">
           <StatusSelect pos={pos} />
         </td>
@@ -778,7 +810,7 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
       </tr>
       {expanded && pos.status === "ASSIGNED" && (
         <tr className="hidden sm:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
-          <td colSpan={11} className="px-4 pb-3">
+          <td colSpan={13} className="px-4 pb-3">
             <AssignmentPanel pos={pos} />
           </td>
         </tr>
@@ -795,6 +827,16 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
     queryKey: ["positions", week.id],
     queryFn: () => fetchPositions(week.id),
     staleTime: 30_000,
+  });
+  const { data: holdings = [] } = useQuery({
+    queryKey: ["holdings"],
+    queryFn: fetchHoldings,
+    staleTime: 60_000,
+  });
+  const { data: premDash } = useQuery({
+    queryKey: ["premiumDashboard"],
+    queryFn: fetchPremiumDashboard,
+    staleTime: 60_000,
   });
 
   const [showForm, setShowForm] = useState(false);
@@ -835,22 +877,51 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
 
   return (
     <div>
-      {positions.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
-            <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
+      {positions.length > 0 && (() => {
+        const totalCostBasis = holdings.reduce((acc, h) => acc + h.cost_basis * h.shares, 0);
+        const totalPremCollected = premDash?.grand_total.total_premium_sold ?? 0;
+        const coveragePct = totalCostBasis > 0 ? (totalPremCollected / totalCostBasis) * 100 : null;
+        // Avg prem/$1K across this week's active positions
+        const weekPositionsWithPrem = thisWeekPositions.filter(p => p.premium_in != null && p.strike > 0);
+        const avgPremPerK = weekPositionsWithPrem.length > 0
+          ? weekPositionsWithPrem.reduce((acc, p) => {
+              const cap = p.strike * p.contracts * 100;
+              return acc + (cap > 0 ? ((p.premium_in ?? 0) / cap) * 1000 : 0);
+            }, 0) / weekPositionsWithPrem.length
+          : null;
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
+              <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active Positions</p>
+              <p className="text-base font-black text-blue-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {positions.length}</span></p>
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Avg Prem / $1K</p>
+              {avgPremPerK != null
+                ? <p className="text-base font-black text-blue-400">${avgPremPerK.toFixed(2)}</p>
+                : <p className="text-base font-black text-foreground/30">—</p>}
+              <p className="text-[10px] text-foreground/40 mt-0.5">this week's positions</p>
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Cost Basis Coverage</p>
+              {coveragePct != null
+                ? (
+                  <>
+                    <p className="text-base font-black text-orange-400">{coveragePct.toFixed(2)}%</p>
+                    <div className="mt-1 h-1 bg-[var(--surface-2)] rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, coveragePct)}%` }} />
+                    </div>
+                  </>
+                )
+                : <p className="text-base font-black text-foreground/30">—</p>}
+            </div>
           </div>
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active</p>
-            <p className="text-base font-black text-blue-500">{activeCount}</p>
-          </div>
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Positions</p>
-            <p className="text-base font-black text-foreground">{positions.length}</p>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex gap-2 flex-wrap">
@@ -936,7 +1007,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
+                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "/$1K", "ROI", "Status", "Margin", "Actions"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -984,7 +1055,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">
-                        {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
+                        {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "/$1K", "ROI", "Status", "Margin", "Actions"].map((h) => (
                           <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
