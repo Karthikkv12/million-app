@@ -87,7 +87,7 @@ export default function BudgetPage() {
   ).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       <PageHeader
         title="Budget"
         action={

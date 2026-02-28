@@ -39,7 +39,7 @@ export default function LedgerPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       <PageHeader title="Ledger" sub="Double-entry transaction log"
         action={<RefreshButton onRefresh={refetch} isRefreshing={isFetching} />}
       />

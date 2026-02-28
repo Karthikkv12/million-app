@@ -180,7 +180,7 @@ export default function AccountsPage() {
   });
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       {showCash && <CashModal onClose={() => setShowCash(false)} />}
       <PageHeader
         title="Accounts"

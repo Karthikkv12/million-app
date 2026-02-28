@@ -216,7 +216,7 @@ function EventsSection() {
 
 export default function SettingsPage() {
   return (
-    <div className="p-4 sm:p-6 max-w-screen-lg mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-lg mx-auto w-full overflow-x-hidden">
       <PageHeader title="Settings" />
       <div className="flex flex-col gap-5">
         <ChangePasswordSection />

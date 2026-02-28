@@ -3113,7 +3113,7 @@ export default function PortfolioPage() {
   });
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       <PageHeader
         title="Portfolio"
         sub="Weekly tracker — sell options, track premium, manage assignments"

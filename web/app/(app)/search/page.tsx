@@ -991,8 +991,7 @@ function SearchContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      {/* sticky search header */}
+    <div className="min-h-screen bg-[var(--background)] w-full overflow-x-hidden">
       <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface)] backdrop-blur">
         <div className="w-full px-4 sm:px-6 py-3">
           <div className="flex items-center gap-3">

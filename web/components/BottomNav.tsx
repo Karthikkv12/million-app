@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, Zap, Search, BarChart2, Globe } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -17,8 +18,41 @@ export default function BottomNav() {
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y > lastY.current + 4) {
+        // scrolling down — hide
+        setHidden(true);
+      } else if (y < lastY.current - 4) {
+        // scrolling up — show immediately
+        setHidden(false);
+      }
+      lastY.current = y;
+
+      // always show again after scroll stops for 300 ms
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setHidden(false), 300);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe">
+    <nav
+      className={clsx(
+        "lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe transition-transform duration-300 ease-in-out",
+        hidden ? "translate-y-full" : "translate-y-0",
+      )}
+    >
       <div className="mx-3 mb-3 rounded-2xl glass border border-[var(--border)] shadow-xl shadow-black/10 overflow-hidden">
         <div className="flex items-stretch">
           {TABS.map(({ href, label, icon: Icon }) => {

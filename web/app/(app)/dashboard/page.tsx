@@ -77,7 +77,7 @@ export default function DashboardPage() {
   const isLoading = tradesQ.isLoading && cashQ.isLoading;
 
   return (
-    <div className="p-4 sm:p-6 w-full">
+    <div className="p-4 sm:p-6 w-full overflow-x-hidden">
 
       <PageHeader
         title={user?.username ? `Hey, ${user.username} 👋` : "Dashboard"}

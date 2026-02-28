@@ -9,11 +9,11 @@ import BottomNav from "@/components/BottomNav";
 function AppShell({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full overflow-x-hidden">
       <Navbar />
       <main
         className={[
-          "min-w-0 pb-nav lg:pb-0 animate-fade-up transition-[padding-left] duration-200 ease-in-out",
+          "min-w-0 w-full overflow-x-hidden pb-nav lg:pb-0 animate-fade-up transition-[padding-left] duration-200 ease-in-out",
           collapsed ? "lg:pl-[64px]" : "lg:pl-[240px]",
         ].join(" ")}
       >

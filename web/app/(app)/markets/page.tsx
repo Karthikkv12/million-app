@@ -272,7 +272,7 @@ export default function MarketsPage() {
   const isRefreshing = loading && Object.keys(quotes).length > 0;
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       <PageHeader
         title="Markets"
         sub="Live quotes, sector heatmaps & volatility."
