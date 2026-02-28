@@ -1163,6 +1163,24 @@ function PremiumTab() {
           ))}
         </div>
       )}
+
+      {/* ── Notation key ── */}
+      <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-4 text-[11px] text-foreground/60 space-y-2">
+        <p className="text-[11px] font-bold text-foreground/80 uppercase tracking-wide mb-2">Notation</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
+          <div><span className="font-semibold text-foreground/80">Avg Cost</span> — original purchase price per share (never changes)</div>
+          <div><span className="font-semibold text-foreground/80">Adj Basis</span> — cost basis permanently reduced by <span className="text-blue-400">realized</span> premium only (locked-in closes/expiries)</div>
+          <div><span className="font-semibold text-foreground/80">Live Adj</span> — true current breakeven = Adj Basis − in-flight premium/share (updates as options move)</div>
+          <div><span className="font-semibold text-foreground/80">BE (Breakeven)</span> — same as Live Adj; the price below which you start losing money today</div>
+          <div><span className="font-semibold text-foreground/80">CC (Covered Call)</span> — sell a call against shares you own; premium collected reduces basis, shares called away if assigned above strike</div>
+          <div><span className="font-semibold text-foreground/80">CSP (Cash-Secured Put)</span> — sell a put holding cash; if assigned, shares are put to you at the strike price</div>
+          <div><span className="font-semibold text-blue-400">Realized $</span> — premium permanently locked in from <span className="font-semibold">closed or expired</span> positions; permanently lowers Adj Basis</div>
+          <div><span className="font-semibold text-orange-400">In-Flight $</span> — premium from <span className="font-semibold">still-active</span> positions; lowers Live Adj only until the option closes/expires</div>
+          <div><span className="font-semibold text-foreground/80"># Pos</span> — number of original option positions logged against this holding (carry-forwards not counted)</div>
+          <div><span className="font-semibold text-foreground/80">Sold $</span> — gross premium ever collected (realized + in-flight combined)</div>
+        </div>
+      </div>
+
     </div>
   );
 }
