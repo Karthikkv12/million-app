@@ -103,7 +103,7 @@ export default function Navbar() {
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
       <aside
         className={clsx(
-          "hidden md:flex flex-col fixed top-0 left-0 h-screen border-r border-[var(--border)] bg-[var(--surface)] z-30 shrink-0 transition-[width] duration-200 ease-in-out",
+          "hidden md:flex flex-col fixed top-0 left-0 h-[100dvh] border-r border-[var(--border)] bg-[var(--surface)] z-30 shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out",
           collapsed ? "w-[64px]" : "w-[240px]",
         )}
       >
@@ -143,7 +143,7 @@ export default function Navbar() {
 
         {/* Nav links */}
         <nav className={clsx(
-          "flex-1 overflow-y-auto overscroll-contain touch-scroll py-4 space-y-0.5",
+          "flex-1 min-h-0 overflow-hidden py-4 space-y-0.5",
           collapsed ? "px-2" : "px-3",
         )}>
           {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => (
