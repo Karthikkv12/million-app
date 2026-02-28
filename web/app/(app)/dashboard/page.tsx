@@ -157,7 +157,7 @@ export default function DashboardPage() {
                       dot={{ r: 2, fill: up ? "#22c55e" : "#ef4444", strokeWidth: 0 }}
                     />
                     <RTooltip
-                      formatter={(v: number) => [`$${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Balance"]}
+                      formatter={(v: number | undefined) => v != null ? [`$${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Balance"] : ["—", "Balance"]}
                       labelFormatter={(l) => `Week ending ${l}`}
                       contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "inherit" }}
                     />

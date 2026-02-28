@@ -5,6 +5,30 @@
 
 ---
 
+## v1.6.1 — Mobile Responsive Overhaul
+**Released:** 2026-02-28
+**Tag:** `v1.6.1`
+**Branch:** `develop`
+
+### 📱 Mobile Optimizations
+- **Scrollable tab bar** — `Tabs` component now horizontally scrolls on mobile with `scrollbar-none`; tabs are `whitespace-nowrap` with smaller padding at `< sm`
+- **Positions table → mobile cards** — dual `sm:hidden` card / `hidden sm:block` table pattern; shows symbol, type badges, strike, contracts, dates, prem in/out, status select, and action buttons in a compact card layout
+- **Holdings table → mobile cards** — symbol, shares, avg cost, live adjustment, premium badges, break-even prices, and live P&L all visible in card form
+- **Symbols table → mobile cards** — symbol, total premium, realized P/L, active count, and status badges
+- **Account tab table → mobile cards** — date, status badge, tappable inline-edit value, and delta/premium/realized P/L
+- **YearTab stacked layout** — monthly chart and week-by-week table stack vertically (`flex-col sm:flex-row`) on mobile; week-by-week also uses mobile card list
+- **PremiumTab by-symbol table** — proper `overflow-x-auto` scroll on narrow screens
+- **Toolbar responsive labels** — HoldingsTab buttons abbreviated on mobile ("Sync", "Import", "Add") with `hidden sm:inline` full labels on desktop
+- **Action bar flex-wrap** — PositionsTab action buttons wrap on small screens; "Mark Week Complete" abbreviated to "Complete" on mobile
+- **WeekSelector** — select stretches full width on mobile (`flex-1`), button is `shrink-0`
+- **`.scrollbar-none` CSS utility** — added to `globals.css` (hides scrollbar cross-browser)
+- **`HoldingLivePriceMobile`** — new inline component (no `<td>` wrapper) for mobile card live price display
+
+### 🔧 Bug Fixes
+- **Dashboard build error** — fixed pre-existing TypeScript error: Recharts `formatter` prop now correctly typed as `(v: number | undefined) => [string, string]`
+
+---
+
 ## v1.6.0 — Positions Prem Out, Account Tab, Dashboard Balance Chart
 **Released:** 2026-02-27  
 **Tag:** `v1.6.0`  
