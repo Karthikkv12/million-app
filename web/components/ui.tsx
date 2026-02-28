@@ -200,21 +200,23 @@ interface TabsProps {
 }
 export function Tabs({ tabs, active, onChange, className }: TabsProps) {
   return (
-    <div className={clsx("flex gap-1 bg-[var(--surface-2)] p-1 rounded-xl w-fit", className)}>
-      {tabs.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => onChange(key)}
-          className={clsx(
-            "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-150",
-            active === key
-              ? "bg-[var(--surface)] text-foreground shadow-sm border border-[var(--border)]"
-              : "text-foreground/70 hover:text-foreground dark:hover:text-foreground",
-          )}
-        >
-          {label}
-        </button>
-      ))}
+    <div className={clsx("overflow-x-auto scrollbar-none -mx-1 px-1", className)}>
+      <div className="flex gap-1 bg-[var(--surface-2)] p-1 rounded-xl w-max min-w-full sm:w-fit sm:min-w-0">
+        {tabs.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            className={clsx(
+              "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 whitespace-nowrap",
+              active === key
+                ? "bg-[var(--surface)] text-foreground shadow-sm border border-[var(--border)]"
+                : "text-foreground/70 hover:text-foreground dark:hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

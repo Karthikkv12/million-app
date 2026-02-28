@@ -91,6 +91,13 @@ input:-webkit-autofill:focus {
   transition: background-color 0s 600000s, color 0s 600000s;
 }
 
+/* ── Hide scrollbar utility ────────────────────────────────────────────────── */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* ── Number input — hide spinners ──────────────────────────────────────────── */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

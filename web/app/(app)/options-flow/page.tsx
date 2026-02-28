@@ -90,7 +90,7 @@ export default function OptionsFlowPage() {
                          "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-[var(--background)] w-full overflow-x-hidden">
 
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="border-b border-[var(--border)] bg-[var(--surface)]">

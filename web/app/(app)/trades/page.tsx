@@ -600,9 +600,108 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
   const isCarried = pos.carried_from_id != null;
   const isCarriedForward = pos.carried === true;
 
+  const premOutCell = (() => {
+    const isClosed = ["CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"].includes(pos.status);
+    const showPremOut = pos.premium_out != null && (isClosed || pos.is_roll);
+    if (!showPremOut) return null;
+    const premIn  = pos.premium_in  ?? 0;
+    const premOut = pos.premium_out!;
+    const isLoss  = Math.abs(premOut) > premIn;
+    const netPL   = (premIn + premOut) * pos.contracts * 100;
+    return { premOut, isLoss, netPL, isClosed };
+  })();
+
   return (
     <>
-      <tr className={`border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
+      {/* ── Mobile card (< sm) ── */}
+      <div className={`sm:hidden border-b border-[var(--border)] px-3 py-3 ${isCarriedForward ? "opacity-90" : ""}`}>
+        {/* Row 1: Symbol + badges + status */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-foreground text-base">{pos.symbol}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${pos.option_type === "PUT" ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
+                {pos.option_type}
+              </span>
+              {isCarriedForward && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 font-semibold">↳ {pos.origin_week_label ?? "prior wk"}</span>
+              )}
+              {!isCarriedForward && isCarried && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 font-semibold">↩ rolled</span>
+              )}
+            </div>
+            <div className="text-sm text-foreground/70">
+              ${pos.strike.toFixed(2)} · {pos.contracts} ct{pos.contracts !== 1 ? "s" : ""}
+            </div>
+          </div>
+          {/* Status select — right side */}
+          <StatusSelect pos={pos} />
+        </div>
+
+        {/* Row 2: Dates */}
+        <div className="flex items-center gap-3 text-[11px] text-foreground/50 mb-2">
+          {pos.sold_date && <span>Sold {fmtDate(pos.sold_date)}</span>}
+          {pos.expiry_date && <span>Exp {fmtDate(pos.expiry_date)}</span>}
+        </div>
+
+        {/* Row 3: Premium In / Out */}
+        <div className="flex items-center gap-4 mb-2">
+          <div>
+            <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Prem In</span>
+            <span className="text-sm font-semibold text-green-600">{pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}` : "—"}</span>
+          </div>
+          {premOutCell && (
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Prem Out</span>
+              <div className="flex flex-col gap-0.5">
+                <span className={premOutCell.isLoss ? "text-red-500 font-semibold text-sm" : "text-orange-400 text-sm"}>
+                  {premOutCell.premOut >= 0 ? "+" : ""}${premOutCell.premOut.toFixed(2)}
+                  {pos.is_roll && <span className="ml-1 text-[9px] text-purple-400">roll</span>}
+                </span>
+                {premOutCell.isClosed && (
+                  <span className={`text-[10px] font-semibold ${premOutCell.isLoss ? "text-red-500" : "text-green-500"}`}>
+                    net {premOutCell.netPL >= 0 ? "+" : ""}${premOutCell.netPL.toFixed(0)}
+                    {premOutCell.isLoss && <span className="ml-1 px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-[9px]">LOSS</span>}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {pos.margin != null && (
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Margin</span>
+              <span className="text-sm text-foreground/60">${pos.margin.toFixed(0)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Row 4: Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {pos.status === "ASSIGNED" && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[10px] px-2.5 py-1.5 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 font-semibold hover:bg-yellow-200 transition flex items-center gap-1"
+            >
+              {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />} Stock
+            </button>
+          )}
+          <button onClick={onEdit} className="text-[10px] px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 transition">Edit</button>
+          <button
+            onClick={() => { if (window.confirm(`Delete ${pos.symbol} $${pos.strike} ${pos.option_type}?`)) onDelete(); }}
+            className="text-[10px] px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition"
+          >Delete</button>
+        </div>
+
+        {/* Assignment panel (mobile) */}
+        {expanded && pos.status === "ASSIGNED" && (
+          <div className="mt-2">
+            <AssignmentPanel pos={pos} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table row (≥ sm) ── */}
+      <tr className={`hidden sm:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
         <td className="px-3 py-2.5 font-bold text-foreground">
           {pos.symbol}
           {isCarriedForward && (
@@ -678,7 +777,7 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
         </td>
       </tr>
       {expanded && pos.status === "ASSIGNED" && (
-        <tr className="border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
+        <tr className="hidden sm:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
           <td colSpan={11} className="px-4 pb-3">
             <AssignmentPanel pos={pos} />
           </td>
@@ -753,8 +852,8 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap">
           {!week.is_complete && (
             <button
               onClick={() => { setEditing(null); setShowForm((v) => !v); }}
@@ -768,12 +867,12 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
               onClick={() => setShowComplete(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition"
             >
-              <CheckCircle2 size={12} /> Mark Week Complete
+              <CheckCircle2 size={12} /> <span className="hidden sm:inline">Mark Week Complete</span><span className="sm:hidden">Complete</span>
             </button>
           )}
         </div>
         {week.is_complete && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold">
               <CheckCircle2 size={13} /> Week complete
             </span>
@@ -818,49 +917,32 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
         <div className="space-y-4">
           {/* This week's positions */}
           {thisWeekPositions.length > 0 && (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                    {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {bySymbol.map(([, rows]) =>
-                    rows.map((p) => (
-                      <PositionRow
-                        key={p.id}
-                        pos={p}
-                        onEdit={() => { setEditing(p); setShowForm(false); }}
-                        onDelete={() => deleteMut.mutate(p.id)}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Carried-forward positions from prior weeks */}
-          {carriedPositions.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">↳ Carried from prior weeks</span>
-                <span className="text-[10px] text-foreground/40">— still open, P&amp;L realises when you close them</span>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+              {/* Mobile cards */}
+              <div className="sm:hidden divide-y divide-[var(--border)]">
+                {bySymbol.map(([, rows]) =>
+                  rows.map((p) => (
+                    <PositionRow
+                      key={p.id}
+                      pos={p}
+                      onEdit={() => { setEditing(p); setShowForm(false); }}
+                      onDelete={() => deleteMut.mutate(p.id)}
+                    />
+                  ))
+                )}
               </div>
-              <div className="bg-[var(--surface)] border border-amber-200 dark:border-amber-800/50 rounded-2xl overflow-x-auto">
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">
+                    <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
                       {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {bySymbolCarried.map(([, rows]) =>
+                    {bySymbol.map(([, rows]) =>
                       rows.map((p) => (
                         <PositionRow
                           key={p.id}
@@ -872,6 +954,55 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Carried-forward positions from prior weeks */}
+          {carriedPositions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">↳ Carried from prior weeks</span>
+                <span className="text-[10px] text-foreground/40 hidden sm:inline">— still open, P&amp;L realises when you close them</span>
+              </div>
+              <div className="bg-[var(--surface)] border border-amber-200 dark:border-amber-800/50 rounded-2xl overflow-hidden">
+                {/* Mobile cards */}
+                <div className="sm:hidden divide-y divide-[var(--border)]">
+                  {bySymbolCarried.map(([, rows]) =>
+                    rows.map((p) => (
+                      <PositionRow
+                        key={p.id}
+                        pos={p}
+                        onEdit={() => { setEditing(p); setShowForm(false); }}
+                        onDelete={() => deleteMut.mutate(p.id)}
+                      />
+                    ))
+                  )}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">
+                        {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
+                          <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bySymbolCarried.map(([, rows]) =>
+                        rows.map((p) => (
+                          <PositionRow
+                            key={p.id}
+                            pos={p}
+                            onEdit={() => { setEditing(p); setShowForm(false); }}
+                            onDelete={() => deleteMut.mutate(p.id)}
+                          />
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -915,31 +1046,60 @@ function SymbolsTab() {
       )}
 
       {!isLoading && filtered.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                {["Symbol", "Total Premium", "Realized P/L", "Active", "Closed", "Expired", "Assigned"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => (
-                <tr key={s.symbol} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                  <td className="px-4 py-2.5 font-bold text-foreground">{s.symbol}</td>
-                  <td className="px-4 py-2.5 text-green-500 font-semibold">${s.total_premium.toFixed(2)}</td>
-                  <td className={`px-4 py-2.5 font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                    {fmt$(s.realized_pnl)}
-                  </td>
-                  <td className="px-4 py-2.5 text-blue-500 font-semibold">{s.active}</td>
-                  <td className="px-4 py-2.5 text-green-600">{s.closed}</td>
-                  <td className="px-4 py-2.5 text-foreground/50">{s.expired}</td>
-                  <td className="px-4 py-2.5 text-yellow-500">{s.assigned}</td>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-[var(--border)]">
+            {filtered.map((s) => (
+              <div key={s.symbol} className="px-3 py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-foreground text-base">{s.symbol}</span>
+                  <span className={`text-sm font-bold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)}</span>
+                </div>
+                <div className="flex items-center gap-4 text-sm mb-1">
+                  <div>
+                    <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Total Prem</span>
+                    <span className="text-green-500 font-semibold">${s.total_premium.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Active</span>
+                    <span className="text-blue-500 font-semibold">{s.active}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-foreground/60">
+                  <span>Closed: <span className="text-green-600 font-semibold">{s.closed}</span></span>
+                  <span>Expired: <span className="text-foreground/50 font-semibold">{s.expired}</span></span>
+                  <span>Assigned: <span className="text-yellow-500 font-semibold">{s.assigned}</span></span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                  {["Symbol", "Total Premium", "Realized P/L", "Active", "Closed", "Expired", "Assigned"].map((h) => (
+                    <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.symbol} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                    <td className="px-4 py-2.5 font-bold text-foreground">{s.symbol}</td>
+                    <td className="px-4 py-2.5 text-green-500 font-semibold">${s.total_premium.toFixed(2)}</td>
+                    <td className={`px-4 py-2.5 font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {fmt$(s.realized_pnl)}
+                    </td>
+                    <td className="px-4 py-2.5 text-blue-500 font-semibold">{s.active}</td>
+                    <td className="px-4 py-2.5 text-green-600">{s.closed}</td>
+                    <td className="px-4 py-2.5 text-foreground/50">{s.expired}</td>
+                    <td className="px-4 py-2.5 text-yellow-500">{s.assigned}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -1486,17 +1646,17 @@ function YearTab() {
 
       {/* ── Monthly chart + Week-by-week side by side ── */}
       {(monthlyEntries.length > 0 || weeksBreakdown.length > 0) && (
-        <div className="flex gap-4 items-start">
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
 
           {/* Monthly bar chart */}
           {monthlyEntries.length > 0 && (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shrink-0" style={{ width: `${Math.max(224, monthlyEntries.length * 36 + 40)}px` }}>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 w-full sm:shrink-0 sm:w-auto" style={{ minWidth: 0 }}>
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={14} className="text-green-500" />
                 <h3 className="text-sm font-bold text-foreground">Monthly Premium</h3>
               </div>
               {/* tall narrow bar chart */}
-              <div className="flex items-end gap-1.5 h-56">
+              <div className="flex items-end gap-1.5 h-56 overflow-x-auto">
                 {monthlyEntries.map(entry => {
                   const ym = entry[0]; const val = entry[1];
                   const [, month] = ym.split("-");
@@ -1523,52 +1683,81 @@ function YearTab() {
 
           {/* Week-by-week table */}
           {weeksBreakdown.length > 0 && (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto flex-1 min-w-0">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden w-full sm:flex-1 sm:min-w-0">
               <div className="px-4 py-3 border-b border-[var(--border)]">
                 <h3 className="text-sm font-bold text-foreground">Week-by-Week</h3>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                    {["Week Ending","Status","Positions","Premium","vs Avg","Realized P/L","Account Value"].map(h => (
-                      <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeksBreakdown.map(w => {
-                    const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
-                    return (
-                      <tr key={w.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                        <td className="px-4 py-2.5 font-semibold text-foreground">{w.week_end}</td>
-                        <td className="px-4 py-2.5">
-                          {w.is_complete
-                            ? <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 px-2 py-0.5 rounded-full font-semibold">Complete</span>
-                            : <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
-                          }
-                        </td>
-                        <td className="px-4 py-2.5 text-foreground/70">{w.position_count}</td>
-                        <td className={`px-4 py-2.5 font-semibold ${w.premium >= 0 ? "text-green-500" : "text-red-500"}`}>
-                          {fmt$(w.premium)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {vsAvg !== null && w.is_complete ? (
-                            <span className={`text-xs font-semibold ${vsAvg >= 0 ? "text-green-500" : "text-red-400"}`}>
-                              {vsAvg >= 0 ? "▲" : "▼"} {Math.abs(vsAvg).toFixed(0)}%
-                            </span>
-                          ) : <span className="text-foreground/30">—</span>}
-                        </td>
-                        <td className={`px-4 py-2.5 font-semibold ${w.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                          {fmt$(w.realized_pnl)}
-                        </td>
-                        <td className="px-4 py-2.5 text-foreground/70">
-                          {w.account_value != null ? `$${w.account_value.toLocaleString()}` : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              {/* Mobile card list */}
+              <div className="sm:hidden divide-y divide-[var(--border)]">
+                {weeksBreakdown.map(w => {
+                  const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
+                  return (
+                    <div key={w.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-foreground">{w.week_end}</span>
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${w.is_complete ? "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300"}`}>
+                          {w.is_complete ? "Complete" : "Active"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm flex-wrap">
+                        <span className={`font-semibold ${w.premium >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(w.premium)}</span>
+                        {vsAvg !== null && w.is_complete && (
+                          <span className={`text-xs font-semibold ${vsAvg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                            {vsAvg >= 0 ? "▲" : "▼"} {Math.abs(vsAvg).toFixed(0)}% vs avg
+                          </span>
+                        )}
+                        <span className={`text-xs font-semibold ${w.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(w.realized_pnl)}</span>
+                        <span className="text-xs text-foreground/50">{w.position_count} pos</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                      {["Week Ending","Status","Positions","Premium","vs Avg","Realized P/L","Account Value"].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeksBreakdown.map(w => {
+                      const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
+                      return (
+                        <tr key={w.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                          <td className="px-4 py-2.5 font-semibold text-foreground">{w.week_end}</td>
+                          <td className="px-4 py-2.5">
+                            {w.is_complete
+                              ? <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 px-2 py-0.5 rounded-full font-semibold">Complete</span>
+                              : <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
+                            }
+                          </td>
+                          <td className="px-4 py-2.5 text-foreground/70">{w.position_count}</td>
+                          <td className={`px-4 py-2.5 font-semibold ${w.premium >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {fmt$(w.premium)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {vsAvg !== null && w.is_complete ? (
+                              <span className={`text-xs font-semibold ${vsAvg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                                {vsAvg >= 0 ? "▲" : "▼"} {Math.abs(vsAvg).toFixed(0)}%
+                              </span>
+                            ) : <span className="text-foreground/30">—</span>}
+                          </td>
+                          <td className={`px-4 py-2.5 font-semibold ${w.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {fmt$(w.realized_pnl)}
+                          </td>
+                          <td className="px-4 py-2.5 text-foreground/70">
+                            {w.account_value != null ? `$${w.account_value.toLocaleString()}` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -1656,7 +1845,7 @@ function PremiumTab() {
       </div>
 
       {/* ── By-symbol table ── */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <h3 className="text-sm font-bold text-foreground">By Symbol</h3>
           <button
@@ -1667,59 +1856,61 @@ function PremiumTab() {
             {syncing ? "Syncing…" : "Sync Ledger"}
           </button>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-              {["Symbol","Avg Cost","Adj Basis","Live Adj","Sold $","Realized $","In-Flight $","# Pos"].map(h => (
-                <th key={h} className="px-4 py-2.5 text-right first:text-left font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {by_symbol.map((row: PremiumSymbolRow) => (
-              <tr key={row.holding_id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                <td className="px-4 py-3 font-bold text-foreground">{row.symbol}</td>
-                <td className="px-4 py-3 text-right text-foreground/70">${row.cost_basis.toFixed(4)}</td>
-                <td className="px-4 py-3 text-right">
-                  <span className={row.adj_basis_stored < row.cost_basis ? "text-blue-500 font-semibold" : "text-foreground/70"}>
-                    ${row.adj_basis_stored.toFixed(4)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <span className={row.live_adj_basis < row.cost_basis ? "text-green-500 font-semibold" : "text-foreground/70"}>
-                    ${row.live_adj_basis.toFixed(4)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right font-semibold text-green-500">${row.total_premium_sold.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right">
-                  {row.realized_premium > 0
-                    ? <span className="text-blue-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
-                    : <span className="text-foreground/30">—</span>}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {row.unrealized_premium > 0
-                    ? <span className="text-orange-400 font-semibold">${row.unrealized_premium.toFixed(2)}</span>
-                    : <span className="text-foreground/30">—</span>}
-                </td>
-                <td className="px-4 py-3 text-right text-foreground/60">{row.positions}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                {["Symbol","Avg Cost","Adj Basis","Live Adj","Sold $","Realized $","In-Flight $","# Pos"].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-right first:text-left font-semibold whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-bold">
-              <td className="px-4 py-3 text-foreground text-[11px] uppercase tracking-wide">Total</td>
-              <td colSpan={3} />
-              <td className="px-4 py-3 text-right text-green-500">${grand_total.total_premium_sold.toFixed(2)}</td>
-              <td className="px-4 py-3 text-right text-blue-500">
-                {grand_total.realized_premium > 0 ? `$${grand_total.realized_premium.toFixed(2)}` : "—"}
-              </td>
-              <td className="px-4 py-3 text-right text-orange-400">
-                {grand_total.unrealized_premium > 0 ? `$${grand_total.unrealized_premium.toFixed(2)}` : "—"}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody>
+              {by_symbol.map((row: PremiumSymbolRow) => (
+                <tr key={row.holding_id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                  <td className="px-4 py-3 font-bold text-foreground">{row.symbol}</td>
+                  <td className="px-4 py-3 text-right text-foreground/70">${row.cost_basis.toFixed(4)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={row.adj_basis_stored < row.cost_basis ? "text-blue-500 font-semibold" : "text-foreground/70"}>
+                      ${row.adj_basis_stored.toFixed(4)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={row.live_adj_basis < row.cost_basis ? "text-green-500 font-semibold" : "text-foreground/70"}>
+                      ${row.live_adj_basis.toFixed(4)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-green-500">${row.total_premium_sold.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {row.realized_premium > 0
+                      ? <span className="text-blue-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
+                      : <span className="text-foreground/30">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {row.unrealized_premium > 0
+                      ? <span className="text-orange-400 font-semibold">${row.unrealized_premium.toFixed(2)}</span>
+                      : <span className="text-foreground/30">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right text-foreground/60">{row.positions}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-bold">
+                <td className="px-4 py-3 text-foreground text-[11px] uppercase tracking-wide">Total</td>
+                <td colSpan={3} />
+                <td className="px-4 py-3 text-right text-green-500">${grand_total.total_premium_sold.toFixed(2)}</td>
+                <td className="px-4 py-3 text-right text-blue-500">
+                  {grand_total.realized_premium > 0 ? `$${grand_total.realized_premium.toFixed(2)}` : "—"}
+                </td>
+                <td className="px-4 py-3 text-right text-orange-400">
+                  {grand_total.unrealized_premium > 0 ? `$${grand_total.unrealized_premium.toFixed(2)}` : "—"}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
       {/* ── By-week breakdown ── */}
@@ -2037,90 +2228,156 @@ function AccountTab() {
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
           <h3 className="text-sm font-bold text-foreground">Friday Account Values</h3>
-          <p className="text-[10px] text-foreground/40">Click a value to edit</p>
+          <p className="text-[10px] text-foreground/40 hidden sm:block">Click a value to edit</p>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-              {["Week Ending (Friday)", "Account Value", "Δ vs Prior", "Premium", "Realized P/L", "Status"].map(h => (
-                <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {rows.map(r => {
-              const idx = changes.findIndex(c => c.id === r.id);
-              const chg = idx >= 0 ? changes[idx].chg : null;
-              const isEdit = editing === r.id;
-              return (
-                <tr key={r.id} className="hover:bg-[var(--surface-2)] transition-colors">
-                  <td className="px-4 py-3 text-foreground/80 font-medium whitespace-nowrap">
-                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                  </td>
-                  <td className="px-4 py-3">
-                    {isEdit ? (
-                      <form
-                        className="flex items-center gap-2"
-                        onSubmit={e => {
-                          e.preventDefault();
-                          const v = parseFloat(editVal);
-                          if (!isNaN(v)) updateMut.mutate({ id: r.id, value: v });
-                        }}
-                      >
-                        <input
-                          autoFocus
-                          type="number"
-                          step="0.01"
-                          value={editVal}
-                          onChange={e => setEditVal(e.target.value)}
-                          className="w-32 border border-blue-500 rounded-lg px-2 py-1 text-sm bg-[var(--surface)] text-foreground focus:outline-none"
-                        />
-                        <button type="submit" className="text-[11px] px-2 py-1 bg-blue-500 text-white rounded-lg font-semibold">
-                          {updateMut.isPending ? "…" : "Save"}
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-[var(--border)]">
+          {rows.map(r => {
+            const idx = changes.findIndex(c => c.id === r.id);
+            const chg = idx >= 0 ? changes[idx].chg : null;
+            const isEdit = editing === r.id;
+            return (
+              <div key={r.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span className="text-sm font-semibold text-foreground/80">
+                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    r.is_complete ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                  }`}>
+                    {r.is_complete ? "Complete" : "Active"}
+                  </span>
+                </div>
+                {isEdit ? (
+                  <form
+                    className="flex items-center gap-2 mb-1"
+                    onSubmit={e => {
+                      e.preventDefault();
+                      const v = parseFloat(editVal);
+                      if (!isNaN(v)) updateMut.mutate({ id: r.id, value: v });
+                    }}
+                  >
+                    <input
+                      autoFocus type="number" step="0.01" value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      className="w-32 border border-blue-500 rounded-lg px-2 py-1 text-sm bg-[var(--surface)] text-foreground focus:outline-none"
+                    />
+                    <button type="submit" className="text-[11px] px-2 py-1 bg-blue-500 text-white rounded-lg font-semibold">
+                      {updateMut.isPending ? "…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditing(null)} className="text-[11px] px-2 py-1 bg-[var(--surface-2)] text-foreground/60 rounded-lg">✕</button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => { setEditing(r.id); setEditVal(r.account_value?.toFixed(2) ?? ""); }}
+                    className="text-lg font-bold text-green-500 hover:underline block mb-1"
+                  >
+                    {r.account_value != null ? `$${r.account_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : <span className="text-foreground/30 font-normal text-sm">tap to add value</span>}
+                  </button>
+                )}
+                <div className="flex items-center gap-4 text-xs">
+                  {chg != null && (
+                    <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                      Δ {chg >= 0 ? "+" : ""}{chg.toFixed(0)}
+                    </span>
+                  )}
+                  {r.premium > 0 && <span className="text-green-500">Prem ${r.premium.toFixed(2)}</span>}
+                  <span className={r.realized_pnl >= 0 ? "text-green-500" : "text-red-400"}>{fmt$(r.realized_pnl)}</span>
+                </div>
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <p className="text-center text-foreground/40 py-10 text-sm">No weeks yet.</p>
+          )}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                {["Week Ending (Friday)", "Account Value", "Δ vs Prior", "Premium", "Realized P/L", "Status"].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {rows.map(r => {
+                const idx = changes.findIndex(c => c.id === r.id);
+                const chg = idx >= 0 ? changes[idx].chg : null;
+                const isEdit = editing === r.id;
+                return (
+                  <tr key={r.id} className="hover:bg-[var(--surface-2)] transition-colors">
+                    <td className="px-4 py-3 text-foreground/80 font-medium whitespace-nowrap">
+                      {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isEdit ? (
+                        <form
+                          className="flex items-center gap-2"
+                          onSubmit={e => {
+                            e.preventDefault();
+                            const v = parseFloat(editVal);
+                            if (!isNaN(v)) updateMut.mutate({ id: r.id, value: v });
+                          }}
+                        >
+                          <input
+                            autoFocus
+                            type="number"
+                            step="0.01"
+                            value={editVal}
+                            onChange={e => setEditVal(e.target.value)}
+                            className="w-32 border border-blue-500 rounded-lg px-2 py-1 text-sm bg-[var(--surface)] text-foreground focus:outline-none"
+                          />
+                          <button type="submit" className="text-[11px] px-2 py-1 bg-blue-500 text-white rounded-lg font-semibold">
+                            {updateMut.isPending ? "…" : "Save"}
+                          </button>
+                          <button type="button" onClick={() => setEditing(null)} className="text-[11px] px-2 py-1 bg-[var(--surface-2)] text-foreground/60 rounded-lg">
+                            ✕
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          onClick={() => { setEditing(r.id); setEditVal(r.account_value?.toFixed(2) ?? ""); }}
+                          className="font-semibold text-green-500 hover:underline"
+                        >
+                          {r.account_value != null ? `$${r.account_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : <span className="text-foreground/30 font-normal">— tap to add</span>}
                         </button>
-                        <button type="button" onClick={() => setEditing(null)} className="text-[11px] px-2 py-1 bg-[var(--surface-2)] text-foreground/60 rounded-lg">
-                          ✕
-                        </button>
-                      </form>
-                    ) : (
-                      <button
-                        onClick={() => { setEditing(r.id); setEditVal(r.account_value?.toFixed(2) ?? ""); }}
-                        className="font-semibold text-green-500 hover:underline"
-                      >
-                        {r.account_value != null ? `$${r.account_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : <span className="text-foreground/30 font-normal">— tap to add</span>}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {chg != null ? (
-                      <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>
-                        {chg >= 0 ? "+" : ""}{chg.toFixed(0)}
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {chg != null ? (
+                        <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                          {chg >= 0 ? "+" : ""}{chg.toFixed(0)}
+                        </span>
+                      ) : <span className="text-foreground/30">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/80">
+                      {r.premium > 0 ? <span className="text-green-500 font-medium">${r.premium.toFixed(2)}</span> : <span className="text-foreground/30">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={r.realized_pnl >= 0 ? "text-green-500" : "text-red-400"}>
+                        {fmt$(r.realized_pnl)}
                       </span>
-                    ) : <span className="text-foreground/30">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-foreground/80">
-                    {r.premium > 0 ? <span className="text-green-500 font-medium">${r.premium.toFixed(2)}</span> : <span className="text-foreground/30">—</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={r.realized_pnl >= 0 ? "text-green-500" : "text-red-400"}>
-                      {fmt$(r.realized_pnl)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                      r.is_complete ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
-                    }`}>
-                      {r.is_complete ? "Complete" : "Active"}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {rows.length === 0 && (
-          <p className="text-center text-foreground/40 py-10 text-sm">No weeks yet.</p>
-        )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                        r.is_complete ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                      }`}>
+                        {r.is_complete ? "Complete" : "Active"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {rows.length === 0 && (
+            <p className="text-center text-foreground/40 py-10 text-sm">No weeks yet.</p>
+          )}
+        </div>
       </div>
 
     </div>
@@ -2141,7 +2398,6 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
   const totalPremSold    = h.total_premium_sold      ?? 0;
   const basisReduction   = h.basis_reduction         ?? 0;
 
-  // Per-share breakdowns for tooltip-style display
   const realizedPerShare   = h.shares > 0 ? realizedPrem   / h.shares : 0;
   const unrealizedPerShare = h.shares > 0 ? unrealizedPrem / h.shares : 0;
 
@@ -2152,9 +2408,124 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
     staleTime: 30_000,
   });
 
+  const expandedHistory = expanded && (
+    <div className="px-3 pb-3 pt-2 bg-[var(--surface-2)]/40">
+      {totalPremSold > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-2 px-3 py-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 text-xs">
+          <span className="font-semibold text-foreground/70">Premium for {h.symbol}:</span>
+          <span className="text-foreground/60">Total: <span className="font-bold text-foreground">${totalPremSold.toFixed(2)}</span></span>
+          <span className="text-green-600 dark:text-green-400">Realized: <span className="font-bold">${realizedPrem.toFixed(2)}</span></span>
+          <span className="text-amber-600 dark:text-amber-400">In-flight: <span className="font-bold">${unrealizedPrem.toFixed(2)}</span></span>
+        </div>
+      )}
+      {eventsLoading ? (
+        <p className="text-xs text-foreground/50">Loading history…</p>
+      ) : events.length === 0 ? (
+        <p className="text-xs text-foreground/50">No events yet.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {events.map((ev: HoldingEvent) => (
+            <div key={ev.id} className={`flex items-start gap-3 text-xs px-3 py-2 rounded-xl border ${
+              ev.event_type === "CC_ASSIGNED"  ? "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800" :
+              ev.event_type === "CC_EXPIRED"   ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" :
+              ev.event_type === "CSP_ASSIGNED" ? "bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800" :
+              "bg-[var(--surface)] border-[var(--border)]"
+            }`}>
+              <span className={`font-bold shrink-0 ${
+                ev.event_type === "CC_ASSIGNED"  ? "text-green-600" :
+                ev.event_type === "CC_EXPIRED"   ? "text-blue-500" :
+                ev.event_type === "CSP_ASSIGNED" ? "text-yellow-600" : "text-foreground/60"
+              }`}>{ev.event_type.replace("_", " ")}</span>
+              <span className="text-foreground/70 flex-1">{ev.description}</span>
+              {ev.realized_gain != null && (
+                <span className={`font-bold shrink-0 ${ev.realized_gain >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {ev.realized_gain >= 0 ? "+" : ""}{ev.realized_gain.toFixed(2)}
+                </span>
+              )}
+              <span className="text-foreground/40 shrink-0">{ev.created_at.slice(0, 10)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <tr className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+      {/* ── Mobile card (< sm) ── */}
+      <div className="sm:hidden border-b border-[var(--border)]">
+        <div className="px-3 py-3">
+          {/* Row 1: Symbol + status badge + actions */}
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-foreground text-base">{h.symbol}</span>
+                {h.status === "CLOSED" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 font-semibold">CLOSED</span>
+                )}
+              </div>
+              {h.company_name && <div className="text-[10px] text-foreground/50">{h.company_name}</div>}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="text-[10px] px-2 py-1 rounded-lg bg-[var(--surface-2)] text-foreground/70 font-semibold flex items-center gap-1"
+              >
+                {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
+              <button onClick={onEdit} className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold">Edit</button>
+              <button
+                onClick={() => { if (window.confirm(`Delete ${h.symbol} holding (${h.shares} shares)?`)) onDelete(); }}
+                className="text-[10px] px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold"
+              >Del</button>
+            </div>
+          </div>
+
+          {/* Row 2: Shares + Avg Cost */}
+          <div className="flex items-center gap-4 mb-1.5 text-sm">
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Shares</span>
+              <span className="font-semibold text-foreground">{h.shares.toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Avg Cost</span>
+              <span className="text-foreground/70">${h.cost_basis.toFixed(2)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Live Adj</span>
+              <span className="font-bold text-blue-500">${liveAdj.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Row 3: Premium badges */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            {realizedPrem > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-semibold">
+                ✓ -${realizedPerShare.toFixed(2)}/sh realized
+              </span>
+            )}
+            {unrealizedPrem > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold">
+                ⏳ -${unrealizedPerShare.toFixed(2)}/sh in-flight
+              </span>
+            )}
+            {basisReduction > 0 && (
+              <span className="text-[9px] text-green-500 font-semibold">↓ ${basisReduction.toFixed(2)} saved</span>
+            )}
+          </div>
+
+          {/* Row 4: BE prices + live P&L */}
+          <div className="flex items-center gap-4 text-[11px]">
+            <span className="text-foreground/50">▼ BE: <span className="text-red-400 font-semibold">${downsideBasis.toFixed(2)}</span></span>
+            {upsideBasis != null && <span className="text-foreground/50">▲ CC: <span className="text-green-500 font-semibold">${upsideBasis.toFixed(2)}</span></span>}
+            <HoldingLivePriceMobile symbol={h.symbol} liveAdjBasis={liveAdj} shares={h.shares} />
+          </div>
+        </div>
+        {expanded && expandedHistory}
+      </div>
+
+      {/* ── Desktop table row (≥ sm) ── */}
+      <tr className="hidden sm:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
         {/* Company / Symbol */}
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-1.5">
@@ -2171,7 +2542,6 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
         <td className="px-3 py-2.5 text-foreground/70 text-sm">${h.cost_basis.toFixed(2)}</td>
         {/* Adj basis — full breakdown */}
         <td className="px-3 py-2.5 text-sm">
-          {/* Live adj basis (headline) */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-bold text-blue-500">${liveAdj.toFixed(2)}</span>
             <span className="text-[9px] text-foreground/40 font-normal">live</span>
@@ -2179,7 +2549,6 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
               <span className="text-[9px] text-foreground/40" title="Stored adj basis (unrealized premium not yet locked in)">(stored: ${storedAdj.toFixed(2)})</span>
             )}
           </div>
-          {/* Premium row: realized (locked) + unrealized (in-flight) */}
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {realizedPrem > 0 && (
               <span
@@ -2198,11 +2567,9 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
               </span>
             )}
           </div>
-          {/* Total basis saved */}
           {basisReduction > 0 && (
             <div className="text-[9px] text-green-500 font-semibold mt-0.5">↓ ${basisReduction.toFixed(2)} total saved</div>
           )}
-          {/* Upside / Downside */}
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-[9px] text-foreground/50" title="Breakeven if stock goes to zero">▼ BE: <span className="text-red-400 font-semibold">${downsideBasis.toFixed(2)}</span></span>
             {upsideBasis != null && (
@@ -2230,9 +2597,8 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
         </td>
       </tr>
       {expanded && (
-        <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <tr className="hidden sm:table-row border-b border-[var(--border)] bg-[var(--surface-2)]/40">
           <td colSpan={6} className="px-4 pb-3 pt-2">
-            {/* Premium summary banner */}
             {totalPremSold > 0 && (
               <div className="flex items-center gap-4 mb-2 px-3 py-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 text-xs">
                 <span className="font-semibold text-foreground/70">Premium history for {h.symbol}:</span>
@@ -2274,6 +2640,24 @@ function HoldingRow({ h, onEdit, onDelete }: { h: StockHolding; onEdit: () => vo
         </tr>
       )}
     </>
+  );
+}
+
+// Inline live price for mobile card (no table cell wrapper)
+function HoldingLivePriceMobile({ symbol, liveAdjBasis, shares }: { symbol: string; liveAdjBasis: number; shares: number }) {
+  const { data } = useQuery({
+    queryKey: ["stockHistory", symbol, "1d"],
+    queryFn: () => fetchStockHistory(symbol, "1d", "5m"),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+  const price = data?.current_price;
+  if (price == null) return null;
+  const unrealized = (price - liveAdjBasis) * shares;
+  return (
+    <span className={`font-semibold ${unrealized >= 0 ? "text-green-500" : "text-red-500"}`}>
+      ${price.toFixed(2)} · {unrealized >= 0 ? "+" : ""}${unrealized.toFixed(0)}
+    </span>
   );
 }
 
@@ -2445,33 +2829,33 @@ function HoldingsTab() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[140px] max-w-xs">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search symbol or company…" className={`${inp} pl-8`} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => syncMut.mutate()}
             disabled={syncMut.isPending}
             title="Sync premium ledger from all linked positions — rebuilds realized/unrealized premium and re-derives adj basis"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            <DollarSign size={12} /> {syncMut.isPending ? "Syncing…" : "Sync Ledger"}
+            <DollarSign size={12} /> <span className="hidden sm:inline">{syncMut.isPending ? "Syncing…" : "Sync Ledger"}</span><span className="sm:hidden">Sync</span>
           </button>
           <button
             onClick={() => seedMut.mutate()}
             disabled={seedMut.isPending}
             title="Create holdings from existing positions using strike as avg cost"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-foreground/70 text-xs font-semibold hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            <TrendingUp size={12} /> {seedMut.isPending ? "Importing…" : "Import from Positions"}
+            <TrendingUp size={12} /> <span className="hidden sm:inline">{seedMut.isPending ? "Importing…" : "Import from Positions"}</span><span className="sm:hidden">Import</span>
           </button>
           <button
             onClick={() => { setEditing(null); resetForm(); setShowForm(v => !v); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
           >
-            <Plus size={12} /> Add Holding
+            <Plus size={12} /> Add
           </button>
         </div>
       </div>
@@ -2549,26 +2933,40 @@ function HoldingsTab() {
       )}
 
       {!isLoading && filtered.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                {["Company","Shares","Avg Cost","Adj Basis","Current Price / P&L","Actions"].map(col => (
-                  <th key={col} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{col}</th>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-[var(--border)]">
+            {filtered.map(h => (
+              <HoldingRow
+                key={h.id}
+                h={h}
+                onEdit={() => startEdit(h)}
+                onDelete={() => deleteMut.mutate(h.id)}
+              />
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                  {["Company","Shares","Avg Cost","Adj Basis","Current Price / P&L","Actions"].map(col => (
+                    <th key={col} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(h => (
+                  <HoldingRow
+                    key={h.id}
+                    h={h}
+                    onEdit={() => startEdit(h)}
+                    onDelete={() => deleteMut.mutate(h.id)}
+                  />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(h => (
-                <HoldingRow
-                  key={h.id}
-                  h={h}
-                  onEdit={() => startEdit(h)}
-                  onDelete={() => deleteMut.mutate(h.id)}
-                />
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -2634,11 +3032,11 @@ function WeekSelector({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
+      <div className="relative flex-1 sm:flex-none">
         <select
           value={selectedId ?? ""}
           onChange={(e) => onSelect(Number(e.target.value))}
-          className="appearance-none border border-[var(--border)] rounded-xl px-3 py-2 pr-8 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold min-w-[220px]"
+          className="appearance-none border border-[var(--border)] rounded-xl px-3 py-2 pr-8 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold w-full sm:min-w-[220px]"
         >
           <option value="" disabled>Select week…</option>
           {weeks.map((w) => (
@@ -2652,9 +3050,9 @@ function WeekSelector({
       </div>
       <button
         onClick={onNewWeek}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-foreground hover:bg-[var(--surface-2)] transition"
+        className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-foreground hover:bg-[var(--surface-2)] transition"
       >
-        <Plus size={12} /> New Week
+        <Plus size={12} /> <span className="hidden xs:inline">New Week</span><span className="xs:hidden">New</span>
       </button>
     </div>
   );
@@ -2715,7 +3113,7 @@ export default function PortfolioPage() {
   });
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       <PageHeader
         title="Portfolio"
         sub="Weekly tracker — sell options, track premium, manage assignments"

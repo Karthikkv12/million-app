@@ -155,7 +155,7 @@ export default function OrdersPage() {
   const shown = filter === "ALL" ? orders : orders.filter((o) => o.status?.toUpperCase() === filter);
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
       {filling && <FillModal order={filling} onDone={() => setFilling(null)} />}
 
       <PageHeader
