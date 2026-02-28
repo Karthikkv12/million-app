@@ -664,7 +664,13 @@ What do you think of this position? Should I roll, close early, or hold to expir
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [{ role: "user", content: prompt }], accessToken: access }),
       });
-      if (!res.ok || !res.body) { setAiAnalysis("Failed to get analysis."); setAiLoading(false); return; }
+      if (!res.ok || !res.body) {
+        let msg = "Failed to get analysis.";
+        try { const j = await res.json(); msg = j.error ?? msg; } catch {}
+        setAiAnalysis(`⚠️ ${msg}`);
+        setAiLoading(false);
+        return;
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let text = "";

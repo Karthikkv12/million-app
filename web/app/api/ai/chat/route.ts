@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (err: unknown) {
       const msg = (err as Error).message ?? "Gemini error";
+      console.error("[AI] Gemini error:", msg);
       // If Gemini fails and OpenAI key exists, fall through to OpenAI below
       if (!openaiKey) {
         return new Response(JSON.stringify({ error: `Gemini error: ${msg}` }), {
