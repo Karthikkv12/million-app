@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
   if (geminiKey) {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
       // Build Gemini history (all messages except the last user message)
       const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
@@ -179,6 +179,18 @@ export async function POST(req: NextRequest) {
     } catch (err: unknown) {
       const msg = (err as Error).message ?? "Gemini error";
       console.error("[AI] Gemini error:", msg);
+
+      // Detect quota exhaustion and surface a friendly message
+      const isQuotaError = msg.includes("429") || msg.includes("quota") || msg.includes("Too Many Requests");
+      if (isQuotaError && !openaiKey) {
+        const retryMatch = msg.match(/retry in ([\d.]+)s/i);
+        const retryIn = retryMatch ? `Please retry in ${Math.ceil(parseFloat(retryMatch[1]))} seconds.` : "Daily free quota is exhausted — resets at midnight PT.";
+        return new Response(
+          JSON.stringify({ error: `AI quota exceeded. ${retryIn}` }),
+          { status: 429, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       // If Gemini fails and OpenAI key exists, fall through to OpenAI below
       if (!openaiKey) {
         return new Response(JSON.stringify({ error: `Gemini error: ${msg}` }), {

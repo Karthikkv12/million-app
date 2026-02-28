@@ -169,7 +169,7 @@ export default function AiChat() {
               </svg>
             </div>
             <span className="font-semibold text-sm text-foreground">OptionFlow AI</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-semibold">Gemini 2.0 Flash</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-semibold">Gemini 2.0 Flash Lite</span>
           </div>
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
