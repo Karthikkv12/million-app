@@ -5,6 +5,41 @@
 
 ---
 
+## v1.6.4 — Positions Metrics Overhaul
+**Released:** 2026-02-28
+**Tag:** `v1.6.4`
+**Branch:** `develop → main`
+
+### ✨ New Metrics — Per-Position Row
+- **DTE (Days to Expiry)** — shown on every position row (mobile + desktop); color-coded urgency: 🔴 expired · 🟠 ≤3d · 🟡 ≤7d · gray >7d; mobile shows `"5d left"` / `"2d ago"`, desktop shows `"5d"`
+- **Fix: /$1K formula** — `premium_in` is a per-share price; corrected formula to `(premium_in / strike) × 1000` (removed erroneous `/contracts` division from prior attempt)
+
+### ✨ New KPI Cards — Positions Tab (8 cards total)
+- **Stock Value at Stake** 🟡 — `sum(cost_basis × shares)` across all holdings with `X% covered` subtitle
+- **Portfolio Value** 🟣 — `week.account_value` (e.g. $25K) for the current week
+- **Portfolio Coverage** 🟠 — `total premium collected / portfolio value × 100` with progress bar (replaces old "Cost Basis Coverage" which only measured stock equity)
+- **Capital at Risk** 🔴 — `sum(strike × contracts × 100)` for ACTIVE positions only; real strike obligation
+- **In-Flight Premium** 🩵 — unrealized premium still open in active trades; subtitle shows locked/realized amount
+
+### 🔧 Fixes
+- **Cost Basis Coverage denominator** — now uses `week.account_value` (full $25K portfolio) not just stock holdings value
+- **/$1K avg in KPI** — `avgPremPerK` also fixed to use `(premium_in / strike) × 1000` per position
+
+---
+
+## v1.6.3 — Positions Trade Metrics
+**Released:** 2026-02-28
+**Tag:** `v1.6.3`
+**Branch:** `develop → main`
+
+### ✨ New Features
+- **Prem/$1K column** — premium collected per $1,000 of capital at risk, normalized to 1 contract (100 shares); comparable across strikes
+- **ROI% column** — realized ROI for closed trades; unrealized income / capital at risk for active trades
+- **Cost Basis Coverage KPI** — total all-time premium collected vs portfolio cost basis, with a mini progress bar
+- **Avg Prem/$1K KPI** — average /$1K across this week's positions
+
+---
+
 ## v1.6.2 — Mobile Pan Fix & Hide-on-Scroll Bottom Nav
 **Released:** 2026-02-28
 **Tag:** `v1.6.2`
