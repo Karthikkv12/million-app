@@ -5,6 +5,30 @@
 
 ---
 
+## v1.6.5 — AI Chat Assistant (Gemini)
+**Released:** 2026-02-28
+**Tag:** `v1.6.5`
+**Branch:** `develop → main`
+
+### ✨ New Feature — OptionFlow AI Chat
+- Floating AI assistant panel on every page (bottom-right corner)
+- Powered by **Google Gemini 2.0 Flash Lite** (free tier, no billing required)
+- Live portfolio context injected automatically: positions, holdings, premium dashboard, account summary
+- Per-position **✨ AI analysis** inline in the Positions tab
+- Streaming responses with typing indicator
+- Multi-key rotation: add `GEMINI_API_KEY_2/3` to `.env.local` for automatic quota failover
+- Falls back to OpenAI if `OPENAI_API_KEY` is set and Gemini quota is exhausted
+
+### 🔧 Infrastructure Fixes
+- Fixed `distDir` split that caused `middleware-manifest.json` 500 on every request
+- Added `middleware.ts` to force pre-generation of `middleware-manifest.json`
+- Added `error.tsx`, `global-error.tsx`, `app/(app)/error.tsx` error boundaries
+- Fixed `npm start` script to include port (`-p 3002`)
+- Added `start:fresh` script for clean build + start
+- **Build rule documented:** always run `npm run build` in foreground (not `&`)
+
+---
+
 ## v1.6.4 — Positions Metrics Overhaul
 **Released:** 2026-02-28
 **Tag:** `v1.6.4`
