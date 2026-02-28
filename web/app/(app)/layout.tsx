@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import AiChat from "@/components/AiChat";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
@@ -20,6 +21,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomNav />
+      <AiChat />
     </div>
   );
 }
