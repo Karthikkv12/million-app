@@ -144,6 +144,11 @@ def bs_gamma(S: float, K: float, T: float, r: float, sigma: float) -> float:
     """Black-Scholes gamma for a European option (same for calls and puts)."""
     if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         return 0.0
+    # Hard floor: yfinance returns 1e-5 as a placeholder IV for illiquid/zero-bid
+    # options. With sigma ~1e-5 the denominator (S*sigma*sqrt(T)) ≈ 0 and gamma
+    # explodes to thousands. Anything below 0.5% IV is not a real market quote.
+    if sigma < 0.005:
+        return 0.0
     try:
         d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
         return _norm_pdf(d1) / (S * sigma * math.sqrt(T))
@@ -233,6 +238,14 @@ def _parse_chain_rows(exp: str, chain: "object", spot: float, T: float) -> list[
                 ask_raw = opt.get("ask", 0)
                 ask = float(ask_raw) if ask_raw is not None and not (isinstance(ask_raw, float) and math.isnan(ask_raw)) else 0.0
                 mid = (bid + ask) / 2.0
+
+                # Skip illiquid/phantom rows: yfinance sets IV=1e-5 as a floor
+                # for options with no real market (zero bid & ask). These rows
+                # have real OI but no price signal; feeding them to bs_gamma with
+                # near-zero sigma causes gamma to explode (~50 vs ~0.025 for ATM).
+                # Threshold: IV < 0.5% (0.005) with zero mid → discard the row.
+                if iv < 0.005 and mid == 0.0:
+                    continue
 
                 chain_gamma = opt.get("gamma", None)
                 if chain_gamma is not None and not (isinstance(chain_gamma, float) and math.isnan(chain_gamma)) and float(chain_gamma) > 0:

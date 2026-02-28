@@ -298,6 +298,181 @@ Index(
     OrderEvent.created_at,
 )
 
+
+# ── Weekly Options Portfolio ──────────────────────────────────────────────────
+
+class OptionPositionStatus(enum.Enum):
+    ACTIVE   = "ACTIVE"    # still open, carries forward each week
+    CLOSED   = "CLOSED"    # bought back before expiry
+    EXPIRED  = "EXPIRED"   # expired worthless — full premium kept
+    ASSIGNED = "ASSIGNED"  # put assigned → stock acquired
+    ROLLED   = "ROLLED"    # this leg closed; new_position_id points to replacement
+
+
+class WeeklySnapshot(Base):
+    """One row per Friday.  Created when user opens a new week or marks one complete."""
+    __tablename__ = "weekly_snapshots"
+    id             = Column(Integer, primary_key=True)
+    user_id        = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    week_start     = Column(DateTime, nullable=False, index=True)   # Monday 00:00 UTC
+    week_end       = Column(DateTime, nullable=False, index=True)   # Friday 23:59 UTC
+    account_value  = Column(Float, nullable=True)                   # Friday close — manual entry
+    is_complete    = Column(Boolean, nullable=False, default=False, index=True)
+    completed_at   = Column(DateTime, nullable=True)
+    notes          = Column(String, nullable=True)
+    created_at     = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+Index(
+    "ux_weekly_snapshots_user_week_end",
+    WeeklySnapshot.user_id,
+    WeeklySnapshot.week_end,
+    unique=True,
+)
+
+
+class OptionPosition(Base):
+    """One row per option leg (one sell-to-open).  Active positions are carried
+    forward automatically when a week is marked complete."""
+    __tablename__ = "option_positions"
+    id               = Column(Integer, primary_key=True)
+    user_id          = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    week_id          = Column(Integer, ForeignKey('weekly_snapshots.id'), nullable=False, index=True)
+    symbol           = Column(String, nullable=False, index=True)
+    contracts        = Column(Integer, nullable=False, default=1)
+    strike           = Column(Float, nullable=False)
+    option_type      = Column(String, nullable=False)               # "CALL" | "PUT"
+    sold_date        = Column(DateTime, nullable=True)
+    buy_date         = Column(DateTime, nullable=True)              # close / buy-back date
+    expiry_date      = Column(DateTime, nullable=True, index=True)
+    premium_in       = Column(Float, nullable=True)                 # credit received (positive)
+    premium_out      = Column(Float, nullable=True)                 # debit paid to close / roll (negative stored as-is)
+    is_roll          = Column(Boolean, nullable=False, default=False)
+    # Lifecycle
+    status           = Column(Enum(OptionPositionStatus), nullable=False,
+                               default=OptionPositionStatus.ACTIVE, index=True)
+    # If rolled: points to the new leg that replaced this one
+    rolled_to_id     = Column(Integer, ForeignKey('option_positions.id'), nullable=True)
+    # If carried forward from a prior week's position
+    carried_from_id  = Column(Integer, ForeignKey('option_positions.id'), nullable=True)
+    # Linked stock holding lot (optional — for CC/CSP tracking against a specific lot)
+    holding_id       = Column(Integer, ForeignKey('stock_holdings.id'), nullable=True, index=True)
+    # Margin used (manual entry)
+    margin           = Column(Float, nullable=True)
+    notes            = Column(String, nullable=True)
+    created_at       = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at       = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class HoldingEventType(enum.Enum):
+    CC_EXPIRED   = "CC_EXPIRED"    # CC expired worthless → cost basis reduced
+    CC_ASSIGNED  = "CC_ASSIGNED"   # CC assigned → shares called away, realized gain recorded
+    CSP_ASSIGNED = "CSP_ASSIGNED"  # CSP assigned → cash converts to shares, basis blended
+    MANUAL       = "MANUAL"        # Manual adjustment
+
+
+class StockHolding(Base):
+    """A stock lot held by the user.  One row per lot (separately tracked)."""
+    __tablename__ = "stock_holdings"
+    id                   = Column(Integer, primary_key=True)
+    user_id              = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    symbol               = Column(String, nullable=False, index=True)
+    company_name         = Column(String, nullable=True)                   # full company name from ticker search
+    shares               = Column(Float, nullable=False)                   # current shares (auto-decrements on CC assignment)
+    cost_basis           = Column(Float, nullable=False)                   # original per-share cost (never changes)
+    adjusted_cost_basis  = Column(Float, nullable=False)                   # reduces as CC premiums expire worthless
+    acquired_date        = Column(DateTime, nullable=True)
+    status               = Column(String, nullable=False, default="ACTIVE", index=True)  # ACTIVE | CLOSED
+    notes                = Column(String, nullable=True)
+    created_at           = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at           = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class HoldingEvent(Base):
+    """Audit log of every automatic change to a StockHolding (basis reductions, share changes)."""
+    __tablename__ = "holding_events"
+    id                  = Column(Integer, primary_key=True)
+    user_id             = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    holding_id          = Column(Integer, ForeignKey('stock_holdings.id'), nullable=False, index=True)
+    position_id         = Column(Integer, ForeignKey('option_positions.id'), nullable=True, index=True)
+    event_type          = Column(Enum(HoldingEventType), nullable=False, index=True)
+    shares_delta        = Column(Float, nullable=True)     # +/- shares change
+    basis_delta         = Column(Float, nullable=True)     # per-share basis change (negative = reduction)
+    realized_gain       = Column(Float, nullable=True)     # for CC_ASSIGNED events
+    description         = Column(String, nullable=True)
+    created_at          = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PremiumLedger(Base):
+    """
+    One row per (holding × option_position) pair.
+
+    Captures the full premium story for every option sold against a holding:
+      - premium_sold:      total credit received when the position was opened
+                           (premium_in × contracts × 100)
+      - realized_premium:  portion that has been locked in (position CLOSED/EXPIRED/ASSIGNED).
+                           For a fully closed position = premium_sold (net of any buyback debit).
+                           For a partially rolled position = net credit on the closed leg.
+      - unrealized_premium: portion still in-flight (ACTIVE positions).
+                           = premium_sold when status is ACTIVE, 0 once realized.
+      - status:            mirrors OptionPosition.status (ACTIVE / CLOSED / EXPIRED / ASSIGNED / ROLLED)
+
+    adj_basis (stored) = cost_basis - SUM(realized_premium) / shares
+    live_adj_basis     = adj_basis  - SUM(unrealized_premium) / shares
+    """
+    __tablename__ = "premium_ledger"
+
+    id                  = Column(Integer, primary_key=True)
+    user_id             = Column(Integer, ForeignKey("users.id"),            nullable=False, index=True)
+    holding_id          = Column(Integer, ForeignKey("stock_holdings.id"),   nullable=False, index=True)
+    position_id         = Column(Integer, ForeignKey("option_positions.id"), nullable=False, index=True)
+    symbol              = Column(String,  nullable=False, index=True)
+    week_id             = Column(Integer, ForeignKey("weekly_snapshots.id"), nullable=True,  index=True)
+    option_type         = Column(String,  nullable=False)           # CALL | PUT
+    strike              = Column(Float,   nullable=False)
+    contracts           = Column(Integer, nullable=False, default=1)
+    expiry_date         = Column(DateTime, nullable=True)
+    # Premium amounts (total dollar value, not per-share)
+    premium_sold        = Column(Float,   nullable=False, default=0.0)  # credit when opened
+    realized_premium    = Column(Float,   nullable=False, default=0.0)  # locked-in (closed/expired)
+    unrealized_premium  = Column(Float,   nullable=False, default=0.0)  # still in-flight (active)
+    # Position status snapshot
+    status              = Column(String,  nullable=False, default="ACTIVE", index=True)
+    notes               = Column(String,  nullable=True)
+    created_at          = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at          = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+Index(
+    "ux_premium_ledger_holding_position",
+    PremiumLedger.holding_id,
+    PremiumLedger.position_id,
+    unique=True,
+)
+
+
+class StockAssignment(Base):
+    """Tracks stock acquired via put assignment, plus any additional buys.
+    Computes upside / downside breakeven automatically."""
+    __tablename__ = "stock_assignments"
+    id                    = Column(Integer, primary_key=True)
+    user_id               = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    position_id           = Column(Integer, ForeignKey('option_positions.id'), nullable=False, index=True)
+    symbol                = Column(String, nullable=False, index=True)
+    # Initial assignment
+    shares_acquired       = Column(Integer, nullable=False)
+    acquisition_price     = Column(Float, nullable=False)           # price per share at assignment
+    # Additional buys (average down / up) stored as JSON string: [{shares, price}, ...]
+    additional_buys       = Column(String, nullable=True)
+    # Covered calls sold against this stock position (reduces cost basis)
+    # Stored as JSON: [{contracts, strike, premium, sold_date, status}, ...]
+    covered_calls         = Column(String, nullable=True)
+    # Net premium collected from options on this symbol (reduces cost basis)
+    net_option_premium    = Column(Float, nullable=True, default=0.0)
+    notes                 = Column(String, nullable=True)
+    created_at            = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at            = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Database Connection Setup
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
@@ -600,6 +775,141 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 ("last_synced_at", "DATETIME"),
             ],
         )
+
+        # ── Weekly Options Portfolio ──────────────────────────────────────
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS weekly_snapshots (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    week_start DATETIME NOT NULL,
+                    week_end DATETIME NOT NULL,
+                    account_value REAL,
+                    is_complete INTEGER NOT NULL DEFAULT 0,
+                    completed_at DATETIME,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_weekly_snapshots_user_id ON weekly_snapshots(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_weekly_snapshots_week_start ON weekly_snapshots(week_start)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_weekly_snapshots_week_end ON weekly_snapshots(week_end)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_weekly_snapshots_is_complete ON weekly_snapshots(is_complete)")
+            _safe_execute(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_weekly_snapshots_user_week_end ON weekly_snapshots(user_id, week_end)")
+
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS option_positions (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    week_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    contracts INTEGER NOT NULL DEFAULT 1,
+                    strike REAL NOT NULL,
+                    option_type TEXT NOT NULL,
+                    sold_date DATETIME,
+                    buy_date DATETIME,
+                    expiry_date DATETIME,
+                    premium_in REAL,
+                    premium_out REAL,
+                    is_roll INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'ACTIVE',
+                    rolled_to_id INTEGER,
+                    carried_from_id INTEGER,
+                    margin REAL,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_option_positions_user_id ON option_positions(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_option_positions_week_id ON option_positions(week_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_option_positions_symbol ON option_positions(symbol)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_option_positions_status ON option_positions(status)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_option_positions_expiry_date ON option_positions(expiry_date)")
+
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS stock_assignments (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    position_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    shares_acquired INTEGER NOT NULL,
+                    acquisition_price REAL NOT NULL,
+                    additional_buys TEXT,
+                    covered_calls TEXT,
+                    net_option_premium REAL DEFAULT 0,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_assignments_user_id ON stock_assignments(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_assignments_position_id ON stock_assignments(position_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_assignments_symbol ON stock_assignments(symbol)")
+
+        # stock_holdings: new table (best-effort)
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS stock_holdings (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    company_name TEXT,
+                    shares REAL NOT NULL,
+                    cost_basis REAL NOT NULL,
+                    adjusted_cost_basis REAL NOT NULL,
+                    acquired_date DATETIME,
+                    status TEXT NOT NULL DEFAULT 'ACTIVE',
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_holdings_user_id ON stock_holdings(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_holdings_symbol ON stock_holdings(symbol)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_stock_holdings_status ON stock_holdings(status)")
+
+        # holding_events: audit log table (best-effort)
+        with engine.begin() as conn:
+            _safe_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS holding_events (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    holding_id INTEGER NOT NULL,
+                    position_id INTEGER,
+                    event_type TEXT NOT NULL,
+                    shares_delta REAL,
+                    basis_delta REAL,
+                    realized_gain REAL,
+                    description TEXT,
+                    created_at DATETIME NOT NULL
+                )
+                """.strip(),
+            )
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holding_events_user_id ON holding_events(user_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holding_events_holding_id ON holding_events(holding_id)")
+            _safe_execute(conn, "CREATE INDEX IF NOT EXISTS ix_holding_events_position_id ON holding_events(position_id)")
+
+        # holding_id column on option_positions
+        _add_columns("option_positions", [("holding_id", "INTEGER")])
+        # company_name column on stock_holdings (for existing DBs)
+        _add_columns("stock_holdings", [("company_name", "TEXT")])
     except Exception:
         # Best-effort: never break app startup due to migration helpers.
         return

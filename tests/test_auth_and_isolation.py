@@ -4,8 +4,9 @@ from logic import services
 def test_create_and_auth(db_engine_and_session):
     uid = services.create_user('alice', 'GoodPassword12')
     assert isinstance(uid, int)
-    auth_id = services.authenticate_user('alice', 'GoodPassword12')
-    assert auth_id == uid
+    auth_result = services.authenticate_user('alice', 'GoodPassword12')
+    assert auth_result is not None
+    assert auth_result['user_id'] == uid
     # wrong password
     assert services.authenticate_user('alice', 'wrong') is None
 
@@ -32,10 +33,10 @@ def test_per_user_isolation(db_engine_and_session):
 
 def test_change_password(db_engine_and_session):
     uid = services.create_user('bob', 'GoodPassword12')
-    assert services.authenticate_user('bob', 'GoodPassword12') == uid
+    assert services.authenticate_user('bob', 'GoodPassword12')['user_id'] == uid
     services.change_password(user_id=uid, old_password='GoodPassword12', new_password='BetterPassword34')
     assert services.authenticate_user('bob', 'GoodPassword12') is None
-    assert services.authenticate_user('bob', 'BetterPassword34') == uid
+    assert services.authenticate_user('bob', 'BetterPassword34')['user_id'] == uid
 
 
 def test_idempotent_trade_submission(db_engine_and_session):
@@ -132,7 +133,7 @@ def test_password_policy_enforced_on_change_password(db_engine_and_session):
 
     # Valid new password
     services.change_password(user_id=uid, old_password="GoodPassword12", new_password="BetterPassword34")
-    assert services.authenticate_user("policy3", "BetterPassword34") == uid
+    assert services.authenticate_user("policy3", "BetterPassword34")['user_id'] == uid
 
 
 def test_accounts_and_holdings_isolation_and_upsert(db_engine_and_session):
