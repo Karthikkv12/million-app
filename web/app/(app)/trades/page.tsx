@@ -8,7 +8,7 @@ import {
   fetchPortfolioSummary, fetchSymbolSummary, fetchStockHistory,
   fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHoldingEvents,
   seedHoldingsFromPositions, recalculateHoldings, syncPremiumLedger,
-  fetchPremiumDashboard,
+  fetchPremiumDashboard, updateWeek,
   WeeklySnapshot, OptionPosition, StockAssignment, PositionStatus, WeekBreakdown,
   StockHolding, HoldingEvent, PremiumDashboard, PremiumSymbolRow, PremiumWeekRow,
 } from "@/lib/api";
@@ -156,6 +156,7 @@ interface PosFormState {
   option_type: "PUT" | "CALL"; sold_date: string; expiry_date: string;
   buy_date: string; premium_in: string; premium_out: string;
   is_roll: boolean; margin: string; notes: string; holding_id: string;
+  status: PositionStatus;
 }
 
 const emptyForm = (): PosFormState => ({
@@ -163,6 +164,7 @@ const emptyForm = (): PosFormState => ({
   sold_date: new Date().toISOString().slice(0, 10),
   expiry_date: "", buy_date: "", premium_in: "", premium_out: "",
   is_roll: false, margin: "", notes: "", holding_id: "",
+  status: "ACTIVE",
 });
 
 function posToForm(p: OptionPosition): PosFormState {
@@ -175,6 +177,7 @@ function posToForm(p: OptionPosition): PosFormState {
     is_roll: p.is_roll, margin: p.margin != null ? String(p.margin) : "",
     notes: p.notes ?? "",
     holding_id: p.holding_id != null ? String(p.holding_id) : "",
+    status: p.status,
   };
 }
 
@@ -262,6 +265,44 @@ function PositionForm({
         {field("Premium In ($)", <input type="number" step="0.01" value={f.premium_in} onChange={(e) => set("premium_in", e.target.value)} placeholder="0.00" className={inp} />)}
         {field("Margin ($)", <input type="number" step="1" value={f.margin} onChange={(e) => set("margin", e.target.value)} placeholder="optional" className={inp} />)}
       </div>
+      {/* Prem Out — shown for closed/rolled/expired/assigned positions and rolls */}
+      {(f.is_roll || ["CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"].includes(f.status)) && (() => {
+        const premIn  = parseFloat(f.premium_in)  || 0;
+        const premOut = parseFloat(f.premium_out) || 0;   // negative = buyback debit
+        const contracts = parseInt(f.contracts) || 1;
+        const netTotal  = (premIn + premOut) * contracts * 100; // premOut is negative
+        const isLoss    = premOut !== 0 && Math.abs(premOut) > premIn;
+        return (
+          <div className="mb-3">
+            <label className="text-xs text-foreground/70 block mb-1">
+              Prem Out ($) <span className="text-foreground/40">— buyback/close cost (enter as negative, e.g. −0.45)</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number" step="0.01" value={f.premium_out}
+                onChange={(e) => set("premium_out", e.target.value)}
+                placeholder={f.is_roll ? "Roll credit (+) or debit (−)" : "e.g. −0.45"}
+                className={`${inp} flex-1 ${isLoss ? "border-red-400 dark:border-red-600" : ""}`}
+              />
+              {f.premium_out !== "" && (
+                <div className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
+                  isLoss
+                    ? "bg-red-50 dark:bg-red-900/30 text-red-500"
+                    : "bg-green-50 dark:bg-green-900/20 text-green-600"
+                }`}>
+                  Net: {netTotal >= 0 ? "+" : ""}${netTotal.toFixed(2)}
+                  {isLoss && <span className="ml-1.5 text-[10px] font-bold">LOSS — adj basis unaffected</span>}
+                </div>
+              )}
+            </div>
+            {isLoss && (
+              <p className="mt-1.5 text-[11px] text-red-500/80">
+                ⚠ Buyback cost exceeds premium collected. This is a realized loss. Adj basis will <span className="font-bold">not</span> be reduced.
+              </p>
+            )}
+          </div>
+        );
+      })()}
       <div className="flex items-center gap-3 mb-3">
         <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
           <input
@@ -271,16 +312,6 @@ function PositionForm({
           />
           This is a roll
         </label>
-        {f.is_roll && (
-          <div className="flex-1">
-            <input
-              type="number" step="0.01" value={f.premium_out}
-              onChange={(e) => set("premium_out", e.target.value)}
-              placeholder="Roll credit (+) or debit (−)"
-              className={inp}
-            />
-          </div>
-        )}
       </div>
       <div className="mb-3">
         {field("Notes", <input value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="optional" className={inp} />)}
@@ -328,25 +359,110 @@ function PositionForm({
   );
 }
 
-// ── Status Quick-Edit ─────────────────────────────────────────────────────────
+// ── Status Quick-Edit (with inline Prem Out when closing) ────────────────────
+
+const PREM_OUT_STATUSES: PositionStatus[] = ["CLOSED", "EXPIRED", "ROLLED"];
 
 function StatusSelect({ pos }: { pos: OptionPosition }) {
   const qc = useQueryClient();
-  const mut = useMutation({
-    mutationFn: (status: PositionStatus) => updatePosition(pos.id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["positions", pos.week_id] }),
+  // Track a pending status change before we confirm with prem out
+  const [pendingStatus, setPendingStatus] = useState<PositionStatus | null>(null);
+  const [premOut, setPremOut] = useState(
+    pos.premium_out != null ? String(pos.premium_out) : ""
+  );
+  const [err, setErr] = useState("");
+
+  const needsPremOut = (s: PositionStatus) => PREM_OUT_STATUSES.includes(s);
+
+  const saveMut = useMutation({
+    mutationFn: (body: { status: PositionStatus; premium_out?: number | null }) =>
+      updatePosition(pos.id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["positions", pos.week_id] });
+      setPendingStatus(null);
+      setErr("");
+    },
+    onError: (e: Error) => setErr(e.message),
   });
+
+  function handleStatusChange(newStatus: PositionStatus) {
+    if (needsPremOut(newStatus)) {
+      // Show inline prem-out input before committing
+      setPendingStatus(newStatus);
+      setPremOut(pos.premium_out != null ? String(pos.premium_out) : "");
+    } else {
+      // ACTIVE / ASSIGNED → save immediately, no prem out needed
+      saveMut.mutate({ status: newStatus, premium_out: null });
+    }
+  }
+
+  function handleConfirm() {
+    if (!pendingStatus) return;
+    const parsed = premOut !== "" ? parseFloat(premOut) : null;
+    saveMut.mutate({ status: pendingStatus, premium_out: parsed });
+  }
+
+  const isClosed = needsPremOut(pendingStatus ?? pos.status);
+  const premIn   = pos.premium_in ?? 0;
+  const premOutV = parseFloat(premOut) || 0;
+  const isLoss   = premOut !== "" && Math.abs(premOutV) > premIn;
+  const netPL    = premOut !== "" ? (premIn + premOutV) * pos.contracts * 100 : null;
+
+  const displayStatus = pendingStatus ?? pos.status;
+
   return (
-    <select
-      value={pos.status}
-      onChange={(e) => mut.mutate(e.target.value as PositionStatus)}
-      disabled={mut.isPending}
-      className="text-[11px] border border-[var(--border)] rounded-lg px-2 py-1 bg-[var(--surface)] text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
-    >
-      {(["ACTIVE", "CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"] as PositionStatus[]).map((s) => (
-        <option key={s} value={s}>{s}</option>
-      ))}
-    </select>
+    <div className="flex flex-col gap-1.5 min-w-[110px]">
+      {/* Status dropdown */}
+      <select
+        value={displayStatus}
+        onChange={(e) => handleStatusChange(e.target.value as PositionStatus)}
+        disabled={saveMut.isPending}
+        className="text-[11px] border border-[var(--border)] rounded-lg px-2 py-1 bg-[var(--surface)] text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+      >
+        {(["ACTIVE", "CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"] as PositionStatus[]).map((s) => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
+
+      {/* Inline prem-out entry — only when status is CLOSED/EXPIRED/ROLLED */}
+      {pendingStatus && needsPremOut(pendingStatus) && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              step="0.01"
+              value={premOut}
+              onChange={(e) => setPremOut(e.target.value)}
+              placeholder="Prem Out (e.g. −0.45)"
+              autoFocus
+              className={`w-full text-[11px] border rounded-lg px-2 py-1 bg-[var(--surface)] text-foreground focus:outline-none focus:ring-1 ${
+                isLoss ? "border-red-400 focus:ring-red-400" : "border-[var(--border)] focus:ring-green-500"
+              }`}
+            />
+            <button
+              onClick={handleConfirm}
+              disabled={saveMut.isPending}
+              className="shrink-0 text-[10px] px-2 py-1 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              {saveMut.isPending ? "…" : "✓"}
+            </button>
+            <button
+              onClick={() => { setPendingStatus(null); setErr(""); }}
+              className="shrink-0 text-[10px] px-1.5 py-1 rounded-lg border border-[var(--border)] text-foreground/60 hover:bg-[var(--surface-2)] transition"
+            >
+              ✕
+            </button>
+          </div>
+          {netPL !== null && (
+            <span className={`text-[10px] font-semibold ${isLoss ? "text-red-500" : "text-green-500"}`}>
+              net {netPL >= 0 ? "+" : ""}${netPL.toFixed(0)}
+              {isLoss && <span className="ml-1 text-[9px] bg-red-100 dark:bg-red-900/40 px-1 rounded">LOSS</span>}
+            </span>
+          )}
+          {err && <span className="text-[10px] text-red-500">{err}</span>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -509,14 +625,33 @@ function PositionRow({ pos, onEdit, onDelete }: { pos: OptionPosition; onEdit: (
           {pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}` : "—"}
         </td>
         <td className="px-3 py-2.5 text-sm">
-          {pos.is_roll ? (
-            <span className={pos.premium_out != null && pos.premium_out >= 0 ? "text-green-500" : "text-red-500"}>
-              {pos.premium_out != null ? `${pos.premium_out >= 0 ? "+" : ""}$${pos.premium_out.toFixed(2)}` : "—"}
-              <span className="ml-1 text-[9px] text-purple-400">roll</span>
-            </span>
-          ) : (
-            <span className="text-foreground/40">—</span>
-          )}
+          {(() => {
+            const isClosed = ["CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"].includes(pos.status);
+            const showPremOut = pos.premium_out != null && (isClosed || pos.is_roll);
+            if (!showPremOut) return <span className="text-foreground/30">—</span>;
+            const premIn  = pos.premium_in  ?? 0;
+            const premOut = pos.premium_out!;   // negative debit
+            const isLoss  = Math.abs(premOut) > premIn;  // paid more to close than collected
+            const netPL   = (premIn + premOut) * pos.contracts * 100;
+            return (
+              <div className="flex flex-col gap-0.5">
+                <span className={isLoss ? "text-red-500 font-semibold" : "text-orange-400"}>
+                  {premOut >= 0 ? "+" : ""}${premOut.toFixed(2)}
+                  {pos.is_roll && <span className="ml-1 text-[9px] text-purple-400">roll</span>}
+                </span>
+                {isClosed && (
+                  <span className={`text-[10px] font-semibold ${
+                    isLoss ? "text-red-500" : "text-green-500"
+                  }`}>
+                    net {netPL >= 0 ? "+" : ""}${netPL.toFixed(0)}
+                    {isLoss && (
+                      <span className="ml-1 px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-[9px]">LOSS</span>
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </td>
         <td className="px-3 py-2.5">
           <StatusSelect pos={pos} />
@@ -687,7 +822,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                    {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Roll", "Status", "Margin", "Actions"].map((h) => (
+                    {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -719,7 +854,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">
-                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Roll", "Status", "Margin", "Actions"].map((h) => (
+                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "Prem In", "Prem Out", "Status", "Margin", "Actions"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -812,6 +947,8 @@ function SymbolsTab() {
 }
 
 // ── Year Summary Tab ─────────────────────────────────────────────────────────
+type MonthEntry = [string, number] | null;
+type CumEntry = { label: string; cumulative: number; weekly: number };
 
 function YearTab() {
   const { data: s, isLoading: summaryLoading } = useQuery({
@@ -834,10 +971,41 @@ function YearTab() {
   if (isLoading) return <div className="space-y-3">{[1,2,3,4].map(i => <SkeletonCard key={i} rows={2} />)}</div>;
   if (!s) return <EmptyState icon={BarChart2} title="No data yet" body="Complete a week to see your performance summary." />;
 
-  const weeksBreakdown: WeekBreakdown[] = s.weeks_breakdown ?? [];
-  const monthlyPremium: Record<string, number> = s.monthly_premium ?? {};
-  const winRate: number = s.win_rate ?? 0;
-  const completeWeeks: number = s.complete_weeks ?? 0;
+  const weeksBreakdown = (s.weeks_breakdown ?? []) as WeekBreakdown[];
+  const monthlyPremium = (s.monthly_premium ?? {}) as Record<string, number>;
+  const winRate = s.win_rate ?? 0;
+  const completeWeeks = s.complete_weeks ?? 0;
+
+  // ── Extra derived metrics (computed once here, used in JSX below) ─────────
+
+  // Weekly premium std-dev → consistency score (0–100, higher = more consistent)
+  const completedPremiums = [...weeksBreakdown].filter(w => w.is_complete && w.premium > 0).map(w => w.premium);
+  const weeklyMean = completedPremiums.length > 0 ? completedPremiums.reduce((a, b) => a + b, 0) / completedPremiums.length : 0;
+  const weeklyStdDev = completedPremiums.length > 1
+    ? Math.sqrt(completedPremiums.reduce((a, b) => a + Math.pow(b - weeklyMean, 2), 0) / completedPremiums.length)
+    : 0;
+  const consistencyScore = weeklyMean > 0 ? Math.max(0, Math.min(100, 100 - (weeklyStdDev / weeklyMean) * 100)) : 0;
+
+  // Current win streak (consecutive profitable complete weeks, newest first)
+  const completedWeeks = weeksBreakdown.filter(w => w.is_complete);
+  const streakBreak = completedWeeks.findIndex(w => w.premium <= 0);
+  const currentStreak = streakBreak === -1 ? completedWeeks.length : streakBreak;
+
+  // Avg positions per week
+  const avgPositionsPerWeek = completeWeeks > 0
+    ? weeksBreakdown.filter(w => w.is_complete).reduce((a, w) => a + w.position_count, 0) / completeWeeks
+    : 0;
+
+  // Best and worst month
+  const monthlyEntries2 = Object.entries(monthlyPremium).sort((a, b) => a[0].localeCompare(b[0]));
+  const bestMonth = monthlyEntries2.reduce((best, cur) => !best || cur[1] > best[1] ? cur : best, null as MonthEntry);
+  const worstMonth = monthlyEntries2.filter(entry => entry[1] > 0).reduce((worst, cur) => !worst || cur[1] < worst[1] ? cur : worst, null as MonthEntry);
+
+  // Realized vs in-flight from premium dashboard
+  const realizedPrem   = premDash?.grand_total.realized_premium ?? 0;
+  const inFlightPrem   = premDash?.grand_total.unrealized_premium ?? 0;
+  const totalPremForSplit = realizedPrem + inFlightPrem;
+  const realizedPct    = totalPremForSplit > 0 ? (realizedPrem / totalPremForSplit) * 100 : 0;
 
   const monthNames: Record<string, string> = {
     "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
@@ -848,17 +1016,17 @@ function YearTab() {
 
   // Cumulative premium over weeks (chronological)
   const chronoWeeks = [...weeksBreakdown].reverse(); // API returns newest-first
-  const cumulativeData = chronoWeeks.reduce<{ label: string; cumulative: number; weekly: number }[]>((acc, w) => {
+  const cumulativeData = (chronoWeeks.reduce((acc, w) => {
     const prev = acc[acc.length - 1]?.cumulative ?? 0;
     const label = new Date(w.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
     acc.push({ label, cumulative: prev + w.premium, weekly: w.premium });
     return acc;
-  }, []);
+  }, [] as CumEntry[]) as CumEntry[]);
 
   // Weekly premium run rate & projection
   const activePremWeeks = chronoWeeks.filter(w => w.premium > 0);
   const avgWeeklyPremium = activePremWeeks.length > 0
-    ? activePremWeeks.reduce((s, w) => s + w.premium, 0) / activePremWeeks.length
+    ? activePremWeeks.reduce((acc, w) => acc + w.premium, 0) / activePremWeeks.length
     : 0;
   const annualProjection = avgWeeklyPremium * 52;
   const monthlyProjection = avgWeeklyPremium * 4.33;
@@ -883,14 +1051,14 @@ function YearTab() {
     .sort((a, b) => b.premiumSold - a.premiumSold);
 
   // Monthly bar data
-  const monthlyEntries = Object.entries(monthlyPremium).sort(([a],[b]) => a.localeCompare(b));
-  const maxMonthlyPremium = Math.max(...monthlyEntries.map(([,v]) => v), 1);
+  const monthlyEntries = Object.entries(monthlyPremium).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxMonthlyPremium = Math.max(...monthlyEntries.map(e => e[1]), 1);
 
   // Max weekly for bar scaling
   const maxWeekly = Math.max(...cumulativeData.map(d => d.weekly), 1);
 
   // Efficiency: premium as % of total cost basis
-  const totalCostBasis = holdings.reduce((s, h) => s + h.cost_basis * h.shares, 0);
+  const totalCostBasis = holdings.reduce((acc, h) => acc + h.cost_basis * h.shares, 0);
   const premiumEfficiency = totalCostBasis > 0
     ? ((premDash?.grand_total.total_premium_sold ?? 0) / totalCostBasis) * 100
     : 0;
@@ -1166,175 +1334,244 @@ function YearTab() {
         </div>
       )}
 
+      {/* ── Consistency + Streak + Avg Positions ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Consistency score */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Consistency</p>
+          <div>
+            <p className="text-3xl font-black" style={{ color: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444" }}>
+              {consistencyScore.toFixed(0)}<span className="text-lg font-semibold text-foreground/40">/100</span>
+            </p>
+            <p className="text-xs text-foreground/50 mt-1">
+              σ ${weeklyStdDev.toFixed(2)} · avg ${weeklyMean.toFixed(2)}/wk
+            </p>
+          </div>
+          <div className="mt-3 h-2 bg-[var(--surface-2)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${consistencyScore}%`,
+                background: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444"
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Win streak */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Current Streak</p>
+          <div>
+            <p className="text-3xl font-black text-yellow-400">
+              {currentStreak}<span className="text-lg font-semibold text-foreground/40"> wks</span>
+            </p>
+            <p className="text-xs text-foreground/50 mt-1">consecutive profitable weeks</p>
+          </div>
+          <div className="mt-3 flex gap-1">
+            {Array.from({ length: Math.min(8, completeWeeks) }).map((_, i) => {
+              const w = [...weeksBreakdown].filter(w => w.is_complete)[i];
+              return (
+                <div
+                  key={i}
+                  className="flex-1 h-2 rounded-full"
+                  style={{ background: w ? (w.premium > 0 ? "#facc15" : "#ef4444") : "var(--surface-2)" }}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Avg positions per week */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Avg Positions / Week</p>
+          <div>
+            <p className="text-3xl font-black text-blue-400">{avgPositionsPerWeek.toFixed(1)}</p>
+            <p className="text-xs text-foreground/50 mt-1">across {completeWeeks} complete weeks</p>
+          </div>
+          <p className="mt-3 text-[10px] text-foreground/40">
+            ${avgPositionsPerWeek > 0 ? (weeklyMean / avgPositionsPerWeek).toFixed(2) : "0.00"} avg per position deployed
+          </p>
+        </div>
+      </div>
+
+      {/* ── Realized vs In-flight split + Best/Worst month ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+        {/* Realized vs in-flight */}
+        {totalPremForSplit > 0 && (
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-3">Realized vs In-Flight</p>
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-xl font-black text-blue-500">${realizedPrem.toFixed(0)}</span>
+              <span className="text-sm text-foreground/40 mb-0.5">locked in</span>
+              <span className="ml-auto text-xl font-black text-orange-400">${inFlightPrem.toFixed(0)}</span>
+              <span className="text-sm text-foreground/40 mb-0.5">active</span>
+            </div>
+            {/* Stacked bar */}
+            <div className="h-3 bg-[var(--surface-2)] rounded-full overflow-hidden flex">
+              <div className="h-full bg-blue-500 rounded-l-full transition-all" style={{ width: `${realizedPct}%` }} />
+              <div className="h-full bg-orange-400 flex-1 rounded-r-full" />
+            </div>
+            <div className="flex justify-between mt-1.5 text-[10px] text-foreground/40">
+              <span>{realizedPct.toFixed(0)}% realized</span>
+              <span>{(100 - realizedPct).toFixed(0)}% in-flight</span>
+            </div>
+          </div>
+        )}
+
+        {/* Best & worst month */}
+        {(bestMonth || worstMonth) && (
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-3">Best / Worst Month</p>
+            <div className="flex gap-4">
+              {bestMonth && (
+                <div className="flex-1">
+                  <p className="text-[10px] text-green-500 font-semibold uppercase mb-1">Best</p>
+                  <p className="text-lg font-black text-green-500">${bestMonth[1].toFixed(0)}</p>
+                  <p className="text-xs text-foreground/50">{monthNames[bestMonth[0].split("-")[1]] ?? bestMonth[0]}</p>
+                </div>
+              )}
+              {worstMonth && (
+                <div className="flex-1">
+                  <p className="text-[10px] text-orange-400 font-semibold uppercase mb-1">Lightest</p>
+                  <p className="text-lg font-black text-orange-400">${worstMonth[1].toFixed(0)}</p>
+                  <p className="text-xs text-foreground/50">{monthNames[worstMonth[0].split("-")[1]] ?? worstMonth[0]}</p>
+                </div>
+              )}
+              {bestMonth && worstMonth && bestMonth[0] !== worstMonth[0] && (
+                <div className="flex-1">
+                  <p className="text-[10px] text-foreground/40 font-semibold uppercase mb-1">Range</p>
+                  <p className="text-lg font-black text-foreground/60">${(bestMonth[1] - worstMonth[1]).toFixed(0)}</p>
+                  <p className="text-xs text-foreground/50">spread</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── Best / Worst week ── */}
       {(s.best_week || s.worst_week) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {s.best_week && s.best_week.premium > 0 && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy size={14} className="text-green-600" />
-                <p className="text-xs font-bold text-green-700 dark:text-green-400">Best Week</p>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-3">Best / Weakest Week</p>
+          <div className="flex gap-4">
+            {s.best_week && s.best_week.premium > 0 && (
+              <div className="flex-1">
+                <p className="text-[10px] text-green-500 font-semibold uppercase mb-1">Best</p>
+                <p className="text-lg font-black text-green-500">${s.best_week.premium.toFixed(0)}</p>
+                <p className="text-xs text-foreground/50">{s.best_week.week_end}</p>
+                <p className="text-[10px] text-foreground/40">{s.best_week.position_count} positions</p>
               </div>
-              <p className="text-sm text-foreground/70">{s.best_week.week_end}</p>
-              <p className="text-2xl font-black text-green-600">${s.best_week.premium.toFixed(2)}</p>
-              <p className="text-xs text-foreground/50">{s.best_week.position_count} positions</p>
-            </div>
-          )}
-          {s.worst_week && s.worst_week.id !== s.best_week?.id && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle size={14} className="text-red-500" />
-                <p className="text-xs font-bold text-red-600 dark:text-red-400">Weakest Week</p>
+            )}
+            {s.worst_week && s.worst_week.id !== s.best_week?.id && (
+              <div className="flex-1">
+                <p className="text-[10px] text-orange-400 font-semibold uppercase mb-1">Weakest</p>
+                <p className={`text-lg font-black ${s.worst_week.premium >= 0 ? "text-orange-400" : "text-red-500"}`}>
+                  {fmt$(s.worst_week.premium)}
+                </p>
+                <p className="text-xs text-foreground/50">{s.worst_week.week_end}</p>
+                <p className="text-[10px] text-foreground/40">{s.worst_week.position_count} positions</p>
               </div>
-              <p className="text-sm text-foreground/70">{s.worst_week.week_end}</p>
-              <p className={`text-2xl font-black ${s.worst_week.premium >= 0 ? "text-green-600" : "text-red-500"}`}>
-                {fmt$(s.worst_week.premium)}
-              </p>
-              <p className="text-xs text-foreground/50">{s.worst_week.position_count} positions</p>
-            </div>
-          )}
+            )}
+            {s.best_week && s.worst_week && s.best_week.premium > 0 && s.worst_week.id !== s.best_week?.id && (
+              <div className="flex-1">
+                <p className="text-[10px] text-foreground/40 font-semibold uppercase mb-1">Range</p>
+                <p className="text-lg font-black text-foreground/60">${(s.best_week.premium - s.worst_week.premium).toFixed(0)}</p>
+                <p className="text-xs text-foreground/50">spread</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── Monthly bar chart + line graph ── */}
-      {monthlyEntries.length > 0 && (() => {
-        // Build SVG polyline points over the 112px bar area (h-28 = 112px).
-        // We use a 100×100 viewBox; bars occupy bottom ~85 units (labels take top 15).
-        const chartH = 85; // usable vertical range in viewBox units
-        const n = monthlyEntries.length;
-        const linePoints = monthlyEntries
-          .map(([, v], i) => {
-            const x = n === 1 ? 50 : (i / (n - 1)) * 100;
-            const y = chartH - Math.max(2, (v / maxMonthlyPremium) * (chartH - 4));
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(" ");
-        const areaPoints =
-          `0,${chartH} ` +
-          monthlyEntries
-            .map(([, v], i) => {
-              const x = n === 1 ? 50 : (i / (n - 1)) * 100;
-              const y = chartH - Math.max(2, (v / maxMonthlyPremium) * (chartH - 4));
-              return `${x.toFixed(1)},${y.toFixed(1)}`;
-            })
-            .join(" ") +
-          ` 100,${chartH}`;
-        return (
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar size={14} className="text-blue-500" />
-              <h3 className="text-sm font-bold text-foreground">Monthly Premium</h3>
-            </div>
-            {/* relative wrapper so SVG overlays the bars */}
-            <div className="relative">
-              <div className="flex items-end gap-1 h-28">
-                {monthlyEntries.map(([ym, val]) => {
+      {/* ── Monthly chart + Week-by-week side by side ── */}
+      {(monthlyEntries.length > 0 || weeksBreakdown.length > 0) && (
+        <div className="flex gap-4 items-start">
+
+          {/* Monthly bar chart */}
+          {monthlyEntries.length > 0 && (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shrink-0" style={{ width: `${Math.max(224, monthlyEntries.length * 36 + 40)}px` }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Calendar size={14} className="text-green-500" />
+                <h3 className="text-sm font-bold text-foreground">Monthly Premium</h3>
+              </div>
+              {/* tall narrow bar chart */}
+              <div className="flex items-end gap-1.5 h-56">
+                {monthlyEntries.map(entry => {
+                  const ym = entry[0]; const val = entry[1];
                   const [, month] = ym.split("-");
-                  const pct = Math.max(4, Math.round((val / maxMonthlyPremium) * 100));
+                  const pct = Math.max(3, Math.round((val / maxMonthlyPremium) * 100));
                   const hasData = val > 0;
                   return (
-                    <div key={ym} className="flex-1 flex flex-col items-center gap-0.5">
-                      <span className="text-[8px] text-foreground/60 font-semibold leading-none">
-                        {hasData ? (val >= 1000 ? (val/1000).toFixed(1)+"k" : val.toFixed(0)) : ""}
+                    <div key={ym} className="flex flex-col items-center gap-1 h-full justify-end" style={{ minWidth: "28px", flex: "1 1 0" }}>
+                      <span className="text-[9px] text-foreground/70 font-semibold leading-none mb-0.5 whitespace-nowrap">
+                        {hasData ? (val >= 1000 ? "$"+(val/1000).toFixed(1)+"k" : "$"+val.toFixed(0)) : ""}
                       </span>
                       <div
-                        className={`w-full rounded-t-sm ${hasData ? "bg-green-500/60" : "bg-[var(--surface-2)]"}`}
+                        className={`w-full rounded-t ${hasData ? "bg-green-500" : "bg-[var(--surface-2)]"}`}
                         style={{ height: `${pct}%` }}
                       />
-                      <span className="text-[8px] text-foreground/50 leading-none">{monthNames[month] ?? month}</span>
+                      <span className="text-[9px] text-foreground/50 leading-none mt-0.5 whitespace-nowrap">
+                        {monthNames[month] ?? month}
+                      </span>
                     </div>
                   );
                 })}
               </div>
-              {/* SVG line overlay — covers just the bar area (not the label row) */}
-              <svg
-                className="absolute pointer-events-none"
-                style={{ top: "14px", left: 0, right: 0, bottom: "16px", width: "100%", height: "calc(100% - 30px)" }}
-                viewBox="0 0 100 85"
-                preserveAspectRatio="none"
-              >
-                {/* soft area fill */}
-                <polygon
-                  points={areaPoints}
-                  fill="rgba(59,130,246,0.08)"
-                />
-                {/* trend line */}
-                <polyline
-                  points={linePoints}
-                  fill="none"
-                  stroke="rgb(59,130,246)"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {/* dots */}
-                {monthlyEntries.map(([, v], i) => {
-                  const x = n === 1 ? 50 : (i / (n - 1)) * 100;
-                  const y = chartH - Math.max(2, (v / maxMonthlyPremium) * (chartH - 4));
-                  return (
-                    <circle
-                      key={i}
-                      cx={x.toFixed(1)}
-                      cy={y.toFixed(1)}
-                      r={v > 0 ? "2" : "1.2"}
-                      fill={v > 0 ? "rgb(59,130,246)" : "rgba(59,130,246,0.3)"}
-                    />
-                  );
-                })}
-              </svg>
             </div>
-          </div>
-        );
-      })()}
+          )}
 
-      {/* ── Week-by-week table ── */}
-      {weeksBreakdown.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto">
-          <div className="px-4 py-3 border-b border-[var(--border)]">
-            <h3 className="text-sm font-bold text-foreground">Week-by-Week</h3>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                {["Week Ending","Status","Positions","Premium","vs Avg","Realized P/L","Account Value"].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {weeksBreakdown.map((w: WeekBreakdown) => {
-                const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
-                return (
-                  <tr key={w.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                    <td className="px-4 py-2.5 font-semibold text-foreground">{w.week_end}</td>
-                    <td className="px-4 py-2.5">
-                      {w.is_complete
-                        ? <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 px-2 py-0.5 rounded-full font-semibold">Complete</span>
-                        : <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
-                      }
-                    </td>
-                    <td className="px-4 py-2.5 text-foreground/70">{w.position_count}</td>
-                    <td className={`px-4 py-2.5 font-semibold ${w.premium >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {fmt$(w.premium)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {vsAvg !== null && w.is_complete ? (
-                        <span className={`text-xs font-semibold ${vsAvg >= 0 ? "text-green-500" : "text-red-400"}`}>
-                          {vsAvg >= 0 ? "▲" : "▼"} {Math.abs(vsAvg).toFixed(0)}%
-                        </span>
-                      ) : <span className="text-foreground/30">—</span>}
-                    </td>
-                    <td className={`px-4 py-2.5 font-semibold ${w.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {fmt$(w.realized_pnl)}
-                    </td>
-                    <td className="px-4 py-2.5 text-foreground/70">
-                      {w.account_value != null ? `$${w.account_value.toLocaleString()}` : "—"}
-                    </td>
+          {/* Week-by-week table */}
+          {weeksBreakdown.length > 0 && (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-x-auto flex-1 min-w-0">
+              <div className="px-4 py-3 border-b border-[var(--border)]">
+                <h3 className="text-sm font-bold text-foreground">Week-by-Week</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+                    {["Week Ending","Status","Positions","Premium","vs Avg","Realized P/L","Account Value"].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {weeksBreakdown.map(w => {
+                    const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
+                    return (
+                      <tr key={w.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                        <td className="px-4 py-2.5 font-semibold text-foreground">{w.week_end}</td>
+                        <td className="px-4 py-2.5">
+                          {w.is_complete
+                            ? <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 px-2 py-0.5 rounded-full font-semibold">Complete</span>
+                            : <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
+                          }
+                        </td>
+                        <td className="px-4 py-2.5 text-foreground/70">{w.position_count}</td>
+                        <td className={`px-4 py-2.5 font-semibold ${w.premium >= 0 ? "text-green-500" : "text-red-500"}`}>
+                          {fmt$(w.premium)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {vsAvg !== null && w.is_complete ? (
+                            <span className={`text-xs font-semibold ${vsAvg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                              {vsAvg >= 0 ? "▲" : "▼"} {Math.abs(vsAvg).toFixed(0)}%
+                            </span>
+                          ) : <span className="text-foreground/30">—</span>}
+                        </td>
+                        <td className={`px-4 py-2.5 font-semibold ${w.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                          {fmt$(w.realized_pnl)}
+                        </td>
+                        <td className="px-4 py-2.5 text-foreground/70">
+                          {w.account_value != null ? `$${w.account_value.toLocaleString()}` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -1356,6 +1593,11 @@ function PremiumTab() {
     queryKey: ["premiumDashboard"],
     queryFn: fetchPremiumDashboard,
     staleTime: 30_000,
+  });
+  const { data: holdings = [] } = useQuery({
+    queryKey: ["holdings"],
+    queryFn: fetchHoldings,
+    staleTime: 60_000,
   });
 
   const toggleWeek = (weekId: number) => {
@@ -1544,6 +1786,49 @@ function PremiumTab() {
         </div>
       )}
 
+      {/* ── Premium per share ── */}
+      {(() => {
+        const rows = by_symbol
+          .map(r => {
+            const h = holdings.find(h => h.symbol === r.symbol);
+            const shares = h?.shares ?? 0;
+            return { symbol: r.symbol, shares, sold: r.total_premium_sold, perShare: shares > 0 ? r.total_premium_sold / shares : 0 };
+          })
+          .filter(r => r.perShare > 0)
+          .sort((a, b) => b.perShare - a.perShare);
+        const maxPs = Math.max(...rows.map(r => r.perShare), 1);
+        if (rows.length === 0) return null;
+        return (
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart2 size={14} className="text-blue-500" />
+              <h3 className="text-sm font-bold text-foreground">Premium per Share</h3>
+              <span className="ml-auto text-[10px] text-foreground/40">how hard each holding is working</span>
+            </div>
+            <div className="space-y-2.5">
+              {rows.map(r => {
+                const barPct = Math.max(4, (r.perShare / maxPs) * 100);
+                return (
+                  <div key={r.symbol} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-foreground w-12 shrink-0">{r.symbol}</span>
+                    <div className="flex-1 h-5 bg-[var(--surface-2)] rounded-lg overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500/70 rounded-lg flex items-center px-2 transition-all"
+                        style={{ width: `${barPct}%` }}
+                      >
+                        {barPct > 25 && <span className="text-[10px] font-bold text-white">${r.perShare.toFixed(2)}/sh</span>}
+                      </div>
+                    </div>
+                    {barPct <= 25 && <span className="text-[10px] font-semibold text-blue-400 shrink-0">${r.perShare.toFixed(2)}/sh</span>}
+                    <span className="text-[10px] text-foreground/40 w-16 text-right shrink-0">{r.shares} shares</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Notation key ── */}
       <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-4 text-[11px] text-foreground/60 space-y-2">
         <p className="text-[11px] font-bold text-foreground/80 uppercase tracking-wide mb-2">Notation</p>
@@ -1559,6 +1844,283 @@ function PremiumTab() {
           <div><span className="font-semibold text-foreground/80"># Pos</span> — number of original option positions logged against this holding (carry-forwards not counted)</div>
           <div><span className="font-semibold text-foreground/80">Sold $</span> — gross premium ever collected (realized + in-flight combined)</div>
         </div>
+      </div>
+
+    </div>
+  );
+}
+
+// ── Account Value Tab ───────────────────────────────────────────────────────
+
+function AccountTab() {
+  const qc = useQueryClient();
+  const { data: s, isLoading } = useQuery({
+    queryKey: ["portfolioSummary"],
+    queryFn: fetchPortfolioSummary,
+    staleTime: 60_000,
+  });
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState("");
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, value }: { id: number; value: number }) =>
+      updateWeek(id, { account_value: value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["portfolioSummary"] });
+      qc.invalidateQueries({ queryKey: ["weeks"] });
+      setEditing(null);
+    },
+  });
+
+  if (isLoading) return <div className="space-y-3">{[1,2,3].map(i => <SkeletonCard key={i} rows={2} />)}</div>;
+  if (!s) return <EmptyState icon={Activity} title="No data" body="Complete a week to start tracking." />;
+
+  const rows = [...(s.weeks_breakdown ?? [])].reverse(); // chronological
+  const withValue = rows.filter(r => r.account_value != null);
+  const maxVal = Math.max(...withValue.map(r => r.account_value!), 1);
+  const minVal = Math.min(...withValue.map(r => r.account_value!), maxVal);
+  const range = maxVal - minVal || 1;
+
+  // week-over-week change series
+  const changes = withValue.map((r, i) => {
+    const prev = i > 0 ? withValue[i - 1].account_value! : null;
+    const chg = prev != null ? r.account_value! - prev : null;
+    return { ...r, chg };
+  });
+
+  const latest = changes[changes.length - 1];
+  const totalGrowth = changes.length >= 2
+    ? changes[changes.length - 1].account_value! - changes[0].account_value!
+    : null;
+  const totalGrowthPct = changes.length >= 2 && changes[0].account_value!
+    ? (totalGrowth! / changes[0].account_value!) * 100
+    : null;
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── KPI strip ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Latest Value</p>
+          <p className="text-xl font-black text-green-500">
+            {latest ? `$${latest.account_value!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+          </p>
+          <p className="text-[10px] text-foreground/50 mt-0.5">{latest?.week_end ?? ""}</p>
+        </div>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Last Week Δ</p>
+          <p className={`text-xl font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-500"}`}>
+            {latest?.chg != null ? `${latest.chg >= 0 ? "+" : ""}$${latest.chg.toFixed(0)}` : "—"}
+          </p>
+          <p className="text-[10px] text-foreground/50 mt-0.5">vs prior Friday</p>
+        </div>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Total Growth</p>
+          <p className={`text-xl font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-blue-500" : "text-red-500"}`}>
+            {totalGrowth != null ? `${totalGrowth >= 0 ? "+" : ""}$${totalGrowth.toFixed(0)}` : "—"}
+          </p>
+          <p className="text-[10px] text-foreground/50 mt-0.5">
+            {totalGrowthPct != null ? `${totalGrowthPct >= 0 ? "+" : ""}${totalGrowthPct.toFixed(1)}%` : "since first entry"}
+          </p>
+        </div>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weeks Logged</p>
+          <p className="text-xl font-black text-purple-400">{withValue.length}</p>
+          <p className="text-[10px] text-foreground/50 mt-0.5">of {rows.length} total weeks</p>
+        </div>
+      </div>
+
+      {/* ── Line chart ── */}
+      {withValue.length >= 2 && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={14} className="text-green-500" />
+            <h3 className="text-sm font-bold text-foreground">Account Value Over Time</h3>
+          </div>
+          <div className="relative h-48">
+            {/* Area + line SVG */}
+            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+              {(() => {
+                const n = withValue.length;
+                const pts = withValue.map((r, i) => {
+                  const x = n === 1 ? 50 : (i / (n - 1)) * 100;
+                  const y = 100 - ((r.account_value! - minVal) / range) * 80 - 10;
+                  return { x, y, r };
+                });
+                const linePts = pts.map(p => `${p.x},${p.y}`).join(" ");
+                const areaPath = `M${pts[0].x},${pts[0].y} L${linePts.split(" ").slice(1).join(" L")} L${pts[n-1].x},100 L${pts[0].x},100 Z`;
+                return (
+                  <>
+                    <defs>
+                      <linearGradient id="acctGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#acctGrad)" />
+                    <polyline points={linePts} fill="none" stroke="#22c55e" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                    {pts.map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r="1.5" fill="#22c55e" vectorEffect="non-scaling-stroke" />
+                    ))}
+                  </>
+                );
+              })()}
+            </svg>
+            {/* Y-axis labels */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              <span className="text-[9px] text-foreground/40">${maxVal.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+              <span className="text-[9px] text-foreground/40">${minVal.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+            </div>
+          </div>
+          {/* X-axis */}
+          <div className="flex justify-between mt-2">
+            {withValue.length <= 8
+              ? withValue.map(r => (
+                  <span key={r.id} className="text-[9px] text-foreground/40">
+                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                ))
+              : [withValue[0], withValue[Math.floor(withValue.length / 2)], withValue[withValue.length - 1]].map(r => (
+                  <span key={r.id} className="text-[9px] text-foreground/40">
+                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* ── Week-over-week delta bars ── */}
+      {changes.length >= 2 && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity size={14} className="text-blue-400" />
+            <h3 className="text-sm font-bold text-foreground">Week-over-Week Change</h3>
+          </div>
+          <div className="flex items-end gap-1 h-24">
+            {changes.map((r, i) => {
+              if (r.chg == null) return <div key={i} className="flex-1" />;
+              const maxChg = Math.max(...changes.filter(c => c.chg != null).map(c => Math.abs(c.chg!)), 1);
+              const pct = Math.max(4, Math.round((Math.abs(r.chg) / maxChg) * 100));
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5">
+                  {r.chg >= 0 ? (
+                    <>
+                      <span className="text-[8px] text-green-500 font-semibold whitespace-nowrap">+{r.chg.toFixed(0)}</span>
+                      <div className="w-full rounded-t bg-green-500" style={{ height: `${pct}%` }} />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[8px] text-red-400 font-semibold whitespace-nowrap">{r.chg.toFixed(0)}</span>
+                      <div className="w-full rounded-t bg-red-400" style={{ height: `${pct}%` }} />
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between mt-1">
+            {changes.length <= 8
+              ? changes.map(r => (
+                  <span key={r.id} className="flex-1 text-center text-[8px] text-foreground/40">
+                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                ))
+              : <span className="text-[9px] text-foreground/40">{changes.length} weeks</span>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* ── Table ── */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">Friday Account Values</h3>
+          <p className="text-[10px] text-foreground/40">Click a value to edit</p>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
+              {["Week Ending (Friday)", "Account Value", "Δ vs Prior", "Premium", "Realized P/L", "Status"].map(h => (
+                <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {rows.map(r => {
+              const idx = changes.findIndex(c => c.id === r.id);
+              const chg = idx >= 0 ? changes[idx].chg : null;
+              const isEdit = editing === r.id;
+              return (
+                <tr key={r.id} className="hover:bg-[var(--surface-2)] transition-colors">
+                  <td className="px-4 py-3 text-foreground/80 font-medium whitespace-nowrap">
+                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                  </td>
+                  <td className="px-4 py-3">
+                    {isEdit ? (
+                      <form
+                        className="flex items-center gap-2"
+                        onSubmit={e => {
+                          e.preventDefault();
+                          const v = parseFloat(editVal);
+                          if (!isNaN(v)) updateMut.mutate({ id: r.id, value: v });
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          type="number"
+                          step="0.01"
+                          value={editVal}
+                          onChange={e => setEditVal(e.target.value)}
+                          className="w-32 border border-blue-500 rounded-lg px-2 py-1 text-sm bg-[var(--surface)] text-foreground focus:outline-none"
+                        />
+                        <button type="submit" className="text-[11px] px-2 py-1 bg-blue-500 text-white rounded-lg font-semibold">
+                          {updateMut.isPending ? "…" : "Save"}
+                        </button>
+                        <button type="button" onClick={() => setEditing(null)} className="text-[11px] px-2 py-1 bg-[var(--surface-2)] text-foreground/60 rounded-lg">
+                          ✕
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        onClick={() => { setEditing(r.id); setEditVal(r.account_value?.toFixed(2) ?? ""); }}
+                        className="font-semibold text-green-500 hover:underline"
+                      >
+                        {r.account_value != null ? `$${r.account_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : <span className="text-foreground/30 font-normal">— tap to add</span>}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {chg != null ? (
+                      <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>
+                        {chg >= 0 ? "+" : ""}{chg.toFixed(0)}
+                      </span>
+                    ) : <span className="text-foreground/30">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-foreground/80">
+                    {r.premium > 0 ? <span className="text-green-500 font-medium">${r.premium.toFixed(2)}</span> : <span className="text-foreground/30">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={r.realized_pnl >= 0 ? "text-green-500" : "text-red-400"}>
+                      {fmt$(r.realized_pnl)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                      r.is_complete ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                    }`}>
+                      {r.is_complete ? "Complete" : "Active"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <p className="text-center text-foreground/40 py-10 text-sm">No weeks yet.</p>
+        )}
       </div>
 
     </div>
@@ -2110,7 +2672,7 @@ export default function PortfolioPage() {
   } = useQuery({ queryKey: ["weeks"], queryFn: fetchWeeks, staleTime: 30_000 });
 
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"holdings" | "positions" | "symbols" | "year" | "premium">("holdings");
+  const [tab, setTab] = useState<"account" | "holdings" | "positions" | "symbols" | "premium" | "year">("account");
   const [autoSelected, setAutoSelected] = useState(false);
 
   if (!autoSelected && weeks.length > 0) {
@@ -2155,7 +2717,7 @@ export default function PortfolioPage() {
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
       <PageHeader
-        title="Options Portfolio"
+        title="Portfolio"
         sub="Weekly tracker — sell options, track premium, manage assignments"
         action={
           <RefreshButton
@@ -2184,13 +2746,14 @@ export default function PortfolioPage() {
         <div className="mb-5">
           <Tabs
             active={tab}
-            onChange={(k) => setTab(k as "holdings" | "positions" | "symbols" | "year" | "premium")}
+            onChange={(k) => setTab(k as "account" | "holdings" | "positions" | "symbols" | "premium" | "year")}
             tabs={[
+              { key: "account",   label: "Account"     },
               { key: "holdings",  label: "Holdings"    },
-              { key: "positions", label: "Positions"  },
-              { key: "symbols",   label: "Activity"   },
+              { key: "positions", label: "Positions"   },
+              { key: "symbols",   label: "Activity"    },
+              { key: "premium",   label: "Premium"     },
               { key: "year",      label: "Performance" },
-              { key: "premium",   label: "Premium"    },
             ]}
           />
         </div>
@@ -2213,6 +2776,7 @@ export default function PortfolioPage() {
       {tab === "symbols"  && <SymbolsTab />}
       {tab === "year"     && <YearTab />}
       {tab === "premium"  && <PremiumTab />}
+      {tab === "account"  && <AccountTab />}
     </div>
   );
 }

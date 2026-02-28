@@ -5,6 +5,36 @@
 
 ---
 
+## v1.6.0 — Positions Prem Out, Account Tab, Dashboard Balance Chart
+**Released:** 2026-02-27  
+**Tag:** `v1.6.0`  
+**Branch:** `develop`
+
+### ✨ New Features
+- **Account Value tab** — weekly Friday account value tracker with KPI cards, SVG line/area chart, week-over-week delta bars, and inline editable table
+- **Dashboard portfolio balance chart** — weekly balance area chart with KPI (current value, total growth %) linked to Account tab; shows placeholder when only 1 data point
+- **Inline Prem Out on status change** — selecting CLOSED / EXPIRED / ROLLED on a position now reveals an inline prem-out input + live net P&L preview (green profit / red LOSS badge) without opening the edit form
+- **Prem Out column** — "Roll" column renamed to "Prem Out"; shows buyback cost for all closed/expired/assigned/rolled positions with net P&L and LOSS badge when buyback exceeds collected
+- **Loss cap on adj basis** — closing a position at a loss (buyback > collected) caps `realized_premium` at 0; losses never reduce `adj_basis`
+
+### 🏗 UX / Nav
+- **Tab reorder** — Account tab is now default; order: Account → Holdings → Positions → Activity → Premium → Performance
+- **Nav cleanup** — Orders, Accounts, Ledger shelved from navbar (commented, not deleted)
+- **Page title** — "Options Portfolio" renamed to "Portfolio"
+- **Dashboard cleanup** — Removed Realized P/L, Cash, and Positions stat cards from dashboard
+
+### 🔧 Infrastructure
+- **Build/dev cache isolation** — `next.config.mjs` now uses `distDir: ".next-build"` for production builds so `npm run build` never overwrites the dev server's `.next` cache
+- **`dev:clean` script** — added `npm run dev:clean` (wipes `.next` then starts dev)
+- **VS Code auto-start task** — `.vscode/tasks.json` kills stale port-3000/3002 processes and starts the dev server automatically on workspace open
+- **`scripts/dev.sh` port fix** — changed default `WEB_PORT` from 3000 → 3002
+
+### 🐛 Bug Fixes
+- **Stale dev server on wrong port** — `scripts/dev.sh` was hardcoded to port 3000; fixed
+- **`_compute_premiums` 3-tuple** — updated function signature and all callers to return `(realized, unrealized, close_loss)`
+
+---
+
 ## v1.5.0 — Performance Charts, Holdings & Monthly Premium
 **Released:** 2026-02-27
 **Tag:** `v1.5.0`

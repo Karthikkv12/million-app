@@ -102,6 +102,7 @@ export interface AuthTokens {
   refresh_token: string;
   user_id: number;
   username: string;
+  role?: string;
 }
 
 export async function login(username: string, password: string): Promise<AuthTokens> {

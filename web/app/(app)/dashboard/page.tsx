@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AreaChart, Area, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
-import { fetchTrades, fetchOrders, fetchCashBalance, Trade } from "@/lib/api";
+import { fetchTrades, fetchOrders, fetchCashBalance, fetchPortfolioSummary, Trade } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import {
@@ -47,16 +47,18 @@ export default function DashboardPage() {
     if (t) router.push(`/stocks/${t}`);
   };
 
-  const tradesQ = useQuery({ queryKey: ["trades"],       queryFn: fetchTrades,          staleTime: 30_000 });
-  const cashQ   = useQuery({ queryKey: ["cash-balance"], queryFn: () => fetchCashBalance(), staleTime: 30_000 });
-  const ordersQ = useQuery({ queryKey: ["orders"],       queryFn: fetchOrders,          staleTime: 30_000 });
+  const tradesQ   = useQuery({ queryKey: ["trades"],            queryFn: fetchTrades,             staleTime: 30_000 });
+  const cashQ     = useQuery({ queryKey: ["cash-balance"],      queryFn: () => fetchCashBalance(), staleTime: 30_000 });
+  const ordersQ   = useQuery({ queryKey: ["orders"],            queryFn: fetchOrders,             staleTime: 30_000 });
+  const summaryQ  = useQuery({ queryKey: ["portfolioSummary"],  queryFn: fetchPortfolioSummary,   staleTime: 60_000 });
 
   const handleRefresh = () => {
     tradesQ.refetch();
     cashQ.refetch();
     ordersQ.refetch();
+    summaryQ.refetch();
   };
-  const isRefreshing = tradesQ.isFetching || cashQ.isFetching || ordersQ.isFetching;
+  const isRefreshing = tradesQ.isFetching || cashQ.isFetching || ordersQ.isFetching || summaryQ.isFetching;
 
   const trades = tradesQ.data ?? [];
   const { pnl, openCount, closedCount } = calcPnl(trades);
@@ -102,63 +104,79 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Stat cards */}
-      {isLoading ? (
-        <div className="mb-6 sm:mb-8"><SkeletonStatGrid count={4} /></div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          {/* P&L + sparkline */}
-          <div className="col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover">
-            <div className="flex items-start justify-between mb-3">
+      {/* ── Portfolio Balance Chart ── */}
+      {(() => {
+        const weeks = summaryQ.data?.weeks_breakdown ?? [];
+        const pts = [...weeks].reverse().filter(w => w.account_value != null) as { id: number; week_end: string; account_value: number; premium: number }[];
+        if (pts.length === 0) return null;
+        const latest = pts[pts.length - 1];
+        const first  = pts[0];
+        const change  = pts.length >= 2 ? latest.account_value - first.account_value : null;
+        const changePct = change != null && first.account_value > 0 ? (change / first.account_value) * 100 : null;
+        const up = change == null ? true : change >= 0;
+        const chartData = pts.map(w => ({
+          date: new Date(w.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          value: w.account_value,
+          premium: w.premium,
+        }));
+        return (
+          <div className="mb-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+            <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide mb-1">Realized P/L</p>
-                <p className={`text-2xl sm:text-3xl font-black ${pnlUp ? "text-green-500" : "text-red-500"}`}>
-                  {tradesQ.data ? (pnlUp ? "+" : "-") + fmt(pnl) : "—"}
+                <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">Portfolio Balance</p>
+                <p className={`text-2xl sm:text-3xl font-black ${up ? "text-green-500" : "text-red-500"}`}>
+                  ${latest.account_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-foreground/70 mt-1">{closedCount} closed trade{closedCount !== 1 ? "s" : ""}</p>
+                <p className={`text-xs mt-1 font-semibold ${up ? "text-green-500" : "text-red-500"}`}>
+                  {change != null
+                    ? `${change >= 0 ? "+" : ""}$${change.toFixed(0)}${changePct != null ? ` (${changePct >= 0 ? "+" : ""}${changePct.toFixed(1)}%)` : ""} since first entry`
+                    : `1 week logged · add more each Friday to track growth`
+                  }
+                </p>
               </div>
-              <span className={`p-2 rounded-xl ${pnlUp ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
-                {pnlUp ? <TrendingUp size={18} className="text-green-500" /> : <TrendingDown size={18} className="text-red-500" />}
-              </span>
+              <Link href="/trades" className="text-[11px] text-blue-500 hover:underline flex items-center gap-1 mt-1">
+                Account tab <ArrowRight size={11} />
+              </Link>
             </div>
-            {sparkData.length > 1 && (
-              <ResponsiveContainer width="100%" height={52}>
-                <AreaChart data={sparkData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <Area type="monotone" dataKey="v" stroke={pnlUp ? "#22c55e" : "#ef4444"}
-                    fill={pnlUp ? "#22c55e22" : "#ef444422"} strokeWidth={2} dot={false} />
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <RTooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P/L"]}
-                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "inherit" }} />
-                </AreaChart>
-              </ResponsiveContainer>
+            {pts.length >= 2 ? (
+              <>
+                <ResponsiveContainer width="100%" height={120}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={up ? "#22c55e" : "#ef4444"} stopOpacity={0.3} />
+                        <stop offset="100%" stopColor={up ? "#22c55e" : "#ef4444"} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke={up ? "#22c55e" : "#ef4444"}
+                      fill="url(#balGrad)"
+                      strokeWidth={2}
+                      dot={{ r: 2, fill: up ? "#22c55e" : "#ef4444", strokeWidth: 0 }}
+                    />
+                    <RTooltip
+                      formatter={(v: number) => [`$${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Balance"]}
+                      labelFormatter={(l) => `Week ending ${l}`}
+                      contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "inherit" }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex justify-between mt-1 px-0.5">
+                  <span className="text-[9px] text-foreground/40">{chartData[0].date}</span>
+                  {chartData.length > 2 && <span className="text-[9px] text-foreground/40">{chartData[Math.floor(chartData.length / 2)].date}</span>}
+                  <span className="text-[9px] text-foreground/40">{chartData[chartData.length - 1].date}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-20 text-[11px] text-foreground/30">
+                Log account values each Friday in the Account tab to build your chart
+              </div>
             )}
           </div>
-
-          {/* Cash */}
-          <Link href="/accounts"
-            className="text-left bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition group card-hover">
-            <div className="flex items-start justify-between mb-2">
-              <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide">Cash</p>
-              <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30"><DollarSign size={15} className="text-blue-500" /></span>
-            </div>
-            <p className="text-xl sm:text-2xl font-black text-foreground">{cash == null ? "—" : fmt(cash)}</p>
-            <p className="text-xs text-foreground/70 mt-1 group-hover:text-blue-500 transition">manage in accounts</p>
-          </Link>
-
-          {/* Positions */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover">
-            <div className="flex items-start justify-between mb-2">
-              <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide">Positions</p>
-              <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30"><Activity size={15} className="text-purple-500" /></span>
-            </div>
-            <p className="text-xl sm:text-2xl font-black text-foreground">{openCount}</p>
-            <div className="flex items-center gap-1 mt-1">
-              <Clock size={11} className="text-yellow-500" />
-              <p className="text-xs text-foreground/70">{pendingOrders} pending order{pendingOrders !== 1 ? "s" : ""}</p>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Market ticker cards */}
       <MarketCards />

@@ -12,6 +12,13 @@ Key rules:
   - ASSIGNED (CC)    → same as CLOSED — premium locked in
   - ROLLED           → closed leg is realized, new leg becomes a new ACTIVE row
 
+Loss rule (buyback > collected):
+  If |premium_out| > premium_in (you paid more to close than you collected),
+  the net_credit is capped at 0.  The loss is a trading loss and must NOT reduce
+  adj_basis — the basis-reduction mechanic only rewards profitable premium income.
+  The loss is purely a P&L event and should be tracked separately (e.g. in the
+  cash ledger), not baked into the cost basis calculation.
+
 Derived holdings basis:
   adj_basis (stored)  = cost_basis  − SUM(realized_premium)  / shares
   live_adj_basis      = adj_basis   − SUM(unrealized_premium) / shares
@@ -40,21 +47,32 @@ _REALIZED_STATUSES = {
 _ACTIVE_STATUS = OptionPositionStatus.ACTIVE
 
 
-def _compute_premiums(pos: OptionPosition) -> tuple[float, float]:
+def _compute_premiums(pos: OptionPosition) -> tuple[float, float, float]:
     """
-    Returns (realized_premium, unrealized_premium) total dollar amounts.
+    Returns (realized_premium, unrealized_premium, close_loss) total dollar amounts.
+
     premium_in  = credit received when position was opened (positive)
     premium_out = debit paid to close/buy back (negative, stored as-is)
+
+    Loss rule:
+      If |premium_out| > premium_in, the close cost exceeds what was collected.
+      realized_premium is capped at 0 (the loss does NOT reduce adj_basis).
+      close_loss returns the absolute loss amount so callers can record it
+      elsewhere (e.g. cash ledger) without contaminating basis calculations.
     """
     prem_in  = (pos.premium_in  or 0.0) * pos.contracts * 100
     prem_out = (pos.premium_out or 0.0) * pos.contracts * 100  # already negative
     gross    = prem_in + prem_out  # net credit (prem_out is negative)
-    gross    = max(0.0, gross)     # can't realize a negative credit
+
+    # Loss cap: if buyback cost > premium collected, the net is negative.
+    # We cap realized premium at 0 — losses never reduce adj_basis.
+    close_loss = round(abs(min(0.0, gross)), 4)  # 0 when profitable, positive when loss
+    gross      = max(0.0, gross)
 
     if pos.status in _REALIZED_STATUSES:
-        return round(gross, 4), 0.0
+        return round(gross, 4), 0.0, close_loss
     else:  # ACTIVE
-        return 0.0, round(prem_in, 4)   # unrealized = full premium_in (buyback not yet known)
+        return 0.0, round(prem_in, 4), 0.0   # unrealized = full premium_in (buyback not yet known)
 
 
 # ── Upsert single row ─────────────────────────────────────────────────────────
@@ -84,7 +102,7 @@ def upsert_ledger_row(*, user_id: int, position_id: int, session=None) -> dict |
             if pos is None:
                 return None
 
-        realized, unrealized = _compute_premiums(pos)
+        realized, unrealized, _close_loss = _compute_premiums(pos)
         prem_sold = (pos.premium_in or 0.0) * pos.contracts * 100
 
         existing = session.query(PremiumLedger).filter(
@@ -164,7 +182,7 @@ def sync_ledger_from_positions(*, user_id: int, holding_id: int | None = None) -
         now = datetime.utcnow()
 
         for pos in positions:
-            realized, unrealized = _compute_premiums(pos)
+            realized, unrealized, _close_loss = _compute_premiums(pos)
             prem_sold = (pos.premium_in or 0.0) * pos.contracts * 100
 
             existing = session.query(PremiumLedger).filter(

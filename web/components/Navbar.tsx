@@ -18,10 +18,11 @@ const NAV = [
   { href: "/options-flow", label: "Options Flow", icon: Zap             },
   { href: "/markets",      label: "Markets",      icon: Globe           },
   { href: "/trades",       label: "Trades",       icon: BarChart2       },
-  { href: "/orders",       label: "Orders",       icon: ClipboardList   },
-  { href: "/accounts",     label: "Accounts",     icon: Wallet          },
+  // shelved – uncomment to restore:
+  // { href: "/orders",       label: "Orders",       icon: ClipboardList   },
+  // { href: "/accounts",     label: "Accounts",     icon: Wallet          },
+  // { href: "/ledger",       label: "Ledger",       icon: BookOpen        },
   { href: "/budget",       label: "Budget",       icon: PiggyBank       },
-  { href: "/ledger",       label: "Ledger",       icon: BookOpen        },
   { href: "/settings",     label: "Settings",     icon: Settings        },
   { href: "/admin/users",  label: "Users",        icon: Users,  adminOnly: true },
 ];

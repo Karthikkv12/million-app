@@ -1,12 +1,13 @@
 {
   "name": "optionflow-v1",
-  "version": "0.1.0",
+  "version": "1.6.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3002",
+    "dev:clean": "rm -rf .next && next dev -p 3002",
     "dev:main": "next dev -p 3000",
-    "dev:develop": "next dev -p 3001",
-    "build": "next build",
+    "dev:develop": "next dev -p 3002",
+    "build": "next build --no-lint",
     "start": "next start",
     "lint": "next lint"
   },
