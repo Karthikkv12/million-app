@@ -5,6 +5,17 @@
 
 ---
 
+## v1.6.2 — Mobile Pan Fix & Hide-on-Scroll Bottom Nav
+**Released:** 2026-02-28
+**Tag:** `v1.6.2`
+**Branch:** `develop → main`
+
+### 📱 Fixes
+- **No more horizontal pan** — `AppShell` `<main>` and all 10 page root divs (`trades`, `dashboard`, `markets`, `budget`, `orders`, `accounts`, `ledger`, `settings`, `admin/users`, `options-flow`, `search`) now carry `w-full overflow-x-hidden`, eliminating horizontal scroll/pan on any narrow viewport
+- **Hide-on-scroll bottom nav** — `BottomNav` listens to `window.scroll` (passive); slides off-screen with `translate-y-full` when scrolling down > 4 px, snaps back immediately on scroll up, and always reappears 300 ms after scroll stops — smooth `transition-transform duration-300`
+
+---
+
 ## v1.6.1 — Mobile Responsive Overhaul
 **Released:** 2026-02-28
 **Tag:** `v1.6.1`
