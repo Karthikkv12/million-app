@@ -879,10 +879,15 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
   return (
     <div>
       {positions.length > 0 && (() => {
-        // Use account_value (full portfolio $25K) as denominator; fall back to holdings cost basis
-        const portfolioValue = week.account_value ?? holdings.reduce((acc, h) => acc + h.cost_basis * h.shares, 0);
+        // Stock value at stake = sum of (cost_basis × shares) across all holdings
+        const stockValue = holdings.reduce((acc, h) => acc + h.cost_basis * h.shares, 0);
+        // Use account_value (full portfolio $25K) as denominator; fall back to stock value
+        const portfolioValue = week.account_value ?? stockValue;
         const totalPremCollected = premDash?.grand_total.total_premium_sold ?? 0;
+        // Coverage vs full portfolio
         const coveragePct = portfolioValue > 0 ? (totalPremCollected / portfolioValue) * 100 : null;
+        // Coverage vs stock value only
+        const stockCoveragePct = stockValue > 0 ? (totalPremCollected / stockValue) * 100 : null;
         // Avg prem/$1K across this week's active positions — normalized to 1 contract (100 shares)
         const weekPositionsWithPrem = thisWeekPositions.filter(p => p.premium_in != null && p.strike > 0);
         const avgPremPerK = weekPositionsWithPrem.length > 0
@@ -891,7 +896,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
             }, 0) / weekPositionsWithPrem.length
           : null;
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
               <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
@@ -908,7 +913,21 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] text-foreground/40 mt-0.5">this week's positions</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Cost Basis Coverage</p>
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Stock Value at Stake</p>
+              {stockValue > 0
+                ? <p className="text-base font-black text-yellow-500">${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                : <p className="text-base font-black text-foreground/30">—</p>}
+              {stockCoveragePct != null && <p className="text-[10px] text-foreground/40 mt-0.5">{stockCoveragePct.toFixed(2)}% covered</p>}
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Value</p>
+              {week.account_value != null
+                ? <p className="text-base font-black text-purple-400">${week.account_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                : <p className="text-base font-black text-foreground/30">—</p>}
+              <p className="text-[10px] text-foreground/40 mt-0.5">this week</p>
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Coverage</p>
               {coveragePct != null
                 ? (
                   <>
