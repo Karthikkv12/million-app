@@ -2425,41 +2425,69 @@ function AccountTab() {
       {/* ── Week-over-week delta bars ── */}
       {changes.length >= 2 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity size={14} className="text-blue-400" />
-            <h3 className="text-sm font-bold text-foreground">Week-over-Week Change</h3>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <Activity size={14} className="text-blue-400" />
+              <h3 className="text-sm font-bold text-foreground">Week-over-Week Change</h3>
+            </div>
+            <span className="text-[10px] text-foreground/40">{changes.filter(c => c.chg != null).length} weeks</span>
           </div>
-          <div className="flex items-end gap-1 h-24">
-            {changes.map((r, i) => {
-              if (r.chg == null) return <div key={i} className="flex-1" />;
-              const maxChg = Math.max(...changes.filter(c => c.chg != null).map(c => Math.abs(c.chg!)), 1);
-              const pct = Math.max(4, Math.round((Math.abs(r.chg) / maxChg) * 100));
+          {/* Horizontally scrollable bar chart — each bar is a fixed width so all 54 fit */}
+          <div className="overflow-x-auto scrollbar-none -mx-1 px-1">
+            <div
+              className="flex items-end gap-[3px] h-32"
+              style={{ minWidth: `${changes.length * 20}px` }}
+            >
+              {changes.map((r, i) => {
+                if (r.chg == null) return <div key={i} style={{ width: 16, minWidth: 16 }} className="shrink-0" />;
+                const maxChg = Math.max(...changes.filter(c => c.chg != null).map(c => Math.abs(c.chg!)), 1);
+                const pct = Math.max(6, Math.round((Math.abs(r.chg) / maxChg) * 88));
+                const isUp = r.chg >= 0;
+                return (
+                  <div
+                    key={i}
+                    title={`${new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${isUp ? "+" : ""}$${r.chg.toFixed(0)}`}
+                    className="shrink-0 flex flex-col items-center justify-end h-full gap-0.5"
+                    style={{ width: 16, minWidth: 16 }}
+                  >
+                    <div
+                      className={`w-full rounded-t ${isUp ? "bg-green-500" : "bg-red-400"}`}
+                      style={{ height: `${pct}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {/* X-axis date labels — show every Nth label to avoid crowding */}
+            {(() => {
+              const n = changes.length;
+              const step = n <= 12 ? 1 : n <= 26 ? 2 : n <= 52 ? 4 : 8;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5">
-                  {r.chg >= 0 ? (
-                    <>
-                      <span className="text-[8px] text-green-500 font-semibold whitespace-nowrap">+{r.chg.toFixed(0)}</span>
-                      <div className="w-full rounded-t bg-green-500" style={{ height: `${pct}%` }} />
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[8px] text-red-400 font-semibold whitespace-nowrap">{r.chg.toFixed(0)}</span>
-                      <div className="w-full rounded-t bg-red-400" style={{ height: `${pct}%` }} />
-                    </>
-                  )}
+                <div
+                  className="flex gap-[3px] mt-1"
+                  style={{ minWidth: `${n * 20}px` }}
+                >
+                  {changes.map((r, i) => (
+                    <div key={i} className="shrink-0" style={{ width: 16, minWidth: 16 }}>
+                      {i % step === 0 && (
+                        <span
+                          className="block text-[8px] text-foreground/40 leading-tight"
+                          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", height: 36 }}
+                        >
+                          {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               );
-            })}
+            })()}
           </div>
-          <div className="flex justify-between mt-1">
-            {changes.length <= 8
-              ? changes.map(r => (
-                  <span key={r.id} className="flex-1 text-center text-[8px] text-foreground/40">
-                    {new Date(r.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </span>
-                ))
-              : <span className="text-[9px] text-foreground/40">{changes.length} weeks</span>
-            }
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-3 pt-2 border-t border-[var(--border)]">
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-green-500" /><span className="text-[10px] text-foreground/50">Gain</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-red-400" /><span className="text-[10px] text-foreground/50">Loss</span></div>
+            <span className="text-[10px] text-foreground/30 ml-auto">Hover bar for value</span>
           </div>
         </div>
       )}
