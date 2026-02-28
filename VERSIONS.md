@@ -5,6 +5,25 @@
 
 ---
 
+## v1.6.7 — Week-over-Week Chart Overhaul
+**Released:** 2026-02-28
+**Tag:** `v1.6.7`
+**Branch:** `develop → main`
+
+### 📊 Week-over-Week Change Bar Chart
+- Fixed bars becoming invisible (hairline thin) when 54 weeks of data are shown
+- Each bar now has a **fixed 16px width** with `overflow-x-auto` horizontal scroll — all weeks always visible
+- Container height increased from `h-24` (96px) → `h-52` (208px) for much taller, readable bars
+- **Minimum 18% bar height** — bars never collapse to zero even on flat/zero-delta weeks
+- **Auto-scale fallback**: when all deltas are < $50 (e.g. only 2 weeks logged), chart switches to account-value scale so bars are always meaningful
+- Flat/zero-change weeks render as **slate-gray** bars (distinct from green gain / red loss)
+- `maxChg` moved outside the `.map()` loop — no more O(n²) recalculation
+- X-axis date labels shown for every Nth week (adaptive: 1, 2, 4, or 8 based on total count)
+- Hover tooltip on each bar shows date + dollar value
+- Legend updated to include Gain / Loss / Flat indicators
+
+---
+
 ## v1.6.6 — iPad & Tablet Optimization
 **Released:** 2026-02-28
 **Tag:** `v1.6.6`
