@@ -1,18 +1,17 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchBudget, saveBudget, updateBudget, deleteBudget,
   BudgetEntry, BudgetEntryType, BudgetRecurrence,
 } from "@/lib/api";
 import {
-  Plus, X, PiggyBank, ChevronLeft, ChevronRight, Edit2, Trash2,
-  Repeat, Zap, Check,
+  Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap,
 } from "lucide-react";
-import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid, Badge } from "@/components/ui";
+import { PageHeader, SectionLabel, SkeletonStatGrid } from "@/components/ui";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-// ── constants ────────────────────────────────────────────────────────────────
+// ── constants ─────────────────────────────────────────────────────────────────
 const PIE_COLORS = ["#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#84cc16","#f97316","#ec4899","#14b8a6"];
 
 const CATEGORIES = [
@@ -22,70 +21,39 @@ const CATEGORIES = [
 ];
 
 const RECURRENCE_MONTHS: Record<BudgetRecurrence, number> = {
-  MONTHLY: 1,
-  SEMI_ANNUAL: 6,
-  ANNUAL: 12,
+  MONTHLY: 1, SEMI_ANNUAL: 6, ANNUAL: 12,
 };
-
 const RECURRENCE_LABEL: Record<BudgetRecurrence, string> = {
-  MONTHLY: "Monthly",
-  SEMI_ANNUAL: "Every 6 months",
-  ANNUAL: "Annual",
+  MONTHLY: "Monthly", SEMI_ANNUAL: "Every 6 mo", ANNUAL: "Yearly",
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: number) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500";
-
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function monthKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 function monthLabel(key: string) {
   const [y, m] = key.split("-");
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
-
-/** Monthly prorated amount for a recurring entry */
 function proratedMonthly(entry: BudgetEntry): number {
   const rec = (entry.recurrence ?? "ANNUAL") as BudgetRecurrence;
   return entry.amount / RECURRENCE_MONTHS[rec];
 }
-
-/** Returns which months this recurring entry "touches" (up to 24 into the past/future) */
-function recurringMonths(entry: BudgetEntry): string[] {
-  const rec = (entry.recurrence ?? "ANNUAL") as BudgetRecurrence;
-  const period = RECURRENCE_MONTHS[rec];
-  const base = new Date(entry.date + "T00:00:00");
-  const keys: string[] = [];
-  // spread backward 2 years and forward 2 years from base
-  for (let i = -24; i <= 24; i++) {
-    const d = new Date(base);
-    d.setMonth(d.getMonth() + i * period);
-    // Normalize to start-of-month
-    for (let m = 0; m < period; m++) {
-      const t = new Date(d);
-      t.setMonth(t.getMonth() + m);
-      keys.push(monthKey(t));
-    }
-  }
-  return Array.from(new Set(keys));
-}
-
-/** Check if a recurring entry applies to the given YYYY-MM */
 function recurringAppliesToMonth(entry: BudgetEntry, targetKey: string): boolean {
   const rec = (entry.recurrence ?? "ANNUAL") as BudgetRecurrence;
   const period = RECURRENCE_MONTHS[rec];
   const base = new Date(entry.date + "T00:00:00");
   const [ty, tm] = targetKey.split("-").map(Number);
-
-  const diffMonths = (ty - base.getFullYear()) * 12 + (tm - (base.getMonth() + 1));
-  if (diffMonths < 0) return false;
-  return diffMonths % period === 0;
+  const diff = (ty - base.getFullYear()) * 12 + (tm - (base.getMonth() + 1));
+  if (diff < 0) return false;
+  return diff % period === 0;
 }
 
-// ── Entry Form ────────────────────────────────────────────────────────────────
-interface FormState {
+// ── blank row template ────────────────────────────────────────────────────────
+interface DraftRow {
+  id?: number;          // set when editing existing
   category: string;
   type: string;
   entry_type: BudgetEntryType;
@@ -94,345 +62,367 @@ interface FormState {
   date: string;
   description: string;
 }
-
-function defaultForm(month: string): FormState {
-  return {
-    category: "",
-    type: "EXPENSE",
-    entry_type: "FLOATING",
-    recurrence: "ANNUAL",
-    amount: "",
-    date: `${month}-01`,
-    description: "",
-  };
+function blankDraft(month: string): DraftRow {
+  return { category: "", type: "EXPENSE", entry_type: "FLOATING", recurrence: "ANNUAL", amount: "", date: `${month}-01`, description: "" };
 }
 
-function EntryForm({
-  initial,
-  editId,
-  onDone,
-  defaultMonth,
+// ── inline cell input styles ──────────────────────────────────────────────────
+const cellInp = "w-full bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-foreground/30 focus:bg-blue-500/10 rounded px-1 py-0.5";
+const cellSel = "w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm text-foreground px-1.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+// ── Inline Editable Row ───────────────────────────────────────────────────────
+function EditableRow({
+  draft,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
 }: {
-  initial?: FormState;
-  editId?: number;
-  onDone: () => void;
-  defaultMonth: string;
+  draft: DraftRow;
+  onChange: (d: DraftRow) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
 }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState<FormState>(initial ?? defaultForm(defaultMonth));
-  const [err, setErr] = useState("");
+  const set = (k: keyof DraftRow, v: string) => onChange({ ...draft, [k]: v });
+  const amtRef = useRef<HTMLInputElement>(null);
 
-  const set = (k: keyof FormState, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  // auto-focus amount when row appears
+  useEffect(() => { amtRef.current?.focus(); }, []);
 
-  const mut = useMutation({
-    mutationFn: () => {
-      const body: Omit<BudgetEntry, "id"> = {
-        category: form.category,
-        type: form.type,
-        entry_type: form.entry_type,
-        recurrence: form.entry_type === "RECURRING" ? form.recurrence : undefined,
-        amount: parseFloat(form.amount),
-        date: form.date,
-        description: form.description || undefined,
-      };
-      return editId ? updateBudget(editId, body) : saveBudget(body);
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget"] }); onDone(); },
-    onError: (e: Error) => setErr(e.message),
-  });
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") onSave();
+    if (e.key === "Escape") onCancel();
+  };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mb-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-foreground">{editId ? "Edit Entry" : "New Entry"}</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-foreground/70 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
-      </div>
-
-      {/* Entry type toggle */}
-      <div className="flex gap-2 mb-4">
-        {(["FLOATING", "RECURRING"] as BudgetEntryType[]).map((et) => (
-          <button
-            key={et}
-            onClick={() => set("entry_type", et)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-              form.entry_type === et
-                ? "bg-blue-600 text-white"
-                : "bg-[var(--surface-2)] text-foreground/70 hover:bg-[var(--border)]"
-            }`}
-          >
-            {et === "FLOATING" ? <Zap size={12} /> : <Repeat size={12} />}
-            {et === "FLOATING" ? "One-off / Floating" : "Recurring"}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Category</label>
-          <select value={form.category} onChange={(e) => set("category", e.target.value)} className={inp}>
-            <option value="">— select —</option>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+    <tr className="bg-blue-500/5 border-b border-blue-500/30" onKeyDown={handleKeyDown}>
+      {/* Date */}
+      <td className="px-2 py-1.5 w-32">
+        <input
+          type="date" value={draft.date}
+          onChange={(e) => set("date", e.target.value)}
+          className={cellInp + " w-28"}
+        />
+      </td>
+      {/* Category */}
+      <td className="px-2 py-1.5">
+        <select value={draft.category} onChange={(e) => set("category", e.target.value)} className={cellSel}>
+          <option value="">— Category —</option>
+          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+        </select>
+      </td>
+      {/* Type */}
+      <td className="px-2 py-1.5 w-28">
+        <select value={draft.type} onChange={(e) => set("type", e.target.value)} className={cellSel}>
+          <option>EXPENSE</option>
+          <option>INCOME</option>
+          <option>ASSET</option>
+        </select>
+      </td>
+      {/* Entry type */}
+      <td className="px-2 py-1.5 w-32">
+        <select value={draft.entry_type} onChange={(e) => set("entry_type", e.target.value as BudgetEntryType)} className={cellSel}>
+          <option value="FLOATING">One-off</option>
+          <option value="RECURRING">Recurring</option>
+        </select>
+      </td>
+      {/* Recurrence */}
+      <td className="px-2 py-1.5 w-28">
+        {draft.entry_type === "RECURRING" ? (
+          <select value={draft.recurrence} onChange={(e) => set("recurrence", e.target.value as BudgetRecurrence)} className={cellSel}>
+            <option value="MONTHLY">Monthly</option>
+            <option value="SEMI_ANNUAL">Every 6 mo</option>
+            <option value="ANNUAL">Yearly</option>
           </select>
-        </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Type</label>
-          <select value={form.type} onChange={(e) => set("type", e.target.value)} className={inp}>
-            <option>EXPENSE</option>
-            <option>INCOME</option>
-            <option>ASSET</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Amount ($)</label>
-          <input type="number" step="0.01" value={form.amount} onChange={(e) => set("amount", e.target.value)} className={inp} placeholder="0.00" />
-        </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Date</label>
-          <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className={inp} />
-        </div>
-        {form.entry_type === "RECURRING" && (
-          <div>
-            <label className="text-xs text-foreground/70 block mb-1">Recurrence</label>
-            <select value={form.recurrence} onChange={(e) => set("recurrence", e.target.value as BudgetRecurrence)} className={inp}>
-              <option value="MONTHLY">Monthly</option>
-              <option value="SEMI_ANNUAL">Every 6 months</option>
-              <option value="ANNUAL">Annual (yearly)</option>
-            </select>
-          </div>
+        ) : (
+          <span className="text-xs text-foreground/30 px-1">—</span>
         )}
-        <div className={form.entry_type === "RECURRING" ? "" : "sm:col-span-1"}>
-          <label className="text-xs text-foreground/70 block mb-1">Description (opt.)</label>
-          <input value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Optional note…" className={inp} />
+      </td>
+      {/* Amount */}
+      <td className="px-2 py-1.5 w-28">
+        <input
+          ref={amtRef}
+          type="number" step="0.01" min="0"
+          value={draft.amount}
+          onChange={(e) => set("amount", e.target.value)}
+          placeholder="0.00"
+          className={cellInp + " text-right"}
+        />
+      </td>
+      {/* Description */}
+      <td className="px-2 py-1.5">
+        <input
+          value={draft.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Note (optional)"
+          className={cellInp}
+        />
+      </td>
+      {/* Actions */}
+      <td className="px-2 py-1.5 w-20 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={onSave}
+            disabled={saving || !draft.category || !draft.amount}
+            className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/40 disabled:opacity-40 transition"
+            title="Save (Enter)"
+          >
+            {saving ? <span className="text-[10px]">…</span> : <Check size={13} />}
+          </button>
+          <button
+            onClick={onCancel}
+            className="p-1.5 rounded-lg bg-[var(--surface-2)] text-foreground/60 hover:bg-[var(--border)] transition"
+            title="Cancel (Esc)"
+          >
+            <X size={13} />
+          </button>
         </div>
-      </div>
-
-      {form.entry_type === "RECURRING" && form.amount && (
-        <p className="text-xs text-blue-400 mb-3 bg-blue-500/10 rounded-xl px-3 py-2">
-          💡 This {RECURRENCE_LABEL[form.recurrence]} payment of {fmt(parseFloat(form.amount) || 0)} will show as{" "}
-          <strong>{fmt((parseFloat(form.amount) || 0) / RECURRENCE_MONTHS[form.recurrence])}/month</strong> in each applicable month.
-        </p>
-      )}
-
-      {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
-      <button
-        onClick={() => mut.mutate()}
-        disabled={mut.isPending || !form.category || !form.amount}
-        className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-      >
-        {mut.isPending ? "Saving…" : editId ? "Save Changes" : "Add Entry"}
-      </button>
-    </div>
+      </td>
+    </tr>
   );
 }
 
-// ── Delete confirm inline ─────────────────────────────────────────────────────
-function DeleteConfirm({ onConfirm, onCancel, loading }: { onConfirm: () => void; onCancel: () => void; loading: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-red-400">Delete?</span>
-      <button onClick={onConfirm} disabled={loading} className="text-xs px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition">
-        {loading ? "…" : <Check size={12} />}
-      </button>
-      <button onClick={onCancel} className="text-xs px-2 py-1 rounded-lg bg-[var(--surface-2)] text-foreground hover:bg-[var(--border)] transition">
-        <X size={12} />
-      </button>
-    </div>
-  );
-}
-
-// ── Entry Row ─────────────────────────────────────────────────────────────────
-function EntryRow({
+// ── Read-only row ─────────────────────────────────────────────────────────────
+function ReadRow({
   entry,
   displayAmount,
-  onEdit,
   isRecurring,
+  onEdit,
 }: {
   entry: BudgetEntry;
   displayAmount: number;
-  onEdit: (e: BudgetEntry) => void;
   isRecurring: boolean;
+  onEdit: () => void;
 }) {
   const qc = useQueryClient();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
+  const [confirmDel, setConfirmDel] = useState(false);
   const delMut = useMutation({
     mutationFn: () => deleteBudget(entry.id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["budget"] }),
   });
 
-  const amtColor = entry.type.toUpperCase() === "EXPENSE"
-    ? "text-red-500" : entry.type.toUpperCase() === "INCOME"
-    ? "text-green-500" : "text-blue-500";
+  const amtCls = entry.type.toUpperCase() === "EXPENSE" ? "text-red-400"
+    : entry.type.toUpperCase() === "INCOME" ? "text-green-400" : "text-blue-400";
 
   return (
-    <tr className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
-      <td className="px-4 py-2.5 text-foreground/70 text-xs whitespace-nowrap">{entry.date.slice(0, 10)}</td>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="font-semibold text-sm text-foreground">{entry.category}</span>
-          {isRecurring && (
-            <span className="text-[10px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-              <Repeat size={9} /> {RECURRENCE_LABEL[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence]}
-            </span>
-          )}
-        </div>
-        {entry.description && <p className="text-xs text-foreground/50 mt-0.5">{entry.description}</p>}
+    <tr
+      className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer group"
+      onClick={onEdit}
+    >
+      <td className="px-3 py-2 text-xs text-foreground/50 whitespace-nowrap">{entry.date.slice(0, 10)}</td>
+      <td className="px-3 py-2 text-sm font-medium text-foreground">{entry.category || "—"}</td>
+      <td className="px-3 py-2">
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+          entry.type.toUpperCase() === "EXPENSE" ? "bg-red-500/15 text-red-400"
+          : entry.type.toUpperCase() === "INCOME" ? "bg-green-500/15 text-green-400"
+          : "bg-blue-500/15 text-blue-400"
+        }`}>{entry.type}</span>
       </td>
-      <td className="px-4 py-2.5">
-        <Badge variant={entry.type.toUpperCase() === "EXPENSE" ? "danger" : entry.type.toUpperCase() === "INCOME" ? "success" : "info"}>
-          {entry.type.toUpperCase()}
-        </Badge>
+      <td className="px-3 py-2">
+        <span className={`text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ${
+          isRecurring ? "bg-purple-500/15 text-purple-400" : "bg-amber-500/15 text-amber-400"
+        }`}>
+          {isRecurring ? <Repeat size={9} /> : <Zap size={9} />}
+          {isRecurring ? "Recurring" : "One-off"}
+        </span>
       </td>
-      <td className={`px-4 py-2.5 font-bold text-sm ${amtColor} whitespace-nowrap`}>
+      <td className="px-3 py-2 text-xs text-foreground/50">
+        {isRecurring ? RECURRENCE_LABEL[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence] : "—"}
+      </td>
+      <td className={`px-3 py-2 text-sm font-bold text-right ${amtCls} whitespace-nowrap`}>
         {fmt(displayAmount)}
         {isRecurring && displayAmount !== entry.amount && (
-          <span className="text-[10px] font-normal text-foreground/40 ml-1">({fmt(entry.amount)} total)</span>
+          <span className="text-[10px] font-normal text-foreground/30 ml-1">({fmt(entry.amount)})</span>
         )}
       </td>
-      <td className="px-4 py-2.5 text-right">
-        {confirmDelete ? (
-          <DeleteConfirm onConfirm={() => delMut.mutate()} onCancel={() => setConfirmDelete(false)} loading={delMut.isPending} />
-        ) : (
-          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
-            <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg hover:bg-[var(--surface)] transition text-foreground/60 hover:text-blue-400">
-              <Edit2 size={13} />
+      <td className="px-3 py-2 text-xs text-foreground/40 max-w-[120px] truncate">{entry.description || ""}</td>
+      <td
+        className="px-3 py-2 text-right"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {confirmDel ? (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => delMut.mutate()}
+              disabled={delMut.isPending}
+              className="text-[11px] px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {delMut.isPending ? "…" : "Yes"}
             </button>
-            <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-lg hover:bg-[var(--surface)] transition text-foreground/60 hover:text-red-400">
-              <Trash2 size={13} />
-            </button>
+            <button onClick={() => setConfirmDel(false)} className="text-[11px] px-2 py-1 rounded-lg bg-[var(--surface-2)] text-foreground">No</button>
           </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDel(true)}
+            className="p-1.5 rounded-lg text-foreground/30 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition"
+          >
+            <Trash2 size={13} />
+          </button>
         )}
       </td>
     </tr>
   );
 }
 
-// ── Mobile Entry Card ─────────────────────────────────────────────────────────
-function EntryCard({
-  entry,
-  displayAmount,
-  onEdit,
-  isRecurring,
-}: {
-  entry: BudgetEntry;
-  displayAmount: number;
-  onEdit: (e: BudgetEntry) => void;
-  isRecurring: boolean;
-}) {
-  const qc = useQueryClient();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const delMut = useMutation({
-    mutationFn: () => deleteBudget(entry.id!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget"] }),
-  });
-
-  const amtColor = entry.type.toUpperCase() === "EXPENSE"
-    ? "text-red-500" : entry.type.toUpperCase() === "INCOME"
-    ? "text-green-500" : "text-blue-500";
-
-  return (
-    <div className="flex items-start justify-between p-3 border-b border-[var(--border)]">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-sm text-foreground">{entry.category}</span>
-          <Badge variant={entry.type.toUpperCase() === "EXPENSE" ? "danger" : entry.type.toUpperCase() === "INCOME" ? "success" : "info"}>
-            {entry.type.toUpperCase()}
-          </Badge>
-          {isRecurring && (
-            <span className="text-[10px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-              <Repeat size={9} /> {RECURRENCE_LABEL[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence]}
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-foreground/50 mt-0.5">{entry.date.slice(0, 10)}{entry.description ? ` · ${entry.description}` : ""}</p>
-      </div>
-      <div className="flex items-center gap-2 ml-3 shrink-0">
-        <div className="text-right">
-          <span className={`font-bold text-sm ${amtColor}`}>{fmt(displayAmount)}</span>
-          {isRecurring && displayAmount !== entry.amount && (
-            <p className="text-[10px] text-foreground/40">{fmt(entry.amount)} total</p>
-          )}
-        </div>
-        {confirmDelete ? (
-          <DeleteConfirm onConfirm={() => delMut.mutate()} onCancel={() => setConfirmDelete(false)} loading={delMut.isPending} />
-        ) : (
-          <div className="flex items-center gap-1">
-            <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] transition text-foreground/60 hover:text-blue-400">
-              <Edit2 size={13} />
-            </button>
-            <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] transition text-foreground/60 hover:text-red-400">
-              <Trash2 size={13} />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Section (Floating or Recurring) ──────────────────────────────────────────
-function BudgetSection({
+// ── Spreadsheet section ───────────────────────────────────────────────────────
+function SpreadsheetSection({
   title,
   icon,
-  color,
-  entries,
+  accentCls,
+  rows,
   isRecurring,
-  onEdit,
-  totalLabel,
+  currentMonth,
+  onSaved,
 }: {
   title: string;
   icon: React.ReactNode;
-  color: string;
-  entries: { entry: BudgetEntry; displayAmount: number }[];
+  accentCls: string;
+  rows: { entry: BudgetEntry; displayAmount: number }[];
   isRecurring: boolean;
-  onEdit: (e: BudgetEntry) => void;
-  totalLabel: string;
+  currentMonth: string;
+  onSaved: () => void;
 }) {
-  const total = entries.reduce((s, { displayAmount }) => s + displayAmount, 0);
+  const qc = useQueryClient();
+  const [drafts, setDrafts] = useState<DraftRow[]>([]);   // pending new rows
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<DraftRow | null>(null);
+
+  const saveMut = useMutation({
+    mutationFn: (d: DraftRow) => {
+      const body: Omit<BudgetEntry, "id"> = {
+        category: d.category,
+        type: d.type,
+        entry_type: d.entry_type,
+        recurrence: d.entry_type === "RECURRING" ? d.recurrence : undefined,
+        amount: parseFloat(d.amount),
+        date: d.date,
+        description: d.description || undefined,
+      };
+      return d.id ? updateBudget(d.id, body) : saveBudget(body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["budget"] });
+      onSaved();
+    },
+  });
+
+  const addRow = () => {
+    const et: BudgetEntryType = isRecurring ? "RECURRING" : "FLOATING";
+    setDrafts((prev) => [...prev, { ...blankDraft(currentMonth), entry_type: et }]);
+  };
+
+  const saveDraft = async (idx: number) => {
+    const d = drafts[idx];
+    if (!d.category || !d.amount) return;
+    await saveMut.mutateAsync(d);
+    setDrafts((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const startEdit = (entry: BudgetEntry) => {
+    setEditingId(entry.id ?? null);
+    setEditDraft({
+      id: entry.id,
+      category: entry.category,
+      type: entry.type,
+      entry_type: (entry.entry_type ?? (isRecurring ? "RECURRING" : "FLOATING")) as BudgetEntryType,
+      recurrence: (entry.recurrence ?? "ANNUAL") as BudgetRecurrence,
+      amount: String(entry.amount),
+      date: entry.date.slice(0, 10),
+      description: entry.description ?? "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editDraft || !editDraft.category || !editDraft.amount) return;
+    await saveMut.mutateAsync(editDraft);
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const total = rows.reduce((s, r) => s + r.displayAmount, 0);
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-      {/* Section header */}
-      <div className={`px-4 py-3 border-b border-[var(--border)] flex items-center justify-between`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
-          <span className={color}>{icon}</span>
+          <span className={accentCls}>{icon}</span>
           <span className="font-bold text-foreground">{title}</span>
-          <span className="text-xs bg-[var(--surface-2)] text-foreground/60 px-2 py-0.5 rounded-full">{entries.length}</span>
+          <span className="text-xs bg-[var(--surface-2)] text-foreground/50 px-2 py-0.5 rounded-full">{rows.length}</span>
         </div>
-        <span className={`font-bold text-sm ${color}`}>{totalLabel}: {fmt(total)}</span>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-bold ${accentCls}`}>{fmt(total)}</span>
+          <button
+            onClick={addRow}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+          >
+            <Plus size={12} /> Add row
+          </button>
+        </div>
       </div>
 
-      {entries.length === 0 ? (
-        <div className="p-6 text-center text-sm text-foreground/50">No {title.toLowerCase()} entries this month</div>
-      ) : (
-        <>
-          {/* Mobile */}
-          <div className="sm:hidden divide-y divide-[var(--border)]">
-            {entries.map(({ entry, displayAmount }) => (
-              <EntryCard key={entry.id} entry={entry} displayAmount={displayAmount} onEdit={onEdit} isRecurring={isRecurring} />
-            ))}
-          </div>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
+          <thead>
+            <tr className="text-[10px] text-foreground/50 uppercase tracking-wide border-b border-[var(--border)] bg-[var(--surface)]">
+              <th className="px-3 py-2 text-left font-semibold">Date</th>
+              <th className="px-3 py-2 text-left font-semibold">Category</th>
+              <th className="px-3 py-2 text-left font-semibold">Type</th>
+              <th className="px-3 py-2 text-left font-semibold">Frequency</th>
+              <th className="px-3 py-2 text-left font-semibold">Recurs</th>
+              <th className="px-3 py-2 text-right font-semibold">Amount</th>
+              <th className="px-3 py-2 text-left font-semibold">Note</th>
+              <th className="px-3 py-2 w-20"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Existing rows */}
+            {rows.map(({ entry, displayAmount }) =>
+              editingId === entry.id && editDraft ? (
+                <EditableRow
+                  key={entry.id}
+                  draft={editDraft}
+                  onChange={setEditDraft}
+                  onSave={saveEdit}
+                  onCancel={() => { setEditingId(null); setEditDraft(null); }}
+                  saving={saveMut.isPending}
+                />
+              ) : (
+                <ReadRow
+                  key={entry.id}
+                  entry={entry}
+                  displayAmount={displayAmount}
+                  isRecurring={isRecurring}
+                  onEdit={() => startEdit(entry)}
+                />
+              )
+            )}
 
-          {/* Desktop */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] text-foreground/60 uppercase tracking-wide bg-[var(--surface)]">
-                  {["Date", "Category", "Type", "Amount", ""].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map(({ entry, displayAmount }) => (
-                  <EntryRow key={entry.id} entry={entry} displayAmount={displayAmount} onEdit={onEdit} isRecurring={isRecurring} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+            {/* New draft rows appended at bottom */}
+            {drafts.map((d, idx) => (
+              <EditableRow
+                key={`draft-${idx}`}
+                draft={d}
+                onChange={(nd) => setDrafts((prev) => prev.map((r, i) => i === idx ? nd : r))}
+                onSave={() => saveDraft(idx)}
+                onCancel={() => setDrafts((prev) => prev.filter((_, i) => i !== idx))}
+                saving={saveMut.isPending}
+              />
+            ))}
+
+            {/* Empty hint */}
+            {rows.length === 0 && drafts.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-sm text-foreground/40">
+                  No entries — click <strong>Add row</strong> to get started
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -445,157 +435,93 @@ export default function BudgetPage() {
     staleTime: 30_000,
   });
 
-  // Month navigation
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(monthKey(today));
+
   const prevMonth = () => {
     const [y, m] = currentMonth.split("-").map(Number);
-    const d = new Date(y, m - 2, 1);
-    setCurrentMonth(monthKey(d));
+    setCurrentMonth(monthKey(new Date(y, m - 2, 1)));
   };
   const nextMonth = () => {
     const [y, m] = currentMonth.split("-").map(Number);
-    const d = new Date(y, m, 1);
-    setCurrentMonth(monthKey(d));
+    setCurrentMonth(monthKey(new Date(y, m, 1)));
   };
 
-  // Form / edit state
-  const [showForm, setShowForm] = useState(false);
-  const [editEntry, setEditEntry] = useState<BudgetEntry | null>(null);
-
-  const handleEdit = (e: BudgetEntry) => {
-    setEditEntry(e);
-    setShowForm(false);
-  };
-  const closeForm = () => { setShowForm(false); setEditEntry(null); };
-
-  // Split entries for this month
   const { floating, recurring } = useMemo(() => {
     const floating: { entry: BudgetEntry; displayAmount: number }[] = [];
     const recurring: { entry: BudgetEntry; displayAmount: number }[] = [];
-
     for (const entry of allEntries) {
       const et = entry.entry_type ?? "FLOATING";
       if (et === "FLOATING") {
-        // One-off: show if it falls in this month
-        if (entry.date.startsWith(currentMonth)) {
+        if (entry.date.startsWith(currentMonth))
           floating.push({ entry, displayAmount: entry.amount });
-        }
       } else {
-        // Recurring: show if this month is an applicable period
-        if (recurringAppliesToMonth(entry, currentMonth)) {
+        if (recurringAppliesToMonth(entry, currentMonth))
           recurring.push({ entry, displayAmount: proratedMonthly(entry) });
-        }
       }
     }
     return { floating, recurring };
   }, [allEntries, currentMonth]);
 
-  // Stats
   const stats = useMemo(() => {
     const all = [...floating, ...recurring];
     const expense  = all.filter((e) => e.entry.type.toUpperCase() === "EXPENSE").reduce((s, e) => s + e.displayAmount, 0);
     const income   = all.filter((e) => e.entry.type.toUpperCase() === "INCOME").reduce((s, e) => s + e.displayAmount, 0);
-    const asset    = all.filter((e) => e.entry.type.toUpperCase() === "ASSET").reduce((s, e) => s + e.displayAmount, 0);
     const recurExp = recurring.filter((e) => e.entry.type.toUpperCase() === "EXPENSE").reduce((s, e) => s + e.displayAmount, 0);
-    return { expense, income, asset, net: income - expense, recurExp };
+    return { expense, income, recurExp, net: income - expense };
   }, [floating, recurring]);
 
-  // Pie – expense breakdown for this month
   const pieData = useMemo(() => {
     const map: Record<string, number> = {};
     for (const { entry, displayAmount } of [...floating, ...recurring]) {
-      if (entry.type.toUpperCase() === "EXPENSE") {
+      if (entry.type.toUpperCase() === "EXPENSE")
         map[entry.category] = (map[entry.category] ?? 0) + displayAmount;
-      }
     }
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [floating, recurring]);
 
-  // Build edit form initial state
-  const editInitial = editEntry
-    ? {
-        category: editEntry.category,
-        type: editEntry.type,
-        entry_type: (editEntry.entry_type ?? "FLOATING") as BudgetEntryType,
-        recurrence: (editEntry.recurrence ?? "ANNUAL") as BudgetRecurrence,
-        amount: String(editEntry.amount),
-        date: editEntry.date.slice(0, 10),
-        description: editEntry.description ?? "",
-      }
-    : undefined;
-
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
-      <PageHeader
-        title="Budget"
-        action={
-          <button
-            onClick={() => { setEditEntry(null); setShowForm((v) => !v); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
-              showForm ? "bg-[var(--surface-2)] text-foreground" : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
-          >
-            {showForm ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Entry</>}
-          </button>
-        }
-      />
-
-      {/* Add / Edit form */}
-      {(showForm || editEntry) && (
-        <EntryForm
-          key={editEntry?.id ?? "new"}
-          initial={editInitial}
-          editId={editEntry?.id}
-          onDone={closeForm}
-          defaultMonth={currentMonth}
-        />
-      )}
+      <PageHeader title="Budget" />
 
       {/* Month navigator */}
       <div className="flex items-center justify-between mb-5 bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-2.5">
-        <button onClick={prevMonth} className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/70">
-          <ChevronLeft size={18} />
-        </button>
+        <button onClick={prevMonth} className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/70"><ChevronLeft size={18} /></button>
         <div className="text-center">
           <p className="font-bold text-foreground">{monthLabel(currentMonth)}</p>
           <p className="text-xs text-foreground/50">{floating.length + recurring.length} entries</p>
         </div>
-        <button onClick={nextMonth} className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/70">
-          <ChevronRight size={18} />
-        </button>
+        <button onClick={nextMonth} className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/70"><ChevronRight size={18} /></button>
       </div>
 
       {/* Stats */}
       {isLoading ? (
-        <div className="mb-6"><SkeletonStatGrid count={4} /></div>
+        <div className="mb-5"><SkeletonStatGrid count={4} /></div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {[
-            { label: "Income",       value: fmt(stats.income),   cls: "text-green-500" },
-            { label: "Expenses",     value: fmt(stats.expense),  cls: "text-red-500" },
-            { label: "Fixed/Month",  value: fmt(stats.recurExp), cls: "text-purple-400" },
-            { label: "Net",          value: fmt(stats.net),      cls: stats.net >= 0 ? "text-green-500" : "text-red-500" },
+            { label: "Income",      value: fmt(stats.income),   cls: "text-green-400" },
+            { label: "Expenses",    value: fmt(stats.expense),  cls: "text-red-400" },
+            { label: "Fixed/Month", value: fmt(stats.recurExp), cls: "text-purple-400" },
+            { label: "Net",         value: fmt(stats.net),      cls: stats.net >= 0 ? "text-green-400" : "text-red-400" },
           ].map(({ label, value, cls }) => (
-            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 card-hover">
-              <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide mb-1">{label}</p>
+            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+              <p className="text-[11px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">{label}</p>
               <p className={`text-xl sm:text-2xl font-black ${cls}`}>{value}</p>
             </div>
           ))}
         </div>
       )}
 
-      {/* Chart + Sections */}
+      {/* Pie + tables */}
       <div className="flex flex-col xl:flex-row gap-4">
         {/* Pie */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 xl:w-72 shrink-0">
-          <SectionLabel>Expense Breakdown</SectionLabel>
-          {pieData.length === 0 ? (
-            <p className="text-sm text-foreground/50 mt-4">No expenses this month.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={250}>
+        {pieData.length > 0 && (
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 xl:w-64 shrink-0">
+            <SectionLabel>Expense Breakdown</SectionLabel>
+            <ResponsiveContainer width="100%" height={230}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
                   {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -603,39 +529,29 @@ export default function BudgetPage() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Two sections */}
+        {/* Spreadsheet tables */}
         <div className="flex-1 flex flex-col gap-4">
-          {isLoading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
-          ) : (
-            <>
-              <BudgetSection
-                title="Floating Expenses"
-                icon={<Zap size={15} />}
-                color="text-amber-400"
-                entries={floating}
-                isRecurring={false}
-                onEdit={handleEdit}
-                totalLabel="Total"
-              />
-              <BudgetSection
-                title="Recurring / Fixed"
-                icon={<Repeat size={15} />}
-                color="text-purple-400"
-                entries={recurring}
-                isRecurring={true}
-                onEdit={handleEdit}
-                totalLabel="Monthly share"
-              />
-            </>
-          )}
-
-          {!isLoading && floating.length === 0 && recurring.length === 0 && (
-            <EmptyState icon={PiggyBank} title="No entries for this month" body="Add a new entry above or navigate to another month." />
-          )}
+          <SpreadsheetSection
+            title="One-off / Floating"
+            icon={<Zap size={14} />}
+            accentCls="text-amber-400"
+            rows={floating}
+            isRecurring={false}
+            currentMonth={currentMonth}
+            onSaved={() => {}}
+          />
+          <SpreadsheetSection
+            title="Recurring / Fixed"
+            icon={<Repeat size={14} />}
+            accentCls="text-purple-400"
+            rows={recurring}
+            isRecurring={true}
+            currentMonth={currentMonth}
+            onSaved={() => {}}
+          />
         </div>
       </div>
     </div>
