@@ -621,17 +621,25 @@ export const fetchCashBalance = (currency = "USD") =>
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
+export type BudgetEntryType = "FLOATING" | "RECURRING";
+export type BudgetRecurrence = "MONTHLY" | "SEMI_ANNUAL" | "ANNUAL";
+
 export interface BudgetEntry {
   id?: number;
   category: string;
   type: "EXPENSE" | "INCOME" | "ASSET" | string;
+  entry_type?: BudgetEntryType;
+  recurrence?: BudgetRecurrence;
   amount: number;
   date: string;
   description?: string;
 }
 
-export const fetchBudget = () => api.get<BudgetEntry[]>("/budget");
-export const saveBudget = (body: Omit<BudgetEntry, "id">) => api.post("/budget", body);
+export const fetchBudget  = () => api.get<BudgetEntry[]>("/budget");
+export const saveBudget   = (body: Omit<BudgetEntry, "id">) => api.post("/budget", body);
+export const updateBudget = (id: number, body: Partial<Omit<BudgetEntry, "id">>) =>
+  api.patch<BudgetEntry>(`/budget/${id}`, body);
+export const deleteBudget = (id: number) => api.del<void>(`/budget/${id}`);
 
 // ── Auth: sessions + events + change-password ─────────────────────────────────
 
