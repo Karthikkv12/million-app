@@ -70,6 +70,8 @@ from .schemas import (
     OrderOut,
     BudgetCreateRequest,
     BudgetOut,
+    CreditCardWeekRequest,
+    CreditCardWeekOut,
     CashCreateRequest,
     CashOut,
     TradeCloseRequest,
@@ -1310,6 +1312,45 @@ def patch_budget(budget_id: int, req: BudgetCreateRequest, user=Depends(get_curr
 @app.delete("/budget/{budget_id}")
 def remove_budget(budget_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
     services.delete_budget(budget_id, user_id=int(user["sub"]))
+    return {"status": "ok"}
+
+
+# ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+@app.get("/credit-card/weeks", response_model=List[Dict[str, Any]])
+def list_cc_weeks(user=Depends(get_current_user)):
+    return services.list_credit_card_weeks(user_id=int(user["sub"]))
+
+
+@app.post("/credit-card/weeks", response_model=Dict[str, Any])
+def create_cc_week(req: CreditCardWeekRequest, user=Depends(get_current_user)):
+    row_id = services.create_credit_card_week(
+        user_id=int(user["sub"]),
+        week_start=req.week_start,
+        balance=req.balance,
+        squared_off=req.squared_off,
+        paid_amount=req.paid_amount,
+        note=req.note,
+    )
+    return {"id": row_id, "status": "ok"}
+
+
+@app.patch("/credit-card/weeks/{row_id}", response_model=Dict[str, str])
+def patch_cc_week(row_id: int, req: CreditCardWeekRequest, user=Depends(get_current_user)):
+    services.update_credit_card_week(
+        row_id, user_id=int(user["sub"]),
+        week_start=req.week_start,
+        balance=req.balance,
+        squared_off=req.squared_off,
+        paid_amount=req.paid_amount,
+        note=req.note,
+    )
+    return {"status": "ok"}
+
+
+@app.delete("/credit-card/weeks/{row_id}", response_model=Dict[str, str])
+def delete_cc_week(row_id: int, user=Depends(get_current_user)):
+    services.delete_credit_card_week(row_id, user_id=int(user["sub"]))
     return {"status": "ok"}
 
 

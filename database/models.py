@@ -162,6 +162,20 @@ class Budget(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
 
 
+class CreditCardWeek(Base):
+    """Tracks weekly Robinhood credit card balance and whether it was squared off by trading."""
+    __tablename__ = 'credit_card_weeks'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    week_start = Column(DateTime, nullable=False)   # Monday of the week
+    balance = Column(Float, nullable=False, default=0.0)
+    squared_off = Column(Boolean, nullable=False, default=False)
+    paid_amount = Column(Float, nullable=True)       # how much was paid from trading
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)

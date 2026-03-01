@@ -233,3 +233,20 @@ class BudgetOut(BaseModel):
     amount: float
     date: datetime
     description: Optional[str] = None
+
+
+class CreditCardWeekRequest(BaseModel):
+    week_start: datetime
+    balance: float
+    squared_off: bool = False
+    paid_amount: Optional[float] = None
+    note: Optional[str] = None
+
+
+class CreditCardWeekOut(BaseModel):
+    id: int
+    week_start: datetime
+    balance: float
+    squared_off: bool
+    paid_amount: Optional[float] = None
+    note: Optional[str] = None

@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchBudget, saveBudget, updateBudget, deleteBudget,
   BudgetEntry, BudgetEntryType, BudgetRecurrence,
+  fetchCCWeeks, saveCCWeek, updateCCWeek, deleteCCWeek, CreditCardWeek,
 } from "@/lib/api";
 import {
-  Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap, PencilLine,
+  Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap, PencilLine, CreditCard,
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
@@ -574,6 +575,273 @@ function AnnualSummary({ entries, year }: { entries: BudgetEntry[]; year: number
   );
 }
 
+// ── TopCategoriesBar ────────────────────────────────────────────────────────────
+function TopCategoriesBar({ pieData }: { pieData: { name: string; value: number }[] }) {
+  const top = pieData.slice(0, 7);
+  const total = top.reduce((s, d) => s + d.value, 0);
+  if (top.length === 0) return null;
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Top Spending Categories</p>
+      <div className="flex flex-col gap-2">
+        {top.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          return (
+            <div key={d.name} className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+              <span className="text-xs text-foreground/70 w-28 truncate shrink-0">{d.name}</span>
+              <div className="flex-1 h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: pct + "%", background: PIE_COLORS[i % PIE_COLORS.length] }} />
+              </div>
+              <span className="text-xs font-semibold text-foreground/70 w-16 text-right shrink-0">{fmt(d.value)}</span>
+              <span className="text-[11px] text-foreground/35 w-8 text-right shrink-0">{Math.round(pct)}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── IncomeExpenseSplit ──────────────────────────────────────────────────────────
+function IncomeExpenseSplit({
+  income, expense, fixedExp, floatExp,
+}: { income: number; expense: number; fixedExp: number; floatExp: number }) {
+  const data = [
+    { name: "Income",   value: Math.round(income),   fill: "#10b981" },
+    { name: "Expenses", value: Math.round(expense),  fill: "#ef4444" },
+    { name: "Fixed",    value: Math.round(fixedExp), fill: "#8b5cf6" },
+    { name: "Variable", value: Math.round(floatExp), fill: "#f59e0b" },
+  ];
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Income vs Expenses</p>
+      <div className="flex flex-col gap-3">
+        {data.map((d) => (
+          <div key={d.name} className="flex items-center gap-2">
+            <span className="text-xs text-foreground/60 w-16 shrink-0">{d.name}</span>
+            <div className="flex-1 h-5 rounded-lg bg-[var(--surface-2)] overflow-hidden">
+              <div
+                className="h-full rounded-lg flex items-center justify-end pr-2 transition-all"
+                style={{ width: Math.max((d.value / max) * 100, d.value > 0 ? 4 : 0) + "%", background: d.fill }}
+              >
+                {d.value > 0 && <span className="text-[11px] font-bold text-white whitespace-nowrap">{fmtK(d.value)}</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+        <span className="text-xs text-foreground/40">Fixed vs Variable expenses</span>
+        <span className="text-xs font-semibold text-foreground/60">
+          {expense > 0 ? Math.round((fixedExp / expense) * 100) : 0}% fixed
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function getMondayISO(d: Date): string {
+  const day = d.getDay(); // 0=Sun … 6=Sat
+  const diff = day === 0 ? -6 : 1 - day; // shift to Monday
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  return mon.toISOString().slice(0, 10);
+}
+
+function fmt$(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Robinhood Credit Card Section ─────────────────────────────────────────────
+function CreditCardSection() {
+  const qc = useQueryClient();
+  const { data: rows = [], isLoading } = useQuery<CreditCardWeek[]>({
+    queryKey: ["cc-weeks"],
+    queryFn: fetchCCWeeks,
+    staleTime: 30_000,
+  });
+
+  // draft for new / edit row
+  const emptyDraft = (): Omit<CreditCardWeek, "id"> => ({
+    week_start: getMondayISO(new Date()),
+    balance: 0,
+    squared_off: false,
+    paid_amount: null,
+    note: "",
+  });
+
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<Omit<CreditCardWeek, "id">>(emptyDraft());
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<Omit<CreditCardWeek, "id">>(emptyDraft());
+
+  const saveMut = useMutation({
+    mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cc-weeks"] }); setAdding(false); setDraft(emptyDraft()); },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cc-weeks"] }); setEditId(null); },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteCCWeek(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
+  });
+
+  // quick toggle squared_off without opening edit mode
+  const toggleSquared = (row: CreditCardWeek) => {
+    if (!row.id) return;
+    updateMut.mutate({
+      id: row.id,
+      body: { week_start: row.week_start, balance: row.balance, squared_off: !row.squared_off, paid_amount: row.paid_amount ?? null, note: row.note ?? "" },
+    });
+  };
+
+  const outstanding = rows.filter((r) => !r.squared_off).reduce((s, r) => s + r.balance, 0);
+  const pendingCount = rows.filter((r) => !r.squared_off).length;
+
+  function startEdit(row: CreditCardWeek) {
+    if (!row.id) return;
+    setEditId(row.id);
+    setEditDraft({ week_start: row.week_start.slice(0, 10), balance: row.balance, squared_off: row.squared_off, paid_amount: row.paid_amount ?? null, note: row.note ?? "" });
+  }
+
+  const inputCls = "bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-full";
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-4">
+      {/* header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CreditCard size={16} className="text-rose-400" />
+          <span className="text-sm font-semibold">Robinhood Credit Card</span>
+          <span className="text-xs text-foreground/40">weekly tracker</span>
+        </div>
+        <button
+          onClick={() => { setAdding(true); setDraft(emptyDraft()); }}
+          className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1.5 transition-colors"
+        >
+          <Plus size={12} /> Add Week
+        </button>
+      </div>
+
+      {/* summary bar */}
+      {rows.length > 0 && (
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-foreground/50">Outstanding:</span>
+            <span className={outstanding > 0 ? "font-bold text-rose-400" : "font-bold text-emerald-400"}>{fmt$(outstanding)}</span>
+          </div>
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+              <span className="text-foreground/50">{pendingCount} week{pendingCount > 1 ? "s" : ""} pending</span>
+            </div>
+          )}
+          {pendingCount === 0 && rows.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Check size={12} className="text-emerald-400" />
+              <span className="text-emerald-400 font-medium">All squared off!</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* table */}
+      {isLoading ? (
+        <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="text-foreground/40 text-left border-b border-[var(--border)]">
+                <th className="pb-2 pr-3 font-medium">Week (Mon)</th>
+                <th className="pb-2 pr-3 font-medium">Card Balance</th>
+                <th className="pb-2 pr-3 font-medium">Paid from Trading</th>
+                <th className="pb-2 pr-3 font-medium">Squared Off?</th>
+                <th className="pb-2 pr-3 font-medium">Note</th>
+                <th className="pb-2 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* add row */}
+              {adding && (
+                <tr className="border-b border-[var(--border)] bg-blue-950/20">
+                  <td className="py-2 pr-3"><input type="date" className={inputCls} value={draft.week_start} onChange={(e) => setDraft({ ...draft, week_start: e.target.value })} /></td>
+                  <td className="py-2 pr-3"><input type="number" className={inputCls} placeholder="0.00" value={draft.balance || ""} onChange={(e) => setDraft({ ...draft, balance: parseFloat(e.target.value) || 0 })} /></td>
+                  <td className="py-2 pr-3"><input type="number" className={inputCls} placeholder="0.00" value={draft.paid_amount ?? ""} onChange={(e) => setDraft({ ...draft, paid_amount: e.target.value ? parseFloat(e.target.value) : null })} /></td>
+                  <td className="py-2 pr-3">
+                    <button onClick={() => setDraft({ ...draft, squared_off: !draft.squared_off })} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${draft.squared_off ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
+                      {draft.squared_off ? "✓ Paid" : "● Pending"}
+                    </button>
+                  </td>
+                  <td className="py-2 pr-3"><input type="text" className={inputCls} placeholder="optional note" value={draft.note ?? ""} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></td>
+                  <td className="py-2 text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => saveMut.mutate(draft)} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors"><Check size={13} /></button>
+                      <button onClick={() => { setAdding(false); setDraft(emptyDraft()); }} className="p-1 rounded text-foreground/40 hover:bg-foreground/10 transition-colors"><X size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {rows.length === 0 && !adding && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-foreground/30 text-xs">No entries yet — click "Add Week" to start tracking</td>
+                </tr>
+              )}
+              {rows.map((row) =>
+                editId === row.id ? (
+                  <tr key={row.id} className="border-b border-[var(--border)] bg-blue-950/20">
+                    <td className="py-2 pr-3"><input type="date" className={inputCls} value={editDraft.week_start} onChange={(e) => setEditDraft({ ...editDraft, week_start: e.target.value })} /></td>
+                    <td className="py-2 pr-3"><input type="number" className={inputCls} value={editDraft.balance || ""} onChange={(e) => setEditDraft({ ...editDraft, balance: parseFloat(e.target.value) || 0 })} /></td>
+                    <td className="py-2 pr-3"><input type="number" className={inputCls} value={editDraft.paid_amount ?? ""} onChange={(e) => setEditDraft({ ...editDraft, paid_amount: e.target.value ? parseFloat(e.target.value) : null })} /></td>
+                    <td className="py-2 pr-3">
+                      <button onClick={() => setEditDraft({ ...editDraft, squared_off: !editDraft.squared_off })} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${editDraft.squared_off ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
+                        {editDraft.squared_off ? "✓ Paid" : "● Pending"}
+                      </button>
+                    </td>
+                    <td className="py-2 pr-3"><input type="text" className={inputCls} value={editDraft.note ?? ""} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} /></td>
+                    <td className="py-2 text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button onClick={() => updateMut.mutate({ id: row.id!, body: editDraft })} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors"><Check size={13} /></button>
+                        <button onClick={() => setEditId(null)} className="p-1 rounded text-foreground/40 hover:bg-foreground/10 transition-colors"><X size={13} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={row.id} className="border-b border-[var(--border)] hover:bg-foreground/5 transition-colors group">
+                    <td className="py-2.5 pr-3 font-medium tabular-nums">{row.week_start.slice(0, 10)}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-rose-400 font-semibold">{fmt$(row.balance)}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-emerald-400">{fmt$(row.paid_amount)}</td>
+                    <td className="py-2.5 pr-3">
+                      <button onClick={() => toggleSquared(row)} title="Click to toggle" className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${row.squared_off ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}>
+                        {row.squared_off ? "✓ Paid" : "● Pending"}
+                      </button>
+                    </td>
+                    <td className="py-2.5 pr-3 text-foreground/60 max-w-[160px] truncate">{row.note || "—"}</td>
+                    <td className="py-2.5 text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button onClick={() => startEdit(row)} className="p-1 rounded text-blue-400 hover:bg-blue-500/20 transition-colors opacity-0 group-hover:opacity-100"><PencilLine size={13} /></button>
+                        <button onClick={() => row.id && deleteMut.mutate(row.id)} className="p-1 rounded text-rose-400 hover:bg-rose-500/20 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
@@ -704,6 +972,7 @@ export default function BudgetPage() {
       {/* ── MONTHLY TAB ─────────────────────────────────────────────────────── */}
       {activeTab === "monthly" && (
         <>
+          {/* stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
             <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
             <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
@@ -712,23 +981,22 @@ export default function BudgetPage() {
             <SavingsRate income={stats.income} net={stats.net} />
           </div>
 
-          <div className="mb-5">
-            <TrendChart entries={allEntries} />
-          </div>
+          {/* charts row — 3 equal columns */}
+          {pieData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
 
-          <div className="flex flex-col xl:flex-row gap-5">
-            {pieData.length > 0 && (
-              <div className="xl:w-72 shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-                <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Expense Breakdown</p>
-                <ResponsiveContainer width="100%" height={260}>
+              {/* Donut pie */}
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-1">Expense Mix</p>
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie
                       data={pieData}
                       dataKey="value"
                       nameKey="name"
-                      cx="50%" cy="45%"
-                      innerRadius={54}
-                      outerRadius={88}
+                      cx="50%" cy="46%"
+                      innerRadius={50}
+                      outerRadius={78}
                       paddingAngle={2}
                     >
                       {pieData.map((_, i) => (
@@ -738,41 +1006,68 @@ export default function BudgetPage() {
                     <Tooltip
                       formatter={(v: unknown) => [fmt(Number(v)), "Amount"]}
                       contentStyle={{
-                        background: "var(--surface)", border: "1px solid var(--border)",
-                        borderRadius: 8, fontSize: 12, color: "inherit",
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        color: "var(--foreground)",
                       }}
+                      itemStyle={{ color: "var(--foreground)" }}
+                      labelStyle={{ color: "var(--foreground)" }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    <Legend
+                      iconType="circle"
+                      iconSize={7}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 4, color: "var(--foreground)" }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-            )}
 
-            <div className="flex-1 flex flex-col gap-5 min-w-0">
-              <Section
-                title="One-off / Floating"
-                icon={<Zap size={14} />}
-                accentCls="text-amber-400"
-                rows={floating}
-                isRecurring={false}
-                currentMonth={currentMonth}
-              />
-              <Section
-                title="Recurring / Fixed"
-                icon={<Repeat size={14} />}
-                accentCls="text-purple-400"
-                rows={recurring}
-                isRecurring={true}
-                currentMonth={currentMonth}
+              {/* Top categories */}
+              <TopCategoriesBar pieData={pieData} />
+
+              {/* Income vs expense split */}
+              <IncomeExpenseSplit
+                income={stats.income}
+                expense={stats.expense}
+                fixedExp={stats.fixedExp}
+                floatExp={stats.expense - stats.fixedExp}
               />
             </div>
+          )}
+
+          {/* tables */}
+          <div className="flex flex-col gap-5">
+            <Section
+              title="One-off / Floating"
+              icon={<Zap size={14} />}
+              accentCls="text-amber-400"
+              rows={floating}
+              isRecurring={false}
+              currentMonth={currentMonth}
+            />
+            <Section
+              title="Recurring / Fixed"
+              icon={<Repeat size={14} />}
+              accentCls="text-purple-400"
+              rows={recurring}
+              isRecurring={true}
+              currentMonth={currentMonth}
+            />
           </div>
+
+          {/* Robinhood Credit Card tracker */}
+          <CreditCardSection />
         </>
       )}
 
       {/* ── ANNUAL SUMMARY TAB ───────────────────────────────────────────────── */}
       {activeTab === "annual" && (
-        <AnnualSummary entries={allEntries} year={currentYear} />
+        <div className="flex flex-col gap-5">
+          <TrendChart entries={allEntries} />
+          <AnnualSummary entries={allEntries} year={currentYear} />
+        </div>
       )}
     </div>
   );

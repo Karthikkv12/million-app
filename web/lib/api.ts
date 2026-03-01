@@ -641,6 +641,23 @@ export const updateBudget = (id: number, body: Partial<Omit<BudgetEntry, "id">>)
   api.patch<BudgetEntry>(`/budget/${id}`, body);
 export const deleteBudget = (id: number) => api.del<void>(`/budget/${id}`);
 
+// ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+export interface CreditCardWeek {
+  id?: number;
+  week_start: string;   // ISO date string — Monday of the week
+  balance: number;
+  squared_off: boolean;
+  paid_amount?: number | null;
+  note?: string | null;
+}
+
+export const fetchCCWeeks  = () => api.get<CreditCardWeek[]>("/credit-card/weeks");
+export const saveCCWeek    = (body: Omit<CreditCardWeek, "id">) => api.post<{ id: number }>("/credit-card/weeks", body);
+export const updateCCWeek  = (id: number, body: Omit<CreditCardWeek, "id">) =>
+  api.patch<void>(`/credit-card/weeks/${id}`, body);
+export const deleteCCWeek  = (id: number) => api.del<void>(`/credit-card/weeks/${id}`);
+
 // ── Auth: sessions + events + change-password ─────────────────────────────────
 
 export interface AuthSession {

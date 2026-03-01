@@ -11,7 +11,7 @@ from brokers import broker_enabled as _broker_enabled
 from brokers import get_broker
 from brokers.base import SubmitOrderRequest
 from database.models import (
-    Trade, CashFlow, Budget,
+    Trade, CashFlow, Budget, CreditCardWeek,
     Order,
     Account, Holding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
@@ -2065,5 +2065,96 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
         session.rollback()
         print(f"Error updating trade: {e}")
         return False
+    finally:
+        session.close()
+
+
+# ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+def list_credit_card_weeks(user_id: int):
+    session = get_session()
+    try:
+        rows = (
+            session.query(CreditCardWeek)
+            .filter(CreditCardWeek.user_id == user_id)
+            .order_by(CreditCardWeek.week_start.desc())
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "week_start": r.week_start.isoformat() if r.week_start else None,
+                "balance": r.balance,
+                "squared_off": r.squared_off,
+                "paid_amount": r.paid_amount,
+                "note": r.note,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+def create_credit_card_week(user_id: int, week_start, balance: float, squared_off: bool = False,
+                            paid_amount=None, note=None):
+    session = get_session()
+    try:
+        row = CreditCardWeek(
+            user_id=user_id,
+            week_start=pd.to_datetime(week_start),
+            balance=float(balance),
+            squared_off=bool(squared_off),
+            paid_amount=float(paid_amount) if paid_amount is not None else None,
+            note=str(note) if note else None,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return row.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_credit_card_week(row_id: int, user_id: int, **kwargs):
+    session = get_session()
+    try:
+        row = session.query(CreditCardWeek).filter(
+            CreditCardWeek.id == row_id,
+            CreditCardWeek.user_id == user_id,
+        ).first()
+        if not row:
+            raise ValueError(f"CreditCardWeek {row_id} not found")
+        for k, v in kwargs.items():
+            if k == 'week_start' and v is not None:
+                v = pd.to_datetime(v)
+            if hasattr(row, k):
+                setattr(row, k, v)
+        row.updated_at = datetime.utcnow()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_credit_card_week(row_id: int, user_id: int):
+    session = get_session()
+    try:
+        row = session.query(CreditCardWeek).filter(
+            CreditCardWeek.id == row_id,
+            CreditCardWeek.user_id == user_id,
+        ).first()
+        if row:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
