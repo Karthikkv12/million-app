@@ -3,7 +3,7 @@
   "version": "1.6.7",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3002",
     "dev:clean": "rm -rf .next && next dev -p 3002",
     "dev:main": "next dev -p 3000",
     "dev:develop": "next dev -p 3002",
