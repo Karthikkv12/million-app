@@ -754,6 +754,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
 
   const inputCls = "bg-transparent border border-[var(--border)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full tabular-nums";
 
+  // ── metrics ──────────────────────────────────────────────────────────────────
   const outstanding = weekSlots.reduce((s, { isoSunday }) => {
     const r = rowByDate[isoSunday];
     return r && !r.squared_off ? s + r.balance : s;
@@ -763,8 +764,51 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     return r && r.balance > 0 && !r.squared_off;
   }).length;
 
+  // month-level aggregates (only this month's slots)
+  const monthCharged = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.balance ?? 0), 0);
+  const monthPaid    = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.paid_amount ?? 0), 0);
+  const payRate      = monthCharged > 0 ? Math.min(100, (monthPaid / monthCharged) * 100) : 0;
+
+  // ── weekly bar chart data (this month) ───────────────────────────────────────
+  const weekBarData = weekSlots.map(({ sunday, saturday, isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return {
+      week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
+      Balance: r?.balance ?? 0,
+      Paid: r?.paid_amount ?? 0,
+      net: (r?.balance ?? 0) - (r?.paid_amount ?? 0),
+    };
+  });
+
+  // ── monthly trend (all stored rows, grouped by YYYY-MM) ──────────────────────
+  const monthTrendData = useMemo(() => {
+    const byMonth: Record<string, { charged: number; paid: number }> = {};
+    for (const r of rows) {
+      const key = r.week_start.slice(0, 7);
+      if (!byMonth[key]) byMonth[key] = { charged: 0, paid: 0 };
+      byMonth[key].charged += r.balance ?? 0;
+      byMonth[key].paid    += r.paid_amount ?? 0;
+    }
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, v]) => ({
+        month: new Date(month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        Charged: parseFloat(v.charged.toFixed(2)),
+        Paid:    parseFloat(v.paid.toFixed(2)),
+      }));
+  }, [rows]);
+
+  const tooltipStyle = {
+    backgroundColor: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    color: "var(--foreground)",
+    fontSize: 11,
+  };
+
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-4">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-5">
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -779,7 +823,86 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         ) : null}
       </div>
 
-      {/* table */}
+      {/* ── metric cards ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Charged", value: fmt$(monthCharged), cls: "text-rose-400" },
+          { label: "Paid from Trading", value: fmt$(monthPaid), cls: "text-emerald-400" },
+          { label: "Net Unpaid", value: fmt$(Math.max(0, monthCharged - monthPaid)), cls: outstanding > 0 ? "text-amber-400" : "text-emerald-400" },
+          { label: "Pay Rate", value: monthCharged > 0 ? payRate.toFixed(1) + "%" : "—", cls: payRate >= 100 ? "text-emerald-400" : payRate >= 50 ? "text-amber-400" : "text-rose-400" },
+        ].map(({ label, value, cls }) => (
+          <div key={label} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3">
+            <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-1">{label}</p>
+            <p className={`text-xl font-black tabular-nums ${cls}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── pay rate progress bar ─────────────────────────────────────────────── */}
+      {monthCharged > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between text-[10px] text-foreground/40">
+            <span>Monthly Pay Coverage</span>
+            <span>{payRate.toFixed(1)}% of balance paid</span>
+          </div>
+          <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${payRate >= 100 ? "bg-emerald-500" : payRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
+              style={{ width: `${Math.min(100, payRate)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── charts row ───────────────────────────────────────────────────────── */}
+      {monthCharged > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* weekly balance vs paid */}
+          <div>
+            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">This Month — Balance vs Paid per Week</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={weekBarData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
+                  itemStyle={{ color: "var(--foreground)" }}
+                  formatter={(v: number) => "$" + v.toFixed(2)}
+                />
+                <Bar dataKey="Balance" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* monthly trend */}
+          {monthTrendData.length > 1 && (
+            <div>
+              <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Monthly Trend — Charged vs Paid</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={monthTrendData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
+                    itemStyle={{ color: "var(--foreground)" }}
+                    formatter={(v: number) => "$" + v.toFixed(2)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
+                  <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── table ────────────────────────────────────────────────────────────── */}
       {isLoading ? (
         <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
       ) : (
