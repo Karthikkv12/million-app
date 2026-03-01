@@ -639,14 +639,38 @@ export default function BudgetPage() {
   }, [floating, recurring]);
 
   const totalEntries = floating.length + recurring.length;
+  const [activeTab, setActiveTab] = useState<"monthly" | "annual">("monthly");
+  const currentYear = Number(currentMonth.split("-")[0]);
 
   return (
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full">
 
+      {/* Header + tabs */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-2xl font-black text-foreground">Budget</h1>
+        <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1">
+          <button
+            onClick={() => setActiveTab("monthly")}
+            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+              (activeTab === "monthly"
+                ? "bg-blue-600 text-white shadow"
+                : "text-foreground/50 hover:text-foreground")}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setActiveTab("annual")}
+            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+              (activeTab === "annual"
+                ? "bg-blue-600 text-white shadow"
+                : "text-foreground/50 hover:text-foreground")}
+          >
+            Annual Summary
+          </button>
+        </div>
       </div>
 
+      {/* Month navigator — shown on both tabs */}
       <div className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-2.5 mb-5">
         <button
           onClick={prev}
@@ -655,10 +679,19 @@ export default function BudgetPage() {
           <ChevronLeft size={18} />
         </button>
         <div className="text-center">
-          <p className="font-bold text-foreground">{monthLabel(currentMonth)}</p>
-          <p className="text-xs text-foreground/40 mt-0.5">
-            {isLoading ? "Loading..." : totalEntries + " entr" + (totalEntries === 1 ? "y" : "ies")}
-          </p>
+          {activeTab === "monthly" ? (
+            <>
+              <p className="font-bold text-foreground">{monthLabel(currentMonth)}</p>
+              <p className="text-xs text-foreground/40 mt-0.5">
+                {isLoading ? "Loading..." : totalEntries + " entr" + (totalEntries === 1 ? "y" : "ies")}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-foreground">{currentYear}</p>
+              <p className="text-xs text-foreground/40 mt-0.5">Annual view</p>
+            </>
+          )}
         </div>
         <button
           onClick={next}
@@ -668,74 +701,79 @@ export default function BudgetPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-        <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
-        <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
-        <StatCard label="Fixed/Month" value={fmt(stats.fixedExp)} cls="text-purple-400" />
-        <StatCard label="Net"         value={fmt(stats.net)}      cls={stats.net >= 0 ? "text-emerald-400" : "text-red-400"} />
-        <SavingsRate income={stats.income} net={stats.net} />
-      </div>
-
-      <div className="mb-5">
-        <TrendChart entries={allEntries} />
-      </div>
-
-      <div className="flex flex-col xl:flex-row gap-5">
-
-        {pieData.length > 0 && (
-          <div className="xl:w-72 shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-            <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Expense Breakdown</p>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%" cy="45%"
-                  innerRadius={54}
-                  outerRadius={88}
-                  paddingAngle={2}
-                >
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: unknown) => [fmt(Number(v)), "Amount"]}
-                  contentStyle={{
-                    background: "var(--surface)", border: "1px solid var(--border)",
-                    borderRadius: 8, fontSize: 12, color: "inherit",
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-              </PieChart>
-            </ResponsiveContainer>
+      {/* ── MONTHLY TAB ─────────────────────────────────────────────────────── */}
+      {activeTab === "monthly" && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
+            <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
+            <StatCard label="Fixed/Month" value={fmt(stats.fixedExp)} cls="text-purple-400" />
+            <StatCard label="Net"         value={fmt(stats.net)}      cls={stats.net >= 0 ? "text-emerald-400" : "text-red-400"} />
+            <SavingsRate income={stats.income} net={stats.net} />
           </div>
-        )}
 
-        <div className="flex-1 flex flex-col gap-5 min-w-0">
-          <Section
-            title="One-off / Floating"
-            icon={<Zap size={14} />}
-            accentCls="text-amber-400"
-            rows={floating}
-            isRecurring={false}
-            currentMonth={currentMonth}
-          />
-          <Section
-            title="Recurring / Fixed"
-            icon={<Repeat size={14} />}
-            accentCls="text-purple-400"
-            rows={recurring}
-            isRecurring={true}
-            currentMonth={currentMonth}
-          />
-        </div>
-      </div>
+          <div className="mb-5">
+            <TrendChart entries={allEntries} />
+          </div>
 
-      <div className="mt-5">
-        <AnnualSummary entries={allEntries} year={Number(currentMonth.split("-")[0])} />
-      </div>
+          <div className="flex flex-col xl:flex-row gap-5">
+            {pieData.length > 0 && (
+              <div className="xl:w-72 shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Expense Breakdown</p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%" cy="45%"
+                      innerRadius={54}
+                      outerRadius={88}
+                      paddingAngle={2}
+                    >
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: unknown) => [fmt(Number(v)), "Amount"]}
+                      contentStyle={{
+                        background: "var(--surface)", border: "1px solid var(--border)",
+                        borderRadius: 8, fontSize: 12, color: "inherit",
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            <div className="flex-1 flex flex-col gap-5 min-w-0">
+              <Section
+                title="One-off / Floating"
+                icon={<Zap size={14} />}
+                accentCls="text-amber-400"
+                rows={floating}
+                isRecurring={false}
+                currentMonth={currentMonth}
+              />
+              <Section
+                title="Recurring / Fixed"
+                icon={<Repeat size={14} />}
+                accentCls="text-purple-400"
+                rows={recurring}
+                isRecurring={true}
+                currentMonth={currentMonth}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── ANNUAL SUMMARY TAB ───────────────────────────────────────────────── */}
+      {activeTab === "annual" && (
+        <AnnualSummary entries={allEntries} year={currentYear} />
+      )}
     </div>
   );
 }
