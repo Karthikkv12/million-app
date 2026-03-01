@@ -11,7 +11,7 @@ from brokers import broker_enabled as _broker_enabled
 from brokers import get_broker
 from brokers.base import SubmitOrderRequest
 from database.models import (
-    Trade, CashFlow, Budget,
+    Trade, CashFlow, Budget, CreditCardWeek, BudgetOverride,
     Order,
     Account, Holding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
@@ -1641,18 +1641,146 @@ def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
     finally:
         session.close()
 
-def save_budget(category, b_type, amount, date, desc, user_id=None):
+def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None):
     session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
 
         new_item = Budget(
             category=str(category), type=type_enum, amount=float(amount),
-            date=pd.to_datetime(date), description=str(desc)
+            date=pd.to_datetime(date), description=str(desc),
+            entry_type=entry_type, recurrence=recurrence,
         )
         if user_id is not None:
             new_item.user_id = int(user_id)
         session.add(new_item)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_budget(budget_id: int, user_id: int, **kwargs):
+    session = get_session()
+    try:
+        item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
+        if not item:
+            raise ValueError(f"Budget {budget_id} not found")
+        for k, v in kwargs.items():
+            if k == 'type' and v is not None:
+                v = normalize_budget_type(v)
+            if k == 'date' and v is not None:
+                v = pd.to_datetime(v)
+            if hasattr(item, k):
+                setattr(item, k, v)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget(budget_id: int, user_id: int):
+    session = get_session()
+    try:
+        item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
+        if item:
+            session.delete(item)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def list_budget_overrides(user_id: int):
+    """Return all budget overrides for the user as a list of dicts."""
+    session = get_session()
+    try:
+        rows = (
+            session.query(BudgetOverride)
+            .filter(BudgetOverride.user_id == user_id)
+            .order_by(BudgetOverride.month_key)
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "budget_id": r.budget_id,
+                "month_key": r.month_key,
+                "amount": r.amount,
+                "description": r.description,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount: float, description: str = None):
+    """Create or update an override for (budget_id, month_key). Returns the override id."""
+    session = get_session()
+    try:
+        existing = session.query(BudgetOverride).filter(
+            BudgetOverride.user_id == user_id,
+            BudgetOverride.budget_id == budget_id,
+            BudgetOverride.month_key == month_key,
+        ).first()
+        if existing:
+            existing.amount = float(amount)
+            existing.description = description
+            existing.updated_at = datetime.utcnow()
+            session.commit()
+            return existing.id
+        else:
+            row = BudgetOverride(
+                user_id=user_id,
+                budget_id=budget_id,
+                month_key=month_key,
+                amount=float(amount),
+                description=description,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return row.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget_override(override_id: int, user_id: int):
+    """Delete a specific override by id."""
+    session = get_session()
+    try:
+        row = session.query(BudgetOverride).filter(
+            BudgetOverride.id == override_id,
+            BudgetOverride.user_id == user_id,
+        ).first()
+        if row:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
+    """Cascade-delete all overrides for a budget entry (called when entry is deleted)."""
+    session = get_session()
+    try:
+        session.query(BudgetOverride).filter(
+            BudgetOverride.budget_id == budget_id,
+            BudgetOverride.user_id == user_id,
+        ).delete()
         session.commit()
     except Exception:
         session.rollback()
@@ -2029,5 +2157,96 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
         session.rollback()
         print(f"Error updating trade: {e}")
         return False
+    finally:
+        session.close()
+
+
+# ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+def list_credit_card_weeks(user_id: int):
+    session = get_session()
+    try:
+        rows = (
+            session.query(CreditCardWeek)
+            .filter(CreditCardWeek.user_id == user_id)
+            .order_by(CreditCardWeek.week_start.desc())
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "week_start": r.week_start.isoformat() if r.week_start else None,
+                "balance": r.balance,
+                "squared_off": r.squared_off,
+                "paid_amount": r.paid_amount,
+                "note": r.note,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+def create_credit_card_week(user_id: int, week_start, balance: float, squared_off: bool = False,
+                            paid_amount=None, note=None):
+    session = get_session()
+    try:
+        row = CreditCardWeek(
+            user_id=user_id,
+            week_start=pd.to_datetime(week_start),
+            balance=float(balance),
+            squared_off=bool(squared_off),
+            paid_amount=float(paid_amount) if paid_amount is not None else None,
+            note=str(note) if note else None,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return row.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_credit_card_week(row_id: int, user_id: int, **kwargs):
+    session = get_session()
+    try:
+        row = session.query(CreditCardWeek).filter(
+            CreditCardWeek.id == row_id,
+            CreditCardWeek.user_id == user_id,
+        ).first()
+        if not row:
+            raise ValueError(f"CreditCardWeek {row_id} not found")
+        for k, v in kwargs.items():
+            if k == 'week_start' and v is not None:
+                v = pd.to_datetime(v)
+            if hasattr(row, k):
+                setattr(row, k, v)
+        row.updated_at = datetime.utcnow()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_credit_card_week(row_id: int, user_id: int):
+    session = get_session()
+    try:
+        row = session.query(CreditCardWeek).filter(
+            CreditCardWeek.id == row_id,
+            CreditCardWeek.user_id == user_id,
+        ).first()
+        if row:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()

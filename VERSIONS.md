@@ -5,6 +5,46 @@
 
 ---
 
+## v1.7.0 — Budget Overrides, CC Tracker & Charts
+**Released:** 2026-03-01
+**Tag:** `v1.7.0`
+**Branch:** `develop → main`
+
+### 💳 Robinhood Credit Card Weekly Tracker
+- Auto-generated Sun→Sat weekly spend slots for each month (4–5 rows based on calendar)
+- No "Add Week" button — slots are fixed and always match the actual weeks of the month
+- Inline editing with auto-save on blur per cell (amount, cashback)
+- Running totals and month summary always visible
+
+### 📊 CC Tracker Charts & Metrics
+- **4 stat cards**: Total Spend, Total Cashback, Avg Weekly Spend, Cashback Rate %
+- **Pay rate progress bar** — tracks spend vs. self-defined budget target
+- **Weekly bar chart** — spend vs. cashback per week for the current month
+- **Monthly trend line** — rolling view of spend across all logged months
+
+### 🔄 Per-Month Budget Overrides for Recurring Entries
+- Editing a recurring budget row **no longer changes the base value for all months**
+- Each edit for a specific month saves a `BudgetOverride` record `(budget_id, month_key, amount)`
+- Overridden rows display a **✎ indicator** with a tooltip showing the original base amount
+- A **× reset button** on each overridden row reverts it back to the base amount instantly
+- Stats, pie chart, and totals all reflect override amounts for the current month
+- Deleting a base recurring entry cascades and removes all its overrides
+
+### 🗄️ Backend
+- `BudgetOverride` model + Alembic migration `0016` (`budget_overrides` table)
+- `GET /budget-overrides`, `POST /budget-overrides` (upsert), `DELETE /budget-overrides/{id}`
+- Cascade delete: removing a budget entry auto-removes all associated overrides
+- `BudgetOverrideRequest` / `BudgetOverrideOut` Pydantic schemas
+
+### 📐 Budget Page Enhancements
+- **Annual Summary tab** — year-at-a-glance breakdown across all months
+- **Trend chart** — spending trajectory over time
+- **Savings rate widget** — income vs. spend ratio
+- **Always-visible edit/delete buttons** on every row (no hover required)
+- Full visual redesign: clean tables, stat cards, pie chart sidebar
+
+---
+
 ## v1.6.7 — Week-over-Week Chart Overhaul
 **Released:** 2026-02-28
 **Tag:** `v1.6.7`

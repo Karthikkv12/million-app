@@ -70,6 +70,10 @@ from .schemas import (
     OrderOut,
     BudgetCreateRequest,
     BudgetOut,
+    BudgetOverrideRequest,
+    BudgetOverrideOut,
+    CreditCardWeekRequest,
+    CreditCardWeekOut,
     CashCreateRequest,
     CashOut,
     TradeCloseRequest,
@@ -1283,7 +1287,99 @@ def list_budget(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
 
 @app.post("/budget")
 def create_budget(req: BudgetCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
-    services.save_budget(req.category, req.type, req.amount, req.date, req.description, user_id=int(user["sub"]))
+    services.save_budget(
+        req.category, req.type, req.amount, req.date, req.description,
+        user_id=int(user["sub"]),
+        entry_type=req.entry_type,
+        recurrence=req.recurrence,
+    )
+    return {"status": "ok"}
+
+
+@app.patch("/budget/{budget_id}")
+def patch_budget(budget_id: int, req: BudgetCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
+    services.update_budget(
+        budget_id, user_id=int(user["sub"]),
+        category=req.category,
+        type=req.type,
+        entry_type=req.entry_type,
+        recurrence=req.recurrence,
+        amount=req.amount,
+        date=req.date,
+        description=req.description,
+    )
+    return {"status": "ok"}
+
+
+@app.delete("/budget/{budget_id}")
+def remove_budget(budget_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    uid = int(user["sub"])
+    services.delete_budget_overrides_for_entry(budget_id, user_id=uid)
+    services.delete_budget(budget_id, user_id=uid)
+    return {"status": "ok"}
+
+
+# ── Budget Overrides ──────────────────────────────────────────────────────────
+
+@app.get("/budget-overrides", response_model=List[Dict[str, Any]])
+def list_overrides(user=Depends(get_current_user)):
+    return services.list_budget_overrides(user_id=int(user["sub"]))
+
+
+@app.post("/budget-overrides", response_model=Dict[str, Any])
+def upsert_override(req: BudgetOverrideRequest, user=Depends(get_current_user)):
+    oid = services.upsert_budget_override(
+        user_id=int(user["sub"]),
+        budget_id=req.budget_id,
+        month_key=req.month_key,
+        amount=req.amount,
+        description=req.description,
+    )
+    return {"id": oid}
+
+
+@app.delete("/budget-overrides/{override_id}")
+def delete_override(override_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    services.delete_budget_override(override_id, user_id=int(user["sub"]))
+    return {"status": "ok"}
+
+
+# ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+@app.get("/credit-card/weeks", response_model=List[Dict[str, Any]])
+def list_cc_weeks(user=Depends(get_current_user)):
+    return services.list_credit_card_weeks(user_id=int(user["sub"]))
+
+
+@app.post("/credit-card/weeks", response_model=Dict[str, Any])
+def create_cc_week(req: CreditCardWeekRequest, user=Depends(get_current_user)):
+    row_id = services.create_credit_card_week(
+        user_id=int(user["sub"]),
+        week_start=req.week_start,
+        balance=req.balance,
+        squared_off=req.squared_off,
+        paid_amount=req.paid_amount,
+        note=req.note,
+    )
+    return {"id": row_id, "status": "ok"}
+
+
+@app.patch("/credit-card/weeks/{row_id}", response_model=Dict[str, str])
+def patch_cc_week(row_id: int, req: CreditCardWeekRequest, user=Depends(get_current_user)):
+    services.update_credit_card_week(
+        row_id, user_id=int(user["sub"]),
+        week_start=req.week_start,
+        balance=req.balance,
+        squared_off=req.squared_off,
+        paid_amount=req.paid_amount,
+        note=req.note,
+    )
+    return {"status": "ok"}
+
+
+@app.delete("/credit-card/weeks/{row_id}", response_model=Dict[str, str])
+def delete_cc_week(row_id: int, user=Depends(get_current_user)):
+    services.delete_credit_card_week(row_id, user_id=int(user["sub"]))
     return {"status": "ok"}
 
 

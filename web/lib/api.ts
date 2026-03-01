@@ -621,17 +621,57 @@ export const fetchCashBalance = (currency = "USD") =>
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
+export type BudgetEntryType = "FLOATING" | "RECURRING";
+export type BudgetRecurrence = "MONTHLY" | "SEMI_ANNUAL" | "ANNUAL";
+
 export interface BudgetEntry {
   id?: number;
   category: string;
   type: "EXPENSE" | "INCOME" | "ASSET" | string;
+  entry_type?: BudgetEntryType;
+  recurrence?: BudgetRecurrence;
   amount: number;
   date: string;
   description?: string;
 }
 
-export const fetchBudget = () => api.get<BudgetEntry[]>("/budget");
-export const saveBudget = (body: Omit<BudgetEntry, "id">) => api.post("/budget", body);
+export const fetchBudget  = () => api.get<BudgetEntry[]>("/budget");
+export const saveBudget   = (body: Omit<BudgetEntry, "id">) => api.post("/budget", body);
+export const updateBudget = (id: number, body: Partial<Omit<BudgetEntry, "id">>) =>
+  api.patch<BudgetEntry>(`/budget/${id}`, body);
+export const deleteBudget = (id: number) => api.del<void>(`/budget/${id}`);
+
+// ── Budget Overrides ──────────────────────────────────────────────────────────
+
+export interface BudgetOverride {
+  id?: number;
+  budget_id: number;
+  month_key: string;   // 'YYYY-MM'
+  amount: number;
+  description?: string | null;
+}
+
+export const fetchBudgetOverrides = () => api.get<BudgetOverride[]>("/budget-overrides");
+export const saveBudgetOverride   = (body: Omit<BudgetOverride, "id">) =>
+  api.post<{ id: number }>("/budget-overrides", body);
+export const deleteBudgetOverride = (id: number) => api.del<void>(`/budget-overrides/${id}`);
+
+// ── Credit Card Weeks ─────────────────────────────────────────────────────────
+
+export interface CreditCardWeek {
+  id?: number;
+  week_start: string;   // ISO date string — Monday of the week
+  balance: number;
+  squared_off: boolean;
+  paid_amount?: number | null;
+  note?: string | null;
+}
+
+export const fetchCCWeeks  = () => api.get<CreditCardWeek[]>("/credit-card/weeks");
+export const saveCCWeek    = (body: Omit<CreditCardWeek, "id">) => api.post<{ id: number }>("/credit-card/weeks", body);
+export const updateCCWeek  = (id: number, body: Omit<CreditCardWeek, "id">) =>
+  api.patch<void>(`/credit-card/weeks/${id}`, body);
+export const deleteCCWeek  = (id: number) => api.del<void>(`/credit-card/weeks/${id}`);
 
 // ── Auth: sessions + events + change-password ─────────────────────────────────
 

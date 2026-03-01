@@ -217,6 +217,8 @@ class CashOut(BaseModel):
 class BudgetCreateRequest(BaseModel):
     category: str
     type: str
+    entry_type: Optional[str] = "FLOATING"
+    recurrence: Optional[str] = None
     amount: float
     date: datetime
     description: str = ""
@@ -226,6 +228,40 @@ class BudgetOut(BaseModel):
     id: int
     category: str
     type: str
+    entry_type: Optional[str] = None
+    recurrence: Optional[str] = None
     amount: float
     date: datetime
     description: Optional[str] = None
+
+
+class BudgetOverrideRequest(BaseModel):
+    budget_id: int
+    month_key: str   # 'YYYY-MM'
+    amount: float
+    description: Optional[str] = None
+
+
+class BudgetOverrideOut(BaseModel):
+    id: int
+    budget_id: int
+    month_key: str
+    amount: float
+    description: Optional[str] = None
+
+
+class CreditCardWeekRequest(BaseModel):
+    week_start: datetime
+    balance: float
+    squared_off: bool = False
+    paid_amount: Optional[float] = None
+    note: Optional[str] = None
+
+
+class CreditCardWeekOut(BaseModel):
+    id: int
+    week_start: datetime
+    balance: float
+    squared_off: bool
+    paid_amount: Optional[float] = None
+    note: Optional[str] = None

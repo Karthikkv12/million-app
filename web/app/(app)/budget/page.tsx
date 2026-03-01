@@ -1,215 +1,1296 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { fetchBudget, saveBudget, BudgetEntry } from "@/lib/api";
-import { Plus, X, PiggyBank } from "lucide-react";
-import { PageHeader, SectionLabel, EmptyState, SkeletonStatGrid, Tabs, Badge } from "@/components/ui";
+import {
+  fetchBudget, saveBudget, updateBudget, deleteBudget,
+  BudgetEntry, BudgetEntryType, BudgetRecurrence,
+  fetchCCWeeks, saveCCWeek, updateCCWeek, deleteCCWeek, CreditCardWeek,
+  fetchBudgetOverrides, saveBudgetOverride, deleteBudgetOverride, BudgetOverride,
+} from "@/lib/api";
+import {
+  Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap, PencilLine, CreditCard,
+} from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
-const PIE_COLORS = ["#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#84cc16","#f97316"];
-const fmt = (v: number) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 });
-const TYPE_VARIANT: Record<string, "danger" | "success" | "info"> = {
-  EXPENSE: "danger",
-  INCOME:  "success",
-  ASSET:   "info",
+// ── constants ─────────────────────────────────────────────────────────────────
+const PIE_COLORS = [
+  "#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444",
+  "#06b6d4","#84cc16","#f97316","#ec4899","#14b8a6",
+  "#6366f1","#f43f5e","#22d3ee","#a3e635","#fb923c",
+];
+
+const CATEGORIES = [
+  "Food & Dining","Groceries","Transport","Gas","Entertainment",
+  "Shopping","Utilities","Insurance","Healthcare","Education",
+  "Subscriptions","Housing","Travel","Savings","Investment","Tax",
+  "Personal Care","Pets","Gifts","Other",
+];
+
+const RECURRENCE_MONTHS: Record<BudgetRecurrence, number> = {
+  MONTHLY: 1, SEMI_ANNUAL: 6, ANNUAL: 12,
+};
+const RECURRENCE_LABEL: Record<BudgetRecurrence, string> = {
+  MONTHLY: "Monthly", SEMI_ANNUAL: "Every 6 mo", ANNUAL: "Yearly",
 };
 
-const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500";
+const SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtK = (v: number) => v >= 1000 ? "$" + (v / 1000).toFixed(1) + "k" : "$" + Math.round(v);
 
-function NewEntryForm({ onDone }: { onDone: () => void }) {
-  const qc = useQueryClient();
-  const [cat, setCat]     = useState("");
-  const [type, setType]   = useState("EXPENSE");
-  const [amount, setAmt]  = useState("");
-  const [date, setDate]   = useState(new Date().toISOString().slice(0, 10));
-  const [desc, setDesc]   = useState("");
-  const [err, setErr]     = useState("");
+// ── helpers ───────────────────────────────────────────────────────────────────
+const fmt = (v: number) =>
+  "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const mut = useMutation({
-    mutationFn: () => saveBudget({ category: cat, type, amount: parseFloat(amount), date, description: desc || undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget"] }); onDone(); },
-    onError: (e: Error) => setErr(e.message),
+function monthKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function monthLabel(key: string) {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-US", {
+    month: "long", year: "numeric",
   });
+}
+function proratedMonthly(entry: BudgetEntry): number {
+  const months = RECURRENCE_MONTHS[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence];
+  return entry.amount / months;
+}
+function recurringAppliesToMonth(entry: BudgetEntry, targetKey: string): boolean {
+  const period = RECURRENCE_MONTHS[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence];
+  const base = new Date(entry.date.slice(0, 10) + "T00:00:00");
+  const [ty, tm] = targetKey.split("-").map(Number);
+  const diff = (ty - base.getFullYear()) * 12 + (tm - (base.getMonth() + 1));
+  return diff >= 0 && diff % period === 0;
+}
+
+// ── draft row type ────────────────────────────────────────────────────────────
+interface DraftRow {
+  id?: number;
+  category: string;
+  type: "EXPENSE" | "INCOME" | "ASSET";
+  entry_type: BudgetEntryType;
+  recurrence: BudgetRecurrence;
+  amount: string;
+  date: string;
+  description: string;
+}
+
+function blankDraft(month: string, isRecurring: boolean): DraftRow {
+  return {
+    category: "",
+    type: "EXPENSE",
+    entry_type: isRecurring ? "RECURRING" : "FLOATING",
+    recurrence: "MONTHLY",
+    amount: "",
+    date: `${month}-01`,
+    description: "",
+  };
+}
+
+// ── shared input styles ───────────────────────────────────────────────────────
+const cellCls = "w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/25 focus:bg-blue-500/10 rounded px-1 py-0.5";
+const selCls  = "w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-foreground px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+// ── EditableRow ───────────────────────────────────────────────────────────────
+function EditableRow({
+  draft, isRecurring, onChange, onSave, onCancel, saving,
+}: {
+  draft: DraftRow;
+  isRecurring: boolean;
+  onChange: (d: DraftRow) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const firstRef = useRef<HTMLInputElement>(null);
+  const set = (k: keyof DraftRow, v: string) => onChange({ ...draft, [k]: v });
+
+  useEffect(() => { firstRef.current?.focus(); }, []);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter")  onSave();
+    if (e.key === "Escape") onCancel();
+  };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 mb-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-foreground">New Entry</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-foreground/70 hover:bg-[var(--surface-2)] transition"><X size={16} /></button>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Category</label>
-          <input value={cat} onChange={(e) => setCat(e.target.value)} placeholder="e.g. Commissions" className={inp} />
-        </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Type</label>
-          <select value={type} onChange={(e) => setType(e.target.value)} className={inp}>
-            <option>EXPENSE</option><option>INCOME</option><option>ASSET</option>
+    <tr className="bg-blue-500/5 border-b border-blue-500/20" onKeyDown={onKey}>
+      <td className="px-2 py-1.5 w-[115px]">
+        <input
+          ref={firstRef}
+          type="date" value={draft.date}
+          onChange={(e) => set("date", e.target.value)}
+          className={cellCls + " w-[105px]"}
+        />
+      </td>
+      <td className="px-2 py-1.5">
+        <select value={draft.category} onChange={(e) => set("category", e.target.value)} className={selCls}>
+          <option value="">— category —</option>
+          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+        </select>
+      </td>
+      <td className="px-2 py-1.5 w-[110px]">
+        <select value={draft.type} onChange={(e) => set("type", e.target.value as DraftRow["type"])} className={selCls}>
+          <option value="EXPENSE">Expense</option>
+          <option value="INCOME">Income</option>
+          <option value="ASSET">Asset</option>
+        </select>
+      </td>
+      {isRecurring && (
+        <td className="px-2 py-1.5 w-[120px]">
+          <select
+            value={draft.recurrence}
+            onChange={(e) => set("recurrence", e.target.value as BudgetRecurrence)}
+            className={selCls}
+          >
+            <option value="MONTHLY">Monthly</option>
+            <option value="SEMI_ANNUAL">Every 6 mo</option>
+            <option value="ANNUAL">Yearly</option>
           </select>
+        </td>
+      )}
+      <td className="px-2 py-1.5 w-[120px]">
+        <input
+          type="number" step="0.01" min="0"
+          value={draft.amount}
+          onChange={(e) => set("amount", e.target.value)}
+          placeholder="0.00"
+          className={cellCls + " text-right"}
+        />
+      </td>
+      <td className="px-2 py-1.5">
+        <input
+          value={draft.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Note (optional)"
+          className={cellCls}
+        />
+      </td>
+      <td className="px-2 py-1.5 w-[70px]">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onSave}
+            disabled={saving || !draft.category || !draft.amount}
+            title="Save (Enter)"
+            className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 disabled:opacity-30 transition"
+          >
+            {saving ? <span className="text-[10px]">...</span> : <Check size={13} />}
+          </button>
+          <button
+            onClick={onCancel}
+            title="Cancel (Esc)"
+            className="p-1.5 rounded-lg bg-[var(--surface-2)] text-foreground/50 hover:bg-[var(--border)] transition"
+          >
+            <X size={13} />
+          </button>
         </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Amount ($)</label>
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmt(e.target.value)} className={inp} />
+      </td>
+    </tr>
+  );
+}
+
+// ── ReadRow ───────────────────────────────────────────────────────────────────
+function ReadRow({
+  entry, displayAmount, isRecurring, onEdit, override, onResetOverride,
+}: {
+  entry: BudgetEntry;
+  displayAmount: number;
+  isRecurring: boolean;
+  onEdit: () => void;
+  override?: BudgetOverride;   // present when this month has an override
+  onResetOverride?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [confirmDel, setConfirmDel] = useState(false);
+  const del = useMutation({
+    mutationFn: () => deleteBudget(entry.id!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget"] }),
+  });
+
+  const typeUp = entry.type?.toUpperCase();
+  const isExpense = typeUp === "EXPENSE";
+  const isIncome  = typeUp === "INCOME";
+  const amtCls = isExpense ? "text-red-400" : isIncome ? "text-emerald-400" : "text-blue-400";
+
+  return (
+    <tr className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
+      <td className="px-3 py-2.5 text-xs text-foreground/50 whitespace-nowrap">
+        {entry.date.slice(0, 10)}
+      </td>
+      <td className="px-3 py-2.5 text-sm font-medium text-foreground">
+        {entry.category || "---"}
+      </td>
+      <td className="px-3 py-2.5">
+        <span className={"inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full " + (
+          isExpense ? "bg-red-500/15 text-red-400"
+          : isIncome ? "bg-emerald-500/15 text-emerald-400"
+          : "bg-blue-500/15 text-blue-400"
+        )}>
+          {entry.type}
+        </span>
+      </td>
+      {isRecurring && (
+        <td className="px-3 py-2.5 text-xs text-foreground/50">
+          {RECURRENCE_LABEL[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence]}
+        </td>
+      )}
+      <td className={"px-3 py-2.5 text-sm font-bold text-right whitespace-nowrap " + amtCls}>
+        {fmt(displayAmount)}
+        {isRecurring && override && (
+          <span className="ml-1 text-[10px] font-normal text-blue-400" title={`Override active (base: ${fmt(entry.amount)})`}>
+            ✎
+          </span>
+        )}
+        {isRecurring && !override && displayAmount !== entry.amount && (
+          <span className="ml-1 text-[10px] font-normal text-foreground/30">
+            ({fmt(entry.amount)})
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-xs text-foreground/40 max-w-[160px] truncate">
+        {override?.description ?? entry.description ?? ""}
+      </td>
+      <td className="px-3 py-2.5 w-[110px]" onClick={(e) => e.stopPropagation()}>
+        {confirmDel ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => del.mutate()}
+              disabled={del.isPending}
+              className="text-[11px] px-2 py-0.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {del.isPending ? "..." : "Yes"}
+            </button>
+            <button
+              onClick={() => setConfirmDel(false)}
+              className="text-[11px] px-2 py-0.5 rounded-lg bg-[var(--surface-2)] text-foreground/70"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onEdit}
+              title={isRecurring ? "Override amount for this month" : "Edit"}
+              className="p-1.5 rounded-lg text-foreground/40 hover:text-blue-400 hover:bg-blue-500/10 transition"
+            >
+              <PencilLine size={13} />
+            </button>
+            {isRecurring && override && onResetOverride && (
+              <button
+                onClick={onResetOverride}
+                title="Reset to base amount"
+                className="p-1.5 rounded-lg text-foreground/40 hover:text-amber-400 hover:bg-amber-500/10 transition"
+              >
+                <X size={11} />
+              </button>
+            )}
+            <button
+              onClick={() => setConfirmDel(true)}
+              title="Delete"
+              className="p-1.5 rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// ── Section ───────────────────────────────────────────────────────────────────
+function Section({
+  title, icon, accentCls, rows, isRecurring, currentMonth, overrides,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  accentCls: string;
+  rows: { entry: BudgetEntry; displayAmount: number }[];
+  isRecurring: boolean;
+  currentMonth: string;
+  overrides: BudgetOverride[];   // all overrides for the current user
+}) {
+  const qc = useQueryClient();
+  const [drafts, setDrafts]       = useState<DraftRow[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<DraftRow | null>(null);
+
+  // index overrides by budget_id+month_key for fast lookup
+  const overrideMap = useMemo(() => {
+    const m: Record<string, BudgetOverride> = {};
+    for (const o of overrides) m[`${o.budget_id}:${o.month_key}`] = o;
+    return m;
+  }, [overrides]);
+
+  const getOverride = (entryId: number) => overrideMap[`${entryId}:${currentMonth}`];
+
+  const mut = useMutation({
+    mutationFn: (d: DraftRow) => {
+      const body: Omit<BudgetEntry, "id"> = {
+        category: d.category,
+        type: d.type,
+        entry_type: d.entry_type,
+        recurrence: d.entry_type === "RECURRING" ? d.recurrence : undefined,
+        amount: parseFloat(d.amount),
+        date: d.date,
+        description: d.description || undefined,
+      };
+      return d.id ? updateBudget(d.id, body) : saveBudget(body);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget"] }),
+  });
+
+  // For recurring rows: save an override for this month instead of touching the base
+  const overrideMut = useMutation({
+    mutationFn: (d: DraftRow) =>
+      saveBudgetOverride({
+        budget_id: d.id!,
+        month_key: currentMonth,
+        amount: parseFloat(d.amount),
+        description: d.description || null,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget-overrides"] }),
+  });
+
+  const resetOverrideMut = useMutation({
+    mutationFn: (overrideId: number) => deleteBudgetOverride(overrideId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget-overrides"] }),
+  });
+
+  const addRow = () => setDrafts((p) => [...p, blankDraft(currentMonth, isRecurring)]);
+
+  const saveDraft = async (idx: number) => {
+    const d = drafts[idx];
+    if (!d.category || !d.amount) return;
+    await mut.mutateAsync(d);
+    setDrafts((p) => p.filter((_, i) => i !== idx));
+  };
+
+  const startEdit = (entry: BudgetEntry) => {
+    setEditingId(entry.id!);
+    const ov = getOverride(entry.id!);
+    setEditDraft({
+      id: entry.id,
+      category: entry.category,
+      type: (entry.type?.toUpperCase() as DraftRow["type"]) ?? "EXPENSE",
+      entry_type: (entry.entry_type ?? (isRecurring ? "RECURRING" : "FLOATING")) as BudgetEntryType,
+      recurrence: (entry.recurrence ?? "MONTHLY") as BudgetRecurrence,
+      // pre-fill the current effective amount (override if exists)
+      amount: String(ov ? ov.amount : proratedMonthly(entry)),
+      date: entry.date.slice(0, 10),
+      description: ov?.description ?? entry.description ?? "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editDraft?.category || !editDraft.amount) return;
+    if (isRecurring && editDraft.id) {
+      // save as monthly override — do NOT mutate the base row
+      await overrideMut.mutateAsync(editDraft);
+    } else {
+      await mut.mutateAsync(editDraft);
+    }
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  // Effective display amount: override > prorated base
+  const effectiveRows = rows.map(({ entry, displayAmount }) => {
+    const ov = isRecurring ? getOverride(entry.id!) : undefined;
+    return { entry, displayAmount: ov ? ov.amount : displayAmount, override: ov };
+  });
+
+  const total = effectiveRows.reduce((s, r) => s + r.displayAmount, 0);
+  const colSpan = isRecurring ? 7 : 6;
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <div className="flex items-center gap-2">
+          <span className={accentCls}>{icon}</span>
+          <span className="font-bold text-sm text-foreground">{title}</span>
+          <span className="text-xs bg-[var(--surface-2)] text-foreground/50 px-2 py-0.5 rounded-full border border-[var(--border)]">
+            {rows.length}
+          </span>
         </div>
-        <div>
-          <label className="text-xs text-foreground/70 block mb-1">Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inp} />
+        <div className="flex items-center gap-3">
+          <span className={"text-sm font-bold " + accentCls}>{fmt(total)}</span>
+          <button
+            onClick={addRow}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+          >
+            <Plus size={12} /> Add row
+          </button>
         </div>
       </div>
-      <div className="mb-4">
-        <label className="text-xs text-foreground/70 block mb-1">Description (opt.)</label>
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Optional note…" className={inp} />
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
+              <th className="px-3 py-2 text-left w-[115px]">Date</th>
+              <th className="px-3 py-2 text-left">Category</th>
+              <th className="px-3 py-2 text-left w-[110px]">Type</th>
+              {isRecurring && <th className="px-3 py-2 text-left w-[120px]">Frequency</th>}
+              <th className="px-3 py-2 text-right w-[120px]">Amount</th>
+              <th className="px-3 py-2 text-left">Note</th>
+              <th className="px-3 py-2 w-[110px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {effectiveRows.map(({ entry, displayAmount, override }) =>
+              editingId === entry.id && editDraft ? (
+                <EditableRow
+                  key={entry.id}
+                  draft={editDraft}
+                  isRecurring={isRecurring}
+                  onChange={setEditDraft}
+                  onSave={saveEdit}
+                  onCancel={() => { setEditingId(null); setEditDraft(null); }}
+                  saving={mut.isPending || overrideMut.isPending}
+                />
+              ) : (
+                <ReadRow
+                  key={entry.id}
+                  entry={entry}
+                  displayAmount={displayAmount}
+                  isRecurring={isRecurring}
+                  onEdit={() => startEdit(entry)}
+                  override={override}
+                  onResetOverride={override?.id ? () => resetOverrideMut.mutate(override.id!) : undefined}
+                />
+              )
+            )}
+
+            {drafts.map((d, idx) => (
+              <EditableRow
+                key={"new-" + idx}
+                draft={d}
+                isRecurring={isRecurring}
+                onChange={(nd) => setDrafts((p) => p.map((r, i) => i === idx ? nd : r))}
+                onSave={() => saveDraft(idx)}
+                onCancel={() => setDrafts((p) => p.filter((_, i) => i !== idx))}
+                saving={mut.isPending}
+              />
+            ))}
+
+            {rows.length === 0 && drafts.length === 0 && (
+              <tr>
+                <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-foreground/30">
+                  No entries yet — click <strong className="text-foreground/50">Add row</strong> to get started
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
-      <button onClick={() => mut.mutate()} disabled={mut.isPending || !cat || !amount}
-        className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
-        {mut.isPending ? "Saving…" : "Add Entry"}
-      </button>
     </div>
   );
 }
 
-export default function BudgetPage() {
-  const { data: entries = [], isLoading } = useQuery<BudgetEntry[]>({ queryKey: ["budget"], queryFn: fetchBudget, staleTime: 30_000 });
-  const [showNew, setShowNew]       = useState(false);
-  const [typeFilter, setTypeFilter] = useState("ALL");
+// ── computeMonthStats ────────────────────────────────────────────────────────
+function computeMonthStats(entries: BudgetEntry[], key: string) {
+  let income = 0, expense = 0;
+  for (const e of entries) {
+    const et = (e.entry_type ?? "FLOATING").toUpperCase();
+    const isIncome = e.type?.toUpperCase() === "INCOME";
+    const isExpense = e.type?.toUpperCase() === "EXPENSE";
+    if (et !== "RECURRING") {
+      if (e.date.slice(0, 7) === key) {
+        if (isIncome)  income  += e.amount;
+        if (isExpense) expense += e.amount;
+      }
+    } else {
+      if (recurringAppliesToMonth(e, key)) {
+        const m = RECURRENCE_MONTHS[(e.recurrence ?? "ANNUAL") as BudgetRecurrence];
+        const prorated = e.amount / m;
+        if (isIncome)  income  += prorated;
+        if (isExpense) expense += prorated;
+      }
+    }
+  }
+  return { income, expense, net: income - expense };
+}
 
-  const totalIncome  = entries.filter((e) => e.type.toUpperCase() === "INCOME").reduce((s, e) => s + e.amount, 0);
-  const totalExpense = entries.filter((e) => e.type.toUpperCase() === "EXPENSE").reduce((s, e) => s + e.amount, 0);
-  const totalAssets  = entries.filter((e) => e.type.toUpperCase() === "ASSET").reduce((s, e) => s + e.amount, 0);
-  const net = totalIncome - totalExpense;
+// ── TrendChart ────────────────────────────────────────────────────────────────
+function TrendChart({ entries }: { entries: BudgetEntry[] }) {
+  const data = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const { income, expense } = computeMonthStats(entries, key);
+      return { month: SHORT_MONTHS[d.getMonth()], Income: Math.round(income), Expenses: Math.round(expense) };
+    });
+  }, [entries]);
 
-  const filtered = typeFilter === "ALL" ? entries : entries.filter((e) => e.type.toUpperCase() === typeFilter);
-  const pieData = Object.entries(
-    entries.filter((e) => e.type.toUpperCase() === "EXPENSE")
-      .reduce((acc, e) => ({ ...acc, [e.category]: (acc[e.category] ?? 0) + e.amount }), {} as Record<string, number>)
-  ).map(([name, value]) => ({ name, value }));
+  const hasData = data.some((d) => d.Income > 0 || d.Expenses > 0);
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full overflow-x-hidden">
-      <PageHeader
-        title="Budget"
-        action={
-          <button onClick={() => setShowNew((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${showNew ? "bg-[var(--surface-2)] text-foreground" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
-            {showNew ? <><X size={14} /> Cancel</> : <><Plus size={14} /> New Entry</>}
-          </button>
-        }
-      />
-
-      {showNew && <NewEntryForm onDone={() => setShowNew(false)} />}
-
-      {/* Stats */}
-      {isLoading ? (
-        <div className="mb-6"><SkeletonStatGrid count={4} /></div>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">12-Month Trend</p>
+      {!hasData ? (
+        <div className="h-[180px] flex items-center justify-center text-sm text-foreground/30">
+          No data yet — add entries to see trends
+        </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {[
-            { label: "Income",   value: fmt(totalIncome),  cls: "text-green-500" },
-            { label: "Expenses", value: fmt(totalExpense), cls: "text-red-500"   },
-            { label: "Assets",   value: fmt(totalAssets),  cls: "text-blue-500"  },
-            { label: "Net",      value: fmt(net),          cls: net >= 0 ? "text-green-500" : "text-red-500" },
-          ].map(({ label, value, cls }) => (
-            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 card-hover">
-              <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide mb-1">{label}</p>
-              <p className={`text-xl sm:text-2xl font-black ${cls}`}>{value}</p>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data} barGap={2} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--foreground)", opacity: 0.5 }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: "var(--foreground)", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
+            <Tooltip
+              formatter={(v: unknown, name: string) => [fmt(Number(v)), name]}
+              contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+            />
+            <Bar dataKey="Income"   fill="#10b981" radius={[3,3,0,0]} />
+            <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+// ── SavingsRate ───────────────────────────────────────────────────────────────
+function SavingsRate({ income, net }: { income: number; net: number }) {
+  const rate = income > 0 ? Math.round((net / income) * 100) : 0;
+  const color = rate < 10 ? "bg-red-500" : rate < 20 ? "bg-amber-400" : "bg-emerald-500";
+  const hint  = rate < 10 ? "Below target" : rate < 20 ? "Getting there" : "On track";
+  const textColor = rate < 10 ? "text-red-400" : rate < 20 ? "text-amber-400" : "text-emerald-400";
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">Savings Rate</p>
+      <p className={"text-2xl font-black " + textColor}>{rate}%</p>
+      <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
+        <div className={"h-full rounded-full transition-all " + color} style={{ width: Math.min(Math.max(rate, 0), 100) + "%" }} />
+      </div>
+      <p className="text-[11px] text-foreground/40 mt-1">{hint}</p>
+    </div>
+  );
+}
+
+// ── AnnualSummary ─────────────────────────────────────────────────────────────
+function AnnualSummary({ entries, year }: { entries: BudgetEntry[]; year: number }) {
+  const rows = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+    return { month: SHORT_MONTHS[i], key, ...computeMonthStats(entries, key) };
+  }), [entries, year]);
+
+  const totals = rows.reduce((acc, r) => ({ income: acc.income + r.income, expense: acc.expense + r.expense, net: acc.net + r.net }), { income: 0, expense: 0, net: 0 });
+  const avgRate = totals.income > 0 ? Math.round((totals.net / totals.income) * 100) : 0;
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide">{year} Annual Summary</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
+              <th className="px-3 py-2 text-left">Month</th>
+              <th className="px-3 py-2 text-right">Income</th>
+              <th className="px-3 py-2 text-right">Expenses</th>
+              <th className="px-3 py-2 text-right">Net</th>
+              <th className="px-3 py-2 text-left w-[140px]">Savings Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const rate = r.income > 0 ? Math.round((r.net / r.income) * 100) : 0;
+              const color = rate < 10 ? "bg-red-500" : rate < 20 ? "bg-amber-400" : "bg-emerald-500";
+              const empty = r.income === 0 && r.expense === 0;
+              return (
+                <tr key={r.key} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                  <td className="px-3 py-2 font-medium text-foreground/70">{r.month}</td>
+                  <td className="px-3 py-2 text-right text-emerald-400 font-semibold">{empty ? "—" : fmt(r.income)}</td>
+                  <td className="px-3 py-2 text-right text-red-400 font-semibold">{empty ? "—" : fmt(r.expense)}</td>
+                  <td className={"px-3 py-2 text-right font-bold " + (r.net >= 0 ? "text-emerald-400" : "text-red-400")}>{empty ? "—" : fmt(r.net)}</td>
+                  <td className="px-3 py-2">
+                    {empty ? <span className="text-foreground/30">—</span> : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                          <div className={"h-full rounded-full " + color} style={{ width: Math.min(Math.max(rate, 0), 100) + "%" }} />
+                        </div>
+                        <span className="text-[11px] text-foreground/50 w-8 text-right">{rate}%</span>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)]/40 font-bold">
+              <td className="px-3 py-2 text-foreground/60 text-xs uppercase">Total</td>
+              <td className="px-3 py-2 text-right text-emerald-400">{fmt(totals.income)}</td>
+              <td className="px-3 py-2 text-right text-red-400">{fmt(totals.expense)}</td>
+              <td className={"px-3 py-2 text-right " + (totals.net >= 0 ? "text-emerald-400" : "text-red-400")}>{fmt(totals.net)}</td>
+              <td className="px-3 py-2 text-[11px] text-foreground/50">Avg {avgRate}% saved</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── TopCategoriesBar ────────────────────────────────────────────────────────────
+function TopCategoriesBar({ pieData }: { pieData: { name: string; value: number }[] }) {
+  const top = pieData.slice(0, 7);
+  const total = top.reduce((s, d) => s + d.value, 0);
+  if (top.length === 0) return null;
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Top Spending Categories</p>
+      <div className="flex flex-col gap-2">
+        {top.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          return (
+            <div key={d.name} className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+              <span className="text-xs text-foreground/70 w-28 truncate shrink-0">{d.name}</span>
+              <div className="flex-1 h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: pct + "%", background: PIE_COLORS[i % PIE_COLORS.length] }} />
+              </div>
+              <span className="text-xs font-semibold text-foreground/70 w-16 text-right shrink-0">{fmt(d.value)}</span>
+              <span className="text-[11px] text-foreground/35 w-8 text-right shrink-0">{Math.round(pct)}%</span>
             </div>
-          ))}
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── IncomeExpenseSplit ──────────────────────────────────────────────────────────
+function IncomeExpenseSplit({
+  income, expense, fixedExp, floatExp,
+}: { income: number; expense: number; fixedExp: number; floatExp: number }) {
+  const data = [
+    { name: "Income",   value: Math.round(income),   fill: "#10b981" },
+    { name: "Expenses", value: Math.round(expense),  fill: "#ef4444" },
+    { name: "Fixed",    value: Math.round(fixedExp), fill: "#8b5cf6" },
+    { name: "Variable", value: Math.round(floatExp), fill: "#f59e0b" },
+  ];
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">Income vs Expenses</p>
+      <div className="flex flex-col gap-3">
+        {data.map((d) => (
+          <div key={d.name} className="flex items-center gap-2">
+            <span className="text-xs text-foreground/60 w-16 shrink-0">{d.name}</span>
+            <div className="flex-1 h-5 rounded-lg bg-[var(--surface-2)] overflow-hidden">
+              <div
+                className="h-full rounded-lg flex items-center justify-end pr-2 transition-all"
+                style={{ width: Math.max((d.value / max) * 100, d.value > 0 ? 4 : 0) + "%", background: d.fill }}
+              >
+                {d.value > 0 && <span className="text-[11px] font-bold text-white whitespace-nowrap">{fmtK(d.value)}</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+        <span className="text-xs text-foreground/40">Fixed vs Variable expenses</span>
+        <span className="text-xs font-semibold text-foreground/60">
+          {expense > 0 ? Math.round((fixedExp / expense) * 100) : 0}% fixed
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function fmt$(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Returns all Sun→Sat week slots that touch a given YYYY-MM month */
+function getWeeksForMonth(yearMonth: string): { sunday: Date; saturday: Date; isoSunday: string }[] {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay  = new Date(y, m, 0);
+
+  // find the Sunday on or before the 1st of the month
+  const startSun = new Date(firstDay);
+  startSun.setDate(firstDay.getDate() - firstDay.getDay()); // getDay()==0 → Sun
+
+  const weeks: { sunday: Date; saturday: Date; isoSunday: string }[] = [];
+  const cur = new Date(startSun);
+  while (cur <= lastDay) {
+    const sun = new Date(cur);
+    const sat = new Date(cur);
+    sat.setDate(sat.getDate() + 6);
+    const isoSunday = sun.toISOString().slice(0, 10);
+    weeks.push({ sunday: sun, saturday: sat, isoSunday });
+    cur.setDate(cur.getDate() + 7);
+  }
+  return weeks;
+}
+
+function fmtWeekLabel(sun: Date, sat: Date): string {
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return sun.toLocaleDateString("en-US", opts) + " – " + sat.toLocaleDateString("en-US", opts);
+}
+
+// ── Robinhood Credit Card Section ─────────────────────────────────────────────
+function CreditCardSection({ currentMonth }: { currentMonth: string }) {
+  const qc = useQueryClient();
+  const { data: rows = [], isLoading } = useQuery<CreditCardWeek[]>({
+    queryKey: ["cc-weeks"],
+    queryFn: fetchCCWeeks,
+    staleTime: 30_000,
+  });
+
+  const weekSlots = useMemo(() => getWeeksForMonth(currentMonth), [currentMonth]);
+
+  // map isoSunday → existing db row
+  const rowByDate = useMemo(() => {
+    const m: Record<string, CreditCardWeek> = {};
+    for (const r of rows) m[r.week_start.slice(0, 10)] = r;
+    return m;
+  }, [rows]);
+
+  // per-slot local edit state: { isoSunday: { balance, paid_amount, note } }
+  const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string }>>({});
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
+  });
+
+  const saveMut = useMutation({
+    mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
+  });
+
+  function getLocalEdit(iso: string, row?: CreditCardWeek) {
+    if (editing[iso]) return editing[iso];
+    return {
+      balance: row?.balance?.toString() ?? "",
+      paid_amount: row?.paid_amount?.toString() ?? "",
+      note: row?.note ?? "",
+    };
+  }
+
+  function commitRow(iso: string) {
+    const local = editing[iso];
+    if (!local) return; // nothing changed
+    const row = rowByDate[iso];
+    const body: Omit<CreditCardWeek, "id"> = {
+      week_start: iso,
+      balance: parseFloat(local.balance) || 0,
+      squared_off: row?.squared_off ?? false,
+      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
+      note: local.note || "",
+    };
+    if (row?.id) {
+      updateMut.mutate({ id: row.id, body });
+    } else {
+      saveMut.mutate(body);
+    }
+    setEditing((p) => { const n = { ...p }; delete n[iso]; return n; });
+  }
+
+  function toggleSquared(iso: string) {
+    const row = rowByDate[iso];
+    const local = getLocalEdit(iso, row);
+    const body: Omit<CreditCardWeek, "id"> = {
+      week_start: iso,
+      balance: parseFloat(local.balance) || row?.balance || 0,
+      squared_off: !(row?.squared_off ?? false),
+      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : (row?.paid_amount ?? null),
+      note: local.note !== "" ? local.note : (row?.note ?? ""),
+    };
+    if (row?.id) {
+      updateMut.mutate({ id: row.id, body });
+    } else {
+      saveMut.mutate(body);
+    }
+  }
+
+  const inputCls = "bg-transparent border border-[var(--border)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full tabular-nums";
+
+  // ── metrics ──────────────────────────────────────────────────────────────────
+  const outstanding = weekSlots.reduce((s, { isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return r && !r.squared_off ? s + r.balance : s;
+  }, 0);
+  const pendingCount = weekSlots.filter(({ isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return r && r.balance > 0 && !r.squared_off;
+  }).length;
+
+  // month-level aggregates (only this month's slots)
+  const monthCharged = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.balance ?? 0), 0);
+  const monthPaid    = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.paid_amount ?? 0), 0);
+  const payRate      = monthCharged > 0 ? Math.min(100, (monthPaid / monthCharged) * 100) : 0;
+
+  // ── weekly bar chart data (this month) ───────────────────────────────────────
+  const weekBarData = weekSlots.map(({ sunday, saturday, isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return {
+      week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
+      Balance: r?.balance ?? 0,
+      Paid: r?.paid_amount ?? 0,
+      net: (r?.balance ?? 0) - (r?.paid_amount ?? 0),
+    };
+  });
+
+  // ── monthly trend (all stored rows, grouped by YYYY-MM) ──────────────────────
+  const monthTrendData = useMemo(() => {
+    const byMonth: Record<string, { charged: number; paid: number }> = {};
+    for (const r of rows) {
+      const key = r.week_start.slice(0, 7);
+      if (!byMonth[key]) byMonth[key] = { charged: 0, paid: 0 };
+      byMonth[key].charged += r.balance ?? 0;
+      byMonth[key].paid    += r.paid_amount ?? 0;
+    }
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, v]) => ({
+        month: new Date(month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        Charged: parseFloat(v.charged.toFixed(2)),
+        Paid:    parseFloat(v.paid.toFixed(2)),
+      }));
+  }, [rows]);
+
+  const tooltipStyle = {
+    backgroundColor: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    color: "var(--foreground)",
+    fontSize: 11,
+  };
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-5">
+      {/* header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CreditCard size={16} className="text-rose-400" />
+          <span className="text-sm font-semibold">Robinhood Credit Card</span>
+          <span className="text-xs text-foreground/40">{weekSlots.length}-week tracker · {currentMonth}</span>
+        </div>
+        {outstanding > 0 ? (
+          <span className="text-xs font-bold text-rose-400">Outstanding: {fmt$(outstanding)}</span>
+        ) : pendingCount === 0 && rows.length > 0 ? (
+          <span className="flex items-center gap-1 text-xs font-medium text-emerald-400"><Check size={12} /> All squared off!</span>
+        ) : null}
+      </div>
+
+      {/* ── metric cards ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Charged", value: fmt$(monthCharged), cls: "text-rose-400" },
+          { label: "Paid from Trading", value: fmt$(monthPaid), cls: "text-emerald-400" },
+          { label: "Net Unpaid", value: fmt$(Math.max(0, monthCharged - monthPaid)), cls: outstanding > 0 ? "text-amber-400" : "text-emerald-400" },
+          { label: "Pay Rate", value: monthCharged > 0 ? payRate.toFixed(1) + "%" : "—", cls: payRate >= 100 ? "text-emerald-400" : payRate >= 50 ? "text-amber-400" : "text-rose-400" },
+        ].map(({ label, value, cls }) => (
+          <div key={label} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3">
+            <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-1">{label}</p>
+            <p className={`text-xl font-black tabular-nums ${cls}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── pay rate progress bar ─────────────────────────────────────────────── */}
+      {monthCharged > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between text-[10px] text-foreground/40">
+            <span>Monthly Pay Coverage</span>
+            <span>{payRate.toFixed(1)}% of balance paid</span>
+          </div>
+          <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${payRate >= 100 ? "bg-emerald-500" : payRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
+              style={{ width: `${Math.min(100, payRate)}%` }}
+            />
+          </div>
         </div>
       )}
 
-      {/* Chart + Entries */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Pie chart */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 lg:w-80 shrink-0">
-          <SectionLabel>Expense Breakdown</SectionLabel>
-          {pieData.length === 0 ? (
-            <p className="text-sm text-foreground/70">No expenses recorded yet.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2}>
-                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <Tooltip formatter={(v: any) => [fmt(Number(v)), "Amount"]} contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "inherit" }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
+      {/* ── charts row ───────────────────────────────────────────────────────── */}
+      {monthCharged > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* weekly balance vs paid */}
+          <div>
+            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">This Month — Balance vs Paid per Week</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={weekBarData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
+                  itemStyle={{ color: "var(--foreground)" }}
+                  formatter={(v: number) => "$" + v.toFixed(2)}
+                />
+                <Bar dataKey="Balance" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Entries */}
-        <div className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-          {/* Filter tabs */}
-          <div className="p-3 border-b border-[var(--border)]">
-            <Tabs
-              tabs={["ALL", "EXPENSE", "INCOME", "ASSET"].map((t) => ({ key: t, label: t }))}
-              active={typeFilter}
-              onChange={setTypeFilter}
-            />
           </div>
 
-          {isLoading && <div className="p-4 space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-10 rounded-xl" />)}</div>}
-
-          {!isLoading && filtered.length === 0 && (
-            <EmptyState icon={PiggyBank} title="No entries" body="Add your first budget entry above." />
+          {/* monthly trend */}
+          {monthTrendData.length > 1 && (
+            <div>
+              <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Monthly Trend — Charged vs Paid</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={monthTrendData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
+                    itemStyle={{ color: "var(--foreground)" }}
+                    formatter={(v: number) => "$" + v.toFixed(2)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
+                  <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
+        </div>
+      )}
 
-          {filtered.length > 0 && (
+      {/* ── table ────────────────────────────────────────────────────────────── */}
+      {isLoading ? (
+        <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="text-foreground/40 text-left border-b border-[var(--border)]">
+                <th className="pb-2 pr-3 font-medium w-[160px]">Week</th>
+                <th className="pb-2 pr-3 font-medium w-[110px]">Card Balance</th>
+                <th className="pb-2 pr-3 font-medium w-[110px]">Paid from Trading</th>
+                <th className="pb-2 pr-3 font-medium w-[100px]">Squared Off?</th>
+                <th className="pb-2 font-medium">Note</th>
+                <th className="pb-2 font-medium text-right w-[50px]">Save</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weekSlots.map(({ sunday, saturday, isoSunday }) => {
+                const row = rowByDate[isoSunday];
+                const local = getLocalEdit(isoSunday, row);
+                const isDirty = !!editing[isoSunday];
+                const squaredOff = row?.squared_off ?? false;
+
+                return (
+                  <tr key={isoSunday} className={`border-b border-[var(--border)] transition-colors ${squaredOff ? "opacity-60" : ""}`}>
+                    <td className="py-2.5 pr-3 font-medium text-foreground/70">{fmtWeekLabel(sunday, saturday)}</td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="number"
+                        className={inputCls}
+                        placeholder="0.00"
+                        value={local.balance}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), balance: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="number"
+                        className={inputCls}
+                        placeholder="0.00"
+                        value={local.paid_amount}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), paid_amount: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <button
+                        onClick={() => toggleSquared(isoSunday)}
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${squaredOff ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}
+                      >
+                        {squaredOff ? "✓ Paid" : "● Pending"}
+                      </button>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="text"
+                        className={inputCls}
+                        placeholder="optional note"
+                        value={local.note}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), note: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
+                    <td className="py-2 text-right">
+                      {isDirty && (
+                        <button onClick={() => commitRow(isoSunday)} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors" title="Save">
+                          <Check size={13} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · click Squared Off badge to toggle payment status</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">{label}</p>
+      <p className={"text-2xl font-black " + cls}>{value}</p>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+export default function BudgetPage() {
+  const { data: allEntries = [], isLoading } = useQuery<BudgetEntry[]>({
+    queryKey: ["budget"],
+    queryFn: fetchBudget,
+    staleTime: 30_000,
+  });
+
+  const { data: allOverrides = [] } = useQuery<BudgetOverride[]>({
+    queryKey: ["budget-overrides"],
+    queryFn: fetchBudgetOverrides,
+    staleTime: 30_000,
+  });
+
+  const [currentMonth, setCurrentMonth] = useState(() => monthKey(new Date()));
+
+  const prev = () => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    setCurrentMonth(monthKey(new Date(y, m - 2, 1)));
+  };
+  const next = () => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    setCurrentMonth(monthKey(new Date(y, m, 1)));
+  };
+
+  // build override lookup for the current month
+  const overrideMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const o of allOverrides) {
+      if (o.month_key === currentMonth) m[o.budget_id] = o.amount;
+    }
+    return m;
+  }, [allOverrides, currentMonth]);
+
+  const { floating, recurring } = useMemo(() => {
+    const floating: { entry: BudgetEntry; displayAmount: number }[] = [];
+    const recurring: { entry: BudgetEntry; displayAmount: number }[] = [];
+    for (const entry of allEntries) {
+      const et = (entry.entry_type ?? "FLOATING").toUpperCase();
+      if (et !== "RECURRING") {
+        if (entry.date.slice(0, 7) === currentMonth)
+          floating.push({ entry, displayAmount: entry.amount });
+      } else {
+        if (recurringAppliesToMonth(entry, currentMonth)) {
+          const base = proratedMonthly(entry);
+          const effective = overrideMap[entry.id!] ?? base;
+          recurring.push({ entry, displayAmount: effective });
+        }
+      }
+    }
+    return { floating, recurring };
+  }, [allEntries, currentMonth, overrideMap]);
+
+  const stats = useMemo(() => {
+    const all = [...floating, ...recurring];
+    const expense  = all.filter((r) => r.entry.type?.toUpperCase() === "EXPENSE").reduce((s, r) => s + r.displayAmount, 0);
+    const income   = all.filter((r) => r.entry.type?.toUpperCase() === "INCOME").reduce((s, r) => s + r.displayAmount, 0);
+    const fixedExp = recurring.filter((r) => r.entry.type?.toUpperCase() === "EXPENSE").reduce((s, r) => s + r.displayAmount, 0);
+    return { expense, income, fixedExp, net: income - expense };
+  }, [floating, recurring]);
+
+  const pieData = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const { entry, displayAmount } of [...floating, ...recurring]) {
+      if (entry.type?.toUpperCase() === "EXPENSE")
+        map[entry.category] = (map[entry.category] ?? 0) + displayAmount;
+    }
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value }));
+  }, [floating, recurring]);
+
+  const totalEntries = floating.length + recurring.length;
+  const [activeTab, setActiveTab] = useState<"monthly" | "annual">("monthly");
+  const currentYear = Number(currentMonth.split("-")[0]);
+
+  return (
+    <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full">
+
+      {/* Header + tabs */}
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-black text-foreground">Budget</h1>
+        <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1">
+          <button
+            onClick={() => setActiveTab("monthly")}
+            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+              (activeTab === "monthly"
+                ? "bg-blue-600 text-white shadow"
+                : "text-foreground/50 hover:text-foreground")}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setActiveTab("annual")}
+            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+              (activeTab === "annual"
+                ? "bg-blue-600 text-white shadow"
+                : "text-foreground/50 hover:text-foreground")}
+          >
+            Annual Summary
+          </button>
+        </div>
+      </div>
+
+      {/* Month navigator — shown on both tabs */}
+      <div className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-2.5 mb-5">
+        <button
+          onClick={prev}
+          className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/60 hover:text-foreground"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <div className="text-center">
+          {activeTab === "monthly" ? (
             <>
-              {/* Mobile */}
-              <div className="flex flex-col divide-y divide-[var(--border)] sm:hidden overflow-y-auto max-h-[400px]">
-                {filtered.map((e, i) => (
-                  <div key={i} className="flex items-center justify-between p-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-foreground">{e.category}</span>
-                        <Badge variant={TYPE_VARIANT[e.type.toUpperCase()] ?? "default"}>{e.type.toUpperCase()}</Badge>
-                      </div>
-                      <p className="text-xs text-foreground/70 mt-0.5">{e.date.slice(0, 10)} {e.description ? `· ${e.description}` : ""}</p>
-                    </div>
-                    <span className={`font-bold text-sm ${e.type.toUpperCase() === "EXPENSE" ? "text-red-500" : e.type.toUpperCase() === "INCOME" ? "text-green-500" : "text-blue-500"}`}>
-                      {fmt(e.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop */}
-              <div className="hidden sm:block overflow-y-auto max-h-[340px]">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] text-[11px] text-foreground/70 uppercase tracking-wide sticky top-0 bg-[var(--surface)]">
-                      {["Date", "Category", "Type", "Amount", "Desc"].map((h) => (
-                        <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((e, i) => (
-                      <tr key={i} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                        <td className="px-4 py-2.5 text-foreground/70 text-xs">{e.date.slice(0, 10)}</td>
-                        <td className="px-4 py-2.5 font-semibold text-foreground">{e.category}</td>
-                        <td className="px-4 py-2.5">
-                          <Badge variant={TYPE_VARIANT[e.type.toUpperCase()] ?? "default"}>
-                            {e.type.toUpperCase()}
-                          </Badge>
-                        </td>
-                        <td className={`px-4 py-2.5 font-bold text-xs ${e.type.toUpperCase() === "EXPENSE" ? "text-red-500" : e.type.toUpperCase() === "INCOME" ? "text-green-500" : "text-blue-500"}`}>
-                          {fmt(e.amount)}
-                        </td>
-                        <td className="px-4 py-2.5 text-foreground/70 text-xs truncate max-w-[140px]">{e.description ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <p className="font-bold text-foreground">{monthLabel(currentMonth)}</p>
+              <p className="text-xs text-foreground/40 mt-0.5">
+                {isLoading ? "Loading..." : totalEntries + " entr" + (totalEntries === 1 ? "y" : "ies")}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-foreground">{currentYear}</p>
+              <p className="text-xs text-foreground/40 mt-0.5">Annual view</p>
             </>
           )}
         </div>
+        <button
+          onClick={next}
+          className="p-1.5 rounded-xl hover:bg-[var(--surface-2)] transition text-foreground/60 hover:text-foreground"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
+
+      {/* ── MONTHLY TAB ─────────────────────────────────────────────────────── */}
+      {activeTab === "monthly" && (
+        <>
+          {/* stat cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
+            <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
+            <StatCard label="Fixed/Month" value={fmt(stats.fixedExp)} cls="text-purple-400" />
+            <StatCard label="Net"         value={fmt(stats.net)}      cls={stats.net >= 0 ? "text-emerald-400" : "text-red-400"} />
+            <SavingsRate income={stats.income} net={stats.net} />
+          </div>
+
+          {/* charts row — 3 equal columns */}
+          {pieData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+
+              {/* Donut pie */}
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-1">Expense Mix</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%" cy="46%"
+                      innerRadius={50}
+                      outerRadius={78}
+                      paddingAngle={2}
+                    >
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: unknown) => [fmt(Number(v)), "Amount"]}
+                      contentStyle={{
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        color: "var(--foreground)",
+                      }}
+                      itemStyle={{ color: "var(--foreground)" }}
+                      labelStyle={{ color: "var(--foreground)" }}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={7}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 4, color: "var(--foreground)" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top categories */}
+              <TopCategoriesBar pieData={pieData} />
+
+              {/* Income vs expense split */}
+              <IncomeExpenseSplit
+                income={stats.income}
+                expense={stats.expense}
+                fixedExp={stats.fixedExp}
+                floatExp={stats.expense - stats.fixedExp}
+              />
+            </div>
+          )}
+
+          {/* tables */}
+          <div className="flex flex-col gap-5">
+            <Section
+              title="One-off / Floating"
+              icon={<Zap size={14} />}
+              accentCls="text-amber-400"
+              rows={floating}
+              isRecurring={false}
+              currentMonth={currentMonth}
+              overrides={allOverrides}
+            />
+            <Section
+              title="Recurring / Fixed"
+              icon={<Repeat size={14} />}
+              accentCls="text-purple-400"
+              rows={recurring}
+              isRecurring={true}
+              currentMonth={currentMonth}
+              overrides={allOverrides}
+            />
+          </div>
+
+          {/* Robinhood Credit Card tracker */}
+          <CreditCardSection currentMonth={currentMonth} />
+        </>
+      )}
+
+      {/* ── ANNUAL SUMMARY TAB ───────────────────────────────────────────────── */}
+      {activeTab === "annual" && (
+        <div className="flex flex-col gap-5">
+          <TrendChart entries={allEntries} />
+          <AnnualSummary entries={allEntries} year={currentYear} />
+        </div>
+      )}
     </div>
   );
 }

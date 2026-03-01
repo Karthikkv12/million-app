@@ -154,10 +154,51 @@ class Budget(Base):
     id = Column(Integer, primary_key=True)
     category = Column(String)
     type = Column(Enum(BudgetType))
+    entry_type = Column(String, nullable=True)   # FLOATING | RECURRING
+    recurrence = Column(String, nullable=True)  # MONTHLY | SEMI_ANNUAL | ANNUAL
     amount = Column(Float)
     date = Column(DateTime)
     description = Column(String)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+
+
+class CreditCardWeek(Base):
+    """Tracks weekly Robinhood credit card balance and whether it was squared off by trading."""
+    __tablename__ = 'credit_card_weeks'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    week_start = Column(DateTime, nullable=False)   # Monday of the week
+    balance = Column(Float, nullable=False, default=0.0)
+    squared_off = Column(Boolean, nullable=False, default=False)
+    paid_amount = Column(Float, nullable=True)       # how much was paid from trading
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BudgetOverride(Base):
+    """Per-month override for a recurring budget entry.
+    If a row exists here for (budget_id, month_key), use its amount instead of the base amount.
+    month_key is a string like '2026-03'.
+    """
+    __tablename__ = 'budget_overrides'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    budget_id = Column(Integer, ForeignKey('budget.id'), nullable=False, index=True)
+    month_key = Column(String, nullable=False)   # 'YYYY-MM'
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+Index(
+    'ux_budget_overrides_user_budget_month',
+    BudgetOverride.user_id,
+    BudgetOverride.budget_id,
+    BudgetOverride.month_key,
+    unique=True,
+)
 
 
 class User(Base):
