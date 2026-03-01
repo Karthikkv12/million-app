@@ -217,6 +217,8 @@ class CashOut(BaseModel):
 class BudgetCreateRequest(BaseModel):
     category: str
     type: str
+    entry_type: Optional[str] = "FLOATING"
+    recurrence: Optional[str] = None
     amount: float
     date: datetime
     description: str = ""
@@ -226,6 +228,8 @@ class BudgetOut(BaseModel):
     id: int
     category: str
     type: str
+    entry_type: Optional[str] = None
+    recurrence: Optional[str] = None
     amount: float
     date: datetime
     description: Optional[str] = None

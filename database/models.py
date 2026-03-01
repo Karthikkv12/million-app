@@ -154,6 +154,8 @@ class Budget(Base):
     id = Column(Integer, primary_key=True)
     category = Column(String)
     type = Column(Enum(BudgetType))
+    entry_type = Column(String, nullable=True)   # FLOATING | RECURRING
+    recurrence = Column(String, nullable=True)  # MONTHLY | SEMI_ANNUAL | ANNUAL
     amount = Column(Float)
     date = Column(DateTime)
     description = Column(String)

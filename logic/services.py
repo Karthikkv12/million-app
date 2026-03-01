@@ -1641,19 +1641,55 @@ def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
     finally:
         session.close()
 
-def save_budget(category, b_type, amount, date, desc, user_id=None):
+def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None):
     session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
 
         new_item = Budget(
             category=str(category), type=type_enum, amount=float(amount),
-            date=pd.to_datetime(date), description=str(desc)
+            date=pd.to_datetime(date), description=str(desc),
+            entry_type=entry_type, recurrence=recurrence,
         )
         if user_id is not None:
             new_item.user_id = int(user_id)
         session.add(new_item)
         session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_budget(budget_id: int, user_id: int, **kwargs):
+    session = get_session()
+    try:
+        item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
+        if not item:
+            raise ValueError(f"Budget {budget_id} not found")
+        for k, v in kwargs.items():
+            if k == 'type' and v is not None:
+                v = normalize_budget_type(v)
+            if k == 'date' and v is not None:
+                v = pd.to_datetime(v)
+            if hasattr(item, k):
+                setattr(item, k, v)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget(budget_id: int, user_id: int):
+    session = get_session()
+    try:
+        item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
+        if item:
+            session.delete(item)
+            session.commit()
     except Exception:
         session.rollback()
         raise

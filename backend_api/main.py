@@ -1283,7 +1283,33 @@ def list_budget(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
 
 @app.post("/budget")
 def create_budget(req: BudgetCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
-    services.save_budget(req.category, req.type, req.amount, req.date, req.description, user_id=int(user["sub"]))
+    services.save_budget(
+        req.category, req.type, req.amount, req.date, req.description,
+        user_id=int(user["sub"]),
+        entry_type=req.entry_type,
+        recurrence=req.recurrence,
+    )
+    return {"status": "ok"}
+
+
+@app.patch("/budget/{budget_id}")
+def patch_budget(budget_id: int, req: BudgetCreateRequest, user=Depends(get_current_user)) -> Dict[str, str]:
+    services.update_budget(
+        budget_id, user_id=int(user["sub"]),
+        category=req.category,
+        type=req.type,
+        entry_type=req.entry_type,
+        recurrence=req.recurrence,
+        amount=req.amount,
+        date=req.date,
+        description=req.description,
+    )
+    return {"status": "ok"}
+
+
+@app.delete("/budget/{budget_id}")
+def remove_budget(budget_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    services.delete_budget(budget_id, user_id=int(user["sub"]))
     return {"status": "ok"}
 
 
