@@ -11,7 +11,7 @@ from brokers import broker_enabled as _broker_enabled
 from brokers import get_broker
 from brokers.base import SubmitOrderRequest
 from database.models import (
-    Trade, CashFlow, Budget, CreditCardWeek,
+    Trade, CashFlow, Budget, CreditCardWeek, BudgetOverride,
     Order,
     Account, Holding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
@@ -1690,6 +1690,98 @@ def delete_budget(budget_id: int, user_id: int):
         if item:
             session.delete(item)
             session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def list_budget_overrides(user_id: int):
+    """Return all budget overrides for the user as a list of dicts."""
+    session = get_session()
+    try:
+        rows = (
+            session.query(BudgetOverride)
+            .filter(BudgetOverride.user_id == user_id)
+            .order_by(BudgetOverride.month_key)
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "budget_id": r.budget_id,
+                "month_key": r.month_key,
+                "amount": r.amount,
+                "description": r.description,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount: float, description: str = None):
+    """Create or update an override for (budget_id, month_key). Returns the override id."""
+    session = get_session()
+    try:
+        existing = session.query(BudgetOverride).filter(
+            BudgetOverride.user_id == user_id,
+            BudgetOverride.budget_id == budget_id,
+            BudgetOverride.month_key == month_key,
+        ).first()
+        if existing:
+            existing.amount = float(amount)
+            existing.description = description
+            existing.updated_at = datetime.utcnow()
+            session.commit()
+            return existing.id
+        else:
+            row = BudgetOverride(
+                user_id=user_id,
+                budget_id=budget_id,
+                month_key=month_key,
+                amount=float(amount),
+                description=description,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return row.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget_override(override_id: int, user_id: int):
+    """Delete a specific override by id."""
+    session = get_session()
+    try:
+        row = session.query(BudgetOverride).filter(
+            BudgetOverride.id == override_id,
+            BudgetOverride.user_id == user_id,
+        ).first()
+        if row:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
+    """Cascade-delete all overrides for a budget entry (called when entry is deleted)."""
+    session = get_session()
+    try:
+        session.query(BudgetOverride).filter(
+            BudgetOverride.budget_id == budget_id,
+            BudgetOverride.user_id == user_id,
+        ).delete()
+        session.commit()
     except Exception:
         session.rollback()
         raise

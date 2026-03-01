@@ -235,6 +235,21 @@ class BudgetOut(BaseModel):
     description: Optional[str] = None
 
 
+class BudgetOverrideRequest(BaseModel):
+    budget_id: int
+    month_key: str   # 'YYYY-MM'
+    amount: float
+    description: Optional[str] = None
+
+
+class BudgetOverrideOut(BaseModel):
+    id: int
+    budget_id: int
+    month_key: str
+    amount: float
+    description: Optional[str] = None
+
+
 class CreditCardWeekRequest(BaseModel):
     week_start: datetime
     balance: float

@@ -176,6 +176,31 @@ class CreditCardWeek(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class BudgetOverride(Base):
+    """Per-month override for a recurring budget entry.
+    If a row exists here for (budget_id, month_key), use its amount instead of the base amount.
+    month_key is a string like '2026-03'.
+    """
+    __tablename__ = 'budget_overrides'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    budget_id = Column(Integer, ForeignKey('budget.id'), nullable=False, index=True)
+    month_key = Column(String, nullable=False)   # 'YYYY-MM'
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+Index(
+    'ux_budget_overrides_user_budget_month',
+    BudgetOverride.user_id,
+    BudgetOverride.budget_id,
+    BudgetOverride.month_key,
+    unique=True,
+)
+
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)

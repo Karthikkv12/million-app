@@ -70,6 +70,8 @@ from .schemas import (
     OrderOut,
     BudgetCreateRequest,
     BudgetOut,
+    BudgetOverrideRequest,
+    BudgetOverrideOut,
     CreditCardWeekRequest,
     CreditCardWeekOut,
     CashCreateRequest,
@@ -1311,7 +1313,34 @@ def patch_budget(budget_id: int, req: BudgetCreateRequest, user=Depends(get_curr
 
 @app.delete("/budget/{budget_id}")
 def remove_budget(budget_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
-    services.delete_budget(budget_id, user_id=int(user["sub"]))
+    uid = int(user["sub"])
+    services.delete_budget_overrides_for_entry(budget_id, user_id=uid)
+    services.delete_budget(budget_id, user_id=uid)
+    return {"status": "ok"}
+
+
+# ── Budget Overrides ──────────────────────────────────────────────────────────
+
+@app.get("/budget-overrides", response_model=List[Dict[str, Any]])
+def list_overrides(user=Depends(get_current_user)):
+    return services.list_budget_overrides(user_id=int(user["sub"]))
+
+
+@app.post("/budget-overrides", response_model=Dict[str, Any])
+def upsert_override(req: BudgetOverrideRequest, user=Depends(get_current_user)):
+    oid = services.upsert_budget_override(
+        user_id=int(user["sub"]),
+        budget_id=req.budget_id,
+        month_key=req.month_key,
+        amount=req.amount,
+        description=req.description,
+    )
+    return {"id": oid}
+
+
+@app.delete("/budget-overrides/{override_id}")
+def delete_override(override_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
+    services.delete_budget_override(override_id, user_id=int(user["sub"]))
     return {"status": "ok"}
 
 

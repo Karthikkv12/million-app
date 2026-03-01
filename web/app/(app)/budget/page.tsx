@@ -5,6 +5,7 @@ import {
   fetchBudget, saveBudget, updateBudget, deleteBudget,
   BudgetEntry, BudgetEntryType, BudgetRecurrence,
   fetchCCWeeks, saveCCWeek, updateCCWeek, deleteCCWeek, CreditCardWeek,
+  fetchBudgetOverrides, saveBudgetOverride, deleteBudgetOverride, BudgetOverride,
 } from "@/lib/api";
 import {
   Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap, PencilLine, CreditCard,
@@ -187,12 +188,14 @@ function EditableRow({
 
 // ── ReadRow ───────────────────────────────────────────────────────────────────
 function ReadRow({
-  entry, displayAmount, isRecurring, onEdit,
+  entry, displayAmount, isRecurring, onEdit, override, onResetOverride,
 }: {
   entry: BudgetEntry;
   displayAmount: number;
   isRecurring: boolean;
   onEdit: () => void;
+  override?: BudgetOverride;   // present when this month has an override
+  onResetOverride?: () => void;
 }) {
   const qc = useQueryClient();
   const [confirmDel, setConfirmDel] = useState(false);
@@ -230,16 +233,21 @@ function ReadRow({
       )}
       <td className={"px-3 py-2.5 text-sm font-bold text-right whitespace-nowrap " + amtCls}>
         {fmt(displayAmount)}
-        {isRecurring && displayAmount !== entry.amount && (
+        {isRecurring && override && (
+          <span className="ml-1 text-[10px] font-normal text-blue-400" title={`Override active (base: ${fmt(entry.amount)})`}>
+            ✎
+          </span>
+        )}
+        {isRecurring && !override && displayAmount !== entry.amount && (
           <span className="ml-1 text-[10px] font-normal text-foreground/30">
             ({fmt(entry.amount)})
           </span>
         )}
       </td>
       <td className="px-3 py-2.5 text-xs text-foreground/40 max-w-[160px] truncate">
-        {entry.description ?? ""}
+        {override?.description ?? entry.description ?? ""}
       </td>
-      <td className="px-3 py-2.5 w-[80px]" onClick={(e) => e.stopPropagation()}>
+      <td className="px-3 py-2.5 w-[110px]" onClick={(e) => e.stopPropagation()}>
         {confirmDel ? (
           <div className="flex items-center gap-1">
             <button
@@ -260,11 +268,20 @@ function ReadRow({
           <div className="flex items-center gap-1">
             <button
               onClick={onEdit}
-              title="Edit"
+              title={isRecurring ? "Override amount for this month" : "Edit"}
               className="p-1.5 rounded-lg text-foreground/40 hover:text-blue-400 hover:bg-blue-500/10 transition"
             >
               <PencilLine size={13} />
             </button>
+            {isRecurring && override && onResetOverride && (
+              <button
+                onClick={onResetOverride}
+                title="Reset to base amount"
+                className="p-1.5 rounded-lg text-foreground/40 hover:text-amber-400 hover:bg-amber-500/10 transition"
+              >
+                <X size={11} />
+              </button>
+            )}
             <button
               onClick={() => setConfirmDel(true)}
               title="Delete"
@@ -281,7 +298,7 @@ function ReadRow({
 
 // ── Section ───────────────────────────────────────────────────────────────────
 function Section({
-  title, icon, accentCls, rows, isRecurring, currentMonth,
+  title, icon, accentCls, rows, isRecurring, currentMonth, overrides,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -289,11 +306,21 @@ function Section({
   rows: { entry: BudgetEntry; displayAmount: number }[];
   isRecurring: boolean;
   currentMonth: string;
+  overrides: BudgetOverride[];   // all overrides for the current user
 }) {
   const qc = useQueryClient();
   const [drafts, setDrafts]       = useState<DraftRow[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<DraftRow | null>(null);
+
+  // index overrides by budget_id+month_key for fast lookup
+  const overrideMap = useMemo(() => {
+    const m: Record<string, BudgetOverride> = {};
+    for (const o of overrides) m[`${o.budget_id}:${o.month_key}`] = o;
+    return m;
+  }, [overrides]);
+
+  const getOverride = (entryId: number) => overrideMap[`${entryId}:${currentMonth}`];
 
   const mut = useMutation({
     mutationFn: (d: DraftRow) => {
@@ -311,6 +338,23 @@ function Section({
     onSuccess: () => qc.invalidateQueries({ queryKey: ["budget"] }),
   });
 
+  // For recurring rows: save an override for this month instead of touching the base
+  const overrideMut = useMutation({
+    mutationFn: (d: DraftRow) =>
+      saveBudgetOverride({
+        budget_id: d.id!,
+        month_key: currentMonth,
+        amount: parseFloat(d.amount),
+        description: d.description || null,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget-overrides"] }),
+  });
+
+  const resetOverrideMut = useMutation({
+    mutationFn: (overrideId: number) => deleteBudgetOverride(overrideId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budget-overrides"] }),
+  });
+
   const addRow = () => setDrafts((p) => [...p, blankDraft(currentMonth, isRecurring)]);
 
   const saveDraft = async (idx: number) => {
@@ -322,26 +366,39 @@ function Section({
 
   const startEdit = (entry: BudgetEntry) => {
     setEditingId(entry.id!);
+    const ov = getOverride(entry.id!);
     setEditDraft({
       id: entry.id,
       category: entry.category,
       type: (entry.type?.toUpperCase() as DraftRow["type"]) ?? "EXPENSE",
       entry_type: (entry.entry_type ?? (isRecurring ? "RECURRING" : "FLOATING")) as BudgetEntryType,
       recurrence: (entry.recurrence ?? "MONTHLY") as BudgetRecurrence,
-      amount: String(entry.amount),
+      // pre-fill the current effective amount (override if exists)
+      amount: String(ov ? ov.amount : proratedMonthly(entry)),
       date: entry.date.slice(0, 10),
-      description: entry.description ?? "",
+      description: ov?.description ?? entry.description ?? "",
     });
   };
 
   const saveEdit = async () => {
     if (!editDraft?.category || !editDraft.amount) return;
-    await mut.mutateAsync(editDraft);
+    if (isRecurring && editDraft.id) {
+      // save as monthly override — do NOT mutate the base row
+      await overrideMut.mutateAsync(editDraft);
+    } else {
+      await mut.mutateAsync(editDraft);
+    }
     setEditingId(null);
     setEditDraft(null);
   };
 
-  const total = rows.reduce((s, r) => s + r.displayAmount, 0);
+  // Effective display amount: override > prorated base
+  const effectiveRows = rows.map(({ entry, displayAmount }) => {
+    const ov = isRecurring ? getOverride(entry.id!) : undefined;
+    return { entry, displayAmount: ov ? ov.amount : displayAmount, override: ov };
+  });
+
+  const total = effectiveRows.reduce((s, r) => s + r.displayAmount, 0);
   const colSpan = isRecurring ? 7 : 6;
 
   return (
@@ -375,11 +432,11 @@ function Section({
               {isRecurring && <th className="px-3 py-2 text-left w-[120px]">Frequency</th>}
               <th className="px-3 py-2 text-right w-[120px]">Amount</th>
               <th className="px-3 py-2 text-left">Note</th>
-              <th className="px-3 py-2 w-[80px]"></th>
+              <th className="px-3 py-2 w-[110px]"></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ entry, displayAmount }) =>
+            {effectiveRows.map(({ entry, displayAmount, override }) =>
               editingId === entry.id && editDraft ? (
                 <EditableRow
                   key={entry.id}
@@ -388,7 +445,7 @@ function Section({
                   onChange={setEditDraft}
                   onSave={saveEdit}
                   onCancel={() => { setEditingId(null); setEditDraft(null); }}
-                  saving={mut.isPending}
+                  saving={mut.isPending || overrideMut.isPending}
                 />
               ) : (
                 <ReadRow
@@ -397,6 +454,8 @@ function Section({
                   displayAmount={displayAmount}
                   isRecurring={isRecurring}
                   onEdit={() => startEdit(entry)}
+                  override={override}
+                  onResetOverride={override?.id ? () => resetOverrideMut.mutate(override.id!) : undefined}
                 />
               )
             )}
@@ -1003,6 +1062,12 @@ export default function BudgetPage() {
     staleTime: 30_000,
   });
 
+  const { data: allOverrides = [] } = useQuery<BudgetOverride[]>({
+    queryKey: ["budget-overrides"],
+    queryFn: fetchBudgetOverrides,
+    staleTime: 30_000,
+  });
+
   const [currentMonth, setCurrentMonth] = useState(() => monthKey(new Date()));
 
   const prev = () => {
@@ -1014,6 +1079,15 @@ export default function BudgetPage() {
     setCurrentMonth(monthKey(new Date(y, m, 1)));
   };
 
+  // build override lookup for the current month
+  const overrideMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const o of allOverrides) {
+      if (o.month_key === currentMonth) m[o.budget_id] = o.amount;
+    }
+    return m;
+  }, [allOverrides, currentMonth]);
+
   const { floating, recurring } = useMemo(() => {
     const floating: { entry: BudgetEntry; displayAmount: number }[] = [];
     const recurring: { entry: BudgetEntry; displayAmount: number }[] = [];
@@ -1023,12 +1097,15 @@ export default function BudgetPage() {
         if (entry.date.slice(0, 7) === currentMonth)
           floating.push({ entry, displayAmount: entry.amount });
       } else {
-        if (recurringAppliesToMonth(entry, currentMonth))
-          recurring.push({ entry, displayAmount: proratedMonthly(entry) });
+        if (recurringAppliesToMonth(entry, currentMonth)) {
+          const base = proratedMonthly(entry);
+          const effective = overrideMap[entry.id!] ?? base;
+          recurring.push({ entry, displayAmount: effective });
+        }
       }
     }
     return { floating, recurring };
-  }, [allEntries, currentMonth]);
+  }, [allEntries, currentMonth, overrideMap]);
 
   const stats = useMemo(() => {
     const all = [...floating, ...recurring];
@@ -1189,6 +1266,7 @@ export default function BudgetPage() {
               rows={floating}
               isRecurring={false}
               currentMonth={currentMonth}
+              overrides={allOverrides}
             />
             <Section
               title="Recurring / Fixed"
@@ -1197,6 +1275,7 @@ export default function BudgetPage() {
               rows={recurring}
               isRecurring={true}
               currentMonth={currentMonth}
+              overrides={allOverrides}
             />
           </div>
 
