@@ -643,21 +643,41 @@ function IncomeExpenseSplit({
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function getMondayISO(d: Date): string {
-  const day = d.getDay(); // 0=Sun … 6=Sat
-  const diff = day === 0 ? -6 : 1 - day; // shift to Monday
-  const mon = new Date(d);
-  mon.setDate(d.getDate() + diff);
-  return mon.toISOString().slice(0, 10);
-}
-
 function fmt$(n: number | null | undefined): string {
   if (n == null) return "—";
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Returns all Sun→Sat week slots that touch a given YYYY-MM month */
+function getWeeksForMonth(yearMonth: string): { sunday: Date; saturday: Date; isoSunday: string }[] {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay  = new Date(y, m, 0);
+
+  // find the Sunday on or before the 1st of the month
+  const startSun = new Date(firstDay);
+  startSun.setDate(firstDay.getDate() - firstDay.getDay()); // getDay()==0 → Sun
+
+  const weeks: { sunday: Date; saturday: Date; isoSunday: string }[] = [];
+  const cur = new Date(startSun);
+  while (cur <= lastDay) {
+    const sun = new Date(cur);
+    const sat = new Date(cur);
+    sat.setDate(sat.getDate() + 6);
+    const isoSunday = sun.toISOString().slice(0, 10);
+    weeks.push({ sunday: sun, saturday: sat, isoSunday });
+    cur.setDate(cur.getDate() + 7);
+  }
+  return weeks;
+}
+
+function fmtWeekLabel(sun: Date, sat: Date): string {
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return sun.toLocaleDateString("en-US", opts) + " – " + sat.toLocaleDateString("en-US", opts);
+}
+
 // ── Robinhood Credit Card Section ─────────────────────────────────────────────
-function CreditCardSection() {
+function CreditCardSection({ currentMonth }: { currentMonth: string }) {
   const qc = useQueryClient();
   const { data: rows = [], isLoading } = useQuery<CreditCardWeek[]>({
     queryKey: ["cc-weeks"],
@@ -665,54 +685,83 @@ function CreditCardSection() {
     staleTime: 30_000,
   });
 
-  // draft for new / edit row
-  const emptyDraft = (): Omit<CreditCardWeek, "id"> => ({
-    week_start: getMondayISO(new Date()),
-    balance: 0,
-    squared_off: false,
-    paid_amount: null,
-    note: "",
-  });
+  const weekSlots = useMemo(() => getWeeksForMonth(currentMonth), [currentMonth]);
 
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<Omit<CreditCardWeek, "id">>(emptyDraft());
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState<Omit<CreditCardWeek, "id">>(emptyDraft());
+  // map isoSunday → existing db row
+  const rowByDate = useMemo(() => {
+    const m: Record<string, CreditCardWeek> = {};
+    for (const r of rows) m[r.week_start.slice(0, 10)] = r;
+    return m;
+  }, [rows]);
 
-  const saveMut = useMutation({
-    mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cc-weeks"] }); setAdding(false); setDraft(emptyDraft()); },
-  });
+  // per-slot local edit state: { isoSunday: { balance, paid_amount, note } }
+  const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string }>>({});
 
   const updateMut = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cc-weeks"] }); setEditId(null); },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (id: number) => deleteCCWeek(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
   });
 
-  // quick toggle squared_off without opening edit mode
-  const toggleSquared = (row: CreditCardWeek) => {
-    if (!row.id) return;
-    updateMut.mutate({
-      id: row.id,
-      body: { week_start: row.week_start, balance: row.balance, squared_off: !row.squared_off, paid_amount: row.paid_amount ?? null, note: row.note ?? "" },
-    });
-  };
+  const saveMut = useMutation({
+    mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
+  });
 
-  const outstanding = rows.filter((r) => !r.squared_off).reduce((s, r) => s + r.balance, 0);
-  const pendingCount = rows.filter((r) => !r.squared_off).length;
-
-  function startEdit(row: CreditCardWeek) {
-    if (!row.id) return;
-    setEditId(row.id);
-    setEditDraft({ week_start: row.week_start.slice(0, 10), balance: row.balance, squared_off: row.squared_off, paid_amount: row.paid_amount ?? null, note: row.note ?? "" });
+  function getLocalEdit(iso: string, row?: CreditCardWeek) {
+    if (editing[iso]) return editing[iso];
+    return {
+      balance: row?.balance?.toString() ?? "",
+      paid_amount: row?.paid_amount?.toString() ?? "",
+      note: row?.note ?? "",
+    };
   }
 
-  const inputCls = "bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-full";
+  function commitRow(iso: string) {
+    const local = editing[iso];
+    if (!local) return; // nothing changed
+    const row = rowByDate[iso];
+    const body: Omit<CreditCardWeek, "id"> = {
+      week_start: iso,
+      balance: parseFloat(local.balance) || 0,
+      squared_off: row?.squared_off ?? false,
+      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
+      note: local.note || "",
+    };
+    if (row?.id) {
+      updateMut.mutate({ id: row.id, body });
+    } else {
+      saveMut.mutate(body);
+    }
+    setEditing((p) => { const n = { ...p }; delete n[iso]; return n; });
+  }
+
+  function toggleSquared(iso: string) {
+    const row = rowByDate[iso];
+    const local = getLocalEdit(iso, row);
+    const body: Omit<CreditCardWeek, "id"> = {
+      week_start: iso,
+      balance: parseFloat(local.balance) || row?.balance || 0,
+      squared_off: !(row?.squared_off ?? false),
+      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : (row?.paid_amount ?? null),
+      note: local.note !== "" ? local.note : (row?.note ?? ""),
+    };
+    if (row?.id) {
+      updateMut.mutate({ id: row.id, body });
+    } else {
+      saveMut.mutate(body);
+    }
+  }
+
+  const inputCls = "bg-transparent border border-[var(--border)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full tabular-nums";
+
+  const outstanding = weekSlots.reduce((s, { isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return r && !r.squared_off ? s + r.balance : s;
+  }, 0);
+  const pendingCount = weekSlots.filter(({ isoSunday }) => {
+    const r = rowByDate[isoSunday];
+    return r && r.balance > 0 && !r.squared_off;
+  }).length;
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-4">
@@ -721,37 +770,14 @@ function CreditCardSection() {
         <div className="flex items-center gap-2">
           <CreditCard size={16} className="text-rose-400" />
           <span className="text-sm font-semibold">Robinhood Credit Card</span>
-          <span className="text-xs text-foreground/40">weekly tracker</span>
+          <span className="text-xs text-foreground/40">{weekSlots.length}-week tracker · {currentMonth}</span>
         </div>
-        <button
-          onClick={() => { setAdding(true); setDraft(emptyDraft()); }}
-          className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1.5 transition-colors"
-        >
-          <Plus size={12} /> Add Week
-        </button>
+        {outstanding > 0 ? (
+          <span className="text-xs font-bold text-rose-400">Outstanding: {fmt$(outstanding)}</span>
+        ) : pendingCount === 0 && rows.length > 0 ? (
+          <span className="flex items-center gap-1 text-xs font-medium text-emerald-400"><Check size={12} /> All squared off!</span>
+        ) : null}
       </div>
-
-      {/* summary bar */}
-      {rows.length > 0 && (
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-foreground/50">Outstanding:</span>
-            <span className={outstanding > 0 ? "font-bold text-rose-400" : "font-bold text-emerald-400"}>{fmt$(outstanding)}</span>
-          </div>
-          {pendingCount > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-              <span className="text-foreground/50">{pendingCount} week{pendingCount > 1 ? "s" : ""} pending</span>
-            </div>
-          )}
-          {pendingCount === 0 && rows.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Check size={12} className="text-emerald-400" />
-              <span className="text-emerald-400 font-medium">All squared off!</span>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* table */}
       {isLoading ? (
@@ -761,81 +787,75 @@ function CreditCardSection() {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="text-foreground/40 text-left border-b border-[var(--border)]">
-                <th className="pb-2 pr-3 font-medium">Week (Mon)</th>
-                <th className="pb-2 pr-3 font-medium">Card Balance</th>
-                <th className="pb-2 pr-3 font-medium">Paid from Trading</th>
-                <th className="pb-2 pr-3 font-medium">Squared Off?</th>
-                <th className="pb-2 pr-3 font-medium">Note</th>
-                <th className="pb-2 font-medium text-right">Actions</th>
+                <th className="pb-2 pr-3 font-medium w-[160px]">Week</th>
+                <th className="pb-2 pr-3 font-medium w-[110px]">Card Balance</th>
+                <th className="pb-2 pr-3 font-medium w-[110px]">Paid from Trading</th>
+                <th className="pb-2 pr-3 font-medium w-[100px]">Squared Off?</th>
+                <th className="pb-2 font-medium">Note</th>
+                <th className="pb-2 font-medium text-right w-[50px]">Save</th>
               </tr>
             </thead>
             <tbody>
-              {/* add row */}
-              {adding && (
-                <tr className="border-b border-[var(--border)] bg-blue-950/20">
-                  <td className="py-2 pr-3"><input type="date" className={inputCls} value={draft.week_start} onChange={(e) => setDraft({ ...draft, week_start: e.target.value })} /></td>
-                  <td className="py-2 pr-3"><input type="number" className={inputCls} placeholder="0.00" value={draft.balance || ""} onChange={(e) => setDraft({ ...draft, balance: parseFloat(e.target.value) || 0 })} /></td>
-                  <td className="py-2 pr-3"><input type="number" className={inputCls} placeholder="0.00" value={draft.paid_amount ?? ""} onChange={(e) => setDraft({ ...draft, paid_amount: e.target.value ? parseFloat(e.target.value) : null })} /></td>
-                  <td className="py-2 pr-3">
-                    <button onClick={() => setDraft({ ...draft, squared_off: !draft.squared_off })} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${draft.squared_off ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
-                      {draft.squared_off ? "✓ Paid" : "● Pending"}
-                    </button>
-                  </td>
-                  <td className="py-2 pr-3"><input type="text" className={inputCls} placeholder="optional note" value={draft.note ?? ""} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></td>
-                  <td className="py-2 text-right">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => saveMut.mutate(draft)} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors"><Check size={13} /></button>
-                      <button onClick={() => { setAdding(false); setDraft(emptyDraft()); }} className="p-1 rounded text-foreground/40 hover:bg-foreground/10 transition-colors"><X size={13} /></button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {rows.length === 0 && !adding && (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-foreground/30 text-xs">No entries yet — click "Add Week" to start tracking</td>
-                </tr>
-              )}
-              {rows.map((row) =>
-                editId === row.id ? (
-                  <tr key={row.id} className="border-b border-[var(--border)] bg-blue-950/20">
-                    <td className="py-2 pr-3"><input type="date" className={inputCls} value={editDraft.week_start} onChange={(e) => setEditDraft({ ...editDraft, week_start: e.target.value })} /></td>
-                    <td className="py-2 pr-3"><input type="number" className={inputCls} value={editDraft.balance || ""} onChange={(e) => setEditDraft({ ...editDraft, balance: parseFloat(e.target.value) || 0 })} /></td>
-                    <td className="py-2 pr-3"><input type="number" className={inputCls} value={editDraft.paid_amount ?? ""} onChange={(e) => setEditDraft({ ...editDraft, paid_amount: e.target.value ? parseFloat(e.target.value) : null })} /></td>
+              {weekSlots.map(({ sunday, saturday, isoSunday }) => {
+                const row = rowByDate[isoSunday];
+                const local = getLocalEdit(isoSunday, row);
+                const isDirty = !!editing[isoSunday];
+                const squaredOff = row?.squared_off ?? false;
+
+                return (
+                  <tr key={isoSunday} className={`border-b border-[var(--border)] transition-colors ${squaredOff ? "opacity-60" : ""}`}>
+                    <td className="py-2.5 pr-3 font-medium text-foreground/70">{fmtWeekLabel(sunday, saturday)}</td>
                     <td className="py-2 pr-3">
-                      <button onClick={() => setEditDraft({ ...editDraft, squared_off: !editDraft.squared_off })} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${editDraft.squared_off ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
-                        {editDraft.squared_off ? "✓ Paid" : "● Pending"}
+                      <input
+                        type="number"
+                        className={inputCls}
+                        placeholder="0.00"
+                        value={local.balance}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), balance: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="number"
+                        className={inputCls}
+                        placeholder="0.00"
+                        value={local.paid_amount}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), paid_amount: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <button
+                        onClick={() => toggleSquared(isoSunday)}
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${squaredOff ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}
+                      >
+                        {squaredOff ? "✓ Paid" : "● Pending"}
                       </button>
                     </td>
-                    <td className="py-2 pr-3"><input type="text" className={inputCls} value={editDraft.note ?? ""} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} /></td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="text"
+                        className={inputCls}
+                        placeholder="optional note"
+                        value={local.note}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), note: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
                     <td className="py-2 text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button onClick={() => updateMut.mutate({ id: row.id!, body: editDraft })} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors"><Check size={13} /></button>
-                        <button onClick={() => setEditId(null)} className="p-1 rounded text-foreground/40 hover:bg-foreground/10 transition-colors"><X size={13} /></button>
-                      </div>
+                      {isDirty && (
+                        <button onClick={() => commitRow(isoSunday)} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors" title="Save">
+                          <Check size={13} />
+                        </button>
+                      )}
                     </td>
                   </tr>
-                ) : (
-                  <tr key={row.id} className="border-b border-[var(--border)] hover:bg-foreground/5 transition-colors group">
-                    <td className="py-2.5 pr-3 font-medium tabular-nums">{row.week_start.slice(0, 10)}</td>
-                    <td className="py-2.5 pr-3 tabular-nums text-rose-400 font-semibold">{fmt$(row.balance)}</td>
-                    <td className="py-2.5 pr-3 tabular-nums text-emerald-400">{fmt$(row.paid_amount)}</td>
-                    <td className="py-2.5 pr-3">
-                      <button onClick={() => toggleSquared(row)} title="Click to toggle" className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${row.squared_off ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}>
-                        {row.squared_off ? "✓ Paid" : "● Pending"}
-                      </button>
-                    </td>
-                    <td className="py-2.5 pr-3 text-foreground/60 max-w-[160px] truncate">{row.note || "—"}</td>
-                    <td className="py-2.5 text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button onClick={() => startEdit(row)} className="p-1 rounded text-blue-400 hover:bg-blue-500/20 transition-colors opacity-0 group-hover:opacity-100"><PencilLine size={13} /></button>
-                        <button onClick={() => row.id && deleteMut.mutate(row.id)} className="p-1 rounded text-rose-400 hover:bg-rose-500/20 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              )}
+                );
+              })}
             </tbody>
           </table>
+          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · click Squared Off badge to toggle payment status</p>
         </div>
       )}
     </div>
@@ -1058,7 +1078,7 @@ export default function BudgetPage() {
           </div>
 
           {/* Robinhood Credit Card tracker */}
-          <CreditCardSection />
+          <CreditCardSection currentMonth={currentMonth} />
         </>
       )}
 
