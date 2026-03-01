@@ -8,7 +8,7 @@ import {
 import {
   Plus, ChevronLeft, ChevronRight, Trash2, Check, X, Repeat, Zap, PencilLine,
 } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 // ── constants ─────────────────────────────────────────────────────────────────
 const PIE_COLORS = [
@@ -30,6 +30,9 @@ const RECURRENCE_MONTHS: Record<BudgetRecurrence, number> = {
 const RECURRENCE_LABEL: Record<BudgetRecurrence, string> = {
   MONTHLY: "Monthly", SEMI_ANNUAL: "Every 6 mo", ANNUAL: "Yearly",
 };
+
+const SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtK = (v: number) => v >= 1000 ? "$" + (v / 1000).toFixed(1) + "k" : "$" + Math.round(v);
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -253,7 +256,7 @@ function ReadRow({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+          <div className="flex items-center gap-1">
             <button
               onClick={onEdit}
               title="Edit"
@@ -423,6 +426,154 @@ function Section({
   );
 }
 
+// ── computeMonthStats ────────────────────────────────────────────────────────
+function computeMonthStats(entries: BudgetEntry[], key: string) {
+  let income = 0, expense = 0;
+  for (const e of entries) {
+    const et = (e.entry_type ?? "FLOATING").toUpperCase();
+    const isIncome = e.type?.toUpperCase() === "INCOME";
+    const isExpense = e.type?.toUpperCase() === "EXPENSE";
+    if (et !== "RECURRING") {
+      if (e.date.slice(0, 7) === key) {
+        if (isIncome)  income  += e.amount;
+        if (isExpense) expense += e.amount;
+      }
+    } else {
+      if (recurringAppliesToMonth(e, key)) {
+        const m = RECURRENCE_MONTHS[(e.recurrence ?? "ANNUAL") as BudgetRecurrence];
+        const prorated = e.amount / m;
+        if (isIncome)  income  += prorated;
+        if (isExpense) expense += prorated;
+      }
+    }
+  }
+  return { income, expense, net: income - expense };
+}
+
+// ── TrendChart ────────────────────────────────────────────────────────────────
+function TrendChart({ entries }: { entries: BudgetEntry[] }) {
+  const data = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const { income, expense } = computeMonthStats(entries, key);
+      return { month: SHORT_MONTHS[d.getMonth()], Income: Math.round(income), Expenses: Math.round(expense) };
+    });
+  }, [entries]);
+
+  const hasData = data.some((d) => d.Income > 0 || d.Expenses > 0);
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide mb-3">12-Month Trend</p>
+      {!hasData ? (
+        <div className="h-[180px] flex items-center justify-center text-sm text-foreground/30">
+          No data yet — add entries to see trends
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data} barGap={2} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--foreground)", opacity: 0.5 }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: "var(--foreground)", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
+            <Tooltip
+              formatter={(v: unknown, name: string) => [fmt(Number(v)), name]}
+              contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+            />
+            <Bar dataKey="Income"   fill="#10b981" radius={[3,3,0,0]} />
+            <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+// ── SavingsRate ───────────────────────────────────────────────────────────────
+function SavingsRate({ income, net }: { income: number; net: number }) {
+  const rate = income > 0 ? Math.round((net / income) * 100) : 0;
+  const color = rate < 10 ? "bg-red-500" : rate < 20 ? "bg-amber-400" : "bg-emerald-500";
+  const hint  = rate < 10 ? "Below target" : rate < 20 ? "Getting there" : "On track";
+  const textColor = rate < 10 ? "text-red-400" : rate < 20 ? "text-amber-400" : "text-emerald-400";
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+      <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">Savings Rate</p>
+      <p className={"text-2xl font-black " + textColor}>{rate}%</p>
+      <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
+        <div className={"h-full rounded-full transition-all " + color} style={{ width: Math.min(Math.max(rate, 0), 100) + "%" }} />
+      </div>
+      <p className="text-[11px] text-foreground/40 mt-1">{hint}</p>
+    </div>
+  );
+}
+
+// ── AnnualSummary ─────────────────────────────────────────────────────────────
+function AnnualSummary({ entries, year }: { entries: BudgetEntry[]; year: number }) {
+  const rows = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+    return { month: SHORT_MONTHS[i], key, ...computeMonthStats(entries, key) };
+  }), [entries, year]);
+
+  const totals = rows.reduce((acc, r) => ({ income: acc.income + r.income, expense: acc.expense + r.expense, net: acc.net + r.net }), { income: 0, expense: 0, net: 0 });
+  const avgRate = totals.income > 0 ? Math.round((totals.net / totals.income) * 100) : 0;
+
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide">{year} Annual Summary</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
+              <th className="px-3 py-2 text-left">Month</th>
+              <th className="px-3 py-2 text-right">Income</th>
+              <th className="px-3 py-2 text-right">Expenses</th>
+              <th className="px-3 py-2 text-right">Net</th>
+              <th className="px-3 py-2 text-left w-[140px]">Savings Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const rate = r.income > 0 ? Math.round((r.net / r.income) * 100) : 0;
+              const color = rate < 10 ? "bg-red-500" : rate < 20 ? "bg-amber-400" : "bg-emerald-500";
+              const empty = r.income === 0 && r.expense === 0;
+              return (
+                <tr key={r.key} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                  <td className="px-3 py-2 font-medium text-foreground/70">{r.month}</td>
+                  <td className="px-3 py-2 text-right text-emerald-400 font-semibold">{empty ? "—" : fmt(r.income)}</td>
+                  <td className="px-3 py-2 text-right text-red-400 font-semibold">{empty ? "—" : fmt(r.expense)}</td>
+                  <td className={"px-3 py-2 text-right font-bold " + (r.net >= 0 ? "text-emerald-400" : "text-red-400")}>{empty ? "—" : fmt(r.net)}</td>
+                  <td className="px-3 py-2">
+                    {empty ? <span className="text-foreground/30">—</span> : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                          <div className={"h-full rounded-full " + color} style={{ width: Math.min(Math.max(rate, 0), 100) + "%" }} />
+                        </div>
+                        <span className="text-[11px] text-foreground/50 w-8 text-right">{rate}%</span>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)]/40 font-bold">
+              <td className="px-3 py-2 text-foreground/60 text-xs uppercase">Total</td>
+              <td className="px-3 py-2 text-right text-emerald-400">{fmt(totals.income)}</td>
+              <td className="px-3 py-2 text-right text-red-400">{fmt(totals.expense)}</td>
+              <td className={"px-3 py-2 text-right " + (totals.net >= 0 ? "text-emerald-400" : "text-red-400")}>{fmt(totals.net)}</td>
+              <td className="px-3 py-2 text-[11px] text-foreground/50">Avg {avgRate}% saved</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
@@ -517,11 +668,16 @@ export default function BudgetPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
         <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
         <StatCard label="Fixed/Month" value={fmt(stats.fixedExp)} cls="text-purple-400" />
         <StatCard label="Net"         value={fmt(stats.net)}      cls={stats.net >= 0 ? "text-emerald-400" : "text-red-400"} />
+        <SavingsRate income={stats.income} net={stats.net} />
+      </div>
+
+      <div className="mb-5">
+        <TrendChart entries={allEntries} />
       </div>
 
       <div className="flex flex-col xl:flex-row gap-5">
@@ -575,6 +731,10 @@ export default function BudgetPage() {
             currentMonth={currentMonth}
           />
         </div>
+      </div>
+
+      <div className="mt-5">
+        <AnnualSummary entries={allEntries} year={Number(currentMonth.split("-")[0])} />
       </div>
     </div>
   );
