@@ -166,14 +166,13 @@ function EditableRow({
         </td>
       )}
       {isRecurring && (
-        <td className="px-2 py-1.5 w-[110px]">
+        <td className="px-2 py-1.5 w-[130px]">
           <input
             type="month"
             value={draft.active_until}
             onChange={(e) => set("active_until", e.target.value)}
-            placeholder="End month"
             title="Leave blank for indefinite"
-            className={cellCls + " w-full"}
+            className={selCls + " cursor-pointer"}
           />
         </td>
       )}
