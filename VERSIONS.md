@@ -5,6 +5,21 @@
 
 ---
 
+## v1.7.1 — Robinhood Gold Tracker Improvements
+**Released:** 2026-03-01
+**Tag:** `v1.7.1`
+**Branch:** `develop`
+
+### 💳 Robinhood Gold Weekly Tracker — Fixes & UX
+- **Fixed save error**: updating "Paid" in a fixed-week row no longer throws an error — `commitWeekRow` now calls `updateCCWeek` / `saveCCWeek` directly instead of routing through `saveMut` (which expected `CCDraft` string fields but received parsed numbers)
+- **Column renames**: "Amount Charged" → **"Amount"**, "Paid from Trading" → **"Paid"** — cleaner, shorter labels
+- **Note column removed** from fixed-week rows — not needed for the Robinhood Gold tracker
+- **Side-by-side layout**: weekly input table (left, `360px`) + metrics/chart panel (right, flex-fill) in a `flex-row` layout at `lg` breakpoint — better use of horizontal space
+- Metrics panel shows placeholder text ("Enter amounts to see metrics") when no data is entered yet
+- Added `group-hover` reveal on delete buttons in fixed-week rows
+
+---
+
 ## v1.7.0 — Budget Overrides, CC Tracker & Charts
 **Released:** 2026-03-01
 **Tag:** `v1.7.0`
