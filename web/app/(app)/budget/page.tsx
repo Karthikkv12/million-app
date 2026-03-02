@@ -910,8 +910,9 @@ function CCSection({
       squared_off: existing?.squared_off ?? false,
       note: local.note || "",
     };
-    if (existing?.id) await saveMut.mutateAsync({ ...body, id: existing.id } as CCDraft & { id: number });
-    else await saveMut.mutateAsync({ ...blankCCDraft(currentMonth), date: iso, balance: local.balance, paid_amount: local.paid_amount, note: local.note, card_name: defaultCard ?? "" });
+    if (existing?.id) await updateCCWeek(existing.id, body);
+    else await saveCCWeek(body);
+    qc.invalidateQueries({ queryKey: ["cc-weeks"] });
     setWeekEdits((p) => { const n = { ...p }; delete n[iso]; return n; });
   };
 
@@ -919,7 +920,7 @@ function CCSection({
     weekEdits[iso] ?? {
       balance: String(rowByDate[iso]?.balance ?? ""),
       paid_amount: rowByDate[iso]?.paid_amount != null ? String(rowByDate[iso]!.paid_amount) : "",
-      note: rowByDate[iso]?.note ?? "",
+      note: "",
     };
 
   const cardNames = useMemo(() => {
@@ -1012,76 +1013,22 @@ function CCSection({
         {cardNames.map((c) => <option key={c} value={c} />)}
       </datalist>
 
+      {!fixedWeeks && (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
-              <th className="px-3 py-2 text-left w-[150px]">{fixedWeeks ? "Week" : "Date"}</th>
-              {!fixedWeeks && <th className="px-3 py-2 text-left w-[160px]">Card Name</th>}
-              <th className="px-3 py-2 text-right w-[130px]">Amount Charged</th>
-              <th className="px-3 py-2 text-right w-[130px]">Paid from Trading</th>
+              <th className="px-3 py-2 text-left w-[150px]">Date</th>
+              <th className="px-3 py-2 text-left w-[160px]">Card Name</th>
+              <th className="px-3 py-2 text-right w-[110px]">Amount</th>
+              <th className="px-3 py-2 text-right w-[110px]">Paid</th>
               <th className="px-3 py-2 text-left">Note</th>
-              <th className="px-3 py-2 w-[100px]"></th>
+              <th className="px-3 py-2 w-[70px]"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={fixedWeeks ? 5 : 6} className="px-4 py-8 text-center text-sm text-foreground/30">Loading…</td></tr>
-            ) : fixedWeeks ? (
-              /* ── fixed-week rows ── */
-              weekSlotList.map(({ sunday, saturday, isoSunday }) => {
-                const existing = rowByDate[isoSunday];
-                const local = getWeekLocal(isoSunday);
-                const isDirty = !!weekEdits[isoSunday];
-                const inputCls = cellCls + " text-right";
-                return (
-                  <tr key={isoSunday} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                    <td className="px-3 py-2 text-xs text-foreground/60 whitespace-nowrap font-medium">
-                      {fmtWeekLabel(sunday, saturday)}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <input type="number" step="0.01" min="0"
-                        value={local.balance} placeholder="0.00"
-                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), balance: e.target.value } }))}
-                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
-                        className={inputCls} />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <input type="number" step="0.01" min="0"
-                        value={local.paid_amount} placeholder="0.00"
-                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), paid_amount: e.target.value } }))}
-                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
-                        className={inputCls} />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <input type="text"
-                        value={local.note} placeholder="Note"
-                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), note: e.target.value } }))}
-                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
-                        className={cellCls} />
-                    </td>
-                    <td className="px-3 py-2 w-[100px]">
-                      <div className="flex items-center gap-2">
-                        {isDirty && (
-                          <button onClick={() => commitWeekRow(isoSunday)}
-                            className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 transition">
-                            <Check size={13} />
-                          </button>
-                        )}
-                        {existing?.id && !isDirty && (
-                          <button onClick={() => delMut.mutate(existing.id!)}
-                            className="p-1.5 rounded-lg text-foreground/30 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100">
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-foreground/30">Loading…</td></tr>
             ) : (
               /* ── free-add rows ── */
               <>
@@ -1111,71 +1058,134 @@ function CCSection({
           </tbody>
         </table>
       </div>
+      )}
 
       {/* ── metrics + chart (fixed-week mode only) ── */}
-      {fixedWeeks && totalCharged > 0 && (
-        <div className="px-4 pb-4 pt-3 flex flex-col gap-4 border-t border-[var(--border)]">
-          {/* stat cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: "Total Charged",     value: fmt$(totalCharged),                          cls: "text-rose-400" },
-              { label: "Paid from Trading",  value: fmt$(totalPaid),                             cls: "text-emerald-400" },
-              { label: "Net Unpaid",         value: fmt$(Math.max(0, totalCharged - totalPaid)), cls: totalCharged - totalPaid > 0 ? "text-amber-400" : "text-emerald-400" },
-              { label: "Pay Rate",           value: totalCharged > 0 ? (Math.min(100, (totalPaid / totalCharged) * 100)).toFixed(1) + "%" : "—",
-                cls: totalPaid >= totalCharged ? "text-emerald-400" : totalPaid / totalCharged >= 0.5 ? "text-amber-400" : "text-rose-400" },
-            ].map(({ label, value, cls }) => (
-              <div key={label} className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3">
-                <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-1">{label}</p>
-                <p className={"text-xl font-black tabular-nums " + cls}>{value}</p>
-              </div>
-            ))}
+      {fixedWeeks && (
+        <div className="flex flex-col lg:flex-row border-t border-[var(--border)]">
+          {/* table — compact left column */}
+          <div className="lg:w-[360px] shrink-0 overflow-x-auto border-b lg:border-b-0 lg:border-r border-[var(--border)]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
+                  <th className="px-3 py-2 text-left">Week</th>
+                  <th className="px-3 py-2 text-right w-[90px]">Amount</th>
+                  <th className="px-3 py-2 text-right w-[90px]">Paid</th>
+                  <th className="px-3 py-2 w-[50px]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-foreground/30">Loading…</td></tr>
+                ) : weekSlotList.map(({ sunday, saturday, isoSunday }) => {
+                  const existing = rowByDate[isoSunday];
+                  const local = getWeekLocal(isoSunday);
+                  const isDirty = !!weekEdits[isoSunday];
+                  const ic = cellCls + " text-right text-xs";
+                  return (
+                    <tr key={isoSunday} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
+                      <td className="px-3 py-1.5 text-xs text-foreground/60 whitespace-nowrap">{fmtWeekLabel(sunday, saturday)}</td>
+                      <td className="px-2 py-1">
+                        <input type="number" step="0.01" min="0" value={local.balance} placeholder="0.00"
+                          onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), balance: e.target.value } }))}
+                          onBlur={() => isDirty && commitWeekRow(isoSunday)}
+                          onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
+                          className={ic} />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input type="number" step="0.01" min="0" value={local.paid_amount} placeholder="0.00"
+                          onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), paid_amount: e.target.value } }))}
+                          onBlur={() => isDirty && commitWeekRow(isoSunday)}
+                          onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
+                          className={ic} />
+                      </td>
+                      <td className="px-1 py-1 w-[50px]">
+                        <div className="flex items-center gap-0.5">
+                          {isDirty && (
+                            <button onClick={() => commitWeekRow(isoSunday)}
+                              className="p-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500/40 transition">
+                              <Check size={11} />
+                            </button>
+                          )}
+                          {existing?.id && !isDirty && (
+                            <button onClick={() => delMut.mutate(existing.id!)}
+                              className="p-1 rounded text-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100">
+                              <Trash2 size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* pay-rate progress bar */}
-          {(() => {
-            const rate = totalCharged > 0 ? Math.min(100, (totalPaid / totalCharged) * 100) : 0;
-            return (
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[10px] text-foreground/40">
-                  <span>Monthly Pay Coverage</span>
-                  <span>{rate.toFixed(1)}% of balance paid</span>
-                </div>
-                <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
-                  <div
-                    className={"h-full rounded-full transition-all duration-500 " + (rate >= 100 ? "bg-emerald-500" : rate >= 50 ? "bg-amber-400" : "bg-rose-500")}
-                    style={{ width: `${rate}%` }}
-                  />
-                </div>
+          {/* right side: metrics + chart */}
+          {totalCharged > 0 ? (
+            <div className="flex-1 px-4 py-4 flex flex-col gap-4">
+              {/* stat cards */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Total Charged", value: fmt$(totalCharged),                          cls: "text-rose-400" },
+                  { label: "Total Paid",     value: fmt$(totalPaid),                             cls: "text-emerald-400" },
+                  { label: "Net Unpaid",     value: fmt$(Math.max(0, totalCharged - totalPaid)), cls: totalCharged - totalPaid > 0 ? "text-amber-400" : "text-emerald-400" },
+                  { label: "Pay Rate",       value: (Math.min(100, (totalPaid / totalCharged) * 100)).toFixed(1) + "%",
+                    cls: totalPaid >= totalCharged ? "text-emerald-400" : totalPaid / totalCharged >= 0.5 ? "text-amber-400" : "text-rose-400" },
+                ].map(({ label, value, cls }) => (
+                  <div key={label} className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-0.5">{label}</p>
+                    <p className={"text-lg font-black tabular-nums " + cls}>{value}</p>
+                  </div>
+                ))}
               </div>
-            );
-          })()}
 
-          {/* weekly bar chart */}
-          <div>
-            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Week-by-Week — Charged vs Paid</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart
-                data={weekSlotList.map(({ sunday, saturday, isoSunday }) => ({
-                  week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
-                  Charged: rowByDate[isoSunday]?.balance ?? 0,
-                  Paid: rowByDate[isoSunday]?.paid_amount ?? 0,
-                }))}
-                barCategoryGap="30%"
-                margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: 11 }}
-                  formatter={(v: number) => "$" + v.toFixed(2)}
-                />
-                <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
-                <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+              {/* pay-rate bar */}
+              {(() => {
+                const rate = Math.min(100, (totalPaid / totalCharged) * 100);
+                return (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-[10px] text-foreground/40">
+                      <span>Pay Coverage</span><span>{rate.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+                      <div className={"h-full rounded-full transition-all duration-500 " + (rate >= 100 ? "bg-emerald-500" : rate >= 50 ? "bg-amber-400" : "bg-rose-500")}
+                        style={{ width: `${rate}%` }} />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* bar chart */}
+              <div className="flex-1">
+                <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-2">Week-by-Week</p>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart
+                    data={weekSlotList.map(({ sunday, saturday, isoSunday }) => ({
+                      week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
+                      Charged: rowByDate[isoSunday]?.balance ?? 0,
+                      Paid: rowByDate[isoSunday]?.paid_amount ?? 0,
+                    }))}
+                    barCategoryGap="30%" margin={{ top: 2, right: 4, left: -16, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 8 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 8 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                    <Tooltip contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: 11 }}
+                      formatter={(v: number) => "$" + v.toFixed(2)} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
+                    <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-sm text-foreground/25 py-8">
+              Enter amounts to see metrics
+            </div>
+          )}
         </div>
       )}
     </div>
