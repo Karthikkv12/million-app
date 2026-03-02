@@ -765,50 +765,20 @@ function fmt$(n: number | null | undefined): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Returns all Sun→Sat week slots that touch a given YYYY-MM month */
-function getWeeksForMonth(yearMonth: string): { sunday: Date; saturday: Date; isoSunday: string }[] {
-  const [y, m] = yearMonth.split("-").map(Number);
-  const firstDay = new Date(y, m - 1, 1);
-  const lastDay  = new Date(y, m, 0);
-
-  // find the Sunday on or before the 1st of the month
-  const startSun = new Date(firstDay);
-  startSun.setDate(firstDay.getDate() - firstDay.getDay()); // getDay()==0 → Sun
-
-  const weeks: { sunday: Date; saturday: Date; isoSunday: string }[] = [];
-  const cur = new Date(startSun);
-  while (cur <= lastDay) {
-    const sun = new Date(cur);
-    const sat = new Date(cur);
-    sat.setDate(sat.getDate() + 6);
-    const isoSunday = sun.toISOString().slice(0, 10);
-    weeks.push({ sunday: sun, saturday: sat, isoSunday });
-    cur.setDate(cur.getDate() + 7);
-  }
-  return weeks;
+// ── CC Section — simple add-row table (like one-off) with card name column ─────────────────
+interface CCDraft {
+  id?: number;
+  card_name: string;
+  date: string;
+  balance: string;
+  paid_amount: string;
+  note: string;
+}
+function blankCCDraft(month: string): CCDraft {
+  return { card_name: "", date: `${month}-01`, balance: "", paid_amount: "", note: "" };
 }
 
-function fmtWeekLabel(sun: Date, sat: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return sun.toLocaleDateString("en-US", opts) + " – " + sat.toLocaleDateString("en-US", opts);
-}
-
-// ── Shared CC tracker logic (used by both Robinhood + Generic trackers) ──────
-function CCTracker({
-  title,
-  accentColor,
-  filterFn,
-  currentMonth,
-  cardSuggestions,
-  defaultCardName,
-}: {
-  title: string;
-  accentColor: string;                        // tailwind text-* class
-  filterFn: (r: CreditCardWeek) => boolean;   // filter which rows belong to this tracker
-  currentMonth: string;
-  cardSuggestions: string[];                  // datalist suggestions
-  defaultCardName?: string;                   // pre-fill card name for new rows
-}) {
+function CCSection({ currentMonth }: { currentMonth: string }) {
   const qc = useQueryClient();
   const { data: allRows = [], isLoading } = useQuery<CreditCardWeek[]>({
     queryKey: ["cc-weeks"],
@@ -816,383 +786,244 @@ function CCTracker({
     staleTime: 30_000,
   });
 
-  const rows = useMemo(() => allRows.filter(filterFn), [allRows, filterFn]);
-
-  const weekSlots = useMemo(() => getWeeksForMonth(currentMonth), [currentMonth]);
-
-  const rowByDate = useMemo(() => {
-    const m: Record<string, CreditCardWeek> = {};
-    for (const r of rows) m[r.week_start.slice(0, 10)] = r;
-    return m;
-  }, [rows]);
-
-  const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string; card_name: string }>>({});
-  // track a pending blur-commit per row — cancelled if focus stays in the same row
-  const blurTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
-  });
-  const saveMut = useMutation({
-    mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
-  });
-
-  /** Schedule a commit 200 ms after blur — cancelled if the user focuses another cell in the same row */
-  function scheduleCommit(iso: string) {
-    clearTimeout(blurTimers.current[iso]);
-    blurTimers.current[iso] = setTimeout(() => commitRow(iso), 200);
-  }
-  function cancelCommit(iso: string) {
-    clearTimeout(blurTimers.current[iso]);
-  }
-
-  function getLocalEdit(iso: string, row?: CreditCardWeek) {
-    if (editing[iso]) return editing[iso];
-    return {
-      balance: row?.balance?.toString() ?? "",
-      paid_amount: row?.paid_amount?.toString() ?? "",
-      note: row?.note ?? "",
-      card_name: row?.card_name ?? defaultCardName ?? "",
-    };
-  }
-
-  function commitRow(iso: string) {
-    const local = editing[iso];
-    if (!local) return;
-    const row = rowByDate[iso];
-    const body: Omit<CreditCardWeek, "id"> = {
-      week_start: iso,
-      card_name: local.card_name || defaultCardName || null,
-      balance: parseFloat(local.balance) || 0,
-      squared_off: row?.squared_off ?? false,
-      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
-      note: local.note || "",
-    };
-    if (row?.id) updateMut.mutate({ id: row.id, body });
-    else          saveMut.mutate(body);
-    setEditing((p) => { const n = { ...p }; delete n[iso]; return n; });
-  }
-
-  function toggleSquared(iso: string) {
-    const row = rowByDate[iso];
-    const local = getLocalEdit(iso, row);
-    const body: Omit<CreditCardWeek, "id"> = {
-      week_start: iso,
-      card_name: local.card_name || row?.card_name || defaultCardName || null,
-      balance: parseFloat(local.balance) || row?.balance || 0,
-      squared_off: !(row?.squared_off ?? false),
-      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : (row?.paid_amount ?? null),
-      note: local.note !== "" ? local.note : (row?.note ?? ""),
-    };
-    if (row?.id) updateMut.mutate({ id: row.id, body });
-    else          saveMut.mutate(body);
-  }
-
-  const inputCls = "bg-transparent border border-[var(--border)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full tabular-nums";
-
-  // ── metrics ─────────────────────────────────────────────────────────────────
-  const outstanding  = weekSlots.reduce((s, { isoSunday }) => { const r = rowByDate[isoSunday]; return r && !r.squared_off ? s + r.balance : s; }, 0);
-  const pendingCount = weekSlots.filter(({ isoSunday }) => { const r = rowByDate[isoSunday]; return r && r.balance > 0 && !r.squared_off; }).length;
-  const monthCharged = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.balance ?? 0), 0);
-  const monthPaid    = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.paid_amount ?? 0), 0);
-  const payRate      = monthCharged > 0 ? Math.min(100, (monthPaid / monthCharged) * 100) : 0;
-
-  // ── per-card breakdown ───────────────────────────────────────────────────────
-  const perCardData = useMemo(() => {
-    const map: Record<string, { charged: number; paid: number }> = {};
-    for (const { isoSunday } of weekSlots) {
-      const r = rowByDate[isoSunday];
-      if (!r) continue;
-      const key = r.card_name || "Unassigned";
-      if (!map[key]) map[key] = { charged: 0, paid: 0 };
-      map[key].charged += r.balance ?? 0;
-      map[key].paid    += r.paid_amount ?? 0;
-    }
-    return Object.entries(map).map(([name, v]) => ({ name, charged: v.charged, paid: v.paid, net: v.charged - v.paid })).sort((a, b) => b.charged - a.charged);
-  }, [weekSlots, rowByDate]);
-
-  // ── weekly bar data ──────────────────────────────────────────────────────────
-  const weekBarData = weekSlots.map(({ sunday, saturday, isoSunday }) => {
-    const r = rowByDate[isoSunday];
-    return { week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"), Balance: r?.balance ?? 0, Paid: r?.paid_amount ?? 0 };
-  });
-
-  // ── monthly trend (all rows for this tracker) ────────────────────────────────
-  const monthTrendData = useMemo(() => {
-    const byMonth: Record<string, { charged: number; paid: number }> = {};
-    for (const r of rows) {
-      const key = r.week_start.slice(0, 7);
-      if (!byMonth[key]) byMonth[key] = { charged: 0, paid: 0 };
-      byMonth[key].charged += r.balance ?? 0;
-      byMonth[key].paid    += r.paid_amount ?? 0;
-    }
-    return Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([month, v]) => ({
-      month: new Date(month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      Charged: parseFloat(v.charged.toFixed(2)),
-      Paid:    parseFloat(v.paid.toFixed(2)),
-    }));
-  }, [rows]);
-
-  const tooltipStyle = { backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: 11 };
-
-  const datalistId = `cc-cards-${title.replace(/\s+/g, "-").toLowerCase()}`;
-
-  return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-5">
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CreditCard size={16} className={accentColor} />
-          <span className="text-sm font-semibold">{title}</span>
-          <span className="text-xs text-foreground/40">{weekSlots.length}-week tracker · {currentMonth}</span>
-        </div>
-        {outstanding > 0 ? (
-          <span className={`text-xs font-bold ${accentColor}`}>Outstanding: {fmt$(outstanding)}</span>
-        ) : pendingCount === 0 && rows.length > 0 ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-emerald-400"><Check size={12} /> All squared off!</span>
-        ) : null}
-      </div>
-
-      {/* metric cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Charged", value: fmt$(monthCharged), cls: "text-rose-400" },
-          { label: "Paid from Trading", value: fmt$(monthPaid), cls: "text-emerald-400" },
-          { label: "Net Unpaid", value: fmt$(Math.max(0, monthCharged - monthPaid)), cls: outstanding > 0 ? "text-amber-400" : "text-emerald-400" },
-          { label: "Pay Rate", value: monthCharged > 0 ? payRate.toFixed(1) + "%" : "—", cls: payRate >= 100 ? "text-emerald-400" : payRate >= 50 ? "text-amber-400" : "text-rose-400" },
-        ].map(({ label, value, cls }) => (
-          <div key={label} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-1">{label}</p>
-            <p className={`text-xl font-black tabular-nums ${cls}`}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* pay rate bar */}
-      {monthCharged > 0 && (
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-[10px] text-foreground/40">
-            <span>Monthly Pay Coverage</span>
-            <span>{payRate.toFixed(1)}% of balance paid</span>
-          </div>
-          <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${payRate >= 100 ? "bg-emerald-500" : payRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${Math.min(100, payRate)}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* per-card breakdown (only if multiple cards in this tracker) */}
-      {perCardData.length > 1 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide">Spending by Card</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {perCardData.map((card, i) => {
-              const r = card.charged > 0 ? Math.min(100, (card.paid / card.charged) * 100) : 0;
-              return (
-                <div key={card.name} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="text-xs font-semibold text-foreground/80">{card.name}</span>
-                    </div>
-                    <span className="text-[10px] text-foreground/40">{r.toFixed(0)}% paid</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-rose-400 font-bold">{fmt$(card.charged)}</span>
-                    <span className="text-emerald-400">{fmt$(card.paid)} paid</span>
-                    {card.net > 0 && <span className="text-amber-400">{fmt$(card.net)} due</span>}
-                  </div>
-                  <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-500 ${r >= 100 ? "bg-emerald-500" : r >= 50 ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${Math.min(100, r)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* charts */}
-      {monthCharged > 0 && (
-        <div className={`grid grid-cols-1 gap-4 ${perCardData.length > 1 ? "lg:grid-cols-3" : monthTrendData.length > 1 ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
-          {perCardData.length > 1 && (
-            <div>
-              <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Charged by Card</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={perCardData} dataKey="charged" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={2}>
-                    {perCardData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => ["$" + v.toFixed(2), "Charged"]} />
-                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.7 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-          <div>
-            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">This Month — Balance vs Paid per Week</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={weekBarData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)", opacity: 0.7 }} itemStyle={{ color: "var(--foreground)" }} formatter={(v: number) => "$" + v.toFixed(2)} />
-                <Bar dataKey="Balance" fill="#f43f5e" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          {monthTrendData.length > 1 && (
-            <div>
-              <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Monthly Trend — Charged vs Paid</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={monthTrendData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="month" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
-                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)", opacity: 0.7 }} itemStyle={{ color: "var(--foreground)" }} formatter={(v: number) => "$" + v.toFixed(2)} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
-                  <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* table */}
-      {isLoading ? (
-        <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <datalist id={datalistId}>
-            {cardSuggestions.map((c) => <option key={c} value={c} />)}
-          </datalist>
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="text-foreground/40 text-left border-b border-[var(--border)]">
-                <th className="pb-2 pr-3 font-medium w-[160px]">Week</th>
-                <th className="pb-2 pr-3 font-medium w-[140px]">Card Name</th>
-                <th className="pb-2 pr-3 font-medium w-[110px]">Card Balance</th>
-                <th className="pb-2 pr-3 font-medium w-[110px]">Paid from Trading</th>
-                <th className="pb-2 pr-3 font-medium w-[100px]">Squared Off?</th>
-                <th className="pb-2 font-medium">Note</th>
-                <th className="pb-2 font-medium text-right w-[50px]">Save</th>
-              </tr>
-            </thead>
-            <tbody>
-              {weekSlots.map(({ sunday, saturday, isoSunday }) => {
-                const row = rowByDate[isoSunday];
-                const local = getLocalEdit(isoSunday, row);
-                const isDirty = !!editing[isoSunday];
-                const squaredOff = row?.squared_off ?? false;
-                return (
-                  <tr key={isoSunday} className={`border-b border-[var(--border)] transition-colors ${squaredOff ? "opacity-60" : ""}`}>
-                    <td className="py-2.5 pr-3 font-medium text-foreground/70">{fmtWeekLabel(sunday, saturday)}</td>
-                    <td className="py-2 pr-3">
-                      <input type="text" list={datalistId} className={inputCls + " text-foreground"} placeholder={defaultCardName ?? "Card name"} value={local.card_name}
-                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), card_name: e.target.value } }))}
-                        onFocus={() => cancelCommit(isoSunday)}
-                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <input type="number" className={inputCls} placeholder="0.00" value={local.balance}
-                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), balance: e.target.value } }))}
-                        onFocus={() => cancelCommit(isoSunday)}
-                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <input type="number" className={inputCls} placeholder="0.00" value={local.paid_amount}
-                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), paid_amount: e.target.value } }))}
-                        onFocus={() => cancelCommit(isoSunday)}
-                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <button onClick={() => toggleSquared(isoSunday)}
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${squaredOff ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}>
-                        {squaredOff ? "✓ Paid" : "● Pending"}
-                      </button>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <input type="text" className={inputCls} placeholder="optional note" value={local.note}
-                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), note: e.target.value } }))}
-                        onFocus={() => cancelCommit(isoSunday)}
-                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
-                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
-                    </td>
-                    <td className="py-2 text-right">
-                      {isDirty && (
-                        <button onClick={() => commitRow(isoSunday)} className="p-1 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors" title="Save">
-                          <Check size={13} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · click Squared Off badge to toggle</p>
-        </div>
-      )}
-    </div>
+  const rows = useMemo(
+    () => allRows.filter((r) => r.week_start.slice(0, 7) === currentMonth),
+    [allRows, currentMonth],
   );
-}
 
-// ── CC Trackers wrapper — renders Robinhood + generic Credit Cards separately ──
-function CCTrackers({ currentMonth }: { currentMonth: string }) {
-  const { data: allRows = [] } = useQuery<CreditCardWeek[]>({
-    queryKey: ["cc-weeks"],
-    queryFn: fetchCCWeeks,
-    staleTime: 30_000,
+  const [drafts, setDrafts] = useState<CCDraft[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<CCDraft | null>(null);
+
+  const saveMut = useMutation({
+    mutationFn: (d: CCDraft) => {
+      const body: Omit<CreditCardWeek, "id"> = {
+        week_start: d.date,
+        card_name: d.card_name || null,
+        balance: parseFloat(d.balance) || 0,
+        paid_amount: d.paid_amount !== "" ? parseFloat(d.paid_amount) : null,
+        squared_off: false,
+        note: d.note || "",
+      };
+      return d.id ? updateCCWeek(d.id, body) : saveCCWeek(body);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
   });
 
-  // Build unique card name suggestions from all rows
-  const allCardNames = useMemo(() => {
+  const delMut = useMutation({
+    mutationFn: (id: number) => deleteCCWeek(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
+  });
+
+  const addRow = () => setDrafts((p) => [...p, blankCCDraft(currentMonth)]);
+
+  const saveDraft = async (idx: number) => {
+    const d = drafts[idx];
+    if (!d.balance) return;
+    await saveMut.mutateAsync(d);
+    setDrafts((p) => p.filter((_, i) => i !== idx));
+  };
+
+  const startEdit = (r: CreditCardWeek) => {
+    setEditingId(r.id!);
+    setEditDraft({
+      id: r.id,
+      card_name: r.card_name ?? "",
+      date: r.week_start.slice(0, 10),
+      balance: String(r.balance ?? ""),
+      paid_amount: r.paid_amount != null ? String(r.paid_amount) : "",
+      note: r.note ?? "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editDraft) return;
+    await saveMut.mutateAsync(editDraft);
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const cardNames = useMemo(() => {
     const s = new Set<string>();
     for (const r of allRows) if (r.card_name) s.add(r.card_name);
     return Array.from(s).sort();
   }, [allRows]);
 
-  // Robinhood rows: card_name starts with "Robinhood" (case-insensitive) OR card_name is null/empty for the Robinhood tracker
-  const rhFilter = (r: CreditCardWeek) =>
-    !r.card_name || r.card_name.toLowerCase().startsWith("robinhood");
+  const totalCharged = rows.reduce((s, r) => s + (r.balance ?? 0), 0);
+  const totalPaid    = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
 
-  // Generic CC rows: explicitly named card that is NOT Robinhood
-  const genericFilter = (r: CreditCardWeek) =>
-    !!r.card_name && !r.card_name.toLowerCase().startsWith("robinhood");
-
-  const rhSuggestions = allCardNames.filter((n) => n.toLowerCase().startsWith("robinhood"));
-  const genericSuggestions = allCardNames.filter((n) => !n.toLowerCase().startsWith("robinhood"));
+  function CCEditRow({ draft, onChange, onSave, onCancel }: {
+    draft: CCDraft;
+    onChange: (d: CCDraft) => void;
+    onSave: () => void;
+    onCancel: () => void;
+  }) {
+    const set = (k: keyof CCDraft, v: string) => onChange({ ...draft, [k]: v });
+    const onKey = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") onSave();
+      if (e.key === "Escape") onCancel();
+    };
+    return (
+      <tr className="bg-blue-500/5 border-b border-blue-500/20" onKeyDown={onKey}>
+        <td className="px-2 py-1.5">
+          <input type="date" value={draft.date} onChange={(e) => set("date", e.target.value)} className={cellCls + " w-[105px]"} />
+        </td>
+        <td className="px-2 py-1.5">
+          <input type="text" list="cc-card-names" value={draft.card_name} placeholder="Card name"
+            onChange={(e) => set("card_name", e.target.value)} className={cellCls} />
+        </td>
+        <td className="px-2 py-1.5">
+          <input type="number" step="0.01" min="0" value={draft.balance} placeholder="0.00"
+            onChange={(e) => set("balance", e.target.value)} className={cellCls + " text-right"} />
+        </td>
+        <td className="px-2 py-1.5">
+          <input type="number" step="0.01" min="0" value={draft.paid_amount} placeholder="0.00"
+            onChange={(e) => set("paid_amount", e.target.value)} className={cellCls + " text-right"} />
+        </td>
+        <td className="px-2 py-1.5">
+          <input type="text" value={draft.note} placeholder="Note (optional)"
+            onChange={(e) => set("note", e.target.value)} className={cellCls} />
+        </td>
+        <td className="px-2 py-1.5 w-[70px]">
+          <div className="flex items-center gap-1">
+            <button onClick={onSave} disabled={saveMut.isPending || !draft.balance}
+              className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 disabled:opacity-30 transition">
+              <Check size={13} />
+            </button>
+            <button onClick={onCancel}
+              className="p-1.5 rounded-lg bg-[var(--surface-2)] text-foreground/50 hover:bg-[var(--border)] transition">
+              <X size={13} />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
 
   return (
-    <>
-      {/* Robinhood Card tracker */}
-      <CCTracker
-        title="Robinhood Card"
-        accentColor="text-rose-400"
-        filterFn={rhFilter}
-        currentMonth={currentMonth}
-        cardSuggestions={rhSuggestions.length > 0 ? rhSuggestions : ["Robinhood Gold", "Robinhood Cash"]}
-        defaultCardName="Robinhood Gold"
-      />
-      {/* Generic Credit Cards tracker */}
-      <CCTracker
-        title="Credit Cards"
-        accentColor="text-blue-400"
-        filterFn={genericFilter}
-        currentMonth={currentMonth}
-        cardSuggestions={genericSuggestions}
-      />
-    </>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+        <div className="flex items-center gap-2">
+          <CreditCard size={14} className="text-blue-400" />
+          <span className="font-bold text-sm text-foreground">Credit Cards</span>
+          <span className="text-xs bg-[var(--surface-2)] text-foreground/50 px-2 py-0.5 rounded-full border border-[var(--border)]">
+            {rows.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          {totalCharged > 0 && (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-foreground/40">Charged: <span className="font-bold text-rose-400">{fmt$(totalCharged)}</span></span>
+              <span className="text-foreground/40">Paid: <span className="font-bold text-emerald-400">{fmt$(totalPaid)}</span></span>
+              {totalCharged - totalPaid > 0 && (
+                <span className="text-foreground/40">Due: <span className="font-bold text-amber-400">{fmt$(totalCharged - totalPaid)}</span></span>
+              )}
+            </div>
+          )}
+          <button onClick={addRow}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition">
+            <Plus size={12} /> Add row
+          </button>
+        </div>
+      </div>
+
+      <datalist id="cc-card-names">
+        {cardNames.map((c) => <option key={c} value={c} />)}
+      </datalist>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
+              <th className="px-3 py-2 text-left w-[115px]">Date</th>
+              <th className="px-3 py-2 text-left w-[160px]">Card Name</th>
+              <th className="px-3 py-2 text-right w-[130px]">Amount Charged</th>
+              <th className="px-3 py-2 text-right w-[130px]">Paid from Trading</th>
+              <th className="px-3 py-2 text-left">Note</th>
+              <th className="px-3 py-2 w-[100px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-foreground/30">Loading…</td></tr>
+            ) : (
+              <>
+                {rows.map((r) =>
+                  editingId === r.id && editDraft ? (
+                    <CCEditRow key={r.id} draft={editDraft} onChange={setEditDraft}
+                      onSave={saveEdit} onCancel={() => { setEditingId(null); setEditDraft(null); }} />
+                  ) : (
+                    <CCReadRow key={r.id} row={r}
+                      onEdit={() => startEdit(r)}
+                      onDelete={() => delMut.mutate(r.id!)} />
+                  )
+                )}
+                {drafts.map((d, idx) => (
+                  <CCEditRow key={"new-" + idx} draft={d}
+                    onChange={(nd) => setDrafts((p) => p.map((x, i) => i === idx ? nd : x))}
+                    onSave={() => saveDraft(idx)}
+                    onCancel={() => setDrafts((p) => p.filter((_, i) => i !== idx))} />
+                ))}
+                {rows.length === 0 && drafts.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-foreground/30">
+                    No entries yet — click <strong className="text-foreground/50">Add row</strong> to get started
+                  </td></tr>
+                )}
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
+
+function CCReadRow({ row, onEdit, onDelete }: {
+  row: CreditCardWeek;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  return (
+    <tr className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
+      <td className="px-3 py-2.5 text-xs text-foreground/50 whitespace-nowrap">{row.week_start.slice(0, 10)}</td>
+      <td className="px-3 py-2.5 text-sm">
+        {row.card_name ? (
+          <span className="inline-flex items-center gap-1 text-xs bg-[var(--surface-2)] border border-[var(--border)] rounded-full px-2 py-0.5">
+            {row.card_name}
+          </span>
+        ) : <span className="text-foreground/25 text-xs">—</span>}
+      </td>
+      <td className="px-3 py-2.5 text-sm font-bold text-right text-rose-400">{fmt$(row.balance)}</td>
+      <td className="px-3 py-2.5 text-sm font-bold text-right text-emerald-400">
+        {row.paid_amount != null ? fmt$(row.paid_amount) : <span className="text-foreground/25">—</span>}
+      </td>
+      <td className="px-3 py-2.5 text-xs text-foreground/40 max-w-[160px] truncate">{row.note || ""}</td>
+      <td className="px-3 py-2.5 w-[100px]" onClick={(e) => e.stopPropagation()}>
+        {confirmDel ? (
+          <div className="flex items-center gap-1">
+            <button onClick={onDelete}
+              className="text-[11px] px-2 py-0.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Yes</button>
+            <button onClick={() => setConfirmDel(false)}
+              className="text-[11px] px-2 py-0.5 rounded-lg bg-[var(--surface-2)] text-foreground/70">No</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button onClick={onEdit}
+              className="p-1.5 rounded-lg text-foreground/40 hover:text-blue-400 hover:bg-blue-500/10 transition">
+              <PencilLine size={13} />
+            </button>
+            <button onClick={() => setConfirmDel(true)}
+              className="p-1.5 rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
@@ -1427,14 +1258,8 @@ export default function BudgetPage() {
             />
           </div>
 
-          {/* CC trackers — Robinhood Card + generic Credit Cards (separate panels) */}
-          <div className="flex flex-col gap-5 mt-5">
-            <div className="flex items-center gap-2">
-              <CreditCard size={14} className="text-foreground/30" />
-              <span className="text-xs font-semibold text-foreground/40 uppercase tracking-wide">Card Trackers</span>
-            </div>
-            <CCTrackers currentMonth={currentMonth} />
-          </div>
+          {/* CC tracker */}
+          <CCSection currentMonth={currentMonth} />
         </>
       )}
 
