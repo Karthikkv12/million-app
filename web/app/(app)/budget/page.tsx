@@ -778,7 +778,21 @@ function blankCCDraft(month: string): CCDraft {
   return { card_name: "", date: `${month}-01`, balance: "", paid_amount: "", note: "" };
 }
 
-function CCSection({ currentMonth }: { currentMonth: string }) {
+function CCSection({
+  currentMonth,
+  title = "Credit Cards",
+  accentColor = "text-blue-400",
+  cardFilter,
+  defaultCard,
+  datalistId = "cc-card-names",
+}: {
+  currentMonth: string;
+  title?: string;
+  accentColor?: string;
+  cardFilter?: (r: CreditCardWeek) => boolean;
+  defaultCard?: string;
+  datalistId?: string;
+}) {
   const qc = useQueryClient();
   const { data: allRows = [], isLoading } = useQuery<CreditCardWeek[]>({
     queryKey: ["cc-weeks"],
@@ -786,10 +800,10 @@ function CCSection({ currentMonth }: { currentMonth: string }) {
     staleTime: 30_000,
   });
 
-  const rows = useMemo(
-    () => allRows.filter((r) => r.week_start.slice(0, 7) === currentMonth),
-    [allRows, currentMonth],
-  );
+  const rows = useMemo(() => {
+    const monthRows = allRows.filter((r) => r.week_start.slice(0, 7) === currentMonth);
+    return cardFilter ? monthRows.filter(cardFilter) : monthRows;
+  }, [allRows, currentMonth, cardFilter]);
 
   const [drafts, setDrafts] = useState<CCDraft[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -815,7 +829,7 @@ function CCSection({ currentMonth }: { currentMonth: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
   });
 
-  const addRow = () => setDrafts((p) => [...p, blankCCDraft(currentMonth)]);
+  const addRow = () => setDrafts((p) => [...p, { ...blankCCDraft(currentMonth), card_name: defaultCard ?? "" }]);
 
   const saveDraft = async (idx: number) => {
     const d = drafts[idx];
@@ -869,7 +883,7 @@ function CCSection({ currentMonth }: { currentMonth: string }) {
           <input type="date" value={draft.date} onChange={(e) => set("date", e.target.value)} className={cellCls + " w-[105px]"} />
         </td>
         <td className="px-2 py-1.5">
-          <input type="text" list="cc-card-names" value={draft.card_name} placeholder="Card name"
+          <input type="text" list={datalistId} value={draft.card_name} placeholder="Card name"
             onChange={(e) => set("card_name", e.target.value)} className={cellCls} />
         </td>
         <td className="px-2 py-1.5">
@@ -904,8 +918,8 @@ function CCSection({ currentMonth }: { currentMonth: string }) {
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
         <div className="flex items-center gap-2">
-          <CreditCard size={14} className="text-blue-400" />
-          <span className="font-bold text-sm text-foreground">Credit Cards</span>
+          <CreditCard size={14} className={accentColor} />
+          <span className="font-bold text-sm text-foreground">{title}</span>
           <span className="text-xs bg-[var(--surface-2)] text-foreground/50 px-2 py-0.5 rounded-full border border-[var(--border)]">
             {rows.length}
           </span>
@@ -927,7 +941,7 @@ function CCSection({ currentMonth }: { currentMonth: string }) {
         </div>
       </div>
 
-      <datalist id="cc-card-names">
+      <datalist id={datalistId}>
         {cardNames.map((c) => <option key={c} value={c} />)}
       </datalist>
 
@@ -1258,8 +1272,24 @@ export default function BudgetPage() {
             />
           </div>
 
-          {/* CC tracker */}
-          <CCSection currentMonth={currentMonth} />
+          {/* CC trackers — Robinhood Card + Other Cards */}
+          <div className="flex flex-col gap-5">
+            <CCSection
+              currentMonth={currentMonth}
+              title="Robinhood Card"
+              accentColor="text-rose-400"
+              cardFilter={(r) => !r.card_name || r.card_name.toLowerCase().startsWith("robinhood")}
+              defaultCard="Robinhood Gold"
+              datalistId="cc-rh-names"
+            />
+            <CCSection
+              currentMonth={currentMonth}
+              title="Credit Cards"
+              accentColor="text-blue-400"
+              cardFilter={(r) => !!r.card_name && !r.card_name.toLowerCase().startsWith("robinhood")}
+              datalistId="cc-other-names"
+            />
+          </div>
         </>
       )}
 
