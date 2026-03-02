@@ -797,6 +797,59 @@ interface CCDraft {
   paid_amount: string;
   note: string;
 }
+function CCEditRow({
+  draft, onChange, onSave, onCancel, datalistId, isSaving,
+}: {
+  draft: CCDraft;
+  onChange: (d: CCDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  datalistId: string;
+  isSaving: boolean;
+}) {
+  const set = (k: keyof CCDraft, v: string) => onChange({ ...draft, [k]: v });
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") onSave();
+    if (e.key === "Escape") onCancel();
+  };
+  return (
+    <tr className="bg-blue-500/5 border-b border-blue-500/20" onKeyDown={onKey}>
+      <td className="px-2 py-1.5">
+        <input type="date" value={draft.date} onChange={(e) => set("date", e.target.value)} className={cellCls + " w-[105px]"} />
+      </td>
+      <td className="px-2 py-1.5">
+        <input type="text" list={datalistId} value={draft.card_name} placeholder="Card name"
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+          onChange={(e) => set("card_name", e.target.value)} className={cellCls} />
+      </td>
+      <td className="px-2 py-1.5">
+        <input type="number" step="0.01" min="0" value={draft.balance} placeholder="0.00"
+          onChange={(e) => set("balance", e.target.value)} className={cellCls + " text-right"} />
+      </td>
+      <td className="px-2 py-1.5">
+        <input type="number" step="0.01" min="0" value={draft.paid_amount} placeholder="0.00"
+          onChange={(e) => set("paid_amount", e.target.value)} className={cellCls + " text-right"} />
+      </td>
+      <td className="px-2 py-1.5">
+        <input type="text" value={draft.note} placeholder="Note (optional)"
+          onChange={(e) => set("note", e.target.value)} className={cellCls} />
+      </td>
+      <td className="px-2 py-1.5 w-[70px]">
+        <div className="flex items-center gap-1">
+          <button onClick={onSave} disabled={isSaving || !draft.balance}
+            className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 disabled:opacity-30 transition">
+            <Check size={13} />
+          </button>
+          <button onClick={onCancel}
+            className="p-1.5 rounded-lg bg-[var(--surface-2)] text-foreground/50 hover:bg-[var(--border)] transition">
+            <X size={13} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function blankCCDraft(month: string): CCDraft {
   return { card_name: "", date: `${month}-01`, balance: "", paid_amount: "", note: "" };
 }
@@ -932,54 +985,6 @@ function CCSection({
   const totalCharged = rows.reduce((s, r) => s + (r.balance ?? 0), 0);
   const totalPaid    = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
 
-  function CCEditRow({ draft, onChange, onSave, onCancel }: {
-    draft: CCDraft;
-    onChange: (d: CCDraft) => void;
-    onSave: () => void;
-    onCancel: () => void;
-  }) {
-    const set = (k: keyof CCDraft, v: string) => onChange({ ...draft, [k]: v });
-    const onKey = (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") onSave();
-      if (e.key === "Escape") onCancel();
-    };
-    return (
-      <tr className="bg-blue-500/5 border-b border-blue-500/20" onKeyDown={onKey}>
-        <td className="px-2 py-1.5">
-          <input type="date" value={draft.date} onChange={(e) => set("date", e.target.value)} className={cellCls + " w-[105px]"} />
-        </td>
-        <td className="px-2 py-1.5">
-          <input type="text" list={datalistId} value={draft.card_name} placeholder="Card name"
-            onChange={(e) => set("card_name", e.target.value)} className={cellCls} />
-        </td>
-        <td className="px-2 py-1.5">
-          <input type="number" step="0.01" min="0" value={draft.balance} placeholder="0.00"
-            onChange={(e) => set("balance", e.target.value)} className={cellCls + " text-right"} />
-        </td>
-        <td className="px-2 py-1.5">
-          <input type="number" step="0.01" min="0" value={draft.paid_amount} placeholder="0.00"
-            onChange={(e) => set("paid_amount", e.target.value)} className={cellCls + " text-right"} />
-        </td>
-        <td className="px-2 py-1.5">
-          <input type="text" value={draft.note} placeholder="Note (optional)"
-            onChange={(e) => set("note", e.target.value)} className={cellCls} />
-        </td>
-        <td className="px-2 py-1.5 w-[70px]">
-          <div className="flex items-center gap-1">
-            <button onClick={onSave} disabled={saveMut.isPending || !draft.balance}
-              className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 disabled:opacity-30 transition">
-              <Check size={13} />
-            </button>
-            <button onClick={onCancel}
-              className="p-1.5 rounded-lg bg-[var(--surface-2)] text-foreground/50 hover:bg-[var(--border)] transition">
-              <X size={13} />
-            </button>
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
@@ -1035,6 +1040,7 @@ function CCSection({
                 {rows.map((r) =>
                   editingId === r.id && editDraft ? (
                     <CCEditRow key={r.id} draft={editDraft} onChange={setEditDraft}
+                      datalistId={datalistId} isSaving={saveMut.isPending}
                       onSave={saveEdit} onCancel={() => { setEditingId(null); setEditDraft(null); }} />
                   ) : (
                     <CCReadRow key={r.id} row={r}
@@ -1044,6 +1050,7 @@ function CCSection({
                 )}
                 {drafts.map((d, idx) => (
                   <CCEditRow key={"new-" + idx} draft={d}
+                    datalistId={datalistId} isSaving={saveMut.isPending}
                     onChange={(nd) => setDrafts((p) => p.map((x, i) => i === idx ? nd : x))}
                     onSave={() => saveDraft(idx)}
                     onCancel={() => setDrafts((p) => p.filter((_, i) => i !== idx))} />
