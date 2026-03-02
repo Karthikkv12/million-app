@@ -982,7 +982,7 @@ function CCSection({
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40">
         <div className="flex items-center gap-2">
           <CreditCard size={14} className={accentColor} />
           <span className="font-bold text-sm text-foreground">{title}</span>
@@ -990,11 +990,11 @@ function CCSection({
             {rows.length}
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {totalCharged > 0 && (
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-foreground/40">Charged: <span className="font-bold text-rose-400">{fmt$(totalCharged)}</span></span>
-              <span className="text-foreground/40">Paid: <span className="font-bold text-emerald-400">{fmt$(totalPaid)}</span></span>
+            <div className="flex items-center gap-2 sm:gap-3 text-xs">
+              <span className="text-foreground/40"><span className="font-bold text-rose-400">{fmt$(totalCharged)}</span></span>
+              <span className="text-foreground/40"><span className="font-bold text-emerald-400">{fmt$(totalPaid)}</span></span>
               {totalCharged - totalPaid > 0 && (
                 <span className="text-foreground/40">Due: <span className="font-bold text-amber-400">{fmt$(totalCharged - totalPaid)}</span></span>
               )}
@@ -1014,8 +1014,8 @@ function CCSection({
       </datalist>
 
       {!fixedWeeks && (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto -mx-px">
+        <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
               <th className="px-3 py-2 text-left w-[150px]">Date</th>
@@ -1062,9 +1062,9 @@ function CCSection({
 
       {/* ── metrics + chart (fixed-week mode only) ── */}
       {fixedWeeks && (
-        <div className="flex flex-col lg:flex-row border-t border-[var(--border)]">
+        <div className="flex flex-col md:flex-row border-t border-[var(--border)]">
           {/* table — compact left column */}
-          <div className="lg:w-[360px] shrink-0 overflow-x-auto border-b lg:border-b-0 lg:border-r border-[var(--border)]">
+          <div className="md:w-[320px] lg:w-[360px] shrink-0 overflow-x-auto border-b md:border-b-0 md:border-r border-[var(--border)]">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
@@ -1124,9 +1124,9 @@ function CCSection({
 
           {/* right side: metrics + chart */}
           {totalCharged > 0 ? (
-            <div className="flex-1 px-4 py-4 flex flex-col gap-4">
+            <div className="flex-1 min-w-0 px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
               {/* stat cards */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: "Total Charged", value: fmt$(totalCharged),                          cls: "text-rose-400" },
                   { label: "Total Paid",     value: fmt$(totalPaid),                             cls: "text-emerald-400" },
@@ -1240,9 +1240,9 @@ function CCReadRow({ row, onEdit, onDelete }: {
 
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-      <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">{label}</p>
-      <p className={"text-2xl font-black " + cls}>{value}</p>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4">
+      <p className="text-[10px] sm:text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-1">{label}</p>
+      <p className={"text-xl sm:text-2xl font-black " + cls}>{value}</p>
     </div>
   );
 }
@@ -1327,12 +1327,12 @@ export default function BudgetPage() {
     <div className="p-4 sm:p-6 max-w-screen-xl mx-auto w-full">
 
       {/* Header + tabs */}
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-black text-foreground">Budget</h1>
+      <div className="flex items-center justify-between mb-5 gap-3">
+        <h1 className="text-xl sm:text-2xl font-black text-foreground shrink-0">Budget</h1>
         <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1">
           <button
             onClick={() => setActiveTab("monthly")}
-            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+            className={"px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition " +
               (activeTab === "monthly"
                 ? "bg-blue-600 text-white shadow"
                 : "text-foreground/50 hover:text-foreground")}
@@ -1341,12 +1341,13 @@ export default function BudgetPage() {
           </button>
           <button
             onClick={() => setActiveTab("annual")}
-            className={"px-4 py-1.5 rounded-lg text-sm font-semibold transition " +
+            className={"px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition " +
               (activeTab === "annual"
                 ? "bg-blue-600 text-white shadow"
                 : "text-foreground/50 hover:text-foreground")}
           >
-            Annual Summary
+            <span className="hidden sm:inline">Annual Summary</span>
+            <span className="sm:hidden">Annual</span>
           </button>
         </div>
       </div>
@@ -1386,7 +1387,7 @@ export default function BudgetPage() {
       {activeTab === "monthly" && (
         <>
           {/* stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
             <StatCard label="Income"      value={fmt(stats.income)}   cls="text-emerald-400" />
             <StatCard label="Expenses"    value={fmt(stats.expense)}  cls="text-red-400" />
             <StatCard label="Fixed/Month" value={fmt(stats.fixedExp)} cls="text-purple-400" />
@@ -1396,7 +1397,7 @@ export default function BudgetPage() {
 
           {/* charts row — 3 equal columns */}
           {pieData.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
 
               {/* Donut pie */}
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
