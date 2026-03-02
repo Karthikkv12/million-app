@@ -71,6 +71,7 @@ interface DraftRow {
   amount: string;
   date: string;
   description: string;
+  merchant: string;
 }
 
 function blankDraft(month: string, isRecurring: boolean): DraftRow {
@@ -82,6 +83,7 @@ function blankDraft(month: string, isRecurring: boolean): DraftRow {
     amount: "",
     date: `${month}-01`,
     description: "",
+    merchant: "",
   };
 }
 
@@ -126,6 +128,16 @@ function EditableRow({
           {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
         </select>
       </td>
+      {!isRecurring && (
+        <td className="px-2 py-1.5">
+          <input
+            value={draft.merchant}
+            onChange={(e) => set("merchant", e.target.value)}
+            placeholder="Merchant / Payee"
+            className={cellCls}
+          />
+        </td>
+      )}
       <td className="px-2 py-1.5 w-[110px]">
         <select value={draft.type} onChange={(e) => set("type", e.target.value as DraftRow["type"])} className={selCls}>
           <option value="EXPENSE">Expense</option>
@@ -217,6 +229,17 @@ function ReadRow({
       <td className="px-3 py-2.5 text-sm font-medium text-foreground">
         {entry.category || "---"}
       </td>
+      {!isRecurring && (
+        <td className="px-3 py-2.5 text-sm text-foreground/70">
+          {entry.merchant ? (
+            <span className="inline-flex items-center gap-1 text-xs bg-[var(--surface-2)] border border-[var(--border)] rounded-full px-2 py-0.5">
+              {entry.merchant}
+            </span>
+          ) : (
+            <span className="text-foreground/25 text-xs">—</span>
+          )}
+        </td>
+      )}
       <td className="px-3 py-2.5">
         <span className={"inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full " + (
           isExpense ? "bg-red-500/15 text-red-400"
@@ -324,7 +347,7 @@ function Section({
 
   const mut = useMutation({
     mutationFn: (d: DraftRow) => {
-      const body: Omit<BudgetEntry, "id"> = {
+    const body: Omit<BudgetEntry, "id"> = {
         category: d.category,
         type: d.type,
         entry_type: d.entry_type,
@@ -332,6 +355,7 @@ function Section({
         amount: parseFloat(d.amount),
         date: d.date,
         description: d.description || undefined,
+        merchant: d.merchant || undefined,
       };
       return d.id ? updateBudget(d.id, body) : saveBudget(body);
     },
@@ -377,6 +401,7 @@ function Section({
       amount: String(ov ? ov.amount : proratedMonthly(entry)),
       date: entry.date.slice(0, 10),
       description: ov?.description ?? entry.description ?? "",
+      merchant: entry.merchant ?? "",
     });
   };
 
@@ -399,7 +424,7 @@ function Section({
   });
 
   const total = effectiveRows.reduce((s, r) => s + r.displayAmount, 0);
-  const colSpan = isRecurring ? 7 : 6;
+  const colSpan = isRecurring ? 7 : 7; // date + category + merchant + type + amount + note + actions
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
@@ -428,6 +453,7 @@ function Section({
             <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
               <th className="px-3 py-2 text-left w-[115px]">Date</th>
               <th className="px-3 py-2 text-left">Category</th>
+              {!isRecurring && <th className="px-3 py-2 text-left w-[140px]">Merchant</th>}
               <th className="px-3 py-2 text-left w-[110px]">Type</th>
               {isRecurring && <th className="px-3 py-2 text-left w-[120px]">Frequency</th>}
               <th className="px-3 py-2 text-right w-[120px]">Amount</th>
@@ -753,8 +779,8 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     return m;
   }, [rows]);
 
-  // per-slot local edit state: { isoSunday: { balance, paid_amount, note } }
-  const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string }>>({});
+  // per-slot local edit state
+  const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string; card_name: string }>>({});
 
   const updateMut = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
@@ -772,15 +798,17 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
       balance: row?.balance?.toString() ?? "",
       paid_amount: row?.paid_amount?.toString() ?? "",
       note: row?.note ?? "",
+      card_name: row?.card_name ?? "",
     };
   }
 
   function commitRow(iso: string) {
     const local = editing[iso];
-    if (!local) return; // nothing changed
+    if (!local) return;
     const row = rowByDate[iso];
     const body: Omit<CreditCardWeek, "id"> = {
       week_start: iso,
+      card_name: local.card_name || null,
       balance: parseFloat(local.balance) || 0,
       squared_off: row?.squared_off ?? false,
       paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
@@ -799,6 +827,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     const local = getLocalEdit(iso, row);
     const body: Omit<CreditCardWeek, "id"> = {
       week_start: iso,
+      card_name: local.card_name || row?.card_name || null,
       balance: parseFloat(local.balance) || row?.balance || 0,
       squared_off: !(row?.squared_off ?? false),
       paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : (row?.paid_amount ?? null),
@@ -823,10 +852,26 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     return r && r.balance > 0 && !r.squared_off;
   }).length;
 
-  // month-level aggregates (only this month's slots)
+  // month-level aggregates
   const monthCharged = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.balance ?? 0), 0);
   const monthPaid    = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.paid_amount ?? 0), 0);
   const payRate      = monthCharged > 0 ? Math.min(100, (monthPaid / monthCharged) * 100) : 0;
+
+  // ── per-card breakdown (this month) ──────────────────────────────────────────
+  const perCardData = useMemo(() => {
+    const map: Record<string, { charged: number; paid: number }> = {};
+    for (const { isoSunday } of weekSlots) {
+      const r = rowByDate[isoSunday];
+      if (!r) continue;
+      const key = r.card_name || "Unassigned";
+      if (!map[key]) map[key] = { charged: 0, paid: 0 };
+      map[key].charged += r.balance ?? 0;
+      map[key].paid    += r.paid_amount ?? 0;
+    }
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, charged: v.charged, paid: v.paid, net: v.charged - v.paid }))
+      .sort((a, b) => b.charged - a.charged);
+  }, [weekSlots, rowByDate]);
 
   // ── weekly bar chart data (this month) ───────────────────────────────────────
   const weekBarData = weekSlots.map(({ sunday, saturday, isoSunday }) => {
@@ -866,13 +911,20 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     fontSize: 11,
   };
 
+  // unique card names from ALL rows (for datalist suggestions)
+  const knownCards = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) if (r.card_name) s.add(r.card_name);
+    return Array.from(s).sort();
+  }, [rows]);
+
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-5">
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CreditCard size={16} className="text-rose-400" />
-          <span className="text-sm font-semibold">Robinhood Credit Card</span>
+          <span className="text-sm font-semibold">Credit Card Tracker</span>
           <span className="text-xs text-foreground/40">{weekSlots.length}-week tracker · {currentMonth}</span>
         </div>
         {outstanding > 0 ? (
@@ -913,11 +965,64 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         </div>
       )}
 
+      {/* ── per-card breakdown ───────────────────────────────────────────────── */}
+      {perCardData.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide">Spending by Card</p>
+          <div className={`grid gap-3 ${perCardData.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
+            {perCardData.map((card, i) => {
+              const cardPayRate = card.charged > 0 ? Math.min(100, (card.paid / card.charged) * 100) : 0;
+              return (
+                <div key={card.name} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="text-xs font-semibold text-foreground/80">{card.name}</span>
+                    </div>
+                    <span className="text-[10px] text-foreground/40">{cardPayRate.toFixed(0)}% paid</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-rose-400 font-bold">{fmt$(card.charged)}</span>
+                    <span className="text-emerald-400">{fmt$(card.paid)} paid</span>
+                    {card.net > 0 && <span className="text-amber-400">{fmt$(card.net)} due</span>}
+                  </div>
+                  <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${cardPayRate >= 100 ? "bg-emerald-500" : cardPayRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
+                      style={{ width: `${Math.min(100, cardPayRate)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── charts row ───────────────────────────────────────────────────────── */}
       {monthCharged > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* per-card pie chart */}
+          {perCardData.length > 1 && (
+            <div>
+              <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Charged by Card</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie data={perCardData} dataKey="charged" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={2}>
+                    {perCardData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v: number) => ["$" + v.toFixed(2), "Charged"]}
+                  />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.7 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {/* weekly balance vs paid */}
-          <div>
+          <div className={perCardData.length > 1 ? "" : "lg:col-span-2"}>
             <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">This Month — Balance vs Paid per Week</p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weekBarData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
@@ -966,10 +1071,15 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
       ) : (
         <div className="overflow-x-auto">
+          {/* datalist for card name suggestions */}
+          <datalist id="cc-card-names">
+            {knownCards.map((c) => <option key={c} value={c} />)}
+          </datalist>
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="text-foreground/40 text-left border-b border-[var(--border)]">
                 <th className="pb-2 pr-3 font-medium w-[160px]">Week</th>
+                <th className="pb-2 pr-3 font-medium w-[140px]">Card Name</th>
                 <th className="pb-2 pr-3 font-medium w-[110px]">Card Balance</th>
                 <th className="pb-2 pr-3 font-medium w-[110px]">Paid from Trading</th>
                 <th className="pb-2 pr-3 font-medium w-[100px]">Squared Off?</th>
@@ -987,6 +1097,17 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                 return (
                   <tr key={isoSunday} className={`border-b border-[var(--border)] transition-colors ${squaredOff ? "opacity-60" : ""}`}>
                     <td className="py-2.5 pr-3 font-medium text-foreground/70">{fmtWeekLabel(sunday, saturday)}</td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="text"
+                        list="cc-card-names"
+                        className={inputCls + " text-foreground"}
+                        placeholder="e.g. Robinhood Gold"
+                        value={local.card_name}
+                        onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), card_name: e.target.value } }))}
+                        onBlur={() => isDirty && commitRow(isoSunday)}
+                      />
+                    </td>
                     <td className="py-2 pr-3">
                       <input
                         type="number"
@@ -1037,7 +1158,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
               })}
             </tbody>
           </table>
-          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · click Squared Off badge to toggle payment status</p>
+          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · type a card name or pick from suggestions · click Squared Off to toggle</p>
         </div>
       )}
     </div>

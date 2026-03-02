@@ -1641,7 +1641,7 @@ def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
     finally:
         session.close()
 
-def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None):
+def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None):
     session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
@@ -1650,6 +1650,7 @@ def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=N
             category=str(category), type=type_enum, amount=float(amount),
             date=pd.to_datetime(date), description=str(desc),
             entry_type=entry_type, recurrence=recurrence,
+            merchant=str(merchant) if merchant else None,
         )
         if user_id is not None:
             new_item.user_id = int(user_id)
@@ -2176,6 +2177,7 @@ def list_credit_card_weeks(user_id: int):
             {
                 "id": r.id,
                 "week_start": r.week_start.isoformat() if r.week_start else None,
+                "card_name": r.card_name,
                 "balance": r.balance,
                 "squared_off": r.squared_off,
                 "paid_amount": r.paid_amount,
@@ -2190,12 +2192,13 @@ def list_credit_card_weeks(user_id: int):
 
 
 def create_credit_card_week(user_id: int, week_start, balance: float, squared_off: bool = False,
-                            paid_amount=None, note=None):
+                            paid_amount=None, note=None, card_name=None):
     session = get_session()
     try:
         row = CreditCardWeek(
             user_id=user_id,
             week_start=pd.to_datetime(week_start),
+            card_name=str(card_name) if card_name else None,
             balance=float(balance),
             squared_off=bool(squared_off),
             paid_amount=float(paid_amount) if paid_amount is not None else None,
