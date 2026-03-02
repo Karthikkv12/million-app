@@ -424,17 +424,16 @@ function Section({
 
   const startEdit = (entry: BudgetEntry) => {
     setEditingId(entry.id!);
-    const ov = getOverride(entry.id!);
     setEditDraft({
       id: entry.id,
       category: entry.category,
       type: (entry.type?.toUpperCase() as DraftRow["type"]) ?? "EXPENSE",
       entry_type: (entry.entry_type ?? (isRecurring ? "RECURRING" : "FLOATING")) as BudgetEntryType,
       recurrence: (entry.recurrence ?? "MONTHLY") as BudgetRecurrence,
-      // pre-fill the current effective amount (override if exists)
-      amount: String(ov ? ov.amount : proratedMonthly(entry)),
+      // always use the base row amount so edits go to the right place
+      amount: String(entry.amount),
       date: entry.date.slice(0, 10),
-      description: ov?.description ?? entry.description ?? "",
+      description: entry.description ?? "",
       merchant: entry.merchant ?? "",
       active_until: entry.active_until ?? "",
     });
@@ -442,12 +441,8 @@ function Section({
 
   const saveEdit = async () => {
     if (!editDraft?.category || !editDraft.amount) return;
-    if (isRecurring && editDraft.id) {
-      // save as monthly override — do NOT mutate the base row
-      await overrideMut.mutateAsync(editDraft);
-    } else {
-      await mut.mutateAsync(editDraft);
-    }
+    // Always save to the base row so category/ends/frequency changes persist
+    await mut.mutateAsync(editDraft);
     setEditingId(null);
     setEditDraft(null);
   };
