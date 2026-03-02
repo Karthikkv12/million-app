@@ -5,6 +5,27 @@
 
 ---
 
+## v1.7.2 — Mobile & iPad Responsive Optimizations
+**Released:** 2026-03-01
+**Tag:** `v1.7.2`
+**Branch:** `develop`
+
+### 📱 Mobile (< 640px)
+- Page header text scales down (`text-xl`); "Annual Summary" tab label truncates to "Annual" on phones
+- `StatCard` font scales: `text-xl` phone → `text-2xl` sm+
+- CC card header uses `flex-wrap` so the Charged/Paid/Due chips wrap instead of overflowing
+- Free-add CC table has `min-w-[520px]` + `overflow-x-auto` for clean horizontal scroll
+- Metrics stat cards: 2×2 grid on phone → 4-in-a-row at `sm` (640px)
+- Tighter padding on metrics right panel (`px-3 py-3` on mobile)
+
+### 📟 iPad / Tablet (`md` = 768px)
+- Stat cards: `2col → 3col at md → 5col at lg` (no more jump from 2 to 5)
+- Charts grid: `1col → 2col at md → 3col at lg`
+- Robinhood Gold tracker: table + metrics side-by-side activates at `md` (iPad portrait) instead of `lg` (1024px only)
+- Table left column narrows to `w-[320px]` on md, expands to `w-[360px]` on lg
+
+---
+
 ## v1.7.1 — Robinhood Gold Tracker Improvements
 **Released:** 2026-03-01
 **Tag:** `v1.7.1`
