@@ -5,6 +5,53 @@
 
 ---
 
+## v1.8.0 — Budget: Category Annual Cards, Income Separation & CC Integration
+**Released:** 2026-03-01
+**Tag:** `v1.8.0`
+**Branch:** `develop`
+
+### 💰 Income Separation
+- Income entries are now fully separated from expense rows — income no longer bleeds into expense totals
+- `allEntries` split into three buckets: `floating` (one-off expenses), `recurring` (fixed expenses), `incomeRows` (all INCOME type)
+- Dedicated **Income section** in the monthly view with TrendingUp icon
+- Stats `expense` total is EXPENSE-only; `income` figure comes from `incomeRows` exclusively
+
+### 💳 Credit Card Total in Expense Summary
+- CC week charges for the current month are now included in the **Expenses** stat card
+- `ccMonthTotal` query filters out Robinhood Gold rows (tracked separately) and sums non-Robinhood CC charges
+- **Net** stat card also deducts `ccMonthTotal` for an accurate real net figure
+- Savings Rate widget uses the corrected net (income − budget expenses − CC charges)
+
+### 📅 Ends Column (Recurring Rows) — Month/Year Dropdowns
+- Replaced `<input type="month">` (invisible on WebKit/Safari) with two `<select>` dropdowns: **Mo** + **Yr**
+- Year dropdown offers current year + 9 future years
+- ✕ clear button resets `active_until` back to "ongoing"
+- `active_until` stored as `YYYY-MM`; `recurringAppliesToMonth` respects the end date
+- Added `merchant` and `active_until` columns to `budget` DB table (migration 0017/0018)
+- Added `card_name` column to `credit_card_weeks` table
+
+### 📋 Curated Categories List
+- `CATEGORIES` array replaced with a focused 14-item list:
+  Groceries · Personal Loan · Car Payment · Communication · Personal Care · Gas · Utilities · Shopping · Housing · Entertainment · Subscriptions · Travel · Gifts · Other
+
+### 🔧 Fix: Recurring Row Edits Now Save Correctly
+- `saveEdit` was routing recurring edits through `overrideMut` (budget_overrides table), discarding category/ends/frequency changes
+- Fixed: `saveEdit` now always calls `mut` (base row PATCH) so all fields persist
+- `startEdit` pre-fills with `entry.amount` (base amount) instead of prorated/overridden value
+
+### 📊 Annual Summary — Category Spend Cards with Monthly Bar Charts
+- New **`CategoryAnnualCards`** component rendered below the Annual Summary table
+- One card per expense category that has spend in the selected year, sorted by annual total (highest first)
+- **4-column responsive grid**: 1 col mobile → 2 sm → 3 lg → 4 xl
+- Each card shows:
+  - Category name with color dot + annual total
+  - Avg monthly spend (active months only) + "X of 12 months" counter
+  - **12-bar chart** (Jan–Dec): colored bars for months with spend, grey for zero months
+  - Hover tooltip shows exact dollar amount per month
+- Uses existing `PIE_COLORS` palette for consistent color coding across charts
+
+---
+
 ## v1.7.2 — Mobile & iPad Responsive Optimizations
 **Released:** 2026-03-01
 **Tag:** `v1.7.2`

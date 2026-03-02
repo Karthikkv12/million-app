@@ -633,8 +633,8 @@ export interface BudgetEntry {
   amount: number;
   date: string;
   description?: string;
-  merchant?: string | null;
-  active_until?: string | null;  // YYYY-MM — last month this recurring entry applies; null = indefinite
+  merchant?: string;
+  active_until?: string;  // YYYY-MM
 }
 
 export const fetchBudget  = () => api.get<BudgetEntry[]>("/budget");
