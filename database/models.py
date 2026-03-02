@@ -160,6 +160,7 @@ class Budget(Base):
     date = Column(DateTime)
     description = Column(String)
     merchant = Column(String, nullable=True)     # merchant / payee name (for one-off rows)
+    active_until = Column(String, nullable=True) # YYYY-MM — last month this recurring entry applies; NULL = indefinite
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
 
 

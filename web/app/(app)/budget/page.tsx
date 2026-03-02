@@ -58,7 +58,13 @@ function recurringAppliesToMonth(entry: BudgetEntry, targetKey: string): boolean
   const base = new Date(entry.date.slice(0, 10) + "T00:00:00");
   const [ty, tm] = targetKey.split("-").map(Number);
   const diff = (ty - base.getFullYear()) * 12 + (tm - (base.getMonth() + 1));
-  return diff >= 0 && diff % period === 0;
+  if (diff < 0) return false;                         // before start
+  if (diff % period !== 0) return false;               // not on cycle
+  if (entry.active_until) {                            // respect end date
+    const [ey, em] = entry.active_until.split("-").map(Number);
+    if (ty > ey || (ty === ey && tm > em)) return false;
+  }
+  return true;
 }
 
 // ── draft row type ────────────────────────────────────────────────────────────
@@ -72,6 +78,7 @@ interface DraftRow {
   date: string;
   description: string;
   merchant: string;
+  active_until: string;  // YYYY-MM, empty = indefinite
 }
 
 function blankDraft(month: string, isRecurring: boolean): DraftRow {
@@ -84,6 +91,7 @@ function blankDraft(month: string, isRecurring: boolean): DraftRow {
     date: `${month}-01`,
     description: "",
     merchant: "",
+    active_until: "",
   };
 }
 
@@ -156,6 +164,18 @@ function EditableRow({
             <option value="SEMI_ANNUAL">Every 6 mo</option>
             <option value="ANNUAL">Yearly</option>
           </select>
+        </td>
+      )}
+      {isRecurring && (
+        <td className="px-2 py-1.5 w-[110px]">
+          <input
+            type="month"
+            value={draft.active_until}
+            onChange={(e) => set("active_until", e.target.value)}
+            placeholder="End month"
+            title="Leave blank for indefinite"
+            className={cellCls + " w-full"}
+          />
         </td>
       )}
       <td className="px-2 py-1.5 w-[120px]">
@@ -252,6 +272,15 @@ function ReadRow({
       {isRecurring && (
         <td className="px-3 py-2.5 text-xs text-foreground/50">
           {RECURRENCE_LABEL[(entry.recurrence ?? "ANNUAL") as BudgetRecurrence]}
+        </td>
+      )}
+      {isRecurring && (
+        <td className="px-3 py-2.5 text-xs">
+          {entry.active_until ? (
+            <span className="text-amber-400/80">{entry.active_until}</span>
+          ) : (
+            <span className="text-foreground/25">∞ ongoing</span>
+          )}
         </td>
       )}
       <td className={"px-3 py-2.5 text-sm font-bold text-right whitespace-nowrap " + amtCls}>
@@ -356,6 +385,7 @@ function Section({
         date: d.date,
         description: d.description || undefined,
         merchant: d.merchant || undefined,
+        active_until: (d.entry_type === "RECURRING" && d.active_until) ? d.active_until : undefined,
       };
       return d.id ? updateBudget(d.id, body) : saveBudget(body);
     },
@@ -402,6 +432,7 @@ function Section({
       date: entry.date.slice(0, 10),
       description: ov?.description ?? entry.description ?? "",
       merchant: entry.merchant ?? "",
+      active_until: entry.active_until ?? "",
     });
   };
 
@@ -456,6 +487,7 @@ function Section({
               {!isRecurring && <th className="px-3 py-2 text-left w-[140px]">Merchant</th>}
               <th className="px-3 py-2 text-left w-[110px]">Type</th>
               {isRecurring && <th className="px-3 py-2 text-left w-[120px]">Frequency</th>}
+              {isRecurring && <th className="px-3 py-2 text-left w-[110px]" title="Leave blank for indefinite">Ends</th>}
               <th className="px-3 py-2 text-right w-[120px]">Amount</th>
               <th className="px-3 py-2 text-left">Note</th>
               <th className="px-3 py-2 w-[110px]"></th>
@@ -761,32 +793,45 @@ function fmtWeekLabel(sun: Date, sat: Date): string {
   return sun.toLocaleDateString("en-US", opts) + " – " + sat.toLocaleDateString("en-US", opts);
 }
 
-// ── Robinhood Credit Card Section ─────────────────────────────────────────────
-function CreditCardSection({ currentMonth }: { currentMonth: string }) {
+// ── Shared CC tracker logic (used by both Robinhood + Generic trackers) ──────
+function CCTracker({
+  title,
+  accentColor,
+  filterFn,
+  currentMonth,
+  cardSuggestions,
+  defaultCardName,
+}: {
+  title: string;
+  accentColor: string;                        // tailwind text-* class
+  filterFn: (r: CreditCardWeek) => boolean;   // filter which rows belong to this tracker
+  currentMonth: string;
+  cardSuggestions: string[];                  // datalist suggestions
+  defaultCardName?: string;                   // pre-fill card name for new rows
+}) {
   const qc = useQueryClient();
-  const { data: rows = [], isLoading } = useQuery<CreditCardWeek[]>({
+  const { data: allRows = [], isLoading } = useQuery<CreditCardWeek[]>({
     queryKey: ["cc-weeks"],
     queryFn: fetchCCWeeks,
     staleTime: 30_000,
   });
 
+  const rows = useMemo(() => allRows.filter(filterFn), [allRows, filterFn]);
+
   const weekSlots = useMemo(() => getWeeksForMonth(currentMonth), [currentMonth]);
 
-  // map isoSunday → existing db row
   const rowByDate = useMemo(() => {
     const m: Record<string, CreditCardWeek> = {};
     for (const r of rows) m[r.week_start.slice(0, 10)] = r;
     return m;
   }, [rows]);
 
-  // per-slot local edit state
   const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string; card_name: string }>>({});
 
   const updateMut = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
   });
-
   const saveMut = useMutation({
     mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
@@ -798,7 +843,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
       balance: row?.balance?.toString() ?? "",
       paid_amount: row?.paid_amount?.toString() ?? "",
       note: row?.note ?? "",
-      card_name: row?.card_name ?? "",
+      card_name: row?.card_name ?? defaultCardName ?? "",
     };
   }
 
@@ -808,17 +853,14 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     const row = rowByDate[iso];
     const body: Omit<CreditCardWeek, "id"> = {
       week_start: iso,
-      card_name: local.card_name || null,
+      card_name: local.card_name || defaultCardName || null,
       balance: parseFloat(local.balance) || 0,
       squared_off: row?.squared_off ?? false,
       paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
       note: local.note || "",
     };
-    if (row?.id) {
-      updateMut.mutate({ id: row.id, body });
-    } else {
-      saveMut.mutate(body);
-    }
+    if (row?.id) updateMut.mutate({ id: row.id, body });
+    else          saveMut.mutate(body);
     setEditing((p) => { const n = { ...p }; delete n[iso]; return n; });
   }
 
@@ -827,37 +869,26 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
     const local = getLocalEdit(iso, row);
     const body: Omit<CreditCardWeek, "id"> = {
       week_start: iso,
-      card_name: local.card_name || row?.card_name || null,
+      card_name: local.card_name || row?.card_name || defaultCardName || null,
       balance: parseFloat(local.balance) || row?.balance || 0,
       squared_off: !(row?.squared_off ?? false),
       paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : (row?.paid_amount ?? null),
       note: local.note !== "" ? local.note : (row?.note ?? ""),
     };
-    if (row?.id) {
-      updateMut.mutate({ id: row.id, body });
-    } else {
-      saveMut.mutate(body);
-    }
+    if (row?.id) updateMut.mutate({ id: row.id, body });
+    else          saveMut.mutate(body);
   }
 
   const inputCls = "bg-transparent border border-[var(--border)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-full tabular-nums";
 
-  // ── metrics ──────────────────────────────────────────────────────────────────
-  const outstanding = weekSlots.reduce((s, { isoSunday }) => {
-    const r = rowByDate[isoSunday];
-    return r && !r.squared_off ? s + r.balance : s;
-  }, 0);
-  const pendingCount = weekSlots.filter(({ isoSunday }) => {
-    const r = rowByDate[isoSunday];
-    return r && r.balance > 0 && !r.squared_off;
-  }).length;
-
-  // month-level aggregates
+  // ── metrics ─────────────────────────────────────────────────────────────────
+  const outstanding  = weekSlots.reduce((s, { isoSunday }) => { const r = rowByDate[isoSunday]; return r && !r.squared_off ? s + r.balance : s; }, 0);
+  const pendingCount = weekSlots.filter(({ isoSunday }) => { const r = rowByDate[isoSunday]; return r && r.balance > 0 && !r.squared_off; }).length;
   const monthCharged = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.balance ?? 0), 0);
   const monthPaid    = weekSlots.reduce((s, { isoSunday }) => s + (rowByDate[isoSunday]?.paid_amount ?? 0), 0);
   const payRate      = monthCharged > 0 ? Math.min(100, (monthPaid / monthCharged) * 100) : 0;
 
-  // ── per-card breakdown (this month) ──────────────────────────────────────────
+  // ── per-card breakdown ───────────────────────────────────────────────────────
   const perCardData = useMemo(() => {
     const map: Record<string, { charged: number; paid: number }> = {};
     for (const { isoSunday } of weekSlots) {
@@ -868,23 +899,16 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
       map[key].charged += r.balance ?? 0;
       map[key].paid    += r.paid_amount ?? 0;
     }
-    return Object.entries(map)
-      .map(([name, v]) => ({ name, charged: v.charged, paid: v.paid, net: v.charged - v.paid }))
-      .sort((a, b) => b.charged - a.charged);
+    return Object.entries(map).map(([name, v]) => ({ name, charged: v.charged, paid: v.paid, net: v.charged - v.paid })).sort((a, b) => b.charged - a.charged);
   }, [weekSlots, rowByDate]);
 
-  // ── weekly bar chart data (this month) ───────────────────────────────────────
+  // ── weekly bar data ──────────────────────────────────────────────────────────
   const weekBarData = weekSlots.map(({ sunday, saturday, isoSunday }) => {
     const r = rowByDate[isoSunday];
-    return {
-      week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
-      Balance: r?.balance ?? 0,
-      Paid: r?.paid_amount ?? 0,
-      net: (r?.balance ?? 0) - (r?.paid_amount ?? 0),
-    };
+    return { week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"), Balance: r?.balance ?? 0, Paid: r?.paid_amount ?? 0 };
   });
 
-  // ── monthly trend (all stored rows, grouped by YYYY-MM) ──────────────────────
+  // ── monthly trend (all rows for this tracker) ────────────────────────────────
   const monthTrendData = useMemo(() => {
     const byMonth: Record<string, { charged: number; paid: number }> = {};
     for (const r of rows) {
@@ -893,48 +917,34 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
       byMonth[key].charged += r.balance ?? 0;
       byMonth[key].paid    += r.paid_amount ?? 0;
     }
-    return Object.entries(byMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-12)
-      .map(([month, v]) => ({
-        month: new Date(month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-        Charged: parseFloat(v.charged.toFixed(2)),
-        Paid:    parseFloat(v.paid.toFixed(2)),
-      }));
+    return Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([month, v]) => ({
+      month: new Date(month + "-02").toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      Charged: parseFloat(v.charged.toFixed(2)),
+      Paid:    parseFloat(v.paid.toFixed(2)),
+    }));
   }, [rows]);
 
-  const tooltipStyle = {
-    backgroundColor: "var(--surface)",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    color: "var(--foreground)",
-    fontSize: 11,
-  };
+  const tooltipStyle = { backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: 11 };
 
-  // unique card names from ALL rows (for datalist suggestions)
-  const knownCards = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of rows) if (r.card_name) s.add(r.card_name);
-    return Array.from(s).sort();
-  }, [rows]);
+  const datalistId = `cc-cards-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-5">
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CreditCard size={16} className="text-rose-400" />
-          <span className="text-sm font-semibold">Credit Card Tracker</span>
+          <CreditCard size={16} className={accentColor} />
+          <span className="text-sm font-semibold">{title}</span>
           <span className="text-xs text-foreground/40">{weekSlots.length}-week tracker · {currentMonth}</span>
         </div>
         {outstanding > 0 ? (
-          <span className="text-xs font-bold text-rose-400">Outstanding: {fmt$(outstanding)}</span>
+          <span className={`text-xs font-bold ${accentColor}`}>Outstanding: {fmt$(outstanding)}</span>
         ) : pendingCount === 0 && rows.length > 0 ? (
           <span className="flex items-center gap-1 text-xs font-medium text-emerald-400"><Check size={12} /> All squared off!</span>
         ) : null}
       </div>
 
-      {/* ── metric cards ─────────────────────────────────────────────────────── */}
+      {/* metric cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Charged", value: fmt$(monthCharged), cls: "text-rose-400" },
@@ -949,7 +959,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         ))}
       </div>
 
-      {/* ── pay rate progress bar ─────────────────────────────────────────────── */}
+      {/* pay rate bar */}
       {monthCharged > 0 && (
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[10px] text-foreground/40">
@@ -957,21 +967,18 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
             <span>{payRate.toFixed(1)}% of balance paid</span>
           </div>
           <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${payRate >= 100 ? "bg-emerald-500" : payRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
-              style={{ width: `${Math.min(100, payRate)}%` }}
-            />
+            <div className={`h-full rounded-full transition-all duration-500 ${payRate >= 100 ? "bg-emerald-500" : payRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${Math.min(100, payRate)}%` }} />
           </div>
         </div>
       )}
 
-      {/* ── per-card breakdown ───────────────────────────────────────────────── */}
-      {perCardData.length > 0 && (
+      {/* per-card breakdown (only if multiple cards in this tracker) */}
+      {perCardData.length > 1 && (
         <div className="flex flex-col gap-3">
           <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide">Spending by Card</p>
-          <div className={`grid gap-3 ${perCardData.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {perCardData.map((card, i) => {
-              const cardPayRate = card.charged > 0 ? Math.min(100, (card.paid / card.charged) * 100) : 0;
+              const r = card.charged > 0 ? Math.min(100, (card.paid / card.charged) * 100) : 0;
               return (
                 <div key={card.name} className="bg-[var(--surface-raised,var(--surface))] border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
@@ -979,7 +986,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                       <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                       <span className="text-xs font-semibold text-foreground/80">{card.name}</span>
                     </div>
-                    <span className="text-[10px] text-foreground/40">{cardPayRate.toFixed(0)}% paid</span>
+                    <span className="text-[10px] text-foreground/40">{r.toFixed(0)}% paid</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-rose-400 font-bold">{fmt$(card.charged)}</span>
@@ -987,10 +994,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                     {card.net > 0 && <span className="text-amber-400">{fmt$(card.net)} due</span>}
                   </div>
                   <div className="h-1.5 rounded-full bg-foreground/10 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${cardPayRate >= 100 ? "bg-emerald-500" : cardPayRate >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
-                      style={{ width: `${Math.min(100, cardPayRate)}%` }}
-                    />
+                    <div className={`h-full rounded-full transition-all duration-500 ${r >= 100 ? "bg-emerald-500" : r >= 50 ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${Math.min(100, r)}%` }} />
                   </div>
                 </div>
               );
@@ -999,10 +1003,9 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         </div>
       )}
 
-      {/* ── charts row ───────────────────────────────────────────────────────── */}
+      {/* charts */}
       {monthCharged > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* per-card pie chart */}
+        <div className={`grid grid-cols-1 gap-4 ${perCardData.length > 1 ? "lg:grid-cols-3" : monthTrendData.length > 1 ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           {perCardData.length > 1 && (
             <div>
               <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Charged by Card</p>
@@ -1011,37 +1014,25 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                   <Pie data={perCardData} dataKey="charged" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={2}>
                     {perCardData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(v: number) => ["$" + v.toFixed(2), "Charged"]}
-                  />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => ["$" + v.toFixed(2), "Charged"]} />
                   <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.7 }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           )}
-
-          {/* weekly balance vs paid */}
-          <div className={perCardData.length > 1 ? "" : "lg:col-span-2"}>
+          <div>
             <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">This Month — Balance vs Paid per Week</p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weekBarData} barCategoryGap="30%" margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
-                  itemStyle={{ color: "var(--foreground)" }}
-                  formatter={(v: number) => "$" + v.toFixed(2)}
-                />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)", opacity: 0.7 }} itemStyle={{ color: "var(--foreground)" }} formatter={(v: number) => "$" + v.toFixed(2)} />
                 <Bar dataKey="Balance" fill="#f43f5e" radius={[3, 3, 0, 0]} />
                 <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-
-          {/* monthly trend */}
           {monthTrendData.length > 1 && (
             <div>
               <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Monthly Trend — Charged vs Paid</p>
@@ -1050,12 +1041,7 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: "var(--foreground)", opacity: 0.7 }}
-                    itemStyle={{ color: "var(--foreground)" }}
-                    formatter={(v: number) => "$" + v.toFixed(2)}
-                  />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)", opacity: 0.7 }} itemStyle={{ color: "var(--foreground)" }} formatter={(v: number) => "$" + v.toFixed(2)} />
                   <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
                   <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
@@ -1066,14 +1052,13 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
         </div>
       )}
 
-      {/* ── table ────────────────────────────────────────────────────────────── */}
+      {/* table */}
       {isLoading ? (
         <p className="text-xs text-foreground/40 py-4 text-center">Loading…</p>
       ) : (
         <div className="overflow-x-auto">
-          {/* datalist for card name suggestions */}
-          <datalist id="cc-card-names">
-            {knownCards.map((c) => <option key={c} value={c} />)}
+          <datalist id={datalistId}>
+            {cardSuggestions.map((c) => <option key={c} value={c} />)}
           </datalist>
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -1093,58 +1078,34 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
                 const local = getLocalEdit(isoSunday, row);
                 const isDirty = !!editing[isoSunday];
                 const squaredOff = row?.squared_off ?? false;
-
                 return (
                   <tr key={isoSunday} className={`border-b border-[var(--border)] transition-colors ${squaredOff ? "opacity-60" : ""}`}>
                     <td className="py-2.5 pr-3 font-medium text-foreground/70">{fmtWeekLabel(sunday, saturday)}</td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="text"
-                        list="cc-card-names"
-                        className={inputCls + " text-foreground"}
-                        placeholder="e.g. Robinhood Gold"
-                        value={local.card_name}
+                      <input type="text" list={datalistId} className={inputCls + " text-foreground"} placeholder={defaultCardName ?? "Card name"} value={local.card_name}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), card_name: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)}
-                      />
+                        onBlur={() => isDirty && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="number"
-                        className={inputCls}
-                        placeholder="0.00"
-                        value={local.balance}
+                      <input type="number" className={inputCls} placeholder="0.00" value={local.balance}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), balance: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)}
-                      />
+                        onBlur={() => isDirty && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="number"
-                        className={inputCls}
-                        placeholder="0.00"
-                        value={local.paid_amount}
+                      <input type="number" className={inputCls} placeholder="0.00" value={local.paid_amount}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), paid_amount: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)}
-                      />
+                        onBlur={() => isDirty && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
-                      <button
-                        onClick={() => toggleSquared(isoSunday)}
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${squaredOff ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}
-                      >
+                      <button onClick={() => toggleSquared(isoSunday)}
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${squaredOff ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"}`}>
                         {squaredOff ? "✓ Paid" : "● Pending"}
                       </button>
                     </td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="text"
-                        className={inputCls}
-                        placeholder="optional note"
-                        value={local.note}
+                      <input type="text" className={inputCls} placeholder="optional note" value={local.note}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), note: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)}
-                      />
+                        onBlur={() => isDirty && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 text-right">
                       {isDirty && (
@@ -1158,14 +1119,61 @@ function CreditCardSection({ currentMonth }: { currentMonth: string }) {
               })}
             </tbody>
           </table>
-          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · type a card name or pick from suggestions · click Squared Off to toggle</p>
+          <p className="text-[10px] text-foreground/30 mt-2">Changes auto-save on blur · click Squared Off badge to toggle</p>
         </div>
       )}
     </div>
   );
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── CC Trackers wrapper — renders Robinhood + generic Credit Cards separately ──
+function CCTrackers({ currentMonth }: { currentMonth: string }) {
+  const { data: allRows = [] } = useQuery<CreditCardWeek[]>({
+    queryKey: ["cc-weeks"],
+    queryFn: fetchCCWeeks,
+    staleTime: 30_000,
+  });
+
+  // Build unique card name suggestions from all rows
+  const allCardNames = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of allRows) if (r.card_name) s.add(r.card_name);
+    return Array.from(s).sort();
+  }, [allRows]);
+
+  // Robinhood rows: card_name starts with "Robinhood" (case-insensitive) OR card_name is null/empty for the Robinhood tracker
+  const rhFilter = (r: CreditCardWeek) =>
+    !r.card_name || r.card_name.toLowerCase().startsWith("robinhood");
+
+  // Generic CC rows: explicitly named card that is NOT Robinhood
+  const genericFilter = (r: CreditCardWeek) =>
+    !!r.card_name && !r.card_name.toLowerCase().startsWith("robinhood");
+
+  const rhSuggestions = allCardNames.filter((n) => n.toLowerCase().startsWith("robinhood"));
+  const genericSuggestions = allCardNames.filter((n) => !n.toLowerCase().startsWith("robinhood"));
+
+  return (
+    <>
+      {/* Robinhood Card tracker */}
+      <CCTracker
+        title="Robinhood Card"
+        accentColor="text-rose-400"
+        filterFn={rhFilter}
+        currentMonth={currentMonth}
+        cardSuggestions={rhSuggestions.length > 0 ? rhSuggestions : ["Robinhood Gold", "Robinhood Cash"]}
+        defaultCardName="Robinhood Gold"
+      />
+      {/* Generic Credit Cards tracker */}
+      <CCTracker
+        title="Credit Cards"
+        accentColor="text-blue-400"
+        filterFn={genericFilter}
+        currentMonth={currentMonth}
+        cardSuggestions={genericSuggestions}
+      />
+    </>
+  );
+}
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
@@ -1400,8 +1408,14 @@ export default function BudgetPage() {
             />
           </div>
 
-          {/* Robinhood Credit Card tracker */}
-          <CreditCardSection currentMonth={currentMonth} />
+          {/* CC trackers — Robinhood Card + generic Credit Cards (separate panels) */}
+          <div className="flex flex-col gap-5 mt-5">
+            <div className="flex items-center gap-2">
+              <CreditCard size={14} className="text-foreground/30" />
+              <span className="text-xs font-semibold text-foreground/40 uppercase tracking-wide">Card Trackers</span>
+            </div>
+            <CCTrackers currentMonth={currentMonth} />
+          </div>
         </>
       )}
 

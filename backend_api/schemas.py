@@ -223,6 +223,7 @@ class BudgetCreateRequest(BaseModel):
     date: datetime
     description: str = ""
     merchant: Optional[str] = None
+    active_until: Optional[str] = None   # YYYY-MM, recurring end month
 
 
 class BudgetOut(BaseModel):
@@ -235,6 +236,7 @@ class BudgetOut(BaseModel):
     date: datetime
     description: Optional[str] = None
     merchant: Optional[str] = None
+    active_until: Optional[str] = None   # YYYY-MM, recurring end month
 
 
 class BudgetOverrideRequest(BaseModel):

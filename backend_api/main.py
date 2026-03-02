@@ -1293,6 +1293,7 @@ def create_budget(req: BudgetCreateRequest, user=Depends(get_current_user)) -> D
         entry_type=req.entry_type,
         recurrence=req.recurrence,
         merchant=req.merchant,
+        active_until=req.active_until,
     )
     return {"status": "ok"}
 
@@ -1309,6 +1310,7 @@ def patch_budget(budget_id: int, req: BudgetCreateRequest, user=Depends(get_curr
         date=req.date,
         description=req.description,
         merchant=req.merchant,
+        active_until=req.active_until,
     )
     return {"status": "ok"}
 

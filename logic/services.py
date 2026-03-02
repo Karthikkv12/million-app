@@ -1641,7 +1641,7 @@ def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
     finally:
         session.close()
 
-def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None):
+def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None, active_until=None):
     session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
@@ -1651,6 +1651,7 @@ def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=N
             date=pd.to_datetime(date), description=str(desc),
             entry_type=entry_type, recurrence=recurrence,
             merchant=str(merchant) if merchant else None,
+            active_until=str(active_until) if active_until else None,
         )
         if user_id is not None:
             new_item.user_id = int(user_id)
