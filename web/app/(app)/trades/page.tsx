@@ -27,6 +27,9 @@ const inp =
   "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] " +
   "text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500";
 
+// Date inputs need color-scheme so the native calendar picker is visible in dark mode
+const datInp = inp + " [color-scheme:dark]";
+
 const STATUS_COLORS: Record<PositionStatus, string> = {
   ACTIVE:   "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300",
   CLOSED:   "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300",
@@ -261,8 +264,8 @@ function PositionForm({
             <option value="PUT">PUT (CSP)</option>
           </select>
         ))}
-        {field("Sold Date", <input type="date" value={f.sold_date} onChange={(e) => set("sold_date", e.target.value)} className={inp} />)}
-        {field("Expiry Date", <input type="date" value={f.expiry_date} onChange={(e) => set("expiry_date", e.target.value)} className={inp} />)}
+        {field("Sold Date", <input type="date" value={f.sold_date} onChange={(e) => set("sold_date", e.target.value)} className={datInp} />)}
+        {field("Expiry Date", <input type="date" value={f.expiry_date} onChange={(e) => set("expiry_date", e.target.value)} className={datInp} />)}
         {field("Premium In ($)", <input type="number" step="0.01" value={f.premium_in} onChange={(e) => set("premium_in", e.target.value)} placeholder="0.00" className={inp} />)}
         {field("Margin ($)", <input type="number" step="1" value={f.margin} onChange={(e) => set("margin", e.target.value)} placeholder="optional" className={inp} />)}
       </div>
@@ -3195,7 +3198,7 @@ function HoldingsTab() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
             {fld("Shares", <input type="number" min="1" step="1" value={f.shares} onChange={e => setField("shares", e.target.value)} placeholder="100" className={inp} />)}
             {fld("Avg Cost / Share ($)", <input type="number" step="0.01" value={f.cost_basis} onChange={e => setField("cost_basis", e.target.value)} placeholder="150.00" className={inp} />)}
-            {fld("Acquired Date", <input type="date" value={f.acquired_date} onChange={e => setField("acquired_date", e.target.value)} className={inp} />)}
+            {fld("Acquired Date", <input type="date" value={f.acquired_date} onChange={e => setField("acquired_date", e.target.value)} className={datInp} />)}
           </div>
           {fld("Notes", <input value={f.notes} onChange={e => setField("notes", e.target.value)} placeholder="optional" className={`${inp} mb-3`} />)}
           {formErr && <p className="text-xs text-red-500 mb-3">{formErr}</p>}
