@@ -765,6 +765,29 @@ function fmt$(n: number | null | undefined): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ── Week helpers (used by Robinhood fixed-week tracker) ─────────────────────
+function getWeeksForMonth(yearMonth: string): { sunday: Date; saturday: Date; isoSunday: string }[] {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay  = new Date(y, m, 0);
+  const startSun = new Date(firstDay);
+  startSun.setDate(firstDay.getDate() - firstDay.getDay());
+  const weeks: { sunday: Date; saturday: Date; isoSunday: string }[] = [];
+  const cur = new Date(startSun);
+  while (cur <= lastDay) {
+    const sun = new Date(cur);
+    const sat = new Date(cur);
+    sat.setDate(sat.getDate() + 6);
+    weeks.push({ sunday: sun, saturday: sat, isoSunday: sun.toISOString().slice(0, 10) });
+    cur.setDate(cur.getDate() + 7);
+  }
+  return weeks;
+}
+function fmtWeekLabel(sun: Date, sat: Date): string {
+  const o: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return sun.toLocaleDateString("en-US", o) + " – " + sat.toLocaleDateString("en-US", o);
+}
+
 // ── CC Section — simple add-row table (like one-off) with card name column ─────────────────
 interface CCDraft {
   id?: number;
@@ -785,6 +808,7 @@ function CCSection({
   cardFilter,
   defaultCard,
   datalistId = "cc-card-names",
+  fixedWeeks = false,
 }: {
   currentMonth: string;
   title?: string;
@@ -792,6 +816,8 @@ function CCSection({
   cardFilter?: (r: CreditCardWeek) => boolean;
   defaultCard?: string;
   datalistId?: string;
+  /** When true, renders one fixed row per week instead of free add-row mode */
+  fixedWeeks?: boolean;
 }) {
   const qc = useQueryClient();
   const { data: allRows = [], isLoading } = useQuery<CreditCardWeek[]>({
@@ -805,6 +831,20 @@ function CCSection({
     return cardFilter ? monthRows.filter(cardFilter) : monthRows;
   }, [allRows, currentMonth, cardFilter]);
 
+  // ── fixed-week mode state ──────────────────────────────────────────────────
+  const weekSlotList = useMemo(
+    () => fixedWeeks ? getWeeksForMonth(currentMonth) : [],
+    [fixedWeeks, currentMonth],
+  );
+  const rowByDate = useMemo(() => {
+    const m: Record<string, CreditCardWeek> = {};
+    for (const r of rows) m[r.week_start.slice(0, 10)] = r;
+    return m;
+  }, [rows]);
+  // inline field state for fixed-week rows: iso → { balance, paid_amount, note }
+  const [weekEdits, setWeekEdits] = useState<Record<string, { balance: string; paid_amount: string; note: string }>>({});
+
+  // ── free-add mode state ────────────────────────────────────────────────────
   const [drafts, setDrafts] = useState<CCDraft[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<CCDraft | null>(null);
@@ -856,6 +896,31 @@ function CCSection({
     setEditingId(null);
     setEditDraft(null);
   };
+
+  /** Commit a fixed-week row (called on Enter or blur) */
+  const commitWeekRow = async (iso: string) => {
+    const local = weekEdits[iso];
+    if (!local) return;
+    const existing = rowByDate[iso];
+    const body: Omit<CreditCardWeek, "id"> = {
+      week_start: iso,
+      card_name: defaultCard ?? null,
+      balance: parseFloat(local.balance) || 0,
+      paid_amount: local.paid_amount !== "" ? parseFloat(local.paid_amount) : null,
+      squared_off: existing?.squared_off ?? false,
+      note: local.note || "",
+    };
+    if (existing?.id) await saveMut.mutateAsync({ ...body, id: existing.id } as CCDraft & { id: number });
+    else await saveMut.mutateAsync({ ...blankCCDraft(currentMonth), date: iso, balance: local.balance, paid_amount: local.paid_amount, note: local.note, card_name: defaultCard ?? "" });
+    setWeekEdits((p) => { const n = { ...p }; delete n[iso]; return n; });
+  };
+
+  const getWeekLocal = (iso: string) =>
+    weekEdits[iso] ?? {
+      balance: String(rowByDate[iso]?.balance ?? ""),
+      paid_amount: rowByDate[iso]?.paid_amount != null ? String(rowByDate[iso]!.paid_amount) : "",
+      note: rowByDate[iso]?.note ?? "",
+    };
 
   const cardNames = useMemo(() => {
     const s = new Set<string>();
@@ -934,10 +999,12 @@ function CCSection({
               )}
             </div>
           )}
-          <button onClick={addRow}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition">
-            <Plus size={12} /> Add row
-          </button>
+          {!fixedWeeks && (
+            <button onClick={addRow}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition">
+              <Plus size={12} /> Add row
+            </button>
+          )}
         </div>
       </div>
 
@@ -949,8 +1016,8 @@ function CCSection({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[11px] font-semibold text-foreground/40 uppercase tracking-wider border-b border-[var(--border)]">
-              <th className="px-3 py-2 text-left w-[115px]">Date</th>
-              <th className="px-3 py-2 text-left w-[160px]">Card Name</th>
+              <th className="px-3 py-2 text-left w-[150px]">{fixedWeeks ? "Week" : "Date"}</th>
+              {!fixedWeeks && <th className="px-3 py-2 text-left w-[160px]">Card Name</th>}
               <th className="px-3 py-2 text-right w-[130px]">Amount Charged</th>
               <th className="px-3 py-2 text-right w-[130px]">Paid from Trading</th>
               <th className="px-3 py-2 text-left">Note</th>
@@ -959,8 +1026,64 @@ function CCSection({
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-foreground/30">Loading…</td></tr>
+              <tr><td colSpan={fixedWeeks ? 5 : 6} className="px-4 py-8 text-center text-sm text-foreground/30">Loading…</td></tr>
+            ) : fixedWeeks ? (
+              /* ── fixed-week rows ── */
+              weekSlotList.map(({ sunday, saturday, isoSunday }) => {
+                const existing = rowByDate[isoSunday];
+                const local = getWeekLocal(isoSunday);
+                const isDirty = !!weekEdits[isoSunday];
+                const inputCls = cellCls + " text-right";
+                return (
+                  <tr key={isoSunday} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
+                    <td className="px-3 py-2 text-xs text-foreground/60 whitespace-nowrap font-medium">
+                      {fmtWeekLabel(sunday, saturday)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="number" step="0.01" min="0"
+                        value={local.balance} placeholder="0.00"
+                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), balance: e.target.value } }))}
+                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
+                        className={inputCls} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="number" step="0.01" min="0"
+                        value={local.paid_amount} placeholder="0.00"
+                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), paid_amount: e.target.value } }))}
+                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
+                        className={inputCls} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="text"
+                        value={local.note} placeholder="Note"
+                        onChange={(e) => setWeekEdits((p) => ({ ...p, [isoSunday]: { ...getWeekLocal(isoSunday), note: e.target.value } }))}
+                        onBlur={() => isDirty && commitWeekRow(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitWeekRow(isoSunday)}
+                        className={cellCls} />
+                    </td>
+                    <td className="px-3 py-2 w-[100px]">
+                      <div className="flex items-center gap-2">
+                        {isDirty && (
+                          <button onClick={() => commitWeekRow(isoSunday)}
+                            className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 transition">
+                            <Check size={13} />
+                          </button>
+                        )}
+                        {existing?.id && !isDirty && (
+                          <button onClick={() => delMut.mutate(existing.id!)}
+                            className="p-1.5 rounded-lg text-foreground/30 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
+              /* ── free-add rows ── */
               <>
                 {rows.map((r) =>
                   editingId === r.id && editDraft ? (
@@ -1281,6 +1404,7 @@ export default function BudgetPage() {
               cardFilter={(r) => !r.card_name || r.card_name.toLowerCase().startsWith("robinhood")}
               defaultCard="Robinhood Gold"
               datalistId="cc-rh-names"
+              fixedWeeks
             />
             <CCSection
               currentMonth={currentMonth}
