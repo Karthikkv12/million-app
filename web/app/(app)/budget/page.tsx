@@ -827,6 +827,8 @@ function CCTracker({
   }, [rows]);
 
   const [editing, setEditing] = useState<Record<string, { balance: string; paid_amount: string; note: string; card_name: string }>>({});
+  // track a pending blur-commit per row — cancelled if focus stays in the same row
+  const blurTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const updateMut = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Omit<CreditCardWeek, "id"> }) => updateCCWeek(id, body),
@@ -836,6 +838,15 @@ function CCTracker({
     mutationFn: (body: Omit<CreditCardWeek, "id">) => saveCCWeek(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cc-weeks"] }),
   });
+
+  /** Schedule a commit 200 ms after blur — cancelled if the user focuses another cell in the same row */
+  function scheduleCommit(iso: string) {
+    clearTimeout(blurTimers.current[iso]);
+    blurTimers.current[iso] = setTimeout(() => commitRow(iso), 200);
+  }
+  function cancelCommit(iso: string) {
+    clearTimeout(blurTimers.current[iso]);
+  }
 
   function getLocalEdit(iso: string, row?: CreditCardWeek) {
     if (editing[iso]) return editing[iso];
@@ -1084,17 +1095,23 @@ function CCTracker({
                     <td className="py-2 pr-3">
                       <input type="text" list={datalistId} className={inputCls + " text-foreground"} placeholder={defaultCardName ?? "Card name"} value={local.card_name}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), card_name: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)} />
+                        onFocus={() => cancelCommit(isoSunday)}
+                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
                       <input type="number" className={inputCls} placeholder="0.00" value={local.balance}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), balance: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)} />
+                        onFocus={() => cancelCommit(isoSunday)}
+                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
                       <input type="number" className={inputCls} placeholder="0.00" value={local.paid_amount}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), paid_amount: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)} />
+                        onFocus={() => cancelCommit(isoSunday)}
+                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 pr-3">
                       <button onClick={() => toggleSquared(isoSunday)}
@@ -1105,7 +1122,9 @@ function CCTracker({
                     <td className="py-2 pr-3">
                       <input type="text" className={inputCls} placeholder="optional note" value={local.note}
                         onChange={(e) => setEditing((p) => ({ ...p, [isoSunday]: { ...getLocalEdit(isoSunday, row), note: e.target.value } }))}
-                        onBlur={() => isDirty && commitRow(isoSunday)} />
+                        onFocus={() => cancelCommit(isoSunday)}
+                        onBlur={() => isDirty && scheduleCommit(isoSunday)}
+                        onKeyDown={(e) => e.key === "Enter" && commitRow(isoSunday)} />
                     </td>
                     <td className="py-2 text-right">
                       {isDirty && (
