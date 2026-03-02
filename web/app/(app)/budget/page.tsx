@@ -722,6 +722,115 @@ function AnnualSummary({ entries, year }: { entries: BudgetEntry[]; year: number
   );
 }
 
+// ── CategoryAnnualCards ──────────────────────────────────────────────────────
+function CategoryAnnualCards({ entries, year }: { entries: BudgetEntry[]; year: number }) {
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    label: SHORT_MONTHS[i],
+    key: `${year}-${String(i + 1).padStart(2, "0")}`,
+  })), [year]);
+
+  // Build { [category]: [{label, value}, ...] }
+  const catData = useMemo(() => {
+    const map: Record<string, number[]> = {};
+    for (const e of entries) {
+      if (e.type?.toUpperCase() !== "EXPENSE") continue;
+      const cat = e.category || "Other";
+      if (!map[cat]) map[cat] = Array(12).fill(0);
+      const et = (e.entry_type ?? "FLOATING").toUpperCase();
+      if (et !== "RECURRING") {
+        const mi = months.findIndex((m) => m.key === e.date.slice(0, 7));
+        if (mi >= 0) map[cat][mi] += e.amount;
+      } else {
+        months.forEach(({ key }, mi) => {
+          if (recurringAppliesToMonth(e, key)) {
+            const m2 = RECURRENCE_MONTHS[(e.recurrence ?? "ANNUAL") as BudgetRecurrence];
+            map[cat][mi] += e.amount / m2;
+          }
+        });
+      }
+    }
+    return map;
+  }, [entries, months, year]);
+
+  const categories = useMemo(
+    () => Object.entries(catData)
+      .map(([name, vals]) => ({ name, vals, total: vals.reduce((s, v) => s + v, 0) }))
+      .filter((c) => c.total > 0)
+      .sort((a, b) => b.total - a.total),
+    [catData],
+  );
+
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wide px-1">
+        Category Spend — Monthly Breakdown
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {categories.map(({ name, vals, total }, ci) => {
+          const color = PIE_COLORS[ci % PIE_COLORS.length];
+          const chartData = months.map(({ label }, i) => ({ month: label, Amount: Math.round(vals[i]) }));
+          const maxVal = Math.max(...vals, 1);
+          const activeMonths = vals.filter((v) => v > 0).length;
+          const avgMonthly = activeMonths > 0 ? total / activeMonths : 0;
+
+          return (
+            <div key={name} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 flex flex-col gap-2">
+              {/* header */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="text-sm font-bold text-foreground truncate">{name}</span>
+                </div>
+                <span className="text-sm font-black text-foreground/80 tabular-nums shrink-0">{fmt(total)}</span>
+              </div>
+
+              {/* sub-stats */}
+              <div className="flex gap-3 text-[11px] text-foreground/45">
+                <span>Avg <span className="text-foreground/70 font-semibold">{fmt(avgMonthly)}</span>/mo</span>
+                <span>{activeMonths} of 12 months</span>
+              </div>
+
+              {/* bar chart */}
+              <div className="mt-1">
+                <ResponsiveContainer width="100%" height={80}>
+                  <BarChart data={chartData} barCategoryGap="20%" margin={{ top: 0, right: 0, left: -32, bottom: 0 }}>
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 8, fill: "var(--foreground)", opacity: 0.4 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis hide domain={[0, maxVal * 1.15]} />
+                    <Tooltip
+                      formatter={(v: unknown) => [fmt(Number(v)), name]}
+                      contentStyle={{
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 11,
+                        color: "var(--foreground)",
+                      }}
+                      itemStyle={{ color: "var(--foreground)" }}
+                      cursor={{ fill: "var(--surface-2)" }}
+                    />
+                    <Bar dataKey="Amount" radius={[3, 3, 0, 0]}>
+                      {chartData.map((_, i) => (
+                        <Cell key={i} fill={vals[i] > 0 ? color : "var(--surface-2)"} fillOpacity={vals[i] > 0 ? 0.85 : 1} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── TopCategoriesBar ────────────────────────────────────────────────────────────
 function TopCategoriesBar({ pieData }: { pieData: { name: string; value: number }[] }) {
   const top = pieData.slice(0, 7);
@@ -1562,6 +1671,7 @@ export default function BudgetPage() {
         <div className="flex flex-col gap-5">
           <TrendChart entries={allEntries} />
           <AnnualSummary entries={allEntries} year={currentYear} />
+          <CategoryAnnualCards entries={allEntries} year={currentYear} />
         </div>
       )}
     </div>
