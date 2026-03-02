@@ -1111,6 +1111,73 @@ function CCSection({
           </tbody>
         </table>
       </div>
+
+      {/* ── metrics + chart (fixed-week mode only) ── */}
+      {fixedWeeks && totalCharged > 0 && (
+        <div className="px-4 pb-4 pt-3 flex flex-col gap-4 border-t border-[var(--border)]">
+          {/* stat cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Total Charged",     value: fmt$(totalCharged),                          cls: "text-rose-400" },
+              { label: "Paid from Trading",  value: fmt$(totalPaid),                             cls: "text-emerald-400" },
+              { label: "Net Unpaid",         value: fmt$(Math.max(0, totalCharged - totalPaid)), cls: totalCharged - totalPaid > 0 ? "text-amber-400" : "text-emerald-400" },
+              { label: "Pay Rate",           value: totalCharged > 0 ? (Math.min(100, (totalPaid / totalCharged) * 100)).toFixed(1) + "%" : "—",
+                cls: totalPaid >= totalCharged ? "text-emerald-400" : totalPaid / totalCharged >= 0.5 ? "text-amber-400" : "text-rose-400" },
+            ].map(({ label, value, cls }) => (
+              <div key={label} className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3">
+                <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wide mb-1">{label}</p>
+                <p className={"text-xl font-black tabular-nums " + cls}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* pay-rate progress bar */}
+          {(() => {
+            const rate = totalCharged > 0 ? Math.min(100, (totalPaid / totalCharged) * 100) : 0;
+            return (
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-between text-[10px] text-foreground/40">
+                  <span>Monthly Pay Coverage</span>
+                  <span>{rate.toFixed(1)}% of balance paid</span>
+                </div>
+                <div className="h-2 rounded-full bg-foreground/10 overflow-hidden">
+                  <div
+                    className={"h-full rounded-full transition-all duration-500 " + (rate >= 100 ? "bg-emerald-500" : rate >= 50 ? "bg-amber-400" : "bg-rose-500")}
+                    style={{ width: `${rate}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* weekly bar chart */}
+          <div>
+            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">Week-by-Week — Charged vs Paid</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart
+                data={weekSlotList.map(({ sunday, saturday, isoSunday }) => ({
+                  week: fmtWeekLabel(sunday, saturday).replace(/ – /g, "–"),
+                  Charged: rowByDate[isoSunday]?.balance ?? 0,
+                  Paid: rowByDate[isoSunday]?.paid_amount ?? 0,
+                }))}
+                barCategoryGap="30%"
+                margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="week" tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--foreground)", opacity: 0.4, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => "$" + v} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: 11 }}
+                  formatter={(v: number) => "$" + v.toFixed(2)}
+                />
+                <Legend wrapperStyle={{ fontSize: 10, color: "var(--foreground)", opacity: 0.5 }} />
+                <Bar dataKey="Charged" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Paid" fill="#10b981" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1395,11 +1462,11 @@ export default function BudgetPage() {
             />
           </div>
 
-          {/* CC trackers — Robinhood Card + Other Cards */}
-          <div className="flex flex-col gap-5">
+          {/* CC trackers — Robinhood Gold + Other Cards */}
+          <div className="flex flex-col gap-5 mt-5">
             <CCSection
               currentMonth={currentMonth}
-              title="Robinhood Card"
+              title="Robinhood Gold"
               accentColor="text-rose-400"
               cardFilter={(r) => !r.card_name || r.card_name.toLowerCase().startsWith("robinhood")}
               defaultCard="Robinhood Gold"
