@@ -159,6 +159,7 @@ interface PosFormState {
   symbol: string; contracts: string; strike: string;
   option_type: "PUT" | "CALL"; sold_date: string; expiry_date: string;
   buy_date: string; premium_in: string; premium_out: string;
+  spot_price: string;
   is_roll: boolean; margin: string; notes: string; holding_id: string;
   status: PositionStatus;
 }
@@ -167,6 +168,7 @@ const emptyForm = (): PosFormState => ({
   symbol: "", contracts: "1", strike: "", option_type: "CALL",
   sold_date: new Date().toISOString().slice(0, 10),
   expiry_date: "", buy_date: "", premium_in: "", premium_out: "",
+  spot_price: "",
   is_roll: false, margin: "", notes: "", holding_id: "",
   status: "ACTIVE",
 });
@@ -178,6 +180,7 @@ function posToForm(p: OptionPosition): PosFormState {
     expiry_date: p.expiry_date ?? "", buy_date: p.buy_date ?? "",
     premium_in: p.premium_in != null ? String(p.premium_in) : "",
     premium_out: p.premium_out != null ? String(p.premium_out) : "",
+    spot_price: p.spot_price != null ? String(p.spot_price) : "",
     is_roll: p.is_roll, margin: p.margin != null ? String(p.margin) : "",
     notes: p.notes ?? "",
     holding_id: p.holding_id != null ? String(p.holding_id) : "",
@@ -223,6 +226,7 @@ function PositionForm({
         buy_date: f.buy_date || null,
         premium_in: f.premium_in ? parseFloat(f.premium_in) : null,
         premium_out: f.premium_out ? parseFloat(f.premium_out) : null,
+        spot_price: f.spot_price ? parseFloat(f.spot_price) : null,
         is_roll: f.is_roll,
         margin: f.margin ? parseFloat(f.margin) : null,
         notes: f.notes || null,
@@ -267,9 +271,53 @@ function PositionForm({
         {field("Sold Date", <input type="date" value={f.sold_date} onChange={(e) => set("sold_date", e.target.value)} className={datInp} />)}
         {field("Expiry Date", <input type="date" value={f.expiry_date} onChange={(e) => set("expiry_date", e.target.value)} className={datInp} />)}
         {field("Premium In ($)", <input type="number" step="0.01" value={f.premium_in} onChange={(e) => set("premium_in", e.target.value)} placeholder="0.00" className={inp} />)}
+        {field("Spot Price ($)", <input type="number" step="0.01" value={f.spot_price} onChange={(e) => set("spot_price", e.target.value)} placeholder="underlying at sale" className={inp} />)}
         {field("Margin ($)", <input type="number" step="1" value={f.margin} onChange={(e) => set("margin", e.target.value)} placeholder="optional" className={inp} />)}
       </div>
-      {/* Prem Out — shown for closed/rolled/expired/assigned positions and rolls */}
+      {/* Live moneyness / extrinsic breakdown */}
+      {(() => {
+        const spot   = parseFloat(f.spot_price);
+        const strike = parseFloat(f.strike);
+        const prem   = parseFloat(f.premium_in);
+        if (!spot || !strike || !prem || isNaN(spot) || isNaN(strike) || isNaN(prem)) return null;
+        const intrinsic = f.option_type === "CALL"
+          ? Math.max(0, spot - strike)
+          : Math.max(0, strike - spot);
+        const cappedIntrinsic = Math.min(intrinsic, prem);
+        const extrinsic = Math.max(0, prem - cappedIntrinsic);
+        const atmBand = strike * 0.005;
+        const moneyness = Math.abs(spot - strike) <= atmBand ? "ATM"
+          : (f.option_type === "CALL" ? spot > strike : spot < strike) ? "ITM" : "OTM";
+        const badgeColor = moneyness === "ITM"
+          ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
+          : moneyness === "ATM"
+          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700"
+          : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-500 border-green-300 dark:border-green-700";
+        const itmWarn = moneyness === "ITM" && cappedIntrinsic > 0;
+        return (
+          <div className="mb-3 p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex flex-wrap gap-4 items-center">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${badgeColor}`}>
+              {moneyness}
+            </span>
+            <div className="text-xs">
+              <span className="text-foreground/50">Intrinsic: </span>
+              <span className={`font-semibold ${itmWarn ? "text-orange-500" : "text-foreground/70"}`}>
+                ${cappedIntrinsic.toFixed(2)}/sh
+              </span>
+            </div>
+            <div className="text-xs">
+              <span className="text-foreground/50">Extrinsic (θ income): </span>
+              <span className="font-semibold text-green-500">${extrinsic.toFixed(2)}/sh</span>
+              <span className="text-foreground/40 ml-1">(${(extrinsic * (parseInt(f.contracts) || 1) * 100).toFixed(0)} total)</span>
+            </div>
+            {itmWarn && (
+              <p className="w-full text-[11px] text-orange-500/80 mt-0 pt-0">
+                ⚠ Selling ITM — ${cappedIntrinsic.toFixed(2)}/sh is intrinsic value, not theta income. True extrinsic collected is <strong>${extrinsic.toFixed(2)}/sh</strong>.
+              </p>
+            )}
+          </div>
+        );
+      })()}
       {(f.is_roll || ["CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"].includes(f.status)) && (() => {
         const premIn  = parseFloat(f.premium_in)  || 0;
         const premOut = parseFloat(f.premium_out) || 0;   // negative = buyback debit
@@ -652,6 +700,8 @@ Contracts: ${pos.contracts}
 Status: ${pos.status}
 DTE: ${dte != null ? (dte <= 0 ? `${Math.abs(dte)} days past expiry` : `${dte} days left`) : "unknown"}
 Premium In: ${pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}/share` : "unknown"}
+${pos.moneyness ? `Moneyness: ${pos.moneyness} (spot at sale: $${pos.spot_price?.toFixed(2) ?? "unknown"})` : ""}
+${pos.extrinsic_value != null && pos.intrinsic_value != null ? `Extrinsic (theta income): $${pos.extrinsic_value.toFixed(2)}/sh | Intrinsic: $${pos.intrinsic_value.toFixed(2)}/sh` : ""}
 Prem/$1K: ${premPerK != null ? `$${premPerK.toFixed(2)}` : "unknown"}
 ROI: ${roi != null ? `${roi.toFixed(2)}%` : "unknown"}
 Sold: ${pos.sold_date ?? "unknown"}
@@ -702,6 +752,15 @@ What do you think of this position? Should I roll, close early, or hold to expir
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${pos.option_type === "PUT" ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
                 {pos.option_type}
               </span>
+              {pos.moneyness && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${
+                  pos.moneyness === "ITM" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 border-orange-300 dark:border-orange-700"
+                  : pos.moneyness === "ATM" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700"
+                  : "bg-green-100 dark:bg-green-900/30 text-green-700 border-green-300 dark:border-green-700"
+                }`}>
+                  {pos.moneyness}
+                </span>
+              )}
               {isCarriedForward && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 font-semibold">↳ {pos.origin_week_label ?? "prior wk"}</span>
               )}
@@ -733,6 +792,9 @@ What do you think of this position? Should I roll, close early, or hold to expir
           <div>
             <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Prem In</span>
             <span className="text-sm font-semibold text-green-600">{pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}` : "—"}</span>
+            {pos.extrinsic_value != null && pos.intrinsic_value != null && pos.intrinsic_value > 0 && (
+              <span className="text-[10px] text-orange-500 block">θ ${pos.extrinsic_value.toFixed(2)}</span>
+            )}
           </div>
           {premOutCell && (
             <div>
@@ -836,9 +898,20 @@ What do you think of this position? Should I roll, close early, or hold to expir
         <td className="px-3 py-2.5 text-foreground/80 text-sm text-center">{pos.contracts}</td>
         <td className="px-3 py-2.5 text-foreground text-sm">${pos.strike.toFixed(2)}</td>
         <td className="px-3 py-2.5">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${pos.option_type === "PUT" ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
-            {pos.option_type}
-          </span>
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${pos.option_type === "PUT" ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
+              {pos.option_type}
+            </span>
+            {pos.moneyness && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${
+                pos.moneyness === "ITM" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 border-orange-300 dark:border-orange-700"
+                : pos.moneyness === "ATM" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700"
+                : "bg-green-100 dark:bg-green-900/30 text-green-700 border-green-300 dark:border-green-700"
+              }`}>
+                {pos.moneyness}
+              </span>
+            )}
+          </div>
         </td>
         <td className="px-3 py-2.5 text-foreground/70 text-xs whitespace-nowrap">{fmtDate(pos.sold_date)}</td>
         <td className="px-3 py-2.5 text-foreground/70 text-xs whitespace-nowrap">{fmtDate(pos.expiry_date)}</td>
@@ -849,6 +922,9 @@ What do you think of this position? Should I roll, close early, or hold to expir
         </td>
         <td className="px-3 py-2.5 text-green-600 font-semibold text-sm">
           {pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}` : "—"}
+          {pos.extrinsic_value != null && pos.intrinsic_value != null && pos.intrinsic_value > 0 && (
+            <div className="text-[10px] text-orange-500 font-normal">θ ${pos.extrinsic_value.toFixed(2)}</div>
+          )}
         </td>
         <td className="px-3 py-2.5 text-sm">
           {(() => {
@@ -1005,6 +1081,17 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
   }, [carriedPositions]);
 
   const totalPremium = thisWeekPositions.reduce((s, p) => s + (p.total_premium ?? 0), 0);
+  // Effective premium = (strike − avg_cost) + pre_collected_premium_per_share, summed across contracts
+  // i.e. total economic gain per share if called away: intrinsic upside + all premium collected to date
+  const effectivePrem = thisWeekPositions.reduce((s, p) => {
+    const contrib = p.contracts * 100;
+    const holding = allHoldings.find(h => h.id === p.holding_id);
+    const avgCost = holding?.cost_basis ?? 0;
+    const preCollected = holding ? (holding.total_premium_sold / (holding.shares || 1)) : 0;
+    const effPerShare = (p.strike - avgCost) + preCollected;
+    return s + effPerShare * contrib;
+  }, 0);
+  const hasAnyMoneyness = thisWeekPositions.some(p => p.moneyness != null);
   const activeCount  = positions.filter((p) => p.status === "ACTIVE").length;
 
   return (
@@ -1039,6 +1126,13 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
               <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
             </div>
+            {hasAnyMoneyness && (
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+                <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Effective Prem</p>
+                <p className="text-base font-black text-emerald-400">${effectivePrem.toFixed(2)}</p>
+                <p className="text-[10px] text-foreground/40 mt-0.5">θ income only · excl. intrinsic</p>
+              </div>
+            )}
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active Positions</p>
               <p className="text-base font-black text-blue-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {positions.length}</span></p>

@@ -391,6 +391,7 @@ class OptionPosition(Base):
     expiry_date      = Column(DateTime, nullable=True, index=True)
     premium_in       = Column(Float, nullable=True)                 # credit received (positive)
     premium_out      = Column(Float, nullable=True)                 # debit paid to close / roll (negative stored as-is)
+    spot_price       = Column(Float, nullable=True)                 # underlying price at time of sale (for ITM/extrinsic calc)
     is_roll          = Column(Boolean, nullable=False, default=False)
     # Lifecycle
     status           = Column(Enum(OptionPositionStatus), nullable=False,

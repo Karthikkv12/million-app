@@ -347,6 +347,7 @@ export interface OptionPosition {
   expiry_date: string | null;
   premium_in: number | null;
   premium_out: number | null;
+  spot_price: number | null;
   is_roll: boolean;
   status: PositionStatus;
   rolled_to_id: number | null;
@@ -357,6 +358,10 @@ export interface OptionPosition {
   // computed
   net_premium: number;
   total_premium: number;
+  // moneyness (computed from spot_price when available)
+  intrinsic_value: number | null;
+  extrinsic_value: number | null;
+  moneyness: "ITM" | "ATM" | "OTM" | null;
   // carry-forward: set when this position is ACTIVE from a prior week
   carried?: boolean;
   origin_week_label?: string | null;

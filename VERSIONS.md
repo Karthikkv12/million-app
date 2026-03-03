@@ -5,6 +5,24 @@
 
 ---
 
+## v1.8.1 — Effective Premium Formula Fix & Spot Price Support
+**Released:** 2026-03-02
+**Tag:** `v1.8.1`
+**Branch:** `develop`
+
+### 📐 Effective Premium Formula (Trades Page)
+- **Corrected formula:** `Eff Prem = (strike − avg_cost) + pre_collected_per_share` × contracts × 100
+- Previously used extrinsic-only value; now reflects the **true economic gain per share if called away**
+- Cross-references each position's linked holding for `cost_basis` and `total_premium_sold`
+- Positions without a linked holding (CSPs) gracefully fall back to $0
+
+### 📍 Option Position Spot Price
+- Added `spot_price` field to `OptionPosition` model (migration `0019`)
+- `logic/portfolio.py` now computes `intrinsic_value`, `extrinsic_value`, and `moneyness` from live spot
+- `web/lib/api.ts` interface updated with `spot_price` field
+
+---
+
 ## v1.8.0 — Budget: Category Annual Cards, Income Separation & CC Integration
 **Released:** 2026-03-01
 **Tag:** `v1.8.0`

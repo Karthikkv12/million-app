@@ -43,6 +43,7 @@ def _week_bounds(for_date: datetime | None = None):
 
 
 def _pos_to_dict(p: OptionPosition) -> dict:
+    intrinsic, extrinsic, moneyness = _compute_moneyness(p)
     return {
         "id":              p.id,
         "week_id":         p.week_id,
@@ -55,6 +56,7 @@ def _pos_to_dict(p: OptionPosition) -> dict:
         "expiry_date":     p.expiry_date.isoformat() if p.expiry_date else None,
         "premium_in":      p.premium_in,
         "premium_out":     p.premium_out,
+        "spot_price":      p.spot_price,
         "is_roll":         p.is_roll,
         "status":          p.status.value if p.status else "ACTIVE",
         "rolled_to_id":    p.rolled_to_id,
@@ -65,6 +67,10 @@ def _pos_to_dict(p: OptionPosition) -> dict:
         # Computed
         "net_premium":     _net_premium(p),
         "total_premium":   _net_premium(p) * p.contracts * 100,
+        # Moneyness / extrinsic value (only when spot_price is provided)
+        "intrinsic_value": intrinsic,
+        "extrinsic_value": extrinsic,
+        "moneyness":       moneyness,   # "ITM" | "ATM" | "OTM" | None
     }
 
 
@@ -73,6 +79,39 @@ def _net_premium(p: OptionPosition) -> float:
     inn  = p.premium_in  or 0.0
     out  = p.premium_out or 0.0
     return inn + out   # out is already signed (negative = debit)
+
+
+def _compute_moneyness(p: OptionPosition):
+    """Return (intrinsic_per_share, extrinsic_per_share, moneyness_label).
+    intrinsic = the in-the-money component of premium_in (per share).
+    extrinsic = premium_in - intrinsic  (the true time/theta value sold).
+    moneyness  = 'ITM' | 'ATM' | 'OTM' | None (when spot_price not provided).
+    ATM threshold: spot within ±0.5% of strike.
+    """
+    spot  = p.spot_price
+    prem  = p.premium_in or 0.0
+    strike = p.strike or 0.0
+
+    if spot is None or spot <= 0 or strike <= 0:
+        return None, None, None
+
+    if p.option_type == "CALL":
+        raw_intrinsic = max(0.0, spot - strike)
+    else:  # PUT
+        raw_intrinsic = max(0.0, strike - spot)
+
+    intrinsic = round(min(raw_intrinsic, prem), 4)   # can't exceed premium paid
+    extrinsic = round(max(0.0, prem - intrinsic), 4)
+
+    atm_band = strike * 0.005   # ±0.5% of strike
+    if abs(spot - strike) <= atm_band:
+        moneyness = "ATM"
+    elif (p.option_type == "CALL" and spot > strike) or (p.option_type == "PUT" and spot < strike):
+        moneyness = "ITM"
+    else:
+        moneyness = "OTM"
+
+    return intrinsic, extrinsic, moneyness
 
 
 def _snap_to_dict(s: WeeklySnapshot) -> dict:
@@ -457,6 +496,7 @@ def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
             expiry_date = _parse_dt(data.get("expiry_date")),
             premium_in  = _float_or_none(data.get("premium_in")),
             premium_out = _float_or_none(data.get("premium_out")),
+            spot_price  = _float_or_none(data.get("spot_price")),
             is_roll     = bool(data.get("is_roll", False)),
             status      = status_val,
             margin      = _float_or_none(data.get("margin")),
@@ -485,7 +525,7 @@ def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
 
         updatable = [
             "contracts", "strike", "option_type", "sold_date", "buy_date",
-            "expiry_date", "premium_in", "premium_out", "is_roll", "margin", "notes",
+            "expiry_date", "premium_in", "premium_out", "spot_price", "is_roll", "margin", "notes",
         ]
         for field in updatable:
             if field not in data:
@@ -493,7 +533,7 @@ def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
             val = data[field]
             if field in ("sold_date", "buy_date", "expiry_date"):
                 val = _parse_dt(val)
-            elif field in ("premium_in", "premium_out", "margin", "strike"):
+            elif field in ("premium_in", "premium_out", "spot_price", "margin", "strike"):
                 val = _float_or_none(val)
             elif field == "contracts":
                 val = int(val)
@@ -645,13 +685,13 @@ def portfolio_summary(*, user_id: int) -> dict:
             .order_by(WeeklySnapshot.week_end)
             .all()
         )
+        # Build set of week IDs that are open (not yet complete)
+        open_week_ids = {w.id for w in all_weeks if not w.is_complete}
 
         total_premium   = 0.0
         realized_pnl    = 0.0
         active_count    = 0
         assigned_count  = 0
-
-        # Avoid double-counting carried-forward positions
         seen_origin: set[int] = set()
 
         for p in all_positions:
@@ -670,12 +710,12 @@ def portfolio_summary(*, user_id: int) -> dict:
             if p.status in (OptionPositionStatus.CLOSED, OptionPositionStatus.EXPIRED):
                 realized_pnl += net
             elif p.status == OptionPositionStatus.ACTIVE:
-                active_count += 1
+                if p.week_id in open_week_ids:
+                    active_count += 1
             elif p.status == OptionPositionStatus.ASSIGNED:
                 assigned_count += 1
 
         # Per-week breakdown for the Year tab
-        week_ids = {w.id: w for w in all_weeks}
         week_premium: dict[int, float] = {w.id: 0.0 for w in all_weeks}
         week_realized: dict[int, float] = {w.id: 0.0 for w in all_weeks}
         week_pos_count: dict[int, int] = {w.id: 0 for w in all_weeks}
