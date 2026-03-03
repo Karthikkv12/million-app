@@ -1,7 +1,21 @@
 # OptionFlow — Version History
 
-> **Branch rules:** All development happens on `develop` (or `feat/*` branches off `develop`).  
+> **Branch rules:** All development happens on `develop` (or `feat/*` branches off `develop`).
 > `main` is production-only and is **never touched directly**. Releases happen on explicit approval.
+
+---
+
+## v1.8.2 — Bug Fixes & Landing Page Polish
+**Released:** 2026-03-03
+**Tag:** `v1.8.2`
+**Branch:** `develop`
+
+### 🐛 Bug Fixes
+- **Trades / Positions tab crash:** Fixed `ReferenceError: allHoldings is not defined` inside `PositionsTab` — variable is named `holdings` in that scope; the `effectivePrem` reducer was incorrectly referencing the outer `allHoldings` from `PositionForm`
+
+### 🎨 Landing Page
+- **Feature grid trimmed to 3 cards:** Options Flow, Markets, Budget & Spending — removed lower-priority cards to reduce noise
+- Card descriptions shortened and tightened
 
 ---
 
