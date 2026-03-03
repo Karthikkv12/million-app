@@ -1085,7 +1085,7 @@ function PositionsTab({ week }: { week: WeeklySnapshot }) {
   // i.e. total economic gain per share if called away: intrinsic upside + all premium collected to date
   const effectivePrem = thisWeekPositions.reduce((s, p) => {
     const contrib = p.contracts * 100;
-    const holding = allHoldings.find(h => h.id === p.holding_id);
+    const holding = holdings.find(h => h.id === p.holding_id);
     const avgCost = holding?.cost_basis ?? 0;
     const preCollected = holding ? (holding.total_premium_sold / (holding.shares || 1)) : 0;
     const effPerShare = (p.strike - avgCost) + preCollected;
