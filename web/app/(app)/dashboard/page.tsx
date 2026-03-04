@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AreaChart, Area, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
-import { fetchTrades, fetchOrders, fetchCashBalance, fetchPortfolioSummary, Trade } from "@/lib/api";
+import { fetchTrades, fetchCashBalance, fetchPortfolioSummary, Trade } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import {
@@ -55,21 +55,18 @@ export default function DashboardPage() {
 
   const tradesQ   = useQuery({ queryKey: ["trades"],            queryFn: fetchTrades,             staleTime: 30_000 });
   const cashQ     = useQuery({ queryKey: ["cash-balance"],      queryFn: () => fetchCashBalance(), staleTime: 30_000 });
-  const ordersQ   = useQuery({ queryKey: ["orders"],            queryFn: fetchOrders,             staleTime: 30_000 });
   const summaryQ  = useQuery({ queryKey: ["portfolioSummary"],  queryFn: fetchPortfolioSummary,   staleTime: 60_000 });
 
   const handleRefresh = () => {
     tradesQ.refetch();
     cashQ.refetch();
-    ordersQ.refetch();
     summaryQ.refetch();
   };
-  const isRefreshing = tradesQ.isFetching || cashQ.isFetching || ordersQ.isFetching || summaryQ.isFetching;
+  const isRefreshing = tradesQ.isFetching || cashQ.isFetching || summaryQ.isFetching;
 
   const trades = tradesQ.data ?? [];
   const { pnl, openCount, closedCount } = calcPnl(trades);
   const cash = cashQ.data?.balance ?? null;
-  const pendingOrders = (ordersQ.data ?? []).filter((o) => o.status?.toUpperCase() === "PENDING").length;
   const pnlUp = pnl >= 0;
 
   const sparkData = trades

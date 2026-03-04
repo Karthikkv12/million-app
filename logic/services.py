@@ -2,7 +2,7 @@
 
 The business logic now lives in:
   - logic/auth_services.py      (auth, users, tokens, rate-limiting)
-  - logic/trade_services.py     (orders, trades, accounts, holdings, load_data)
+  - logic/trade_services.py     (trades, accounts, holdings, load_data)
   - logic/budget_services.py    (cash, budget, overrides, CC weeks, ledger)
   - logic/portfolio_services.py (portfolio value history)
 

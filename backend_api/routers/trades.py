@@ -5,7 +5,6 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from logic import services
@@ -14,16 +13,12 @@ from ..schemas import (
     AccountOut,
     HoldingOut,
     HoldingUpsertRequest,
-    OrderCreateRequest,
-    OrderFillRequest,
-    OrderOut,
     TradeCloseRequest,
     TradeCreateRequest,
     TradeOut,
     TradeUpdateRequest,
 )
 from ..deps import get_current_user
-from ..utils import df_records as _df_records
 
 logger = logging.getLogger("optionflow.trades")
 router = APIRouter(tags=["trades"])
@@ -86,100 +81,6 @@ def delete_account_holding(holding_id: int, user=Depends(get_current_user)) -> D
     if not ok:
         raise HTTPException(status_code=404, detail="Holding not found")
     return {"status": "ok"}
-
-
-# ── Orders ────────────────────────────────────────────────────────────────────
-
-@router.get("/orders", response_model=List[OrderOut])
-def list_orders(
-    user=Depends(get_current_user),
-    limit: int = Query(default=200, ge=1, le=1000),
-    offset: int = Query(default=0, ge=0),
-) -> List[OrderOut]:
-    rows = services.list_orders(user_id=int(user["sub"]), limit=limit, offset=offset)
-    return [OrderOut.model_validate(r) for r in rows]
-
-
-@router.post("/orders", response_model=Dict[str, Any])
-def create_order(req: OrderCreateRequest, user=Depends(get_current_user)) -> Dict[str, Any]:
-    try:
-        oid = services.create_order(
-            user_id=int(user["sub"]),
-            symbol=req.symbol,
-            instrument=req.instrument,
-            action=req.action,
-            strategy=req.strategy,
-            qty=int(req.qty),
-            limit_price=req.limit_price,
-            client_order_id=req.client_order_id,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"status": "ok", "order_id": int(oid)}
-
-
-@router.post("/orders/{order_id}/cancel")
-def cancel_order(order_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
-    ok = services.cancel_order(user_id=int(user["sub"]), order_id=int(order_id))
-    if not ok:
-        raise HTTPException(status_code=400, detail="Order not found or not cancelable")
-    return {"status": "ok"}
-
-
-@router.post("/orders/{order_id}/fill", response_model=Dict[str, Any])
-def fill_order(order_id: int, req: OrderFillRequest, user=Depends(get_current_user)) -> Dict[str, Any]:
-    try:
-        trade_id = services.fill_order(
-            user_id=int(user["sub"]),
-            order_id=int(order_id),
-            filled_price=float(req.filled_price),
-            filled_at=req.filled_at,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"status": "ok", "trade_id": int(trade_id)}
-
-
-@router.post("/orders/{order_id}/sync")
-def sync_order(order_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
-    ok = services.sync_order_status(user_id=int(user["sub"]), order_id=int(order_id))
-    if not ok:
-        raise HTTPException(status_code=400, detail="Order not found, not linked to broker, or broker disabled")
-    return {"status": "ok"}
-
-
-@router.post("/orders/sync-pending")
-def sync_pending_orders(user=Depends(get_current_user)) -> Dict[str, int]:
-    n = services.sync_pending_orders(user_id=int(user["sub"]))
-    return {"status": 0, "updated": int(n)}
-
-
-@router.post("/orders/{order_id}/fill-external", response_model=Dict[str, Any])
-def fill_order_external(
-    order_id: int, req: OrderFillRequest, user=Depends(get_current_user)
-) -> Dict[str, Any]:
-    try:
-        trade_id = services.fill_order_via_broker(
-            user_id=int(user["sub"]),
-            order_id=int(order_id),
-            filled_price=float(req.filled_price),
-            filled_at=req.filled_at,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"status": "ok", "trade_id": int(trade_id)}
-
-
-@router.get("/orders/{order_id}/events", response_model=List[Dict[str, Any]])
-def order_events(
-    order_id: int,
-    user=Depends(get_current_user),
-    limit: int = Query(default=200, ge=1, le=1000),
-) -> List[Dict[str, Any]]:
-    rows = services.list_order_events(
-        user_id=int(user["sub"]), order_id=int(order_id), limit=int(limit)
-    )
-    return _df_records(pd.DataFrame(rows) if rows else pd.DataFrame())
 
 
 # ── Trades ────────────────────────────────────────────────────────────────────

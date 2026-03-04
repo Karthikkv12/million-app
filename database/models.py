@@ -67,11 +67,6 @@ class LedgerEntryType(enum.Enum):
     CASH_DEPOSIT  = "CASH_DEPOSIT"
     CASH_WITHDRAW = "CASH_WITHDRAW"
 
-class OrderStatus(enum.Enum):
-    PENDING   = "PENDING"
-    FILLED    = "FILLED"
-    CANCELLED = "CANCELLED"
-
 class OptionPositionStatus(enum.Enum):
     ACTIVE   = "ACTIVE"
     CLOSED   = "CLOSED"
@@ -174,42 +169,6 @@ class Trade(TradesBase):
     updated_at      = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 Index("ux_trades_user_client_order_id", Trade.user_id, Trade.client_order_id, unique=True)
-
-class Order(TradesBase):
-    __tablename__ = "orders"
-    id                = Column(Integer, primary_key=True)
-    user_id           = Column(Integer, nullable=False, index=True)
-    symbol            = Column(String, nullable=False, index=True)
-    instrument        = Column(Enum(InstrumentType), nullable=False)
-    action            = Column(Enum(Action), nullable=False)
-    strategy          = Column(String, nullable=True)
-    quantity          = Column(Integer, nullable=False)
-    limit_price       = Column(Float, nullable=True)
-    status            = Column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING, index=True)
-    created_at        = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    filled_at         = Column(DateTime, nullable=True, index=True)
-    filled_price      = Column(Float, nullable=True)
-    trade_id          = Column(Integer, nullable=True, index=True)
-    client_order_id   = Column(String, nullable=True)
-    external_order_id = Column(String, nullable=True, index=True)
-    venue             = Column(String, nullable=True, index=True)
-    external_status   = Column(String, nullable=True, index=True)
-    last_synced_at    = Column(DateTime, nullable=True, index=True)
-
-Index("ux_orders_user_client_order_id", Order.user_id, Order.client_order_id, unique=True)
-
-class OrderEvent(TradesBase):
-    __tablename__ = "order_events"
-    id              = Column(Integer, primary_key=True)
-    created_at      = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    user_id         = Column(Integer, nullable=False, index=True)
-    order_id        = Column(Integer, nullable=False, index=True)
-    event_type      = Column(String, nullable=False, index=True)
-    order_status    = Column(String, nullable=True, index=True)
-    external_status = Column(String, nullable=True, index=True)
-    note            = Column(String, nullable=True)
-
-Index("ix_order_events_user_order_ts", OrderEvent.user_id, OrderEvent.order_id, OrderEvent.created_at)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PORTFOLIO DATABASE  (portfolio.db)

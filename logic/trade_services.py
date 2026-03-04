@@ -8,15 +8,10 @@ from datetime import datetime, timezone
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
 
-from brokers import broker_enabled as _broker_enabled
-from brokers import get_broker
-from brokers.base import SubmitOrderRequest
 from database.models import (
     Account,
     Action,
     InstrumentType,
-    Order,
-    OrderStatus,
     StockHolding,
     Trade,
     get_trades_engine,
@@ -96,24 +91,6 @@ def _trade_signed_quantity(*, action: Action, quantity: int) -> float:
     act = getattr(action, "value", str(action))
     q = float(int(quantity or 0))
     return q if str(act).upper() == "BUY" else -q
-
-
-def _order_status_str(v) -> str:
-    return str(getattr(v, "value", v) or "")
-
-
-def _append_order_event(session, *, user_id: int, order: Order, event_type: str, note: str | None = None) -> None:
-    from database.models import OrderEvent
-    ev = OrderEvent(
-        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-        user_id=int(user_id),
-        order_id=int(getattr(order, "id")),
-        event_type=str(event_type).upper(),
-        order_status=(_order_status_str(getattr(order, "status", None)) or None),
-        external_status=(str(getattr(order, "external_status", "") or "") or None),
-        note=(str(note)[:500] if note else None),
-    )
-    session.add(ev)
 
 
 def _get_or_create_holdings_sync_account(session, *, user_id: int) -> Account:
@@ -196,357 +173,9 @@ def _apply_holding_delta(session, *, user_id: int, symbol: str, delta_qty: float
         session.delete(h)
 
 
-def _trades_create_filled_orders_enabled() -> bool:
-    v = str(os.getenv("TRADES_CREATE_FILLED_ORDERS", "1") or "").strip().lower()
-    return v not in {"0", "false", "no", "off"}
-
-
-def _ensure_filled_order_for_trade(session, *, trade: Trade) -> None:
-    try:
-        if trade is None or trade.user_id is None or trade.id is None:
-            return
-        coid = f"trade:{trade.client_order_id}" if trade.client_order_id else f"trade:{trade.id}"
-        existing = (
-            session.query(Order)
-            .filter(Order.user_id == int(trade.user_id))
-            .filter(Order.client_order_id == coid)
-            .first()
-        )
-        if existing is not None:
-            if existing.trade_id is None:
-                existing.trade_id = int(trade.id)
-                session.add(existing)
-            return
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        filled_at = getattr(trade, "entry_date", None) or now
-        filled_price = getattr(trade, "entry_price", None)
-        o = Order(
-            user_id=int(trade.user_id),
-            symbol=str(getattr(trade, "symbol", "") or "").upper(),
-            instrument=getattr(trade, "instrument", None),
-            action=getattr(trade, "action", None),
-            strategy=str(getattr(trade, "strategy", "") or ""),
-            quantity=int(getattr(trade, "quantity", 0) or 0),
-            limit_price=None,
-            status=OrderStatus.FILLED,
-            created_at=filled_at,
-            filled_at=filled_at,
-            filled_price=float(filled_price) if filled_price is not None else None,
-            trade_id=int(trade.id),
-            client_order_id=coid,
-        )
-        session.add(o)
-    except Exception:
-        return
-
-
 # ── Orders ────────────────────────────────────────────────────────────────────
 
-def create_order(
-    *,
-    user_id: int,
-    symbol: str,
-    instrument: str = "STOCK",
-    action: str = "BUY",
-    strategy: str | None = None,
-    qty: int = 1,
-    limit_price: float | None = None,
-    client_order_id: str | None = None,
-) -> int:
-    session = get_session()
-    try:
-        sym = str(symbol or "").strip().upper()
-        if not sym:
-            raise ValueError("symbol is required")
-        if int(qty) < 1:
-            raise ValueError("qty must be >= 1")
-        inst_enum = normalize_instrument(instrument)
-        act_enum = normalize_action(action)
-        coid = (str(client_order_id).strip() if client_order_id is not None else "") or None
-
-        if coid:
-            existing = session.query(Order).filter(Order.user_id == int(user_id), Order.client_order_id == coid).first()
-            if existing is not None:
-                return int(existing.id)
-
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        o = Order(
-            user_id=int(user_id), symbol=sym, instrument=inst_enum, action=act_enum,
-            strategy=(str(strategy).strip() if strategy else None),
-            quantity=int(qty),
-            limit_price=(float(limit_price) if limit_price is not None else None),
-            status=OrderStatus.PENDING, created_at=now,
-            filled_at=None, filled_price=None, trade_id=None, client_order_id=coid,
-        )
-        session.add(o)
-        session.flush()
-        _append_order_event(session, user_id=int(user_id), order=o, event_type="CREATED")
-
-        if _broker_enabled():
-            broker = get_broker()
-            resp = broker.submit_order(
-                user_id=int(user_id),
-                req=SubmitOrderRequest(
-                    symbol=sym, instrument=str(inst_enum.value), action=str(act_enum.value),
-                    quantity=int(qty),
-                    limit_price=(float(limit_price) if limit_price is not None else None),
-                    client_order_id=(coid or f"order:{int(o.id)}"),
-                ),
-            )
-            o.external_order_id = str(resp.external_order_id)
-            o.venue = str(resp.venue)
-            o.external_status = str(resp.external_status)
-            o.last_synced_at = getattr(resp, "submitted_at", None)
-            session.add(o)
-            _append_order_event(session, user_id=int(user_id), order=o, event_type="SUBMITTED")
-
-        session.commit()
-        return int(o.id)
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def list_orders(*, user_id: int, limit: int = 100, offset: int = 0) -> list[dict]:
-    session = get_session()
-    try:
-        rows = (
-            session.query(Order)
-            .filter(Order.user_id == int(user_id))
-            .order_by(Order.created_at.desc())
-            .offset(int(offset))
-            .limit(int(limit))
-            .all()
-        )
-        out: list[dict] = []
-        for o in rows:
-            out.append({
-                "id": int(getattr(o, "id")),
-                "symbol": str(getattr(o, "symbol", "") or ""),
-                "instrument": str(getattr(getattr(o, "instrument", None), "value", getattr(o, "instrument", "")) or ""),
-                "action": str(getattr(getattr(o, "action", None), "value", getattr(o, "action", "")) or ""),
-                "strategy": (str(getattr(o, "strategy", "") or "") or None),
-                "quantity": int(getattr(o, "quantity", 0) or 0),
-                "limit_price": (float(getattr(o, "limit_price")) if getattr(o, "limit_price", None) is not None else None),
-                "status": str(getattr(getattr(o, "status", None), "value", getattr(o, "status", "")) or ""),
-                "created_at": getattr(o, "created_at", None),
-                "filled_at": getattr(o, "filled_at", None),
-                "filled_price": (float(getattr(o, "filled_price")) if getattr(o, "filled_price", None) is not None else None),
-                "trade_id": (int(getattr(o, "trade_id")) if getattr(o, "trade_id", None) is not None else None),
-                "client_order_id": (str(getattr(o, "client_order_id", "") or "") or None),
-                "external_order_id": (str(getattr(o, "external_order_id", "") or "") or None),
-                "venue": (str(getattr(o, "venue", "") or "") or None),
-                "external_status": (str(getattr(o, "external_status", "") or "") or None),
-                "last_synced_at": getattr(o, "last_synced_at", None),
-            })
-        return out
-    finally:
-        session.close()
-
-
-def list_order_events(*, user_id: int, order_id: int, limit: int = 200) -> list[dict]:
-    session = get_session()
-    try:
-        from database.models import OrderEvent
-        rows = (
-            session.query(OrderEvent)
-            .filter(OrderEvent.user_id == int(user_id))
-            .filter(OrderEvent.order_id == int(order_id))
-            .order_by(OrderEvent.created_at.asc())
-            .limit(int(limit))
-            .all()
-        )
-        return [
-            {
-                "id": int(getattr(r, "id")),
-                "created_at": getattr(r, "created_at", None),
-                "event_type": str(getattr(r, "event_type", "") or ""),
-                "order_status": (str(getattr(r, "order_status", "") or "") or None),
-                "external_status": (str(getattr(r, "external_status", "") or "") or None),
-                "note": (str(getattr(r, "note", "") or "") or None),
-            }
-            for r in rows
-        ]
-    finally:
-        session.close()
-
-
-def cancel_order(*, user_id: int, order_id: int) -> bool:
-    session = get_session()
-    try:
-        o = session.query(Order).filter(Order.id == int(order_id), Order.user_id == int(user_id)).first()
-        if o is None:
-            return False
-        if getattr(o, "status", None) != OrderStatus.PENDING:
-            return False
-        if _broker_enabled() and getattr(o, "external_order_id", None):
-            broker = get_broker()
-            broker.cancel_order(user_id=int(user_id), external_order_id=str(getattr(o, "external_order_id")))
-            o.external_status = "CANCELLED"
-            o.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        o.status = OrderStatus.CANCELLED
-        session.add(o)
-        _append_order_event(session, user_id=int(user_id), order=o, event_type="CANCELLED")
-        session.commit()
-        return True
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def sync_order_status(*, user_id: int, order_id: int) -> bool:
-    if not _broker_enabled():
-        return False
-    session = get_session()
-    try:
-        o = session.query(Order).filter(Order.user_id == int(user_id), Order.id == int(order_id)).first()
-        if o is None or not getattr(o, "external_order_id", None):
-            return False
-        broker = get_broker()
-        resp = broker.get_order_status(user_id=int(user_id), external_order_id=str(getattr(o, "external_order_id")))
-        o.venue = str(resp.venue)
-        o.external_status = str(resp.external_status)
-        o.last_synced_at = resp.last_synced_at
-        session.add(o)
-        _append_order_event(session, user_id=int(user_id), order=o, event_type="SYNCED")
-        session.commit()
-        return True
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def sync_pending_orders(*, user_id: int, limit: int = 200) -> int:
-    if not _broker_enabled():
-        return 0
-    session = get_session()
-    try:
-        rows = (
-            session.query(Order)
-            .filter(Order.user_id == int(user_id))
-            .filter(Order.status == OrderStatus.PENDING)
-            .filter(Order.external_order_id.isnot(None))
-            .order_by(Order.created_at.desc())
-            .limit(int(limit))
-            .all()
-        )
-        if not rows:
-            return 0
-        broker = get_broker()
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        updated = 0
-        for o in rows:
-            resp = broker.get_order_status(user_id=int(user_id), external_order_id=str(o.external_order_id))
-            o.venue = str(resp.venue)
-            o.external_status = str(resp.external_status)
-            o.last_synced_at = getattr(resp, "last_synced_at", None) or now
-            session.add(o)
-            updated += 1
-        session.commit()
-        return int(updated)
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def fill_order(*, user_id: int, order_id: int, filled_price: float, filled_at=None) -> int:
-    session = get_session()
-    try:
-        o = session.query(Order).filter(Order.id == int(order_id), Order.user_id == int(user_id)).first()
-        if o is None:
-            raise ValueError("order not found")
-        if getattr(o, "status", None) != OrderStatus.PENDING:
-            raise ValueError("order is not fillable")
-        px = float(filled_price)
-        if px <= 0:
-            raise ValueError("filled_price must be > 0")
-        ts = pd.to_datetime(filled_at) if filled_at is not None else pd.to_datetime("today")
-
-        inst_enum = getattr(o, "instrument", InstrumentType.STOCK)
-        act_enum = getattr(o, "action", Action.BUY)
-        sym = str(getattr(o, "symbol", "") or "").strip().upper()
-        qty = int(getattr(o, "quantity", 0) or 0)
-        strat = str(getattr(o, "strategy", "") or "Swing")
-        trade_coid = (str(getattr(o, "client_order_id", "") or "").strip() or None) or f"order:{int(order_id)}"
-
-        existing_trade = session.query(Trade).filter(Trade.user_id == int(user_id), Trade.client_order_id == trade_coid).first()
-        if existing_trade is not None:
-            o.status = OrderStatus.FILLED
-            o.filled_price = px
-            o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
-            o.trade_id = int(getattr(existing_trade, "id"))
-            session.add(o)
-            _append_order_event(session, user_id=int(user_id), order=o, event_type="FILLED")
-            session.commit()
-            return int(getattr(existing_trade, "id"))
-
-        new_trade = Trade(
-            symbol=sym, quantity=int(qty), instrument=inst_enum, strategy=strat,
-            action=act_enum, entry_date=ts, entry_price=float(px),
-            option_type=None, strike_price=None, expiry_date=None,
-            user_id=int(user_id), client_order_id=trade_coid,
-        )
-        session.add(new_trade)
-        session.flush()
-
-        try:
-            if inst_enum == InstrumentType.STOCK:
-                signed_qty = _trade_signed_quantity(action=act_enum, quantity=int(qty))
-                _apply_holding_delta(session, user_id=int(user_id), symbol=sym, delta_qty=float(signed_qty), price=float(px))
-        except Exception:
-            pass
-
-        o.status = OrderStatus.FILLED
-        o.filled_price = float(px)
-        o.filled_at = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
-        o.trade_id = int(getattr(new_trade, "id"))
-        session.add(o)
-        _append_order_event(session, user_id=int(user_id), order=o, event_type="FILLED")
-        session.commit()
-        return int(getattr(new_trade, "id"))
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def fill_order_via_broker(*, user_id: int, order_id: int, filled_price: float, filled_at=None) -> int:
-    if not _broker_enabled():
-        raise ValueError("broker disabled")
-    session = get_session()
-    try:
-        o = session.query(Order).filter(Order.user_id == int(user_id), Order.id == int(order_id)).first()
-        if o is None:
-            raise ValueError("order not found")
-        if getattr(o, "status", None) != OrderStatus.PENDING:
-            raise ValueError("order not fillable")
-        if not getattr(o, "external_order_id", None):
-            raise ValueError("order not linked to broker")
-        broker = get_broker()
-        resp = broker.fill_order(
-            user_id=int(user_id), external_order_id=str(o.external_order_id),
-            filled_price=float(filled_price), filled_at=filled_at,
-        )
-        o.external_status = str(resp.external_status)
-        o.last_synced_at = getattr(resp, "filled_at", None)
-        session.add(o)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-    return fill_order(user_id=int(user_id), order_id=int(order_id), filled_price=float(filled_price), filled_at=filled_at)
-
+# (Order/broker layer removed — was never enabled in production)
 
 # ── Trades ────────────────────────────────────────────────────────────────────
 
@@ -631,9 +260,6 @@ def save_trade(
         if coid and user_id is not None:
             existing = session.query(Trade).filter(Trade.user_id == int(user_id), Trade.client_order_id == coid).first()
             if existing:
-                if _trades_create_filled_orders_enabled():
-                    _ensure_filled_order_for_trade(session, trade=existing)
-                    session.commit()
                 return existing.id
 
         new_trade = Trade(
@@ -657,9 +283,6 @@ def save_trade(
                 _apply_holding_delta(session, user_id=int(user_id), symbol=str(symbol), delta_qty=float(signed_qty), price=float(price))
         except Exception:
             pass
-
-        if _trades_create_filled_orders_enabled():
-            _ensure_filled_order_for_trade(session, trade=new_trade)
 
         session.commit()
         return new_trade.id
