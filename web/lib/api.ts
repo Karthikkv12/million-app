@@ -307,12 +307,21 @@ export interface Trade {
   instrument: string;
   strategy: string;
   action: string;
-  qty: number;
-  price: number;
-  date: string;
-  exit_price?: number;
-  exit_date?: string;
-  pnl?: number;
+  quantity: number;
+  entry_price: number;
+  entry_date: string;
+  exit_price?: number | null;
+  exit_date?: string | null;
+  realized_pnl?: number | null;
+  is_closed?: boolean;
+  option_type?: string | null;
+  strike_price?: number | null;
+  expiry_date?: string | null;
+  // legacy aliases for backwards compat
+  qty?: number;
+  price?: number;
+  date?: string;
+  pnl?: number | null;
 }
 
 export const fetchTrades = () => api.get<Trade[]>("/trades");

@@ -13,13 +13,17 @@ from brokers.base import SubmitOrderRequest
 from database.models import (
     Trade, CashFlow, Budget, CreditCardWeek, BudgetOverride,
     Order,
-    Account, Holding,
+    Account, StockHolding,
     InstrumentType, OptionType, Action, CashAction, BudgetType,
     OrderStatus,
     LedgerAccount, LedgerAccountType,
     LedgerEntry, LedgerEntryType,
     LedgerLine,
-    get_engine
+    get_engine,
+    get_users_engine, get_trades_engine, get_budget_engine,
+    get_portfolio_engine, get_markets_engine,
+    get_users_session, get_trades_session, get_budget_session,
+    get_portfolio_session, get_markets_session,
 )
 
 
@@ -182,15 +186,15 @@ def _apply_holding_delta(
     acct = _get_or_create_holdings_sync_account(session, user_id=int(user_id))
 
     h = (
-        session.query(Holding)
-        .filter(Holding.user_id == int(user_id))
-        .filter(Holding.account_id == int(acct.id))
-        .filter(Holding.symbol == sym)
+        session.query(StockHolding)
+        .filter(StockHolding.user_id == int(user_id))
+        .filter(StockHolding.account_id == int(acct.id))
+        .filter(StockHolding.symbol == sym)
         .first()
     )
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if h is None:
-        h = Holding(
+        h = StockHolding(
             user_id=int(user_id),
             account_id=int(acct.id),
             symbol=sym,
@@ -677,19 +681,47 @@ def _epoch_seconds_from_utc_naive(dt: datetime) -> int:
 # sqlite) if env vars change between processes.
 
 def get_session():
-    """Create a new SQLAlchemy Session bound to the engine returned by get_engine()."""
-    # Allow tests (or other callers) to monkeypatch `logic.services.engine`.
-    # If `engine` is set at module level, prefer it; otherwise create via get_engine().
+    """Default session — uses trades.db. Legacy alias kept for backwards compat."""
     try:
-        # module-level 'engine' may be set to a test engine by tests
         if engine is not None:
             _engine = engine
         else:
-            _engine = get_engine()
+            _engine = get_trades_engine()
     except NameError:
-        _engine = get_engine()
+        _engine = get_trades_engine()
     Session = sessionmaker(bind=_engine)
     return Session()
+
+
+def _users_session():
+    """Session for users.db (auth, tokens, events)."""
+    try:
+        if engine is not None:
+            return sessionmaker(bind=engine)()
+    except NameError:
+        pass
+    return get_users_session()
+
+
+def _budget_session():
+    """Session for budget.db (budget, cc_weeks, cash_flow, ledger)."""
+    try:
+        if engine is not None:
+            return sessionmaker(bind=engine)()
+    except NameError:
+        pass
+    return get_budget_session()
+
+
+def _portfolio_session():
+    """Session for portfolio.db (holdings, option positions, premium ledger)."""
+    try:
+        if engine is not None:
+            return sessionmaker(bind=engine)()
+    except NameError:
+        pass
+    return get_portfolio_session()
+
 
 # Compatibility placeholder: tests may monkeypatch `logic.services.engine`.
 engine = None
@@ -734,7 +766,7 @@ def create_refresh_token(*, user_id: int, ip: str | None = None, user_agent: str
 
     Returns the *raw* refresh token (store it securely client-side).
     """
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -769,7 +801,7 @@ def create_refresh_token(*, user_id: int, ip: str | None = None, user_agent: str
 
 def validate_refresh_token(*, refresh_token: str) -> int | None:
     """Return user_id if the refresh token is valid, else None."""
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -797,7 +829,7 @@ def rotate_refresh_token(
 
     On success, revokes the old token and returns (user_id, new_refresh_token).
     """
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -847,7 +879,7 @@ def rotate_refresh_token(
 
 def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> None:
     """Revoke a single refresh token (best-effort, no error if missing)."""
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -873,7 +905,7 @@ def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> N
 
 def revoke_all_refresh_tokens(*, user_id: int) -> int:
     """Revoke all refresh tokens for a user. Returns count revoked."""
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -901,7 +933,7 @@ def revoke_all_refresh_tokens(*, user_id: int) -> int:
 
 def list_refresh_sessions(*, user_id: int, limit: int = 25) -> list[dict]:
     """List active (non-revoked, non-expired) refresh sessions for a user."""
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -933,7 +965,7 @@ def list_refresh_sessions(*, user_id: int, limit: int = 25) -> list[dict]:
 
 
 def revoke_refresh_session_by_id(*, user_id: int, session_id: int, reason: str = "revoked") -> bool:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RefreshToken
 
@@ -977,7 +1009,7 @@ def log_auth_event(
     detail: str | None = None,
 ) -> None:
     """Append an auth audit event (best-effort)."""
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import AuthEvent
 
@@ -1002,7 +1034,7 @@ def log_auth_event(
 
 
 def list_auth_events(*, user_id: int, limit: int = 25) -> list[dict]:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import AuthEvent
 
@@ -1038,7 +1070,7 @@ def is_login_rate_limited(*, username: str, ip: str | None = None) -> bool:
 
     since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
     since_naive = since.replace(tzinfo=None)
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import AuthEvent
 
@@ -1066,7 +1098,7 @@ def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
 
     since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
     since_naive = since.replace(tzinfo=None)
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import AuthEvent
 
@@ -1084,7 +1116,7 @@ def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
 
 
 def create_user(username, password, role="user"):
-    session = get_session()
+    session = _users_session()
     try:
         username = str(username).strip().lower()
         if not username:
@@ -1117,7 +1149,7 @@ def _normalize_str(x):
 
 
 def authenticate_user(username, password):
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         uname = str(username).strip().lower()
@@ -1137,7 +1169,7 @@ def authenticate_user(username, password):
 
 
 def get_user(user_id: int):
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         return session.query(User).filter(User.id == int(user_id)).first()
@@ -1146,7 +1178,7 @@ def get_user(user_id: int):
 
 
 def list_all_users():
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         return session.query(User).order_by(User.created_at.asc()).all()
@@ -1155,7 +1187,7 @@ def list_all_users():
 
 
 def patch_user_admin(user_id: int, *, role: str | None = None, is_active: bool | None = None):
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -1175,7 +1207,7 @@ def patch_user_admin(user_id: int, *, role: str | None = None, is_active: bool |
 
 
 def delete_user_admin(user_id: int) -> None:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -1191,7 +1223,7 @@ def delete_user_admin(user_id: int) -> None:
 
 
 def set_auth_valid_after_epoch(*, user_id: int, epoch_seconds: int) -> None:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -1228,7 +1260,7 @@ def change_password(
     new_password: str,
     invalidate_tokens_before_epoch: int | None = None,
 ) -> None:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -1300,7 +1332,7 @@ def _validate_password_policy(password: str) -> None:
 
 
 def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RevokedToken
         jti = str(jti).strip()
@@ -1325,7 +1357,7 @@ def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
 
 
 def is_token_revoked(*, jti: str) -> bool:
-    session = get_session()
+    session = _users_session()
     try:
         from database.models import RevokedToken
         jti = str(jti).strip()
@@ -1526,7 +1558,7 @@ def save_trade(
         session.close()
 
 def save_cash(action, amount, date, notes, user_id=None):
-    session = get_session()
+    session = _budget_session()
     try:
         action_enum = normalize_cash_action(action)
         new_cash = CashFlow(
@@ -1567,7 +1599,7 @@ def save_cash(action, amount, date, notes, user_id=None):
 
 def get_cash_balance_ledger(*, user_id: int, currency: str = "USD") -> float:
     """Return cash balance derived from the ledger (cash-only MVP)."""
-    session = get_session()
+    session = _budget_session()
     try:
         cur = str(currency or "USD").strip().upper() or "USD"
         cash_name = f"Cash ({cur})"
@@ -1599,7 +1631,7 @@ def get_cash_balance(*, user_id: int, currency: str = "USD") -> float:
 
 
 def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
-    session = get_session()
+    session = _budget_session()
     try:
         es = (
             session.query(LedgerEntry)
@@ -1642,7 +1674,7 @@ def list_ledger_entries(*, user_id: int, limit: int = 100) -> list[dict]:
         session.close()
 
 def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None, active_until=None):
-    session = get_session()
+    session = _budget_session()
     try:
         type_enum = normalize_budget_type(b_type)
 
@@ -1665,7 +1697,7 @@ def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=N
 
 
 def update_budget(budget_id: int, user_id: int, **kwargs):
-    session = get_session()
+    session = _budget_session()
     try:
         item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
         if not item:
@@ -1686,7 +1718,7 @@ def update_budget(budget_id: int, user_id: int, **kwargs):
 
 
 def delete_budget(budget_id: int, user_id: int):
-    session = get_session()
+    session = _budget_session()
     try:
         item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
         if item:
@@ -1701,7 +1733,7 @@ def delete_budget(budget_id: int, user_id: int):
 
 def list_budget_overrides(user_id: int):
     """Return all budget overrides for the user as a list of dicts."""
-    session = get_session()
+    session = _budget_session()
     try:
         rows = (
             session.query(BudgetOverride)
@@ -1725,7 +1757,7 @@ def list_budget_overrides(user_id: int):
 
 def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount: float, description: str = None):
     """Create or update an override for (budget_id, month_key). Returns the override id."""
-    session = get_session()
+    session = _budget_session()
     try:
         existing = session.query(BudgetOverride).filter(
             BudgetOverride.user_id == user_id,
@@ -1759,7 +1791,7 @@ def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount:
 
 def delete_budget_override(override_id: int, user_id: int):
     """Delete a specific override by id."""
-    session = get_session()
+    session = _budget_session()
     try:
         row = session.query(BudgetOverride).filter(
             BudgetOverride.id == override_id,
@@ -1777,7 +1809,7 @@ def delete_budget_override(override_id: int, user_id: int):
 
 def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
     """Cascade-delete all overrides for a budget entry (called when entry is deleted)."""
-    session = get_session()
+    session = _budget_session()
     try:
         session.query(BudgetOverride).filter(
             BudgetOverride.budget_id == budget_id,
@@ -1792,7 +1824,7 @@ def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
 
 
 def create_account(*, user_id: int, name: str, broker: str | None = None, currency: str = "USD") -> int:
-    session = get_session()
+    session = _budget_session()
     try:
         nm = str(name or "").strip()
         if not nm:
@@ -1816,7 +1848,7 @@ def create_account(*, user_id: int, name: str, broker: str | None = None, curren
 
 
 def list_accounts(*, user_id: int) -> list[dict]:
-    session = get_session()
+    session = _budget_session()
     try:
         rows = (
             session.query(Account)
@@ -1841,7 +1873,7 @@ def list_accounts(*, user_id: int) -> list[dict]:
 
 
 def list_holdings(*, user_id: int, account_id: int) -> list[dict]:
-    session = get_session()
+    session = _budget_session()
     try:
         # Ensure account belongs to user.
         acct = (
@@ -1854,10 +1886,10 @@ def list_holdings(*, user_id: int, account_id: int) -> list[dict]:
             raise ValueError("account not found")
 
         rows = (
-            session.query(Holding)
-            .filter(Holding.user_id == int(user_id))
-            .filter(Holding.account_id == int(account_id))
-            .order_by(Holding.symbol.asc())
+            session.query(StockHolding)
+            .filter(StockHolding.user_id == int(user_id))
+            .filter(StockHolding.account_id == int(account_id))
+            .order_by(StockHolding.symbol.asc())
             .all()
         )
         out: list[dict] = []
@@ -1885,7 +1917,7 @@ def upsert_holding(
     quantity: float,
     avg_cost: float | None = None,
 ) -> dict:
-    session = get_session()
+    session = _budget_session()
     try:
         sym = str(symbol or "").strip().upper()
         if not sym:
@@ -1901,15 +1933,15 @@ def upsert_holding(
             raise ValueError("account not found")
 
         h = (
-            session.query(Holding)
-            .filter(Holding.user_id == int(user_id))
-            .filter(Holding.account_id == int(account_id))
-            .filter(Holding.symbol == sym)
+            session.query(StockHolding)
+            .filter(StockHolding.user_id == int(user_id))
+            .filter(StockHolding.account_id == int(account_id))
+            .filter(StockHolding.symbol == sym)
             .first()
         )
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if h is None:
-            h = Holding(
+            h = StockHolding(
                 user_id=int(user_id),
                 account_id=int(account_id),
                 symbol=sym,
@@ -1942,12 +1974,12 @@ def upsert_holding(
 
 
 def delete_holding(*, user_id: int, holding_id: int) -> bool:
-    session = get_session()
+    session = _portfolio_session()
     try:
         h = (
-            session.query(Holding)
-            .filter(Holding.id == int(holding_id))
-            .filter(Holding.user_id == int(user_id))
+            session.query(StockHolding)
+            .filter(StockHolding.id == int(holding_id))
+            .filter(StockHolding.user_id == int(user_id))
             .first()
         )
         if not h:
@@ -1963,22 +1995,25 @@ def delete_holding(*, user_id: int, holding_id: int) -> bool:
 def load_data(user_id=None):
     """Load trades, cash, budget. If `user_id` is provided, filter rows to that user."""
     try:
-        # Prefer an overridden module-level engine (tests set this). Otherwise use configured engine.
+        # Trades come from trades.db; cash_flow and budget come from budget.db
         try:
             if engine is not None:
-                _engine = engine
+                _trades_engine = engine
+                _budget_engine = engine
             else:
-                _engine = get_engine()
+                _trades_engine = get_trades_engine()
+                _budget_engine = get_budget_engine()
         except NameError:
-            _engine = get_engine()
+            _trades_engine = get_trades_engine()
+            _budget_engine = get_budget_engine()
         if user_id is None:
-            trades = pd.read_sql("SELECT * FROM trades", _engine)
-            cash = pd.read_sql("SELECT * FROM cash_flow", _engine)
-            budget = pd.read_sql("SELECT * FROM budget", _engine)
+            trades = pd.read_sql("SELECT * FROM trades", _trades_engine)
+            cash = pd.read_sql("SELECT * FROM cash_flow", _budget_engine)
+            budget = pd.read_sql("SELECT * FROM budget", _budget_engine)
         else:
-            trades = pd.read_sql("SELECT * FROM trades WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
-            cash = pd.read_sql("SELECT * FROM cash_flow WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
-            budget = pd.read_sql("SELECT * FROM budget WHERE user_id = :uid", _engine, params={"uid": int(user_id)})
+            trades = pd.read_sql("SELECT * FROM trades WHERE user_id = :uid", _trades_engine, params={"uid": int(user_id)})
+            cash = pd.read_sql("SELECT * FROM cash_flow WHERE user_id = :uid", _budget_engine, params={"uid": int(user_id)})
+            budget = pd.read_sql("SELECT * FROM budget WHERE user_id = :uid", _budget_engine, params={"uid": int(user_id)})
 
         if not trades.empty:
             trades['entry_date'] = pd.to_datetime(trades['entry_date'])
@@ -2166,7 +2201,7 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
 # ── Credit Card Weeks ─────────────────────────────────────────────────────────
 
 def list_credit_card_weeks(user_id: int):
-    session = get_session()
+    session = _budget_session()
     try:
         rows = (
             session.query(CreditCardWeek)
@@ -2194,7 +2229,7 @@ def list_credit_card_weeks(user_id: int):
 
 def create_credit_card_week(user_id: int, week_start, balance: float, squared_off: bool = False,
                             paid_amount=None, note=None, card_name=None):
-    session = get_session()
+    session = _budget_session()
     try:
         row = CreditCardWeek(
             user_id=user_id,
@@ -2217,7 +2252,7 @@ def create_credit_card_week(user_id: int, week_start, balance: float, squared_of
 
 
 def update_credit_card_week(row_id: int, user_id: int, **kwargs):
-    session = get_session()
+    session = _budget_session()
     try:
         row = session.query(CreditCardWeek).filter(
             CreditCardWeek.id == row_id,
@@ -2240,7 +2275,7 @@ def update_credit_card_week(row_id: int, user_id: int, **kwargs):
 
 
 def delete_credit_card_week(row_id: int, user_id: int):
-    session = get_session()
+    session = _budget_session()
     try:
         row = session.query(CreditCardWeek).filter(
             CreditCardWeek.id == row_id,

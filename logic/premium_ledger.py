@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from logic.services import get_session
+from logic.services import get_session, _portfolio_session
 from database.models import (
     PremiumLedger,
     StockHolding,
@@ -84,7 +84,7 @@ def upsert_ledger_row(*, user_id: int, position_id: int, session=None) -> dict |
     """
     own_session = session is None
     if own_session:
-        session = get_session()
+        session = _portfolio_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -166,7 +166,7 @@ def sync_ledger_from_positions(*, user_id: int, holding_id: int | None = None) -
     Returns:
         {"upserted": N, "rows": [...]}
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         q = session.query(OptionPosition).filter(
             OptionPosition.user_id       == user_id,
@@ -239,7 +239,7 @@ def get_premium_summary(*, holding_id: int, session=None) -> dict:
     """
     own_session = session is None
     if own_session:
-        session = get_session()
+        session = _portfolio_session()
     try:
         rows = (
             session.query(PremiumLedger)
@@ -264,7 +264,7 @@ def get_premium_summary(*, holding_id: int, session=None) -> dict:
 
 def get_all_premium_summaries(*, user_id: int) -> dict[int, dict]:
     """Returns {holding_id: summary_dict} for all holdings of a user."""
-    session = get_session()
+    session = _portfolio_session()
     try:
         rows = (
             session.query(PremiumLedger)
@@ -306,7 +306,7 @@ def get_premium_dashboard(*, user_id: int) -> dict:
       - grand_total: overall realized + unrealized + total_sold
       - rows: all individual ledger rows (for the detail table)
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         from database.models import StockHolding, WeeklySnapshot
         rows = (

@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from logic.services import get_session
+from logic.services import get_session, _portfolio_session
 from database.models import (
     WeeklySnapshot,
     OptionPosition,
@@ -215,7 +215,7 @@ def calc_cost_basis(
 def get_or_create_week(*, user_id: int, for_date: datetime | None = None) -> dict:
     """Return the week containing for_date, creating it if necessary."""
     monday, friday = _week_bounds(for_date)
-    session = get_session()
+    session = _portfolio_session()
     try:
         snap = (
             session.query(WeeklySnapshot)
@@ -243,7 +243,7 @@ def get_or_create_week(*, user_id: int, for_date: datetime | None = None) -> dic
 
 def list_weeks(*, user_id: int) -> list[dict]:
     """Return all weeks for this user, newest first."""
-    session = get_session()
+    session = _portfolio_session()
     try:
         snaps = (
             session.query(WeeklySnapshot)
@@ -257,7 +257,7 @@ def list_weeks(*, user_id: int) -> list[dict]:
 
 
 def get_week(*, user_id: int, week_id: int) -> dict | None:
-    session = get_session()
+    session = _portfolio_session()
     try:
         s = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -271,7 +271,7 @@ def get_week(*, user_id: int, week_id: int) -> dict | None:
 def update_week(*, user_id: int, week_id: int, account_value: float | None = None,
                 notes: str | None = None) -> dict:
     """Update the Friday account value and/or notes for a week."""
-    session = get_session()
+    session = _portfolio_session()
     try:
         s = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -295,7 +295,7 @@ def mark_week_complete(*, user_id: int, week_id: int, account_value: float | Non
     Mark a week as complete and carry all ACTIVE positions forward into the
     next week (creating it if necessary).
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         snap = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -371,7 +371,7 @@ def reopen_week(*, user_id: int, week_id: int) -> dict:
          this week (carried_from_id points to a position in week_id).
          Delete those carried copies so they are not orphaned duplicates.
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         snap = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -416,7 +416,7 @@ def reopen_week(*, user_id: int, week_id: int) -> dict:
 # ── Option positions ──────────────────────────────────────────────────────────
 
 def list_positions(*, user_id: int, week_id: int) -> list[dict]:
-    session = get_session()
+    session = _portfolio_session()
     try:
         # Get the week snapshot to know if it's complete
         snap = session.query(WeeklySnapshot).filter(
@@ -479,7 +479,7 @@ def list_positions(*, user_id: int, week_id: int) -> list[dict]:
 
 
 def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         # Validate week belongs to user
         snap = session.query(WeeklySnapshot).filter(
@@ -524,7 +524,7 @@ def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
 
 
 def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -567,7 +567,7 @@ def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
 
 
 def delete_position(*, user_id: int, position_id: int) -> None:
-    session = get_session()
+    session = _portfolio_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -584,7 +584,7 @@ def delete_position(*, user_id: int, position_id: int) -> None:
 # ── Stock assignments ─────────────────────────────────────────────────────────
 
 def create_assignment(*, user_id: int, position_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -620,7 +620,7 @@ def create_assignment(*, user_id: int, position_id: int, data: dict) -> dict:
 
 
 def update_assignment(*, user_id: int, assignment_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         a = session.query(StockAssignment).filter(
             StockAssignment.id == assignment_id,
@@ -645,7 +645,7 @@ def update_assignment(*, user_id: int, assignment_id: int, data: dict) -> dict:
 
 
 def get_assignment_for_position(*, user_id: int, position_id: int) -> dict | None:
-    session = get_session()
+    session = _portfolio_session()
     try:
         a = session.query(StockAssignment).filter(
             StockAssignment.position_id == position_id,
@@ -658,7 +658,7 @@ def get_assignment_for_position(*, user_id: int, position_id: int) -> dict | Non
 
 def list_assignments(*, user_id: int) -> list[dict]:
     """All stock assignments for a user — for the portfolio summary."""
-    session = get_session()
+    session = _portfolio_session()
     try:
         rows = (
             session.query(StockAssignment)
@@ -682,7 +682,7 @@ def portfolio_summary(*, user_id: int) -> dict:
       - Monthly account value series (for chart)
       - Capital gains (sum of realized P&L on closed/expired)
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         all_positions = (
             session.query(OptionPosition)
@@ -814,7 +814,7 @@ def portfolio_summary(*, user_id: int) -> dict:
 
 def symbol_summary(*, user_id: int) -> list[dict]:
     """Per-symbol aggregated P&L — powers the searchable stock list."""
-    session = get_session()
+    session = _portfolio_session()
     try:
         all_positions = (
             session.query(OptionPosition)

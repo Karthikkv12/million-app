@@ -25,10 +25,16 @@ const QUICK = [
 function calcPnl(trades: Trade[]) {
   let pnl = 0; let open = 0; let closed = 0;
   for (const t of trades) {
+    const entryPrice = t.entry_price ?? t.price ?? 0;
+    const qty = t.quantity ?? t.qty ?? 0;
     if (t.exit_price == null) { open++; continue; }
     closed++;
-    const d = t.action?.toUpperCase() === "SELL" ? t.price - t.exit_price : t.exit_price - t.price;
-    pnl += d * t.qty;
+    if (t.realized_pnl != null) {
+      pnl += t.realized_pnl;
+    } else {
+      const d = t.action?.toUpperCase() === "SELL" ? entryPrice - t.exit_price : t.exit_price - entryPrice;
+      pnl += d * qty;
+    }
   }
   return { pnl, openCount: open, closedCount: closed };
 }
@@ -70,8 +76,12 @@ export default function DashboardPage() {
     .filter((t) => t.exit_price != null)
     .slice(-14)
     .map((t, i) => {
-      const d = t.action?.toUpperCase() === "SELL" ? t.price - (t.exit_price ?? 0) : (t.exit_price ?? 0) - t.price;
-      return { i, v: d * t.qty };
+      const entryPrice = t.entry_price ?? t.price ?? 0;
+      const qty = t.quantity ?? t.qty ?? 0;
+      const v = t.realized_pnl != null
+        ? t.realized_pnl
+        : (t.action?.toUpperCase() === "SELL" ? entryPrice - (t.exit_price ?? 0) : (t.exit_price ?? 0) - entryPrice) * qty;
+      return { i, v };
     });
 
   const isLoading = tradesQ.isLoading && cashQ.isLoading;
@@ -235,8 +245,11 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-2 sm:hidden divide-y divide-[var(--border)]">
             {[...trades].reverse().slice(0, 6).map((t) => {
               const ep = t.exit_price;
+              const entryPrice = t.entry_price ?? t.price ?? 0;
+              const qty = t.quantity ?? t.qty ?? 0;
               const rowPnl = ep != null
-                ? (t.action?.toUpperCase() === "SELL" ? t.price - ep : ep - t.price) * t.qty
+                ? t.realized_pnl != null ? t.realized_pnl
+                : (t.action?.toUpperCase() === "SELL" ? entryPrice - ep : ep - entryPrice) * qty
                 : null;
               return (
                 <div key={t.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 flex items-center justify-between">
@@ -245,7 +258,7 @@ export default function DashboardPage() {
                       <span className="font-bold text-foreground text-sm">{t.symbol}</span>
                       <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
                     </div>
-                    <p className="text-xs text-foreground/70 mt-0.5">{t.qty} × ${t.price?.toFixed(2)} · {String(t.date ?? "").slice(0, 10)}</p>
+                    <p className="text-xs text-foreground/70 mt-0.5">{qty} × ${entryPrice?.toFixed(2)} · {String(t.entry_date ?? t.date ?? "").slice(0, 10)}</p>
                   </div>
                   <div className={`text-sm font-bold ${rowPnl == null ? "text-foreground/60" : rowPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                     {rowPnl == null ? <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">Open</span> : `${rowPnl >= 0 ? "+" : ""}${fmt(rowPnl)}`}
@@ -268,18 +281,21 @@ export default function DashboardPage() {
               <tbody>
                 {[...trades].reverse().slice(0, 8).map((t) => {
                   const ep = t.exit_price;
+                  const entryPrice = t.entry_price ?? t.price ?? 0;
+                  const qty = t.quantity ?? t.qty ?? 0;
                   const rowPnl = ep != null
-                    ? (t.action?.toUpperCase() === "SELL" ? t.price - ep : ep - t.price) * t.qty
+                    ? t.realized_pnl != null ? t.realized_pnl
+                    : (t.action?.toUpperCase() === "SELL" ? entryPrice - ep : ep - entryPrice) * qty
                     : null;
                   return (
                     <tr key={t.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                      <td className="px-4 py-3 text-foreground/70 text-xs">{String(t.date ?? "").slice(0, 10)}</td>
+                      <td className="px-4 py-3 text-foreground/70 text-xs">{String(t.entry_date ?? t.date ?? "").slice(0, 10)}</td>
                       <td className="px-4 py-3 font-bold text-foreground">{t.symbol}</td>
                       <td className="px-4 py-3">
                         <Badge variant={t.action?.toUpperCase() === "BUY" ? "success" : "danger"}>{t.action}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-foreground">{t.qty}</td>
-                      <td className="px-4 py-3 text-foreground">${t.price?.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-foreground">{qty}</td>
+                      <td className="px-4 py-3 text-foreground">${entryPrice?.toFixed(2)}</td>
                       <td className="px-4 py-3 text-foreground/70">{ep != null ? `$${ep.toFixed(2)}` : "—"}</td>
                       <td className={`px-4 py-3 font-bold ${rowPnl == null ? "text-foreground/60" : rowPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                         {rowPnl == null ? "—" : `${rowPnl >= 0 ? "+" : ""}${fmt(rowPnl)}`}

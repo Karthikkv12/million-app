@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from logic.services import get_session
+from logic.services import get_session, _portfolio_session
 from database.models import (
     StockHolding,
     HoldingEvent,
@@ -142,7 +142,7 @@ def _recalculate_adj_basis(h: StockHolding, session) -> float:
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def list_holdings(*, user_id: int) -> list[dict]:
-    session = get_session()
+    session = _portfolio_session()
     try:
         rows = (
             session.query(StockHolding)
@@ -156,7 +156,7 @@ def list_holdings(*, user_id: int) -> list[dict]:
 
 
 def create_holding(*, user_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         now = datetime.utcnow()
         cost = float(data["cost_basis"])
@@ -182,7 +182,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
 
 
 def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
-    session = get_session()
+    session = _portfolio_session()
     try:
         h = session.query(StockHolding).filter(
             StockHolding.id == holding_id,
@@ -212,7 +212,7 @@ def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
 
 
 def delete_holding(*, user_id: int, holding_id: int) -> None:
-    session = get_session()
+    session = _portfolio_session()
     try:
         h = session.query(StockHolding).filter(
             StockHolding.id == holding_id,
@@ -227,7 +227,7 @@ def delete_holding(*, user_id: int, holding_id: int) -> None:
 
 
 def list_holding_events(*, user_id: int, holding_id: int) -> list[dict]:
-    session = get_session()
+    session = _portfolio_session()
     try:
         rows = (
             session.query(HoldingEvent)
@@ -267,7 +267,7 @@ def apply_position_status_change(
     """
     from logic.premium_ledger import upsert_ledger_row, get_premium_summary
 
-    session = get_session()
+    session = _portfolio_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -491,7 +491,7 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
     Returns:
         {"created": [<holding_dict>, ...], "linked": N}
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         positions = (
             session.query(OptionPosition)
@@ -571,7 +571,7 @@ def recalculate_all_holdings(*, user_id: int) -> dict:
     This is idempotent — safe to call repeatedly.
     Returns a summary of how many holdings were updated.
     """
-    session = get_session()
+    session = _portfolio_session()
     try:
         holdings = (
             session.query(StockHolding)
