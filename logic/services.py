@@ -1488,13 +1488,34 @@ def _ensure_filled_order_for_trade(session, *, trade: Trade) -> None:
     except Exception:
         return
 
-def list_trades(*, user_id: int, limit: int = 200, offset: int = 0) -> list[dict]:
-    """Return trades for a user with SQL-level pagination."""
+def list_trades(
+    *,
+    user_id: int,
+    limit: int = 200,
+    offset: int = 0,
+    symbol: str | None = None,
+    is_closed: bool | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    instrument: str | None = None,
+) -> list[dict]:
+    """Return trades for a user with SQL-level pagination and optional filters."""
     session = get_session()
     try:
+        q = session.query(Trade).filter(Trade.user_id == int(user_id))
+        if symbol is not None:
+            q = q.filter(Trade.symbol == str(symbol).strip().upper())
+        if is_closed is not None:
+            q = q.filter(Trade.is_closed == bool(is_closed))
+        if date_from is not None:
+            q = q.filter(Trade.entry_date >= date_from)
+        if date_to is not None:
+            q = q.filter(Trade.entry_date <= date_to)
+        if instrument is not None:
+            inst_enum = normalize_instrument(instrument)
+            q = q.filter(Trade.instrument == inst_enum)
         rows = (
-            session.query(Trade)
-            .filter(Trade.user_id == int(user_id))
+            q
             .order_by(Trade.entry_date.desc())
             .offset(int(offset))
             .limit(int(limit))
@@ -1581,6 +1602,7 @@ def save_trade(
     user_id=None,
     client_order_id=None,
     notes=None,
+    account_id=None,
 ):
     session = get_session()
     try:
@@ -1613,6 +1635,7 @@ def save_trade(
             user_id=int(user_id) if user_id is not None else None,
             client_order_id=coid,
             notes=(str(notes)[:2000] if notes else None),
+            account_id=(int(account_id) if account_id is not None else None),
         )
         session.add(new_trade)
 
@@ -1646,7 +1669,7 @@ def save_trade(
     finally:
         session.close()
 
-def save_cash(action, amount, date, notes, user_id=None):
+def save_cash(action, amount, date, notes, user_id=None) -> int:
     session = _budget_session()
     try:
         action_enum = normalize_cash_action(action)
@@ -1679,6 +1702,8 @@ def save_cash(action, amount, date, notes, user_id=None):
             )
 
         session.commit()
+        session.refresh(new_cash)
+        return int(new_cash.id)
     except Exception:
         session.rollback()
         raise
@@ -1933,7 +1958,7 @@ def list_budget_entries(*, user_id: int, limit: int = 500, offset: int = 0) -> l
         session.close()
 
 
-def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None, active_until=None):
+def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None, active_until=None) -> int:
     session = _budget_session()
     try:
         type_enum = normalize_budget_type(b_type)
@@ -1949,6 +1974,8 @@ def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=N
             new_item.user_id = int(user_id)
         session.add(new_item)
         session.commit()
+        session.refresh(new_item)
+        return int(new_item.id)
     except Exception:
         session.rollback()
         raise
@@ -2402,7 +2429,7 @@ def delete_trade(trade_id, user_id=None):
         session.close()
 
 
-def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=None, notes=None):
+def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=None, notes=None, option_type=None, strike=None, expiry=None):
     session = get_session()
     try:
         q = session.query(Trade).filter(Trade.id == int(trade_id))
@@ -2459,6 +2486,12 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
             trade.entry_date = pd.to_datetime(date)
             if notes is not None:
                 trade.notes = str(notes)[:2000]
+            if option_type is not None:
+                trade.option_type = normalize_option_type(option_type)
+            if strike is not None:
+                trade.strike_price = float(strike)
+            if expiry is not None:
+                trade.expiry_date = pd.to_datetime(expiry)
             session.commit()
             return True
         return False
@@ -2466,6 +2499,94 @@ def update_trade(trade_id, symbol, strategy, action, qty, price, date, user_id=N
         session.rollback()
         _logger.error("Error updating trade: %s", e)
         return False
+    finally:
+        session.close()
+
+
+# ── Credit Card Weeksd: int, user_id: int) -> bool:
+    """Delete a cash flow entry. Returns True if deleted, False if not found."""
+    session = _budget_session()
+    try:
+        row = session.query(CashFlow).filter(
+            CashFlow.id == int(cash_id),
+            CashFlow.user_id == int(user_id),
+        ).first()
+        if not row:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_cash(cash_id: int, user_id: int, *, action: str | None = None, amount: float | None = None, date=None, notes: str | None = None) -> dict | None:
+    """Update a cash flow entry. Returns the updated row dict or None if not found."""
+    session = _budget_session()
+    try:
+        row = session.query(CashFlow).filter(
+            CashFlow.id == int(cash_id),
+            CashFlow.user_id == int(user_id),
+        ).first()
+        if not row:
+            return None
+        if action is not None:
+            row.action = normalize_cash_action(action)
+        if amount is not None:
+            row.amount = float(amount)
+        if date is not None:
+            row.date = pd.to_datetime(date)
+        if notes is not None:
+            row.notes = str(notes)
+        session.commit()
+        return {
+            "id": int(row.id),
+            "action": str(getattr(getattr(row, "action", None), "value", row.action) or ""),
+            "amount": float(row.amount),
+            "date": row.date,
+            "notes": (str(row.notes) if row.notes else None),
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def get_budget_summary(*, user_id: int) -> dict:
+    """Return per-category and per-type totals for all budget entries."""
+    session = _budget_session()
+    try:
+        rows = (
+            session.query(Budget)
+            .filter(Budget.user_id == int(user_id))
+            .all()
+        )
+        by_category: dict[str, float] = {}
+        by_type: dict[str, float] = {}
+        total_income = 0.0
+        total_expense = 0.0
+        for r in rows:
+            cat = str(r.category or "Uncategorized")
+            b_type = str(getattr(getattr(r, "type", None), "value", r.type) or "EXPENSE").upper()
+            amt = float(r.amount or 0.0)
+            by_category[cat] = by_category.get(cat, 0.0) + amt
+            by_type[b_type] = by_type.get(b_type, 0.0) + amt
+            if b_type == "INCOME":
+                total_income += amt
+            else:
+                total_expense += amt
+        return {
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "net": total_income - total_expense,
+            "by_category": by_category,
+            "by_type": by_type,
+            "entry_count": len(rows),
+        }
     finally:
         session.close()
 

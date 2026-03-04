@@ -1,6 +1,7 @@
 """backend_api/routers/trades.py — Trade journal & order management routes."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -24,6 +25,7 @@ from ..schemas import (
 from ..deps import get_current_user
 from ..utils import df_records as _df_records
 
+logger = logging.getLogger("optionflow.trades")
 router = APIRouter(tags=["trades"])
 
 
@@ -174,7 +176,6 @@ def order_events(
     user=Depends(get_current_user),
     limit: int = Query(default=200, ge=1, le=1000),
 ) -> List[Dict[str, Any]]:
-    import pandas as pd
     rows = services.list_order_events(
         user_id=int(user["sub"]), order_id=int(order_id), limit=int(limit)
     )
@@ -188,8 +189,22 @@ def list_trades(
     user=Depends(get_current_user),
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
+    symbol: Optional[str] = Query(default=None, description="Filter by ticker symbol (case-insensitive)"),
+    is_closed: Optional[bool] = Query(default=None, description="Filter by open/closed status"),
+    date_from: Optional[datetime] = Query(default=None, description="Filter trades on or after this date"),
+    date_to: Optional[datetime] = Query(default=None, description="Filter trades on or before this date"),
+    instrument: Optional[str] = Query(default=None, description="Filter by instrument: STOCK or OPTION"),
 ) -> List[TradeOut]:
-    rows = services.list_trades(user_id=int(user["sub"]), limit=limit, offset=offset)
+    rows = services.list_trades(
+        user_id=int(user["sub"]),
+        limit=limit,
+        offset=offset,
+        symbol=symbol,
+        is_closed=is_closed,
+        date_from=date_from,
+        date_to=date_to,
+        instrument=instrument,
+    )
     return [TradeOut.model_validate(r) for r in rows]
 
 
@@ -212,6 +227,7 @@ def create_trade(req: TradeCreateRequest, user=Depends(get_current_user)) -> Dic
         notes=req.notes,
         user_id=int(user["sub"]),
         client_order_id=req.client_order_id,
+        account_id=req.account_id,
     )
     return {"status": "ok", "trade_id": int(trade_id)}
 
@@ -225,6 +241,9 @@ def update_trade(
         req.qty, req.price, req.date,
         user_id=int(user["sub"]),
         notes=req.notes,
+        option_type=req.option_type,
+        strike=req.strike,
+        expiry=req.expiry,
     )
     if not ok:
         raise HTTPException(status_code=404, detail="Trade not found")

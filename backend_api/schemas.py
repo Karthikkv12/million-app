@@ -1,6 +1,6 @@
 """backend_api/schemas.py — Pydantic v2 request/response models."""
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -179,6 +179,9 @@ class TradeUpdateRequest(BaseModel):
     price: float = Field(gt=0)
     date: datetime
     notes: Optional[str] = None
+    option_type: Optional[str] = None
+    strike: Optional[float] = None
+    expiry: Optional[datetime] = None
 
 
 class TradeCloseRequest(BaseModel):
@@ -226,9 +229,21 @@ class CashOut(BaseModel):
     notes: Optional[str] = None
 
 
+class CashUpdateRequest(BaseModel):
+    action: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class CashCreateOut(BaseModel):
+    id: int
+    status: str = "ok"
+
+
 class BudgetCreateRequest(BaseModel):
     category: str
-    type: str
+    type: Literal["INCOME", "EXPENSE", "ASSET"] = "EXPENSE"
     entry_type: Optional[str] = "FLOATING"
     recurrence: Optional[str] = None
     amount: float
@@ -236,6 +251,11 @@ class BudgetCreateRequest(BaseModel):
     description: str = ""
     merchant: Optional[str] = None
     active_until: Optional[str] = None   # YYYY-MM
+
+
+class BudgetCreateOut(BaseModel):
+    id: int
+    status: str = "ok"
 
 
 class BudgetOut(BaseModel):
