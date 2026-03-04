@@ -4,6 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# ── Ensure custom Node/npm is on PATH ─────────────────────────────────────────
+# The project uses a user-local Node installation that may not be in the shell's
+# default PATH. Prepend known locations so `npm` and `node` are always found.
+for _node_candidate in \
+  "$HOME/bin/node-v20.11.1-darwin-arm64/bin" \
+  "$HOME/bin" \
+  "/usr/local/bin" \
+  "/opt/homebrew/bin"; do
+  if [[ -x "$_node_candidate/npm" ]]; then
+    export PATH="$_node_candidate:$PATH"
+    break
+  fi
+done
+unset _node_candidate
+
 CMD="${1:-start}"
 
 # Prefer a repo-local venv, then the parent-folder venv (common in this workspace).
