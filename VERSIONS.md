@@ -5,6 +5,60 @@
 
 ---
 
+## v2.4.0 — Dead Code Removal: Trade Journal & Broker Layer
+**Released:** 2026-03-04
+**Branch:** `develop`
+**Commits:** `50ed41e` (broker/orders), `d8a10fa` (trade journal)
+
+### 🗑️ Removed: Broker / Orders System (commit `50ed41e`)
+The broker abstraction and order management system were Robinhood-era dead code — `BROKER_ENABLED` defaulted to `0` and only a `PaperBroker` stub existed. Never used in production.
+
+- **Deleted** `brokers/` folder (`__init__.py`, `base.py`, `factory.py`, `paper.py`)
+- **`database/models.py`** — removed `Order`, `OrderEvent`, `OrderStatus` models
+- **`logic/trade_services.py`** — removed all order functions
+- **`backend_api/routers/trades.py`** — removed all `/orders` routes
+- **`backend_api/schemas/`** — removed `OrderCreateRequest`, `OrderFillRequest`, `OrderOut`
+- **Frontend** — removed dead pages: `/orders`, `/accounts`, `/search`, `/stocks/[symbol]`, `options-flow/page.stable.tsx`; removed `fetchOrders` from Dashboard
+- **Deleted tests:** `test_broker_enabled_orders.py`, `test_orders_lifecycle.py`
+
+### 🗑️ Removed: Raw Trade Journal (commit `d8a10fa`)
+The `Trade` table was a Robinhood-vision leftover. The actual Trades page uses `WeeklyOptionPortfolio` / `OptionPosition` / `StockHolding` tables — the raw `Trade` table was never connected to any live UI.
+
+- **`database/models.py`** — removed `Trade` model, `InstrumentType`, `Action`, `OptionType` enums and their index
+- **`logic/trade_services.py`** — removed `normalize_instrument`, `normalize_action`, `normalize_option_type`, `_trade_signed_quantity`, `_get_or_create_holdings_sync_account`, `_apply_holding_delta`, `list_trades`, `get_trade`, `save_trade`, `close_trade`, `delete_trade`, `update_trade`, `load_data`; removed unused `os`, `pandas`, `get_trades_engine` imports
+- **`backend_api/routers/trades.py`** — removed all `/trades` CRUD routes (GET, POST, PUT, POST /close, DELETE); kept `/accounts` and `/holdings` routes intact
+- **`backend_api/schemas/trades.py`** — removed `TradeCreateRequest`, `TradeUpdateRequest`, `TradeCloseRequest`, `TradeOut`
+- **`backend_api/schemas/__init__.py`** — removed Trade schema re-exports
+- **`logic/services.py`** — removed `normalize_instrument/action/option_type` re-exports
+- **`web/lib/api.ts`** — removed `Trade` interface, `fetchTrades`, `createTrade`, `updateTrade`, `deleteTrade`
+- **`web/app/(app)/dashboard/page.tsx`** — removed `tradesQ`, `calcPnl`, `sparkData`, `isLoading`, entire "Recent Trades" JSX section (mobile card list + desktop table), stat tiles (`pnl`, `openCount`, `closedCount`); cleaned unused imports (`Trade`, `fetchTrades`, `fetchCashBalance`, `Badge`, `SkeletonStatGrid`, `TrendingUp/Down`, `DollarSign`, `Activity`, `Clock`, `useRef`, `fmt`)
+- **Deleted tests:** `test_trade_closing.py`, `test_db_crud_pytest.py`, `test_holdings_trade_sync.py`, `test_services_normalization.py`
+- **Updated tests:** `test_auth_and_isolation.py` — rewrote `test_per_user_isolation` and `test_idempotent_trade_submission` to use `create_account` / `list_accounts` instead of the removed trade journal functions
+
+### 📊 Test Count
+| Milestone | Tests |
+|-----------|-------|
+| Before broker cleanup | 441 |
+| After broker cleanup | 434 (removed 7) |
+| After trade journal cleanup | 428 (removed 6 more) |
+
+### 📦 Files Changed
+| File | Change |
+|------|--------|
+| `brokers/` | **Deleted** (entire folder) |
+| `database/models.py` | Removed Order*, Trade, InstrumentType, Action, OptionType |
+| `logic/trade_services.py` | Removed all trade CRUD; kept accounts + holdings only |
+| `logic/services.py` | Removed stale normalizer re-exports |
+| `backend_api/routers/trades.py` | Removed /trades routes; kept /accounts + /holdings |
+| `backend_api/schemas/trades.py` | Removed Trade* Pydantic models |
+| `backend_api/schemas/__init__.py` | Removed Trade* re-exports |
+| `web/lib/api.ts` | Removed Trade interface + 4 trade functions |
+| `web/app/(app)/dashboard/page.tsx` | Removed Recent Trades section + all related state |
+| `tests/test_auth_and_isolation.py` | Rewrote 2 tests to use accounts |
+| 8 test files | **Deleted** (broker + trade journal tests) |
+
+---
+
 ## v2.2.0 — Test Repair, API Polish & Service Correctness
 **Released:** 2026-03-04
 **Branch:** `develop`
