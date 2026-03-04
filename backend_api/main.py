@@ -21,7 +21,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
-from database.models import init_db, get_users_session
+from database.models import (
+    init_db,
+    get_users_session,
+    get_trades_session,
+    get_budget_session,
+    get_portfolio_session,
+    get_markets_session,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -123,15 +130,39 @@ app.include_router(admin.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
-@app.get("/health", tags=["meta"])
+@app.get("/health", tags=["meta"], response_model=None)
 def health() -> Dict[str, Any] | JSONResponse:
-    """Liveness + readiness probe: pings the users DB."""
-    session = get_users_session()
-    try:
-        session.execute(text("SELECT 1"))
-        return {"status": "ok", "db": "ok"}
-    except Exception as exc:
-        logger.error("Health check DB ping failed: %s", exc)
-        return JSONResponse(status_code=503, content={"status": "error", "db": "unreachable"})
-    finally:
-        session.close()
+    """Liveness + readiness probe: pings all 5 SQLite databases.
+
+    Returns 200 if every database responds to SELECT 1.
+    Returns 503 if any database is unreachable, with per-DB status in the body.
+    """
+    _db_factories = {
+        "users":     get_users_session,
+        "trades":    get_trades_session,
+        "budget":    get_budget_session,
+        "portfolio": get_portfolio_session,
+        "markets":   get_markets_session,
+    }
+
+    db_status: Dict[str, str] = {}
+    any_down = False
+
+    for name, factory in _db_factories.items():
+        session = factory()
+        try:
+            session.execute(text("SELECT 1"))
+            db_status[name] = "ok"
+        except Exception as exc:
+            logger.error("Health check failed for %s db: %s", name, exc)
+            db_status[name] = "unreachable"
+            any_down = True
+        finally:
+            session.close()
+
+    overall = "unhealthy" if any_down else "healthy"
+    payload: Dict[str, Any] = {"status": overall, "databases": db_status}
+
+    if any_down:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
