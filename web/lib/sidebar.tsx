@@ -8,15 +8,25 @@ interface SidebarCtx {
 
 const Ctx = createContext<SidebarCtx>({ collapsed: false, toggle: () => {} });
 
+/** On iPad (md breakpoint, 768–1023 px) the sidebar defaults to collapsed so the
+ *  content area isn't squeezed to ~528 px.  On larger screens it defaults open.
+ *  A localStorage value always wins if the user has previously toggled it. */
+function getInitialCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved !== null) return saved === "true";
+  } catch {}
+  // Default: collapsed on tablet (< 1024 px), expanded on laptop+
+  return window.innerWidth < 1024;
+}
+
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
-  // Hydrate from localStorage after mount (avoids SSR mismatch)
+  // Hydrate from localStorage / viewport after mount (avoids SSR mismatch)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("sidebar-collapsed");
-      if (saved === "true") setCollapsed(true);
-    } catch {}
+    setCollapsed(getInitialCollapsed());
   }, []);
 
   const toggle = () =>

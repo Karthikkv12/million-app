@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Zap, Search, BarChart2, Globe } from "lucide-react";
+import { LayoutDashboard, Zap, BarChart2, Globe, PiggyBank } from "lucide-react";
 import { clsx } from "clsx";
 
 const TABS = [
   { href: "/dashboard",    label: "Home",    icon: LayoutDashboard },
   { href: "/options-flow", label: "Flow",    icon: Zap             },
-  { href: "/search",       label: "Search",  icon: Search          },
-  { href: "/trades",       label: "Trades",  icon: BarChart2       },
   { href: "/markets",      label: "Markets", icon: Globe           },
+  { href: "/trades",       label: "Trades",  icon: BarChart2       },
+  { href: "/budget",       label: "Budget",  icon: PiggyBank       },
 ];
 
 export default function BottomNav() {
