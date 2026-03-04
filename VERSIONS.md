@@ -5,6 +5,54 @@
 
 ---
 
+## v2.1.0 — Backend Quality & Correctness Pass
+**Released:** 2026-03-04
+**Branch:** `develop`
+**Commit:** `0c12f5c`
+
+### 🏗️ Architecture
+- **`backend_api/state.py`** *(new)* — all shared module-level state (GEX cache, background poller, watched-symbol set, flow-DB helpers) extracted from `main.py`; eliminates the `markets.py → main.py` circular import
+- **`backend_api/utils.py`** *(new)* — single canonical `df_records()` helper; removed 3 duplicate copies spread across `main.py`, `trades.py`, and `budget.py`
+- **`backend_api/main.py`** further reduced from 301 → ~110 lines (pure app factory: env load, middleware, routers, startup)
+
+### 🐛 Bug Fixes
+- **Ledger pagination** (`GET /ledger/entries`): was fetching `limit+offset` rows then slicing in Python; now passes `limit` + `offset` directly to SQLAlchemy query. `list_ledger_entries()` in `services.py` gains an `offset` parameter.
+- **`_flow_db()` per-request migrations**: `ALTER TABLE` / `CREATE INDEX` / `UPDATE` normalisation ran on every DB connection open; moved into a one-time `_init_flow_db()` called at startup.
+- **`markets.py` imports from `main.py`**: `_watched`, `_gex_cache`, `_backfill_history` etc. were imported at call-time from `main.py` (circular). Now imported from `state.py`.
+
+### ✅ Correctness
+- **`model_validate()`**: replaced all manual `Foo(id=int(r.get("id")), ...)` dict→Pydantic construction in `trades.py` (`AccountOut`, `HoldingOut`, `OrderOut`) and `auth.py` (`AuthEventOut`, `AuthSessionOut`) with `Foo.model_validate(r)` — field mismatches now raise at the boundary instead of silently returning `None`.
+- **Swallowed exceptions fixed**: every `except Exception: pass` replaced with `logger.warning(...)`:
+  - `auth.py` — login rate-limit check, refresh rate-limit check, logout refresh-token revoke, logout-all and change-password `revoke_all_refresh_tokens`
+  - `portfolio.py` — `apply_position_status_change` side-effect after position status update
+
+### 🔒 Input Validation
+- All `limit` / `offset` pagination query params across `trades.py` and `budget.py` now use `Query(ge=1, le=1000)` / `Query(ge=0)` — negative or zero values are rejected at the FastAPI layer.
+
+### 🚨 Error Handling
+- **Global 500 handler** added to `main.py` via `@app.exception_handler(Exception)`: logs unhandled exceptions with `logger.exception()` and returns a clean `{"detail": "Internal server error"}` JSON response instead of a raw stack trace.
+
+### 🧹 Code Quality
+- **`portfolio.py`**: all 20+ inline `from logic.X import Y` imports inside route function bodies moved to module-level — faster cold start, standard Python style, easier IDE navigation.
+- **Unbounded caches capped**: `markets.py` in-memory caches (`_search_cache`, `_STOCK_INFO_CACHE`, `_QUOTE_CACHE`) replaced with `cachetools.TTLCache(maxsize=...)` — prevents unbounded memory growth on long-running servers.
+- `cachetools` added to `requirements.txt`.
+
+### 📦 Files Changed
+| File | Change |
+|------|--------|
+| `backend_api/state.py` | **New** — shared state + poller + flow-DB |
+| `backend_api/utils.py` | **New** — `df_records()` helper |
+| `backend_api/main.py` | Stripped to ~110 lines; global 500 handler |
+| `backend_api/routers/auth.py` | Logger, `model_validate`, swallowed-exception fixes |
+| `backend_api/routers/trades.py` | `utils.df_records`, `model_validate`, `Query` bounds |
+| `backend_api/routers/budget.py` | `utils.df_records`, `Query` bounds, ledger pagination fix |
+| `backend_api/routers/portfolio.py` | Module-level imports, logger, `_apply_holding` warning |
+| `backend_api/routers/markets.py` | `state.py` imports, `TTLCache`, remove local `_flow_db()` |
+| `logic/services.py` | `list_ledger_entries` gains `offset` param |
+| `requirements.txt` | Added `cachetools` |
+
+---
+
 ## v2.0.0 — Backend Modularisation & Hardening
 **Released:** 2026-03-04
 **Branch:** `develop`
