@@ -38,3 +38,4 @@ trading_journal.db
 
 # Node
 node_modules/
+backups/
