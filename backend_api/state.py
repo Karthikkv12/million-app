@@ -40,7 +40,7 @@ _flow_db_initialised = False
 _flow_db_init_lock = threading.Lock()
 
 
-def _init_flow_db() -> None:
+def init_flow_db() -> None:
     """Run one-time schema migrations for the flow snapshot DB.
 
     Safe to call multiple times — subsequent calls are no-ops.
@@ -116,8 +116,9 @@ def _record_flow_snapshot(
         logger.error("_record_flow_snapshot failed for %s: %s", symbol, exc)
 
 
-def _backfill_history(sym: str, days: int) -> None:
-    import yfinance as yf
+def backfill_history(sym: str, days: int) -> None:  # noqa: C901
+    import yfinance as yf  # type: ignore[import-untyped]
+    from pandas import DatetimeIndex
 
     key = (sym, days)
     with _backfill_lock:
@@ -129,15 +130,16 @@ def _backfill_history(sym: str, days: int) -> None:
         period_map = {1: "1d", 2: "2d", 3: "5d", 7: "5d", 14: "1mo", 30: "1mo"}
         period = period_map.get(days, f"{days}d")
         ticker = yf.Ticker(sym)
-        bars = ticker.history(period=period, interval=interval, progress=False)
-        if bars is None or bars.empty:
+        bars = ticker.history(period=period, interval=interval, progress=False)  # type: ignore[no-untyped-call]
+        if bars.empty:
             return
-        if bars.index.tz is None:
-            bars.index = bars.index.tz_localize("UTC")
+        idx: DatetimeIndex = bars.index  # type: ignore[assignment]
+        if idx.tz is None:
+            bars.index = idx.tz_localize("UTC")
         else:
-            bars.index = bars.index.tz_convert("UTC")
+            bars.index = idx.tz_convert("UTC")
         cutoff = datetime.now(_tz.utc) - _td(days=days)
-        bars = bars[bars.index >= cutoff]
+        bars = bars[bars.index >= cutoff]  # type: ignore[operator]
         if bars.empty:
             return
         call_ratio, put_ratio, prem_per_share = 0.55, 0.45, 0.5
@@ -164,11 +166,13 @@ def _backfill_history(sym: str, days: int) -> None:
                     (sym, since_iso),
                 ).fetchall()
             }
-        rows_to_insert = []
+        rows_to_insert: list[tuple[str, str, float, float, float, float, float, int]] = []
         for ts_idx, row in bars.iterrows():
-            raw_ts = ts_idx.isoformat(timespec="seconds")
-            ts_str = raw_ts.replace(" ", "T")
-            ts_str = re.sub(r"[+-]00:?00$", "Z", ts_str)
+            from pandas import Timestamp
+            ts: Timestamp = ts_idx  # type: ignore[assignment]
+            raw_ts = ts.isoformat(timespec="seconds")
+            ts_str: str = raw_ts.replace(" ", "T")
+            ts_str = re.sub(r"[+-]00:?00$", "Z", str(ts_str))
             if not ts_str.endswith("Z") and "+" not in ts_str and ts_str.count("-") == 2:
                 ts_str += "Z"
             if ts_str in existing:
@@ -192,12 +196,12 @@ def _backfill_history(sym: str, days: int) -> None:
                     rows_to_insert,
                 )
     except Exception as exc:
-        logger.error("_backfill_history %s %dd failed: %s", sym, days, exc)
+        logger.error("backfill_history %s %dd failed: %s", sym, days, exc)
         with _backfill_lock:
             _backfilled.discard(key)
 
 
-def _background_poller() -> None:
+def background_poller() -> None:
     from logic.gamma import compute_gamma_exposure
 
     last_date = datetime.now(_tz.utc).date()

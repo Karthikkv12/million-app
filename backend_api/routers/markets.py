@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..deps import get_current_user
 from ..state import (
     _RANGE_INTERVAL,
-    _backfill_history,
+    backfill_history,
     _flow_db,
     _gex_cache,
     _GEX_CACHE_TTL,
@@ -103,7 +103,7 @@ def watch_symbols(body: Dict[str, Any], _user=Depends(get_current_user)) -> None
     for s in new_symbols:
         for d in _RANGE_INTERVAL:
             threading.Thread(
-                target=_backfill_history, args=(s, d), daemon=True,
+                target=backfill_history, args=(s, d), daemon=True,
                 name=f"backfill-{s}-{d}d"
             ).start()
 

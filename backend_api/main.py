@@ -14,11 +14,11 @@ import os
 import threading
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict
+from typing import Any, Callable, Coroutine, Dict
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
 from database.models import init_db, get_users_session
@@ -54,11 +54,11 @@ _load_dotenv()
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Run startup tasks before yield; shutdown tasks after."""
-    from .state import _init_flow_db, _background_poller
+    from .state import init_flow_db, background_poller
 
     init_db()
-    _init_flow_db()
-    threading.Thread(target=_background_poller, daemon=True, name="gex-poller").start()
+    init_flow_db()
+    threading.Thread(target=background_poller, daemon=True, name="gex-poller").start()
     logger.info("OptionFlow API v2.2.0 started — GEX poller running")
     yield
     # (shutdown: nothing to clean up — poller is a daemon thread)
@@ -86,10 +86,13 @@ app.add_middleware(
 _req_logger = logging.getLogger("optionflow.requests")
 
 
-@app.middleware("http")
-async def _log_requests(request: Request, call_next):
+@app.middleware("http")  # type: ignore[misc]
+async def log_requests(
+    request: Request,
+    call_next: Callable[[Request], Coroutine[Any, Any, Response]],
+) -> Response:
     t0 = time.perf_counter()
-    response = await call_next(request)
+    response: Response = await call_next(request)
     ms = (time.perf_counter() - t0) * 1000
     _req_logger.info("%s %s → %d  %.1fms", request.method, request.url.path, response.status_code, ms)
     return response
@@ -97,8 +100,8 @@ async def _log_requests(request: Request, call_next):
 
 # ── Global exception handler ──────────────────────────────────────────────────
 
-@app.exception_handler(Exception)
-async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+@app.exception_handler(Exception)  # type: ignore[misc]
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception(
         "Unhandled error on %s %s: %s", request.method, request.url.path, exc
     )
@@ -121,7 +124,7 @@ app.include_router(admin.router)
 
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["meta"])
-def health() -> Dict[str, Any]:
+def health() -> Dict[str, Any] | JSONResponse:
     """Liveness + readiness probe: pings the users DB."""
     session = get_users_session()
     try:
