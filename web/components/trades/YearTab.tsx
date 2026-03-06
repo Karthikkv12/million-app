@@ -148,14 +148,19 @@ export function YearTab() {
   const expiryBucketMap = new Map<string, OptionPosition[]>();
   for (const pos of allPositions) {
     if (!pos.expiry_date) continue;
-    const key = pos.expiry_date;
+    // Normalise to "YYYY-MM-DD" regardless of whether the backend returns
+    // a full ISO datetime ("2026-03-07T00:00:00") or a bare date string.
+    const key = pos.expiry_date.slice(0, 10);
     if (!expiryBucketMap.has(key)) expiryBucketMap.set(key, []);
     expiryBucketMap.get(key)!.push(pos);
   }
   const expiryBuckets: ExpiryBucket[] = Array.from(expiryBucketMap.entries())
     .map(([expiry, positions]) => {
+      // Parse as local midnight by appending T00:00:00 to the guaranteed YYYY-MM-DD key
       const expiryDate = new Date(expiry + "T00:00:00");
-      const dte = Math.round((expiryDate.getTime() - today.getTime()) / 86_400_000);
+      const dte = isNaN(expiryDate.getTime())
+        ? 0
+        : Math.round((expiryDate.getTime() - today.getTime()) / 86_400_000);
       const totalPremium = positions.reduce((sum, p) => sum + (p.total_premium ?? 0), 0);
       return { expiry, positions, totalPremium, dte, isSettled: dte < 0 };
     })
