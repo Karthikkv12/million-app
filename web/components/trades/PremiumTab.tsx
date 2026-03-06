@@ -27,7 +27,11 @@ export function PremiumTab() {
   const toggleWeek = (weekId: number) => {
     setExpandedWeeks((prev) => {
       const next = new Set(prev);
-      next.has(weekId) ? next.delete(weekId) : next.add(weekId);
+      if (next.has(weekId)) {
+        next.delete(weekId);
+      } else {
+        next.add(weekId);
+      }
       return next;
     });
   };
