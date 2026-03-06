@@ -5,6 +5,24 @@
 
 ---
 
+## v2.5.4 — Build Fix: ESLint & TypeScript Errors
+**Released:** 2026-03-06
+**Branch:** `develop`
+
+### 🐛 Bug Fixes
+
+#### `PremiumTab.tsx`
+- Fixed ESLint `@typescript-eslint/no-unused-expressions` build error on `toggleWeek`
+- Replaced ternary used as a side-effect statement with an explicit `if/else` block
+
+#### `AccountTab.tsx`
+- Fixed TypeScript error: Recharts `labelFormatter` prop typed `(l: string)` but receives `ReactNode`
+- Changed parameter type to `(l: unknown)` with `String(l)` coercion — fixes both occurrences (lines 161 & 195)
+
+> These errors caused `next build` to fail, producing stale compiled output that broke the app on iOS/Safari (which is stricter about JS errors than desktop Chrome).
+
+---
+
 ## v2.5.3 — Budget UI Overhaul: Income Sources, Type Removal, Layout & New Charts
 **Released:** 2026-03-04
 **Branch:** `develop → main`

@@ -209,6 +209,7 @@ source .venv/bin/activate && python -m pytest tests/ -q --ignore=tests/test_api_
 
 | Version | What |
 |---------|------|
+| v2.5.4 | Build fix: ESLint no-unused-expressions in PremiumTab (ternary→if/else); TypeScript labelFormatter type in AccountTab (string→unknown). Fixes iOS/Safari breakage from stale compiled output. |
 | v2.5.3 | Budget: Income rows → Source dropdown (Salary/Stock Market), no Merchant, no Type. Type column removed from all 3 budget sections. 2-column page layout (Income+One-off left, Recurring+CC right). Robinhood Gold week cards redesign + flush stat tiles. Two new charts: CashFlowWaterfall + FixedVsVariableDonut in 50/50 row. |
 | v2.5.2 | Dashboard: removed portfolio balance chart. Performance tab: 52-Friday skeleton chart, vertical x-axis labels, side-by-side accumulation+projection, streak bar sparkline, compact week-by-week rows. Budget TrendChart rewritten as AreaChart with gradient fills + Net line. |
 | v2.5.1 | UI polish: recharts area+bar charts side-by-side in AccountTab (52-week scaffold, $1k Y ticks, newest-first table); Expense Mix pie redesign; dark-mode tooltip fix across all budget charts. |
