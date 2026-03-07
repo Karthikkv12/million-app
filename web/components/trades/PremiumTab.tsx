@@ -104,8 +104,23 @@ export function PremiumTab() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                      {["Symbol", "Avg Cost", "Adj Basis", "Live Adj", "Sold $", "Realized $", "In-Flight $", "# Pos"].map((h) => (
+                      {(["Symbol", "Avg Cost", "Adj Basis", "Live Adj"] as const).map((h) => (
                         <th key={h} className="px-4 py-2.5 text-right first:text-left font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                      <th className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1">
+                          Sold $
+                          <span title="Gross premium collected when positions were opened. Difference vs Realized = in-flight unrealized premium (active positions) + any buyback debits paid to close early." className="cursor-help text-foreground/40 hover:text-foreground/70 text-[10px] leading-none">ⓘ</span>
+                        </span>
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1">
+                          Realized $
+                          <span title="Net premium locked in from closed/expired positions only. Lower than Sold$ when: (1) positions are still active (in-flight), or (2) a position was bought back early at a loss." className="cursor-help text-foreground/40 hover:text-foreground/70 text-[10px] leading-none">ⓘ</span>
+                        </span>
+                      </th>
+                      {(["In-Flight $", "# Pos"] as const).map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>

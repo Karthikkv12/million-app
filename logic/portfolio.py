@@ -855,11 +855,13 @@ def portfolio_summary(*, user_id: int) -> dict:
                 monthly_premium.get(key, 0.0) + week_premium.get(w.id, 0.0), 2
             )
 
-        # Always return all 12 months of the current calendar year so the chart
-        # shows a complete Jan–Dec skeleton even when only a few weeks exist.
+        # Pad months from January up to (and including) the current month so the chart
+        # shows a YTD skeleton without rendering future empty bars.
         import datetime as _dt
-        _cy = _dt.datetime.utcnow().year
-        for _m in range(1, 13):
+        _now = _dt.datetime.utcnow()
+        _cy  = _now.year
+        _cm  = _now.month
+        for _m in range(1, _cm + 1):
             _k = f"{_cy}-{_m:02d}"
             if _k not in monthly_premium:
                 monthly_premium[_k] = 0.0
@@ -928,8 +930,9 @@ def symbol_summary(*, user_id: int) -> list[dict]:
                     "expired":       0,
                     "assigned":      0,
                 }
-            net = _net_premium(p) * p.contracts * 100
-            by_symbol[sym]["total_premium"] += net
+            gross = (p.premium_in or 0.0) * p.contracts * 100
+            net   = _net_premium(p) * p.contracts * 100
+            by_symbol[sym]["total_premium"] += gross
             if p.status in (OptionPositionStatus.CLOSED, OptionPositionStatus.EXPIRED,
                             OptionPositionStatus.ASSIGNED):
                 # Premium is fully realized for closed, expired, and assigned positions

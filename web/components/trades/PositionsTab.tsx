@@ -149,7 +149,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         const hasLiveData        = liveSpotMap.size > 0;
 
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
               <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>

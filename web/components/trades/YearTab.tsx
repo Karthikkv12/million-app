@@ -209,7 +209,7 @@ export function YearTab() {
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Win Rate</p>
           <div>
             <p className="text-3xl font-black text-blue-500">{winRate.toFixed(0)}%</p>
-            <p className="text-xs text-foreground/50 mt-1">{completeWeeks}/{s.total_weeks} weeks profitable</p>
+            <p className="text-xs text-foreground/50 mt-1">{Math.round(winRate / 100 * completeWeeks)}/{completeWeeks} completed weeks profitable</p>
           </div>
           <div className="mt-3 h-2 bg-[var(--surface-2)] rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${winRate}%` }} />
@@ -514,7 +514,7 @@ export function YearTab() {
                   <p className="text-xs text-foreground/50">{monthNames[bestMonth[0].split("-")[1]] ?? bestMonth[0]}</p>
                 </div>
               )}
-              {worstMonth && (
+              {worstMonth && bestMonth && worstMonth[0] !== bestMonth[0] && (
                 <div className="flex-1">
                   <p className="text-[10px] text-orange-400 font-semibold uppercase mb-1">Lightest</p>
                   <p className="text-lg font-black text-orange-400">${worstMonth[1].toFixed(0)}</p>
