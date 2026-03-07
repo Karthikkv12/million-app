@@ -410,6 +410,31 @@ def get_premium_dashboard(*, user_id: int) -> dict:
                         "symbol":              r.symbol,
                     }
 
+        # Build a lookup: symbol → active holding info (shares > 0, status=ACTIVE).
+        # This is used to correctly classify a symbol as active vs exited even when
+        # the PremiumLedger rows reference an older (hard-deleted) holding_id.
+        active_holding_by_symbol: dict[str, Any] = {}
+        all_symbols = {r.symbol for r in rows}
+        for sym in all_symbols:
+            active_h = (
+                session.query(StockHolding)
+                .filter(
+                    StockHolding.user_id == user_id,
+                    StockHolding.symbol == sym,
+                    StockHolding.status == "ACTIVE",
+                    StockHolding.shares > 0,
+                )
+                .first()
+            )
+            if active_h:
+                active_holding_by_symbol[sym] = {
+                    "cost_basis":          active_h.cost_basis,
+                    "adjusted_cost_basis": active_h.adjusted_cost_basis,
+                    "adj_at_exit":         active_h.adjusted_cost_basis,
+                    "shares":              active_h.shares,
+                    "holding_id":          active_h.id,
+                }
+
         # by_symbol
         by_symbol: dict[str, dict] = {}
         by_week: dict[int, dict] = {}
@@ -417,10 +442,13 @@ def get_premium_dashboard(*, user_id: int) -> dict:
         for r in rows:
             sym = r.symbol
             if sym not in by_symbol:
-                hinfo = holding_map.get(r.holding_id, {})
+                # Prefer the live active holding for this symbol; fall back to the
+                # holding referenced by this ledger row (may be hard-deleted).
+                hinfo = active_holding_by_symbol.get(sym) or holding_map.get(r.holding_id, {})
+                best_hid = hinfo.get("holding_id", r.holding_id)
                 by_symbol[sym] = {
                     "symbol":             sym,
-                    "holding_id":         r.holding_id,
+                    "holding_id":         best_hid,
                     "cost_basis":         hinfo.get("cost_basis", 0.0),
                     "adj_basis_db":       hinfo.get("adjusted_cost_basis") or hinfo.get("cost_basis", 0.0),
                     "adj_at_exit":        hinfo.get("adj_at_exit", hinfo.get("cost_basis", 0.0)),

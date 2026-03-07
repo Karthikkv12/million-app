@@ -158,7 +158,11 @@ export function AccountTab() {
                     />
                     <Tooltip
                       formatter={(v: unknown) => v == null ? ["—", "Value"] : [`$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Value"]}
-                      labelFormatter={(l: unknown) => new Date(String(l) + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                        const iso = payload?.[0]?.payload?.label;
+                        if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                        return String(_l);
+                      }}
                       contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "var(--foreground)" }}
                       itemStyle={{ color: "#22c55e" }}
                       labelStyle={{ color: "var(--foreground)", marginBottom: 2 }}
@@ -192,7 +196,11 @@ export function AccountTab() {
                     <ReferenceLine y={0} stroke="var(--border)" strokeWidth={1} />
                     <Tooltip
                       formatter={(v: unknown) => v == null ? ["—", "Change"] : [`${Number(v) >= 0 ? "+" : ""}$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, "Change"]}
-                      labelFormatter={(l: unknown) => new Date(String(l) + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                        const iso = payload?.[0]?.payload?.label;
+                        if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                        return String(_l);
+                      }}
                       contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11, color: "var(--foreground)" }}
                       itemStyle={{ color: "var(--foreground)" }}
                       labelStyle={{ color: "var(--foreground)", marginBottom: 2 }}

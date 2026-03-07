@@ -104,7 +104,7 @@ export function YearTab() {
   const cumulativeData = allFridaysOfYear;
   const chronoWeeks   = [...weeksBreakdown].reverse();
 
-  const activePremWeeks  = chronoWeeks.filter((w) => w.premium > 0);
+  const activePremWeeks  = chronoWeeks.filter((w) => w.premium > 0 && w.is_complete);
   const avgWeeklyPremium = activePremWeeks.length > 0
     ? activePremWeeks.reduce((acc, w) => acc + w.premium, 0) / activePremWeeks.length
     : 0;

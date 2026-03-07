@@ -871,8 +871,9 @@ def portfolio_summary(*, user_id: int) -> dict:
         winning_weeks = sum(1 for w in complete_weeks if week_premium.get(w.id, 0) > 0)
         win_rate = round(winning_weeks / len(complete_weeks) * 100, 1) if complete_weeks else 0.0
 
-        best_week = max(weeks_breakdown, key=lambda x: x["premium"], default=None)
-        worst_week = min(weeks_breakdown, key=lambda x: x["premium"], default=None)
+        complete_breakdown = [w for w in weeks_breakdown if w["is_complete"]]
+        best_week = max(complete_breakdown, key=lambda x: x["premium"], default=None)
+        worst_week = min(complete_breakdown, key=lambda x: x["premium"], default=None)
 
         # Estimated capital gains tax (short-term: 22% bracket default)
         cap_gains_tax_rate = 0.22
