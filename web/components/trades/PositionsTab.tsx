@@ -149,7 +149,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         const hasLiveData        = liveSpotMap.size > 0;
 
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
               <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
@@ -214,7 +214,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] text-foreground/40 mt-0.5">locked: ${realizedPrem.toFixed(2)}</p>
             </div>
             {/* ITM Assignment Risk — live card, only shown when live quotes loaded */}
-            <div className={`border rounded-xl p-3 col-span-2 sm:col-span-2 lg:col-span-2 ${
+            <div className={`border rounded-xl p-3 col-span-2 sm:col-span-2 xl:col-span-2 ${
               itmPositions.length > 0
                 ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"
                 : "bg-[var(--surface)] border-[var(--border)]"
