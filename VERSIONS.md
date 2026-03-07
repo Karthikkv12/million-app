@@ -5,6 +5,82 @@
 
 ---
 
+## v2.5.7 — Full Bug Audit Fix: 14 Bugs Across All Trades Tabs
+**Released:** 2026-03-07
+**Branch:** `develop → main`
+
+### 🐛 Bug Fixes (14 total — 4 HIGH · 6 MEDIUM · 4 LOW)
+
+#### 🔴 HIGH — Data Correctness
+
+**B1 · PremiumTab — Active holding mis-categorized as "Exited" (`logic/premium_ledger.py`)**
+- `get_premium_dashboard()` was keying `by_symbol` from the first-encountered `holding_id` per symbol
+- For HIMS: first ledger row pointed to a hard-deleted old holding (shares=0) → active position landed in Exited table, $112 in-flight premium invisible
+- Fix: now queries `StockHolding` for `status="ACTIVE", shares>0` per symbol before building `by_symbol`; active holding info takes precedence over any orphaned ledger row reference
+
+**B2 · AccountTab — Chart tooltips show "Invalid Date" (`web/components/trades/AccountTab.tsx`)**
+- Both AreaChart and WoW BarChart `labelFormatter` did `new Date(String(l) + "T00:00:00")` where `l` is the XAxis tick value — an abbreviated month name like `"Mar"` → `"MarT00:00:00"` → `Invalid Date`
+- Fix: `labelFormatter` now reads the full ISO date (`YYYY-MM-DD`) from `payload[0].payload.label` and passes that to `new Date()`; falls back to plain string
+
+**B3 · YearTab — "Worst Week" shows current open incomplete week (`logic/portfolio.py`)**
+- `worst_week = min(weeks_breakdown, ...)` ran over all weeks including open ones; open week with `premium=$0, is_complete=False` always won
+- Fix: compute `complete_breakdown = [w for w in weeks_breakdown if w["is_complete"]]`; `best_week`/`worst_week` now derived from complete weeks only
+
+**B13 · YearTab — Annual projection includes in-progress open weeks (`web/components/trades/YearTab.tsx`)**
+- `activePremWeeks = chronoWeeks.filter(w => w.premium > 0)` included incomplete open weeks, inflating the average and annual/monthly projection cards
+- Fix: filter changed to `w.premium > 0 && w.is_complete`
+
+#### 🟡 MEDIUM — Misleading or Incorrect Display
+
+**B4 · YearTab — Best/Worst Month same when 1 month of data (`YearTab.tsx`)**
+- With a single month, `bestMonth` and `worstMonth` resolved to the same entry — two identical cards
+- Fix: "Lightest" card only renders when `worstMonth[0] !== bestMonth[0]`
+
+**B5 · YearTab — Win Rate subtitle denominator mismatch (`YearTab.tsx`)**
+- Subtitle showed `completeWeeks / total_weeks` (winning weeks over all weeks including open ones)
+- Fix: `Math.round(winRate/100 * completeWeeks) / completeWeeks completed weeks profitable`
+
+**B6 · YearTab — Monthly chart renders 9 future empty $0 bars (`logic/portfolio.py`)**
+- `portfolio_summary()` always padded all 12 months; Apr–Dec showed as $0 bars
+- Fix: padding loop changed to `range(1, current_month + 1)` — only Jan → current month
+
+**B7 · PositionsTab — ITM card overflows metrics grid (`PositionsTab.tsx`)**
+- `lg:grid-cols-8` with 8 single-col cards + 1 `col-span-2` ITM card = 10 columns → wrap overflow
+- Fix: `lg:grid-cols-5 xl:grid-cols-10`; at laptop (1024px) 2 comfortable rows of 5; at 1280px+ single row. ITM `col-span-2` scoped to `xl:col-span-2`
+
+**B8 · PremiumTab — Sold$ vs Realized$ diff has no explanation (`PremiumTab.tsx`)**
+- Users couldn't tell if gap was in-flight premium (active positions) or buyback loss (early close)
+- Fix: ⓘ icon on both "Sold $" and "Realized $" column headers with `title` tooltip explaining each source of difference
+
+**B14 · SymbolsTab — `total_premium` net vs PremiumTab gross inconsistency (`logic/portfolio.py`)**
+- `symbol_summary()` used `_net_premium()` (after buyback deduction) for `total_premium`; dashboard used gross
+- Fix: `total_premium` now `premium_in × contracts × 100` (gross); `realized_pnl` keeps net
+
+#### 🟢 LOW — Minor UI/UX
+
+**B9 · AccountTab — "Δ vs Prior" column missing $ prefix (`AccountTab.tsx`)**
+- Delta rendered `+750` instead of `+$750` in both desktop table and mobile card view
+- Fix: `${chg >= 0 ? "+" : "-"}$${Math.abs(chg).toFixed(0)}` in both render paths
+
+**B10 · YearTab — Consistency 100/100 with 1 data point (`YearTab.tsx`)**
+- Single complete week → `stddev=0` → score=100, misleading with sample size of 1
+- Fix: shows `— / Need 3+ complete weeks` when `completedPremiums.length < 3`
+
+**B11 · SymbolsTab — "Win Rate" counts symbols not positions (`SymbolsTab.tsx`)**
+- Card labeled "Win Rate" counted symbols with `realized_pnl > 0` — per-symbol, not per-trade
+- Fix: label renamed to **"Profitable Symbols"**
+
+**B12 · HoldingsTab — "Basis Saved" includes closed holdings (`HoldingsTab.tsx`)**
+- `totalSaved` summed all holdings including CLOSED, mixing active savings with historical totals
+- Fix: filters to `status="ACTIVE"` only; shows "active only" subtitle; when closed holdings exist, displays `$X lifetime` subtitle below
+
+### 📱 Responsive Fixes
+- **PositionsTab**: metrics grid now `grid-cols-2 → sm:grid-cols-4 → lg:grid-cols-5 → xl:grid-cols-10`; cards never become unreadably narrow at laptop viewport
+- **HoldingsTab**: summary row uses `truncate` on dollar values; label shortened to prevent overflow on narrow phones
+- **AccountTab**: mobile card delta value fixed to show `$` prefix (was only fixed in desktop table in B9)
+
+---
+
 ## v2.5.5 — Expiry-Bucketed Premium Table + Live ITM Assignment Risk Card
 **Released:** 2026-03-06
 **Branch:** `develop → main`
