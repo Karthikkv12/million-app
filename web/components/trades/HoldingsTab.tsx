@@ -605,21 +605,21 @@ export function HoldingsTab() {
   return (
     <div>
       {holdings.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 mb-4">
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
             <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active Lots</p>
             <p className="text-base font-black text-foreground">{holdings.filter((h) => h.status === "ACTIVE").length}</p>
           </div>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
             <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Total Adj Cost</p>
-            <p className="text-base font-black text-blue-500">${totalAdjCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-base font-black text-blue-500 truncate">${totalAdjCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Basis Saved (Active)</p>
+            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Basis Saved</p>
             <p className="text-base font-black text-green-500">${totalSaved.toFixed(2)}</p>
-            {totalSavedLifetime > totalSaved && (
-              <p className="text-[10px] text-foreground/40 mt-0.5">${totalSavedLifetime.toFixed(2)} lifetime</p>
-            )}
+            {totalSavedLifetime > totalSaved
+              ? <p className="text-[10px] text-foreground/40 mt-0.5">${totalSavedLifetime.toFixed(2)} lifetime</p>
+              : <p className="text-[10px] text-foreground/40 mt-0.5">active only</p>}
           </div>
         </div>
       )}

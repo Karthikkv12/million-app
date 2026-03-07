@@ -259,7 +259,7 @@ export function AccountTab() {
                   </button>
                 )}
                 <div className="flex items-center gap-4 text-xs">
-                  {chg != null && <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>Δ {chg >= 0 ? "+" : ""}{chg.toFixed(0)}</span>}
+                  {chg != null && <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>Δ {chg >= 0 ? "+" : "-"}${Math.abs(chg).toFixed(0)}</span>}
                   {r.premium > 0 && <span className="text-green-500">Prem ${r.premium.toFixed(2)}</span>}
                   <span className={r.realized_pnl >= 0 ? "text-green-500" : "text-red-400"}>{fmt$(r.realized_pnl)}</span>
                 </div>
