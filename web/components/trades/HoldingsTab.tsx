@@ -595,7 +595,8 @@ export function HoldingsTab() {
   );
 
   const totalAdjCost = holdings.filter((h) => h.status === "ACTIVE").reduce((s, h) => s + h.total_adjusted_cost, 0);
-  const totalSaved   = holdings.reduce((s, h) => s + h.basis_reduction, 0);
+  const totalSaved   = holdings.filter((h) => h.status === "ACTIVE").reduce((s, h) => s + h.basis_reduction, 0);
+  const totalSavedLifetime = holdings.reduce((s, h) => s + h.basis_reduction, 0);
 
   const fld = (label: string, el: React.ReactNode) => (
     <div><label className="text-xs text-foreground/70 block mb-1">{label}</label>{el}</div>
@@ -614,8 +615,11 @@ export function HoldingsTab() {
             <p className="text-base font-black text-blue-500">${totalAdjCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Basis Saved</p>
+            <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Basis Saved (Active)</p>
             <p className="text-base font-black text-green-500">${totalSaved.toFixed(2)}</p>
+            {totalSavedLifetime > totalSaved && (
+              <p className="text-[10px] text-foreground/40 mt-0.5">${totalSavedLifetime.toFixed(2)} lifetime</p>
+            )}
           </div>
         </div>
       )}

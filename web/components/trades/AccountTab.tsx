@@ -305,7 +305,7 @@ export function AccountTab() {
                     </td>
                     <td className="px-4 py-3">
                       {chg != null
-                        ? <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>{chg >= 0 ? "+" : ""}{chg.toFixed(0)}</span>
+                        ? <span className={`font-semibold ${chg >= 0 ? "text-green-500" : "text-red-400"}`}>{chg >= 0 ? "+" : "-"}${Math.abs(chg).toFixed(0)}</span>
                         : <span className="text-foreground/30">—</span>}
                     </td>
                     <td className="px-4 py-3 text-foreground/80">

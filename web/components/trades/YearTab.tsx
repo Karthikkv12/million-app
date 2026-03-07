@@ -433,13 +433,22 @@ export function YearTab() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Consistency</p>
           <div>
-            <p className="text-3xl font-black" style={{ color: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444" }}>
-              {consistencyScore.toFixed(0)}<span className="text-lg font-semibold text-foreground/40">/100</span>
-            </p>
-            <p className="text-xs text-foreground/50 mt-1">σ ${weeklyStdDev.toFixed(2)} · avg ${weeklyMean.toFixed(2)}/wk</p>
+            {completedPremiums.length < 3 ? (
+              <>
+                <p className="text-3xl font-black text-foreground/30">—<span className="text-lg font-semibold text-foreground/40">/100</span></p>
+                <p className="text-xs text-foreground/40 mt-1">Need 3+ complete weeks</p>
+              </>
+            ) : (
+              <>
+                <p className="text-3xl font-black" style={{ color: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444" }}>
+                  {consistencyScore.toFixed(0)}<span className="text-lg font-semibold text-foreground/40">/100</span>
+                </p>
+                <p className="text-xs text-foreground/50 mt-1">σ ${weeklyStdDev.toFixed(2)} · avg ${weeklyMean.toFixed(2)}/wk</p>
+              </>
+            )}
           </div>
           <div className="mt-3 h-2 bg-[var(--surface-2)] rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${consistencyScore}%`, background: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444" }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${completedPremiums.length < 3 ? 0 : consistencyScore}%`, background: consistencyScore >= 70 ? "#22c55e" : consistencyScore >= 40 ? "#f59e0b" : "#ef4444" }} />
           </div>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between">

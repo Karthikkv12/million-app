@@ -52,7 +52,7 @@ function MetricsPanel({ symbols, selected }: { symbols: SymbolSummary[]; selecte
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Award size={11} className="text-yellow-400" />
-            <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold">Win Rate</p>
+            <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold">Profitable Symbols</p>
           </div>
           <p className="text-xl font-black text-foreground">{pct(winners, symbols.length)}<span className="text-sm font-semibold text-foreground/40">%</span></p>
           <p className="text-[10px] text-foreground/40 mt-0.5">{winners}/{symbols.length} symbols profitable</p>
