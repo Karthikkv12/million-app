@@ -928,16 +928,19 @@ def symbol_summary(*, user_id: int) -> list[dict]:
                 }
             net = _net_premium(p) * p.contracts * 100
             by_symbol[sym]["total_premium"] += net
-            if p.status in (OptionPositionStatus.CLOSED, OptionPositionStatus.EXPIRED):
+            if p.status in (OptionPositionStatus.CLOSED, OptionPositionStatus.EXPIRED,
+                            OptionPositionStatus.ASSIGNED):
+                # Premium is fully realized for closed, expired, and assigned positions
+                # (assigned = option exercised against you; premium collected is kept)
                 by_symbol[sym]["realized_pnl"] += net
                 if p.status == OptionPositionStatus.CLOSED:
                     by_symbol[sym]["closed"] += 1
-                else:
+                elif p.status == OptionPositionStatus.EXPIRED:
                     by_symbol[sym]["expired"] += 1
+                else:
+                    by_symbol[sym]["assigned"] += 1
             elif p.status == OptionPositionStatus.ACTIVE:
                 by_symbol[sym]["active"] += 1
-            elif p.status == OptionPositionStatus.ASSIGNED:
-                by_symbol[sym]["assigned"] += 1
 
         result = list(by_symbol.values())
         result.sort(key=lambda x: x["symbol"])
