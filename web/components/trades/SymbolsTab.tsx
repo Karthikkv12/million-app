@@ -42,25 +42,12 @@ export function SymbolsTab() {
           {/* Mobile cards */}
           <div className="sm:hidden divide-y divide-[var(--border)]">
             {filtered.map((s) => (
-              <div key={s.symbol} className="px-3 py-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-foreground text-base">{s.symbol}</span>
-                  <span className={`text-sm font-bold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm mb-1">
-                  <div>
-                    <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Total Prem</span>
-                    <span className="text-green-500 font-semibold">${s.total_premium.toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Active</span>
-                    <span className="text-blue-500 font-semibold">{s.active}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-foreground/60">
-                  <span>Closed: <span className="text-green-600 font-semibold">{s.closed}</span></span>
-                  <span>Expired: <span className="text-foreground/50 font-semibold">{s.expired}</span></span>
-                  <span>Assigned: <span className="text-yellow-500 font-semibold">{s.assigned}</span></span>
+              <div key={s.symbol} className="px-3 py-3 flex items-center justify-between">
+                <span className="font-bold text-foreground text-base">{s.symbol}</span>
+                <div className="text-right">
+                  <div className="text-[10px] text-foreground/40 uppercase tracking-wide">Total Prem</div>
+                  <div className="text-green-500 font-semibold text-sm">${s.total_premium.toFixed(2)}</div>
+                  <div className={`text-xs font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)} realized</div>
                 </div>
               </div>
             ))}
@@ -70,7 +57,7 @@ export function SymbolsTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                  {["Symbol", "Total Premium", "Realized P/L", "Active", "Closed", "Expired", "Assigned"].map((h) => (
+                  {["Symbol", "Total Premium", "Realized P/L"].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -83,10 +70,6 @@ export function SymbolsTab() {
                     <td className={`px-4 py-2.5 font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {fmt$(s.realized_pnl)}
                     </td>
-                    <td className="px-4 py-2.5 text-blue-500 font-semibold">{s.active}</td>
-                    <td className="px-4 py-2.5 text-green-600">{s.closed}</td>
-                    <td className="px-4 py-2.5 text-foreground/50">{s.expired}</td>
-                    <td className="px-4 py-2.5 text-yellow-500">{s.assigned}</td>
                   </tr>
                 ))}
               </tbody>
