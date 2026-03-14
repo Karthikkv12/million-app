@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchPortfolioSummary, fetchWeeks, getOrCreateWeek, WeeklySnapshot } from "@/lib/api";
 import { DollarSign, TrendingUp, Activity, AlertCircle, ChevronDown, Plus } from "lucide-react";
@@ -60,29 +61,74 @@ export function WeekSelector({
   onSelect: (id: number) => void;
   onNewWeek: () => void;
 }) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Drop future blank weeks (no account_value), but always keep the selected + most-recent
+  const mostRecentId = weeks[0]?.id;
+  const filtered = weeks.filter((w) => {
+    if (w.id === selectedId || w.id === mostRecentId) return true;
+    if (w.week_end.slice(0, 10) > todayStr && !w.account_value) return false;
+    return true;
+  });
+
+  // Group by year, sort years descending
+  const byYear = new Map<string, WeeklySnapshot[]>();
+  for (const w of filtered) {
+    const yr = w.week_end.slice(0, 4);
+    if (!byYear.has(yr)) byYear.set(yr, []);
+    byYear.get(yr)!.push(w);
+  }
+  const years = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
+
+  // Default the active year to whichever year the selected week belongs to
+  const selectedYear = selectedId
+    ? (filtered.find((w) => w.id === selectedId)?.week_end.slice(0, 4) ?? years[0])
+    : years[0];
+  const [activeYear, setActiveYear] = useState<string>(selectedYear);
+
+  // If the selected week isn't in the active year, snap the year
+  const effectiveYear = byYear.has(activeYear) ? activeYear : years[0];
+  const weeksForYear = byYear.get(effectiveYear) ?? [];
+
   return (
     <div className="flex items-center gap-2">
-      <div className="relative flex-1 sm:flex-none">
+      {/* ── Year dropdown ── */}
+      <div className="relative">
+        <select
+          value={effectiveYear}
+          onChange={(e) => setActiveYear(e.target.value)}
+          className="appearance-none border border-[var(--border)] rounded-xl px-3 py-2 pr-7 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+        >
+          {years.map((yr) => (
+            <option key={yr} value={yr}>{yr}</option>
+          ))}
+        </select>
+        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/50 pointer-events-none" />
+      </div>
+
+      {/* ── Week dropdown — scoped to selected year ── */}
+      <div className="relative">
         <select
           value={selectedId ?? ""}
           onChange={(e) => onSelect(Number(e.target.value))}
-          className="appearance-none border border-[var(--border)] rounded-xl px-3 py-2 pr-8 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold w-full sm:min-w-[220px]"
+          className="appearance-none border border-[var(--border)] rounded-xl px-3 py-2 pr-7 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold w-[320px]"
         >
           <option value="" disabled>Select week…</option>
-          {weeks.map((w) => (
+          {weeksForYear.map((w) => (
             <option key={w.id} value={w.id}>
               {weekLabel(w)}{w.is_complete ? " ✓" : ""}
-              {w.account_value ? ` — $${w.account_value.toLocaleString()}` : ""}
             </option>
           ))}
         </select>
-        <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/50 pointer-events-none" />
+        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/50 pointer-events-none" />
       </div>
+
+      {/* ── New Week button ── */}
       <button
         onClick={onNewWeek}
-        className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-foreground hover:bg-[var(--surface-2)] transition"
+        className="flex items-center gap-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-foreground hover:bg-[var(--surface-2)] transition"
       >
-        <Plus size={12} /> <span className="hidden xs:inline">New Week</span><span className="xs:hidden">New</span>
+        <Plus size={11} /> New Week
       </button>
     </div>
   );

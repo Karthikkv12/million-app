@@ -5,6 +5,28 @@
 
 ---
 
+## v2.5.8 — UI Polish: Week Selector, Account Toggle Panel, Equal-Width Table, 12-Month Chart Cap
+**Released:** 2026-03-14
+**Branch:** `develop → main`
+
+### ✨ Changes
+
+#### Week Selector — `PortfolioSummaryBar.tsx` + `TradesHelpers.ts`
+- Year selector redesigned from chip buttons to a native `<select>` dropdown — compact, never wraps
+- Week dropdown width doubled to `w-[320px]` — full week label is always readable without truncation
+- `weekLabel()` fixed: replaced `new Date("YYYY-MM-DD")` (UTC parse → off-by-one in US timezones) with `new Date(year, month-1, day)` (local time) — eliminates "Invalid Date" in the dropdown
+
+#### Account Balances by Week — `AccountTab.tsx`
+- Account legend replaced with a hidden toggle panel: "Accounts ▾" button in the card header reveals a pill panel on click (hidden by default to reduce clutter)
+- Active accounts shown as solid pills; click to toggle visibility (hidden accounts get strike-through label)
+- Inactive/deactivated accounts shown as dashed-border pills with re-activate on click
+- Table layout changed to `table-fixed` + `<colgroup>`: first column fixed at 80 px (Friday date), all account/total/delta columns share remaining width equally — no more static pixel widths that break when accounts are added/removed
+
+#### Performance Tab — `YearTab.tsx`
+- Monthly premium bar chart now scoped to the **last 12 months** via `.slice(-12)` — prevents chart from becoming unreadably crowded after a full year of data
+
+---
+
 ## v2.5.7 — Full Bug Audit Fix: 14 Bugs Across All Trades Tabs
 **Released:** 2026-03-07
 **Branch:** `develop → main`
