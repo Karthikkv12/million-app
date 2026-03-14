@@ -32,7 +32,10 @@ export function fmtDate(s: string | null | undefined): string {
 }
 
 export function weekLabel(w: WeeklySnapshot): string {
-  const d = new Date(w.week_end);
+  // Parse as local date to avoid UTC-offset "Invalid Date" / off-by-one issues.
+  // week_end is "YYYY-MM-DD"; split manually so it works in all browsers.
+  const [year, month, day] = w.week_end.slice(0, 10).split("-").map(Number);
+  const d = new Date(year, month - 1, day);
   return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 }
 

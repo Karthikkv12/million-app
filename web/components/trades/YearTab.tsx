@@ -1,17 +1,27 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchPortfolioSummary, fetchPremiumDashboard, fetchHoldings, fetchAllPositions,
-  WeekBreakdown, OptionPosition,
+  getOrCreateWeek, WeekBreakdown, OptionPosition,
 } from "@/lib/api";
 import { EmptyState, SkeletonCard } from "@/components/ui";
 import { TrendingUp, TrendingDown, BarChart2, Calendar } from "lucide-react";
 import { fmt$ } from "./TradesHelpers";
 
+/** Next Friday on or after today (returns YYYY-MM-DD) */
+function nextFridayStr(): string {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const diff = (5 - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
 type MonthEntry = [string, number] | null;
 type CumEntry = { label: string; cumulative: number; weekly: number };
 
 export function YearTab() {
+  const qc = useQueryClient();
   const { data: s, isLoading: summaryLoading } = useQuery({
     queryKey: ["portfolioSummary"],
     queryFn: fetchPortfolioSummary,
@@ -33,28 +43,44 @@ export function YearTab() {
     staleTime: 0,
   });
 
+  // Auto-create the upcoming Friday's week on every mount
+  const ensureWeekMut = useMutation({
+    mutationFn: () => getOrCreateWeek(nextFridayStr()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolioSummary"] }),
+  });
+  useEffect(() => { ensureWeekMut.mutate(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isLoading = summaryLoading || premLoading;
   if (isLoading) return <div className="space-y-3">{[1, 2, 3, 4].map((i) => <SkeletonCard key={i} rows={2} />)}</div>;
   if (!s) return <EmptyState icon={BarChart2} title="No data yet" body="Complete a week to see your performance summary." />;
 
   const weeksBreakdown    = (s.weeks_breakdown ?? []) as WeekBreakdown[];
   const monthlyPremium    = (s.monthly_premium ?? {}) as Record<string, number>;
-  const winRate           = s.win_rate ?? 0;
-  const completeWeeks     = s.complete_weeks ?? 0;
 
-  const completedPremiums = [...weeksBreakdown].filter((w) => w.is_complete && w.premium > 0).map((w) => w.premium);
+  // A week counts as "effective complete" if it is explicitly closed OR its week_end is in the past and it has data.
+  // This prevents the Performance tab from going blank when the user hasn't used the "Close Week" button.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isEffectivelyComplete = (w: WeekBreakdown) =>
+    w.is_complete || (w.week_end < todayStr && (w.premium > 0 || w.position_count > 0));
+
+  const effectiveCompleteWeeks = weeksBreakdown.filter(isEffectivelyComplete);
+  const completeWeeks     = effectiveCompleteWeeks.length > 0 ? effectiveCompleteWeeks.length : (s.complete_weeks ?? 0);
+  const winningWeeks      = effectiveCompleteWeeks.filter((w) => w.premium > 0).length;
+  const winRate           = completeWeeks > 0 ? Math.round((winningWeeks / completeWeeks) * 100) : (s.win_rate ?? 0);
+
+  const completedPremiums = [...weeksBreakdown].filter((w) => isEffectivelyComplete(w) && w.premium > 0).map((w) => w.premium);
   const weeklyMean        = completedPremiums.length > 0 ? completedPremiums.reduce((a, b) => a + b, 0) / completedPremiums.length : 0;
   const weeklyStdDev      = completedPremiums.length > 1
     ? Math.sqrt(completedPremiums.reduce((a, b) => a + Math.pow(b - weeklyMean, 2), 0) / completedPremiums.length)
     : 0;
   const consistencyScore  = weeklyMean > 0 ? Math.max(0, Math.min(100, 100 - (weeklyStdDev / weeklyMean) * 100)) : 0;
 
-  const completedWeeks    = weeksBreakdown.filter((w) => w.is_complete);
+  const completedWeeks    = weeksBreakdown.filter(isEffectivelyComplete);
   const streakBreak       = completedWeeks.findIndex((w) => w.premium <= 0);
   const currentStreak     = streakBreak === -1 ? completedWeeks.length : streakBreak;
 
   const avgPositionsPerWeek = completeWeeks > 0
-    ? weeksBreakdown.filter((w) => w.is_complete).reduce((a, w) => a + w.position_count, 0) / completeWeeks
+    ? weeksBreakdown.filter(isEffectivelyComplete).reduce((a, w) => a + w.position_count, 0) / completeWeeks
     : 0;
 
   const monthlyEntries2 = Object.entries(monthlyPremium).sort((a, b) => a[0].localeCompare(b[0]));
@@ -104,7 +130,7 @@ export function YearTab() {
   const cumulativeData = allFridaysOfYear;
   const chronoWeeks   = [...weeksBreakdown].reverse();
 
-  const activePremWeeks  = chronoWeeks.filter((w) => w.premium > 0 && w.is_complete);
+  const activePremWeeks  = chronoWeeks.filter((w) => w.premium > 0 && isEffectivelyComplete(w));
   const avgWeeklyPremium = activePremWeeks.length > 0
     ? activePremWeeks.reduce((acc, w) => acc + w.premium, 0) / activePremWeeks.length
     : 0;
@@ -127,7 +153,7 @@ export function YearTab() {
     })
     .sort((a, b) => b.premiumSold - a.premiumSold);
 
-  const monthlyEntries    = Object.entries(monthlyPremium).sort((a, b) => a[0].localeCompare(b[0]));
+  const monthlyEntries    = Object.entries(monthlyPremium).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
   const maxMonthlyPremium = Math.max(...monthlyEntries.map((e) => e[1]), 1);
   const maxWeekly         = Math.max(...cumulativeData.map((d) => d.weekly), 1);
 
@@ -151,6 +177,12 @@ export function YearTab() {
     isSettled: boolean;
   }
   const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Build week_id → week_end lookup from weeks_breakdown
+  const weekEndByWeekId = new Map<number, string>(
+    weeksBreakdown.map((w) => [w.id, w.week_end])
+  );
+
   const expiryBucketMap = new Map<string, OptionPosition[]>();
   for (const pos of allPositions) {
     if (!pos.expiry_date) continue;
@@ -158,9 +190,15 @@ export function YearTab() {
     // created when a position carries into a new week. The premium was only collected
     // once (on the original), so counting carried copies would double-count it.
     if (pos.carried_from_id != null) continue;
-    // Normalise to "YYYY-MM-DD" regardless of whether the backend returns
-    // a full ISO datetime ("2026-03-07T00:00:00") or a bare date string.
-    const key = pos.expiry_date.slice(0, 10);
+    // CLOSED positions (bought back early) → bucket by the week they were closed in,
+    // not by expiry date (their expiry date may be a future week they never reached).
+    // All other statuses → bucket by expiry_date as normal.
+    let key: string;
+    if (pos.status === "CLOSED") {
+      key = weekEndByWeekId.get(pos.week_id) ?? pos.expiry_date.slice(0, 10);
+    } else {
+      key = pos.expiry_date.slice(0, 10);
+    }
     if (!expiryBucketMap.has(key)) expiryBucketMap.set(key, []);
     expiryBucketMap.get(key)!.push(pos);
   }
@@ -171,6 +209,7 @@ export function YearTab() {
       const dte = isNaN(expiryDate.getTime())
         ? 0
         : Math.round((expiryDate.getTime() - today.getTime()) / 86_400_000);
+      // Sum net premium for each position (can be negative for loss buybacks)
       const totalPremium = positions.reduce((sum, p) => sum + (p.total_premium ?? 0), 0);
       return { expiry, positions, totalPremium, dte, isSettled: dte < 0 };
     })
@@ -604,62 +643,76 @@ export function YearTab() {
           )}
 
           {weeksBreakdown.length > 0 && (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden w-full sm:flex-1 sm:min-w-0">
-              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden w-full sm:flex-1 sm:min-w-0 flex flex-col">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between shrink-0">
                 <h3 className="text-sm font-bold text-foreground">Week-by-Week</h3>
-                <span className="text-[10px] text-foreground/40">{weeksBreakdown.length} weeks</span>
+                <span className="text-[10px] text-foreground/40">
+                  {weeksBreakdown.filter((w) => isEffectivelyComplete(w)).length} of {weeksBreakdown.length} wks
+                </span>
               </div>
-              <div className="divide-y divide-[var(--border)]">
-                {weeksBreakdown.map((w) => {
-                  const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
-                  const barPct = maxWeekly > 0 ? Math.max(0, Math.min(100, (w.premium / maxWeekly) * 100)) : 0;
-                  const dateShort = new Date(w.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                  return (
-                    <div key={w.id} className="px-4 py-2.5 hover:bg-[var(--surface-2)] transition-colors">
-                      <div className="flex items-center gap-3">
-                        {/* Date + status dot */}
-                        <div className="w-20 shrink-0">
-                          <p className="text-[11px] font-semibold text-foreground">{dateShort}</p>
-                          <p className="text-[9px] text-foreground/40">{w.position_count} pos</p>
+              {/* Fixed height scrollable list — blank weeks and future weeks are hidden */}
+              <div className="overflow-y-auto divide-y divide-[var(--border)]" style={{ maxHeight: 320 }}>
+                {weeksBreakdown
+                  .filter((w) => {
+                    // Hide future weeks (week_end > today)
+                    if (w.week_end > todayStr) return false;
+                    // Hide completely blank weeks (no premium, no positions)
+                    if (w.premium === 0 && w.position_count === 0) return false;
+                    return true;
+                  })
+                  .map((w) => {
+                    const effComplete = isEffectivelyComplete(w);
+                    const vsAvg = avgWeeklyPremium > 0 ? ((w.premium - avgWeeklyPremium) / avgWeeklyPremium) * 100 : null;
+                    const barPct = maxWeekly > 0 ? Math.max(0, Math.min(100, (w.premium / maxWeekly) * 100)) : 0;
+                    const dateShort = new Date(w.week_end + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    return (
+                      <div key={w.id} className="px-4 py-2.5 hover:bg-[var(--surface-2)] transition-colors">
+                        <div className="flex items-center gap-3">
+                          {/* Date + status dot */}
+                          <div className="w-20 shrink-0">
+                            <p className="text-[11px] font-semibold text-foreground">{dateShort}</p>
+                            <p className="text-[9px] text-foreground/40">{w.position_count} pos</p>
+                          </div>
+                          {/* Sparkline bar */}
+                          <div className="flex-1 h-5 bg-[var(--surface-2)] rounded-md overflow-hidden">
+                            <div
+                              className="h-full rounded-md transition-all"
+                              style={{
+                                width: `${barPct}%`,
+                                background: w.premium > avgWeeklyPremium * 1.1
+                                  ? "#22c55e"
+                                  : w.premium > 0
+                                  ? "#86efac"
+                                  : "#ef4444",
+                              }}
+                            />
+                          </div>
+                          {/* Premium value */}
+                          <div className="w-24 shrink-0 text-right">
+                            <p className={`text-[12px] font-black tabular-nums ${
+                              w.premium > 0 ? "text-green-500" : w.premium < 0 ? "text-red-500" : "text-foreground/40"
+                            }`}>{fmt$(w.premium)}</p>
+                            <p className="text-[9px] text-foreground/40">prem sold</p>
+                            {vsAvg !== null && effComplete && (
+                              <p className={`text-[9px] font-semibold ${
+                                vsAvg >= 0 ? "text-green-400" : "text-red-400"
+                              }`}>{vsAvg >= 0 ? "▲" : "▼"}{Math.abs(vsAvg).toFixed(0)}% vs avg</p>
+                            )}
+                          </div>
+                          {/* Status pill */}
+                          <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            w.is_complete
+                              ? "bg-green-500/15 text-green-400"
+                              : effComplete
+                              ? "bg-blue-500/15 text-blue-400"
+                              : "bg-yellow-500/15 text-yellow-400"
+                          }`}>
+                            {w.is_complete ? "✓" : effComplete ? "•" : "…"}
+                          </span>
                         </div>
-                        {/* Sparkline bar */}
-                        <div className="flex-1 h-5 bg-[var(--surface-2)] rounded-md overflow-hidden">
-                          <div
-                            className="h-full rounded-md transition-all"
-                            style={{
-                              width: `${barPct}%`,
-                              background: w.premium > avgWeeklyPremium * 1.1
-                                ? "#22c55e"
-                                : w.premium > 0
-                                ? "#86efac"
-                                : "#ef4444",
-                            }}
-                          />
-                        </div>
-                        {/* Premium value */}
-                        <div className="w-24 shrink-0 text-right">
-                          <p className={`text-[12px] font-black tabular-nums ${
-                            w.premium > 0 ? "text-green-500" : w.premium < 0 ? "text-red-500" : "text-foreground/40"
-                          }`}>{fmt$(w.premium)}</p>
-                          <p className="text-[9px] text-foreground/40">prem sold</p>
-                          {vsAvg !== null && w.is_complete && (
-                            <p className={`text-[9px] font-semibold ${
-                              vsAvg >= 0 ? "text-green-400" : "text-red-400"
-                            }`}>{vsAvg >= 0 ? "▲" : "▼"}{Math.abs(vsAvg).toFixed(0)}% vs avg</p>
-                          )}
-                        </div>
-                        {/* Status pill */}
-                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                          w.is_complete
-                            ? "bg-green-500/15 text-green-400"
-                            : "bg-blue-500/15 text-blue-400"
-                        }`}>
-                          {w.is_complete ? "✓" : "•"}
-                        </span>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           )}

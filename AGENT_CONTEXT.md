@@ -150,7 +150,7 @@ web/components/
   Navbar.tsx     # Desktop sidebar — Dashboard → Options Flow → Markets → Trades → Budget
   BottomNav.tsx  # Mobile nav — same order
   trades/        # 13 component files split from trades/page.tsx (v2.5.0)
-    TradesHelpers.ts        # Types, emptyForm(), posToForm(), formatters
+    TradesHelpers.ts        # Types, emptyForm(), posToForm(), formatters. weekLabel() uses local-time Date constructor (year,month-1,day) to avoid UTC off-by-one "Invalid Date"
     TradeModals.tsx         # CompleteWeekModal, ReopenWeekModal
     PositionForm.tsx        # Add/edit position form
     StatusSelect.tsx        # Status dropdown
@@ -158,11 +158,11 @@ web/components/
     PositionRow.tsx         # Mobile card + desktop row (AI streaming, live moneyness)
     PositionsTab.tsx        # Metrics grid, live quotes poll, form management
     SymbolsTab.tsx          # Symbol search + breakdown table
-    YearTab.tsx             # Annual analytics, cumulative chart
+    YearTab.tsx             # Annual analytics, cumulative chart. Monthly premium bar chart scoped to last 12 months via .slice(-12)
     PremiumTab.tsx          # Premium ledger by-symbol and by-week
-    AccountTab.tsx          # Account value tracking with charts
+    AccountTab.tsx          # Account value tracking with charts. Account legend is a hidden "Accounts ▾" toggle panel (pill buttons). Table uses table-fixed + <colgroup> for equal-width columns
     HoldingsTab.tsx         # Holdings table with Sync/Import/Add toolbar
-    PortfolioSummaryBar.tsx # 4-card summary grid + WeekSelector
+    PortfolioSummaryBar.tsx # 4-card summary grid + WeekSelector (year <select> dropdown + week <select w-[320px]> + New Week button in a single flex row)
   budget/        # 5 component files split from budget/page.tsx (v2.5.0)
     BudgetHelpers.ts        # Constants, formatters, monthKey/Label, recurringAppliesToMonth
     BudgetSection.tsx       # EditableRow, ReadRow, Section (override/mutation logic)
@@ -209,6 +209,8 @@ source .venv/bin/activate && python -m pytest tests/ -q --ignore=tests/test_api_
 
 | Version | What |
 |---------|------|
+| v2.5.8 | UI: Week selector year redesigned as `<select>` dropdown; week dropdown widened to `w-[320px]`; `weekLabel()` fixed to local-time parsing (avoids UTC off-by-one "Invalid Date"). AccountTab: account legend replaced with hidden "Accounts ▾" toggle panel (pill buttons, strike-through for hidden, dashed for inactive); table uses `table-fixed` + `<colgroup>` for equal-width columns. YearTab: monthly premium bar chart capped to last 12 months (`.slice(-12)`). |
+| v2.5.7 | Full Bug Audit Fix: 14 Bugs Across All Trades Tabs (see VERSIONS.md). |
 | v2.5.6 | Holdings: soft-delete guard (lots with event history → CLOSED not destroyed), ↻ Re-enter button on closed holdings, _recalculate_adj_basis dual-path (PremiumLedger primary, HoldingEvent basis_delta fallback). Fixed SOFI/EOSE/BBAI closed adj_basis in DB. Fixed admin/users page (was 500 — mismatched service function names, wrong schema alias). Audit cleanup: JWT renamed million-* → optionflow-*, trading_journal.db removed from backup list, DEV_GUIDE wrong path fixed. |
 | v2.5.5 | Performance tab: expiry-bucketed Premium by Expiry table (grouped by expiry_date, DTE colour badges, Settled dimming). New GET /portfolio/positions endpoint + fetchAllPositions(). Bug fix: ISO datetime normalisation (.slice(0,10)) for valid dates. Positions tab: live ITM Assignment Risk card (assignment value, net proceeds, per-symbol depth pills, 30s refresh). |
 | v2.5.4 | Build fix: ESLint no-unused-expressions in PremiumTab (ternary→if/else); TypeScript labelFormatter type in AccountTab (string→unknown). Fixes iOS/Safari breakage from stale compiled output. |
