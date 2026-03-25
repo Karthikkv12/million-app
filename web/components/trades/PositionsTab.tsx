@@ -188,10 +188,10 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         const hasLiveData = liveSpotMap.size > 0;
 
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Week P&amp;L</p>
-              <p className={`text-base font-black ${totalPremium >= 0 ? "text-green-500" : "text-red-600"}`}>
+              <p className={`text-sm sm:text-base font-black ${totalPremium >= 0 ? "text-green-500" : "text-red-600"}`}>
                 {totalPremium >= 0 ? "$" : "-$"}{Math.abs(totalPremium).toFixed(2)}
               </p>
               <p className="text-[10px] text-foreground/40 mt-0.5">
@@ -200,7 +200,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               </p>
             </div>
             {hasClosed && (
-              <div className={`border rounded-xl p-3 ${weekNetRealized >= 0 ? "bg-[var(--surface)] border-[var(--border)]" : "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"}`}>
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
                 <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Net Realized</p>
                 <p className={`text-base font-black ${weekNetRealized >= 0 ? "text-green-500" : "text-red-600"}`}>
                   {weekNetRealized >= 0 ? "$" : "-$"}{Math.abs(weekNetRealized).toFixed(2)}
@@ -268,15 +268,9 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] text-foreground/40 mt-0.5">locked: ${realizedPrem.toFixed(2)}</p>
             </div>
             {/* ITM Calls at Risk */}
-            <div className={`border rounded-xl p-3 col-span-1 ${
-              itmCalls.length > 0
-                ? "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"
-                : "bg-[var(--surface)] border-[var(--border)]"
-            }`}>
+            <div className="border rounded-xl p-3 col-span-1 bg-[var(--surface)] border-[var(--border)]">
               <div className="flex items-center gap-1.5 mb-1">
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmCalls.length > 0 ? "text-red-600" : "text-foreground/60"
-                }`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
                   Calls at Risk
                 </p>
                 {hasLiveData && (
@@ -295,7 +289,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   <p className="text-base font-black text-red-600">
                     ${(itmCallValue + itmCallPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] text-red-600/80 mt-0.5">
+                  <p className="text-[10px] text-foreground/60 mt-0.5">
                     {itmCalls.length} ITM · ${itmCallValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -303,7 +297,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                       const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
-                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600">
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--border)] text-foreground">
                           {p.symbol} ${p.strike}{depth != null ? ` (+${depth.toFixed(1)})` : ""}
                         </span>
                       );
@@ -313,15 +307,9 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               )}
             </div>
             {/* ITM Puts at Risk */}
-            <div className={`border rounded-xl p-3 col-span-1 ${
-              itmPuts.length > 0
-                ? "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"
-                : "bg-[var(--surface)] border-[var(--border)]"
-            }`}>
+            <div className="border rounded-xl p-3 col-span-1 bg-[var(--surface)] border-[var(--border)]">
               <div className="flex items-center gap-1.5 mb-1">
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmPuts.length > 0 ? "text-red-600" : "text-foreground/60"
-                }`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
                   Puts at Risk
                 </p>
                 {hasLiveData && (
@@ -340,7 +328,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   <p className="text-base font-black text-red-600">
                     ${(itmPutValue + itmPutPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] text-red-600/80 mt-0.5">
+                  <p className="text-[10px] text-foreground/60 mt-0.5">
                     {itmPuts.length} ITM · ${itmPutValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -348,7 +336,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                       const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
-                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600">
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--border)] text-foreground">
                           {p.symbol} ${p.strike}{depth != null ? ` (${depth.toFixed(1)} deep)` : ""}
                         </span>
                       );
@@ -366,15 +354,15 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
           {!week.is_complete && (
             <button
               onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 active:bg-blue-800 transition min-h-[36px]"
             >
-              <Plus size={12} /> Add Position
+              <Plus size={13} /> Add Position
             </button>
           )}
           {!week.is_complete && positions.length > 0 && (
             <button
               onClick={() => setShowComplete(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 active:bg-green-800 transition min-h-[36px]"
             >
               <CheckCircle2 size={12} /> <span className="hidden sm:inline">Mark Week Complete</span><span className="sm:hidden">Complete</span>
             </button>
@@ -387,7 +375,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             </span>
             <button
               onClick={() => setShowReopen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-2)] text-foreground/60 text-xs font-semibold hover:bg-[var(--surface-3)] border border-[var(--border)] transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--surface-2)] text-foreground/60 text-xs font-semibold hover:bg-[var(--surface-3)] active:bg-[var(--surface-3)] border border-[var(--border)] transition min-h-[36px]"
             >
               <LockOpen size={11} /> Re-open Week
             </button>
@@ -424,7 +412,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <span className="text-[11px] font-bold uppercase tracking-wide text-foreground/70">Open Positions</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-foreground/50 font-semibold">{openPositions.length}</span>
               </div>
-              <div className="sm:hidden divide-y divide-[var(--border)]">
+              <div className="lg:hidden divide-y divide-[var(--border)]">
                 {bySymbol.map(([, rows]) =>
                   rows.map((p) => (
                     <PositionRow
@@ -437,7 +425,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   ))
                 )}
               </div>
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
@@ -472,7 +460,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-foreground/40 font-semibold">{closedPositions.length}</span>
                 <span className="text-[10px] text-foreground/40 hidden sm:inline">— realized P&amp;L locked in</span>
               </div>
-              <div className="sm:hidden divide-y divide-[var(--border)]">
+              <div className="lg:hidden divide-y divide-[var(--border)]">
                 {bySymbolClosed.map(([, rows]) =>
                   rows.map((p) => (
                     <PositionRow
@@ -485,7 +473,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   ))
                 )}
               </div>
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/40 uppercase tracking-wide bg-[var(--surface)]">
@@ -519,7 +507,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <span className="text-[10px] text-foreground/40 hidden sm:inline">— still open, P&amp;L realises when you close them</span>
               </div>
               <div className="bg-[var(--surface)] border border-amber-200 dark:border-amber-800/50 rounded-2xl overflow-hidden">
-                <div className="sm:hidden divide-y divide-[var(--border)]">
+                <div className="lg:hidden divide-y divide-[var(--border)]">
                   {bySymbolCarried.map(([, rows]) =>
                     rows.map((p) => (
                       <PositionRow
@@ -532,7 +520,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                     ))
                   )}
                 </div>
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">

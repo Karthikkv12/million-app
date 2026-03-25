@@ -74,14 +74,14 @@ export function PositionForm({
   );
 
   return (
-    <div className="bg-[var(--surface)] border border-blue-200 dark:border-blue-800 rounded-2xl p-5 mb-4">
+    <div className="bg-[var(--surface)] border border-blue-200 dark:border-blue-800 rounded-2xl p-4 sm:p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-foreground">{editPos ? "Edit Position" : "Add Position"}</h3>
-        <button onClick={onDone} className="p-1.5 rounded-xl text-foreground/70 hover:bg-[var(--surface-2)] transition">
+        <h3 className="font-bold text-foreground text-sm sm:text-base">{editPos ? "Edit Position" : "Add Position"}</h3>
+        <button onClick={onDone} className="p-2 rounded-xl text-foreground/70 hover:bg-[var(--surface-2)] transition min-h-[36px] min-w-[36px] flex items-center justify-center">
           <X size={15} />
         </button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
         {field("Symbol", <input value={f.symbol} onChange={(e) => set("symbol", e.target.value.toUpperCase())} placeholder="AAPL" className={inp} />)}
         {field("Contracts", <input type="number" min="1" value={f.contracts} onChange={(e) => set("contracts", e.target.value)} className={inp} />)}
         {field("Strike ($)", <input type="number" step="0.5" value={f.strike} onChange={(e) => set("strike", e.target.value)} placeholder="150.00" className={inp} />)}
@@ -231,7 +231,7 @@ export function PositionForm({
       <button
         onClick={() => mut.mutate()}
         disabled={mut.isPending || !f.symbol || !f.strike}
-        className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        className="w-full sm:w-auto px-5 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition min-h-[44px]"
       >
         {mut.isPending ? "Saving…" : editPos ? "Save Changes" : "Add Position"}
       </button>

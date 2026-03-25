@@ -56,8 +56,8 @@ export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPo
 
   return (
     <>
-      {/* ── Mobile card (< sm) ── */}
-      <div className={`sm:hidden border-b border-[var(--border)] px-3 py-3 ${isCarriedForward ? "opacity-90" : ""}`}>
+      {/* ── Mobile/Tablet card (< lg) ── */}
+      <div className={`lg:hidden border-b border-[var(--border)] px-3 py-3 ${isCarriedForward ? "opacity-90" : ""}`}>
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -147,10 +147,10 @@ export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPo
             )}
             {!isCarriedForward && (
               <>
-                <button onClick={onEdit} className="text-[10px] px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 transition">Edit</button>
+                <button onClick={onEdit} className="text-xs px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 active:bg-blue-200 transition min-h-[36px]">Edit</button>
                 <button
                   onClick={() => { if (window.confirm(`Delete ${pos.symbol} $${pos.strike} ${pos.option_type}?\n\nThis will permanently remove this trade from all weeks.`)) onDelete(); }}
-                  className="text-[10px] px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition"
+                  className="text-xs px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 active:bg-red-200 transition min-h-[36px]"
                 >Delete</button>
               </>
             )}
@@ -167,8 +167,8 @@ export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPo
 
       </div>
 
-      {/* ── Desktop table row (≥ sm) ── */}
-      <tr className={`hidden sm:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
+      {/* ── Desktop table row (≥ lg) ── */}
+      <tr className={`hidden lg:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
         <td className="px-3 py-2.5 font-bold text-foreground">
           {pos.symbol}
           {isCarriedForward && (
@@ -275,7 +275,7 @@ export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPo
         )}
       </tr>
       {expanded && pos.status === "ASSIGNED" && (
-        <tr className="hidden sm:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
+        <tr className="hidden lg:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
           <td colSpan={10} className="px-4 pb-3">
             <AssignmentPanel pos={pos} />
           </td>

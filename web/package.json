@@ -3,13 +3,13 @@
   "version": "1.8.4",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
-    "dev:clean": "rm -rf .next && next dev -p 3002",
+    "dev": "next dev -p 3000",
+    "dev:clean": "rm -rf .next && next dev -p 3000",
     "dev:main": "next dev -p 3000",
-    "dev:develop": "next dev -p 3002",
+    "dev:develop": "next dev -p 3000",
     "build": "next build --no-lint",
     "start": "next start -p 3000",
-    "start:fresh": "next build --no-lint && next start -p 3002",
+    "start:fresh": "next build --no-lint && next start -p 3000",
     "lint": "next lint"
   },
   "dependencies": {

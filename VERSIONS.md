@@ -5,6 +5,39 @@
 
 ---
 
+## v2.6.2 — Mobile/iPad Optimization + ITM Card Color Polish
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### 📱 Mobile & Tablet Optimization
+
+#### `PositionsTab.tsx`
+- **Metrics grid** — `2-col` on phone → `3-col` on tablet (md) → `5-col` on desktop (lg) → `10-col` on wide (xl)
+- Metric value font sizes scale with screen size (`text-sm sm:text-base`)
+- **Action buttons** (Add Position, Mark Complete, Re-open Week) — larger touch targets with `min-h-[36px]` and `active:` states
+- All table/card breakpoints moved from `sm` (640px) to `lg` (1024px) so iPad shows the card view instead of the cramped table
+
+#### `PositionRow.tsx`
+- **Card view** (mobile-friendly) now shows on **all screens < 1024px** (phones and iPads)
+- **Desktop table** only shown at `lg` (1024px+) where there's enough horizontal room
+- Action buttons (Edit, Delete) get larger touch targets: `text-xs px-3 py-2 min-h-[36px]` with `active:` pressed states
+
+#### `PositionForm.tsx`
+- Form grid: `1-col on xs` → `2-col on sm` → `3-col on md` → `4-col on lg`
+- **Submit button** — full-width on mobile (`w-full sm:w-auto`), taller touch target (`py-3 min-h-[44px]`)
+- Close `×` button enlarged to `min-h-[36px] min-w-[36px]` for easier tap
+
+### 🎨 Color Fixes
+
+#### `PositionsTab.tsx`
+- **ITM Calls/Puts at Risk cards** — only the dollar value stays `text-red-600`; label, subtitle, and symbol chips are neutral
+- **Net Realized card** — removed red background (`bg-red-100/60 dark:bg-red-900/40`) when negative; only the dollar value text is red
+
+### ⚙️ Port Cleanup
+- Eliminated all `3002` references across `package.json`, `dev.sh`, `docker-compose.yml`, `next.config.mjs` — all dev scripts now exclusively use port `3000`
+
+---
+
 ## v2.6.1 — UI Color Standardization (green-500 / red-600)
 **Released:** 2026-03-25
 **Branch:** `develop`
