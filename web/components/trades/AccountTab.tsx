@@ -360,26 +360,26 @@ export function AccountTab({
         {/* PSB card 2 — Realized P/L */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp size={11} className="text-blue-500" />
+            <TrendingUp size={11} className="text-green-500" />
             <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Realized P/L</p>
           </div>
-          <p className={`text-lg font-black ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)}</p>
+          <p className={`text-lg font-black ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-600"}`}>{fmt$(s.realized_pnl)}</p>
         </div>
         {/* PSB card 3 — Active Positions */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <div className="flex items-center gap-1.5 mb-1">
-            <Activity size={11} className="text-blue-400" />
+            <Activity size={11} className="text-green-500" />
             <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Active Positions</p>
           </div>
-          <p className="text-lg font-black text-blue-500">{s.active_positions}</p>
+          <p className="text-lg font-black text-green-500">{s.active_positions}</p>
         </div>
         {/* PSB card 4 — Est. Tax */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <div className="flex items-center gap-1.5 mb-1">
-            <AlertCircle size={11} className="text-orange-400" />
+            <AlertCircle size={11} className="text-red-600" />
             <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Est. Tax ({(s.cap_gains_tax_rate * 100).toFixed(0)}%)</p>
           </div>
-          <p className="text-lg font-black text-orange-400">${s.estimated_tax.toFixed(2)}</p>
+          <p className="text-lg font-black text-red-600">${s.estimated_tax.toFixed(2)}</p>
         </div>
         {/* KPI card 1 — Latest Value */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
@@ -392,7 +392,7 @@ export function AccountTab({
         {/* KPI card 2 — Last Week Δ */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Last Week Δ</p>
-          <p className={`text-lg font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-600"}`}>
             {latest?.chg != null ? `${latest.chg >= 0 ? "+" : ""}$${latest.chg.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">vs prior Friday</p>
@@ -400,7 +400,7 @@ export function AccountTab({
         {/* KPI card 3 — Total Growth */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Total Growth</p>
-          <p className={`text-lg font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-blue-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-green-500" : "text-red-600"}`}>
             {totalGrowth != null ? `${totalGrowth >= 0 ? "+" : ""}$${totalGrowth.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">
@@ -410,7 +410,7 @@ export function AccountTab({
         {/* KPI card 4 — Weeks Logged */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weeks Logged</p>
-          <p className="text-lg font-black text-purple-400">{withValue.length}</p>
+          <p className="text-lg font-black text-green-500">{withValue.length}</p>
           <p className="text-[10px] text-foreground/50 mt-0.5">of {rows.length} total weeks</p>
         </div>
       </div>
@@ -528,7 +528,7 @@ export function AccountTab({
               </ResponsiveContainer>
               <div className="flex items-center gap-4 pt-2 border-t border-[var(--border)] mt-1">
                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-green-500" /><span className="text-[10px] text-foreground/50">Gain</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-red-400" /><span className="text-[10px] text-foreground/50">Loss</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-red-600" /><span className="text-[10px] text-foreground/50">Loss</span></div>
                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-slate-500" /><span className="text-[10px] text-foreground/50">Flat</span></div>
               </div>
             </div>
@@ -766,7 +766,7 @@ export function AccountTab({
                       {/* Delta */}
                       <td className="px-3 py-2 text-right">
                         {delta != null ? (
-                          <span className={`text-[11px] font-semibold tabular-nums ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-400" : "text-foreground/40"}`}>
+                          <span className={`text-[11px] font-semibold tabular-nums ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-600" : "text-foreground/40"}`}>
                             {delta > 0 ? "+" : ""}{delta.toLocaleString()}
                           </span>
                         ) : (

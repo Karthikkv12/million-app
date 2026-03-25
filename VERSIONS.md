@@ -5,6 +5,24 @@
 
 ---
 
+## v2.6.1 — UI Color Standardization (green-500 / red-600)
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### 🎨 Changes
+
+#### Color Standardization — 6 trade component files
+- Unified all positive/gain colors to `text-green-500` (was mix of `text-emerald-400`, `text-blue-500`, `text-purple-400`, `text-green-500`)
+- Unified all negative/loss colors to `text-red-600` (was mix of `text-red-400`, `text-red-500`)
+- `AccountTab.tsx` — Realized P/L icon, Active Positions, Total Growth, Weeks Logged, Est. Tax, chart legend, week delta, table delta
+- `PositionsTab.tsx` — Week P&L, Net Realized card (bg + text), Weekly Basis ↓, cost-to-close annotation
+- `PremiumTab.tsx` — color token updates throughout premium metrics
+- `SymbolsTab.tsx` — symbol-level P&L and metric colors
+- `WatchlistTab.tsx` — quote change/loss color tokens
+- `YearTab.tsx` — year-level P&L and table row colors
+
+---
+
 ## v2.6.0 — Watchlist Tab, ITM Risk Split (Calls/Puts), Nav Rename, AccountTab Restructure
 **Released:** 2026-03-25
 **Branch:** `develop`

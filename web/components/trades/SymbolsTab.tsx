@@ -43,15 +43,15 @@ function MetricsPanel({ symbols, selected }: { symbols: SymbolSummary[]; selecte
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3">
           <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold mb-1">Total Premium</p>
-          <p className="text-xl font-black text-green-400">${totalPrem.toFixed(0)}</p>
+          <p className="text-xl font-black text-green-500">${totalPrem.toFixed(0)}</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3">
           <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold mb-1">Realized P&L</p>
-          <p className={`text-xl font-black ${totalReal >= 0 ? "text-green-400" : "text-red-400"}`}>{fmt$(totalReal)}</p>
+          <p className={`text-xl font-black ${totalReal >= 0 ? "text-green-500" : "text-red-600"}`}>{fmt$(totalReal)}</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <Award size={11} className="text-yellow-400" />
+            <Award size={11} className="text-green-500" />
             <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold">Profitable Symbols</p>
           </div>
           <p className="text-xl font-black text-foreground">{pct(winners, symbols.length)}<span className="text-sm font-semibold text-foreground/40">%</span></p>
@@ -59,26 +59,26 @@ function MetricsPanel({ symbols, selected }: { symbols: SymbolSummary[]; selecte
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp size={11} className="text-blue-400" />
+            <TrendingUp size={11} className="text-green-500" />
             <p className="text-[10px] text-foreground/50 uppercase tracking-wide font-semibold">Best Symbol</p>
           </div>
           <p className="text-xl font-black text-foreground">{best?.symbol ?? "—"}</p>
-          <p className="text-[10px] text-green-400 font-semibold mt-0.5">{best ? fmt$(best.realized_pnl) : ""}</p>
+          <p className="text-[10px] text-green-500 font-semibold mt-0.5">{best ? fmt$(best.realized_pnl) : ""}</p>
         </div>
       </div>
 
       {/* ── Selected symbol detail ── */}
       {selected && (
-        <div className="bg-[var(--surface)] border border-blue-400/30 rounded-2xl px-4 py-3">
-          <p className="text-[10px] text-blue-400 uppercase tracking-wide font-semibold mb-2">Selected — {selected.symbol}</p>
+        <div className="bg-[var(--surface)] border border-green-500/30 rounded-2xl px-4 py-3">
+          <p className="text-[10px] text-green-500 uppercase tracking-wide font-semibold mb-2">Selected — {selected.symbol}</p>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-[10px] text-foreground/40">Total Premium</p>
-              <p className="font-bold text-green-400">${selected.total_premium.toFixed(2)}</p>
+              <p className="font-bold text-green-500">${selected.total_premium.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-[10px] text-foreground/40">Realized P&L</p>
-              <p className={`font-bold ${selected.realized_pnl >= 0 ? "text-green-400" : "text-red-400"}`}>{fmt$(selected.realized_pnl)}</p>
+              <p className={`font-bold ${selected.realized_pnl >= 0 ? "text-green-500" : "text-red-600"}`}>{fmt$(selected.realized_pnl)}</p>
             </div>
             <div>
               <p className="text-[10px] text-foreground/40">Share of Total</p>
@@ -88,7 +88,7 @@ function MetricsPanel({ symbols, selected }: { symbols: SymbolSummary[]; selecte
               <p className="text-[10px] text-foreground/40">Premium Bar</p>
               <div className="mt-1 h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-green-400 transition-all"
+                  className="h-full rounded-full bg-green-500 transition-all"
                   style={{ width: `${pct(selected.total_premium, mostPrem?.total_premium ?? 1)}%` }}
                 />
               </div>
@@ -100,7 +100,7 @@ function MetricsPanel({ symbols, selected }: { symbols: SymbolSummary[]; selecte
       {/* ── Bar chart: Premium by symbol ── */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <BarChart2 size={13} className="text-green-400" />
+          <BarChart2 size={13} className="text-green-500" />
           <p className="text-xs font-bold text-foreground">Premium by Symbol</p>
         </div>
         <ResponsiveContainer width="100%" height={160}>
@@ -199,12 +199,12 @@ export function SymbolsTab() {
                 <div
                   key={s.symbol}
                   onClick={() => setSelected((prev) => prev?.symbol === s.symbol ? null : s)}
-                  className={`px-3 py-3 flex items-center justify-between cursor-pointer transition-colors ${selected?.symbol === s.symbol ? "bg-blue-50/60 dark:bg-blue-900/10" : "hover:bg-[var(--surface-2)]"}`}
+                  className={`px-3 py-3 flex items-center justify-between cursor-pointer transition-colors ${selected?.symbol === s.symbol ? "bg-green-500/10" : "hover:bg-[var(--surface-2)]"}`}
                 >
                   <span className="font-bold text-foreground text-base">{s.symbol}</span>
                   <div className="text-right">
                     <div className="text-green-500 font-semibold text-sm">${s.total_premium.toFixed(2)}</div>
-                    <div className={`text-xs font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)} realized</div>
+                    <div className={`text-xs font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-600"}`}>{fmt$(s.realized_pnl)} realized</div>
                   </div>
                 </div>
               ))}
@@ -224,11 +224,11 @@ export function SymbolsTab() {
                     <tr
                       key={s.symbol}
                       onClick={() => setSelected((prev) => prev?.symbol === s.symbol ? null : s)}
-                      className={`border-b border-[var(--border)] cursor-pointer transition-colors ${selected?.symbol === s.symbol ? "bg-blue-50/60 dark:bg-blue-900/10" : "hover:bg-[var(--surface-2)]"}`}
+                      className={`border-b border-[var(--border)] cursor-pointer transition-colors ${selected?.symbol === s.symbol ? "bg-green-500/10" : "hover:bg-[var(--surface-2)]"}`}
                     >
                       <td className="px-4 py-2.5 font-bold text-foreground">{s.symbol}</td>
                       <td className="px-4 py-2.5 text-green-500 font-semibold">${s.total_premium.toFixed(2)}</td>
-                      <td className={`px-4 py-2.5 font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      <td className={`px-4 py-2.5 font-semibold ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-600"}`}>
                         {fmt$(s.realized_pnl)}
                       </td>
                     </tr>

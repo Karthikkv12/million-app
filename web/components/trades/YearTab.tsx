@@ -302,17 +302,17 @@ export function YearTab() {
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Avg / Week</p>
-          <p className="text-lg sm:text-xl font-black text-blue-500">${avgWeeklyPremium.toFixed(0)}</p>
+          <p className="text-lg sm:text-xl font-black text-green-500">${avgWeeklyPremium.toFixed(0)}</p>
           <p className="text-[9px] sm:text-[10px] text-foreground/50 mt-0.5">{activePremWeeks.length} active wks</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Annual Run Rate</p>
-          <p className="text-lg sm:text-xl font-black text-purple-500">${annualProjection.toFixed(0)}</p>
+          <p className="text-lg sm:text-xl font-black text-green-500">${annualProjection.toFixed(0)}</p>
           <p className="text-[9px] sm:text-[10px] text-foreground/50 mt-0.5">${monthlyProjection.toFixed(0)}/mo est</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Yield on Cost</p>
-          <p className="text-lg sm:text-xl font-black text-orange-400">{premiumEfficiency.toFixed(2)}%</p>
+          <p className="text-lg sm:text-xl font-black text-green-500">{premiumEfficiency.toFixed(2)}%</p>
           <p className="text-[9px] sm:text-[10px] text-foreground/50 mt-0.5">prem ÷ cost basis</p>
         </div>
       </div>
@@ -322,11 +322,11 @@ export function YearTab() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4 flex flex-col justify-between">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Win Rate</p>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-blue-500">{winRate.toFixed(0)}%</p>
+            <p className="text-2xl sm:text-3xl font-black text-green-500">{winRate.toFixed(0)}%</p>
             <p className="text-[11px] text-foreground/50 mt-1">{Math.round(winRate / 100 * completeWeeks)}/{completeWeeks} profitable weeks</p>
           </div>
           <div className="mt-3 h-2 bg-[var(--surface-2)] rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${winRate}%` }} />
+            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${winRate}%` }} />
           </div>
         </div>
 
@@ -351,7 +351,7 @@ export function YearTab() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4 flex flex-col justify-between">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Est. Tax ({(s.cap_gains_tax_rate * 100).toFixed(0)}%)</p>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-orange-400">${s.estimated_tax.toFixed(0)}</p>
+            <p className="text-2xl sm:text-3xl font-black text-red-600">${s.estimated_tax.toFixed(0)}</p>
             <p className="text-[11px] text-foreground/50 mt-1">on ${s.realized_pnl.toFixed(0)} realized P/L</p>
           </div>
           {weeksToFullCover && (
@@ -511,7 +511,7 @@ export function YearTab() {
                 <span className="text-xs text-foreground/50">
                   {premRange === "MAX" ? "All time" : `Last ${premRange}`} · running total
                 </span>
-                <span className="text-sm font-black text-blue-400">
+                <span className="text-sm font-black text-green-500">
                   ${(cumulativeData[cumulativeData.length - 1]?.cumulative ?? 0).toFixed(2)}
                 </span>
               </div>
@@ -522,7 +522,7 @@ export function YearTab() {
           {avgWeeklyPremium > 0 && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-5 w-full sm:flex-1 sm:min-w-0 flex flex-col">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <TrendingUp size={13} className="text-purple-500" />
+                <TrendingUp size={13} className="text-green-500" />
                 <h3 className="text-sm font-bold text-foreground">Annual Projection</h3>
                 <span className="ml-auto text-[9px] sm:text-[10px] text-foreground/40">${avgMonthlyPremium.toFixed(0)}/mo avg</span>
               </div>
@@ -536,13 +536,13 @@ export function YearTab() {
                       <span className="text-[10px] text-foreground/60 w-12 sm:w-16 shrink-0">{label}</span>
                       <div className="flex-1 h-5 bg-[var(--surface-2)] rounded-lg overflow-hidden">
                         <div
-                          className="h-full bg-purple-500/70 rounded-lg flex items-center px-1.5 sm:px-2 transition-all"
+                          className="h-full bg-green-500/70 rounded-lg flex items-center px-1.5 sm:px-2 transition-all"
                           style={{ width: `${pct}%` }}
                         >
                           {pct > 25 && <span className="text-[9px] sm:text-[10px] font-bold text-white">${proj.toFixed(0)}</span>}
                         </div>
                       </div>
-                      {pct <= 25 && <span className="text-[10px] sm:text-[11px] font-bold text-purple-400 shrink-0">${proj.toFixed(0)}</span>}
+                      {pct <= 25 && <span className="text-[10px] sm:text-[11px] font-bold text-green-500 shrink-0">${proj.toFixed(0)}</span>}
                     </div>
                   );
                 })}
@@ -551,7 +551,7 @@ export function YearTab() {
                 {[["Monthly", avgMonthlyPremium], ["Quarterly", avgMonthlyPremium * 3], ["Annual", avgMonthlyPremium * 12]].map(([label, val]) => (
                   <div key={label as string} className="bg-[var(--surface-2)] rounded-lg p-1.5 sm:p-2">
                     <p className="text-[8px] sm:text-[9px] text-foreground/50 uppercase tracking-wide">{label}</p>
-                    <p className="text-xs sm:text-sm font-black text-purple-400">${(val as number).toFixed(0)}</p>
+                    <p className="text-xs sm:text-sm font-black text-green-500">${(val as number).toFixed(0)}</p>
                   </div>
                 ))}
               </div>
@@ -633,7 +633,7 @@ export function YearTab() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4 flex flex-col justify-between">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Current Streak</p>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-yellow-400">{currentStreak}<span className="text-base sm:text-lg font-semibold text-foreground/40"> wks</span></p>
+            <p className="text-2xl sm:text-3xl font-black text-green-500">{currentStreak}<span className="text-base sm:text-lg font-semibold text-foreground/40"> wks</span></p>
             <p className="text-[11px] text-foreground/50 mt-1">consecutive profitable weeks</p>
           </div>
           {/* Dot sparkline — last 12 complete weeks, newest on right */}
@@ -661,7 +661,7 @@ export function YearTab() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4 flex flex-col justify-between">
           <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-2">Avg Positions / Week</p>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-blue-400">{avgPositionsPerWeek.toFixed(1)}</p>
+            <p className="text-2xl sm:text-3xl font-black text-green-500">{avgPositionsPerWeek.toFixed(1)}</p>
             <p className="text-[11px] text-foreground/50 mt-1">across {completeWeeks} complete weeks</p>
           </div>
           <p className="mt-3 text-[9px] sm:text-[10px] text-foreground/40">
@@ -676,14 +676,14 @@ export function YearTab() {
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 sm:p-4">
             <p className="text-[9px] sm:text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-3">Realized vs In-Flight</p>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-lg sm:text-xl font-black text-blue-500">${realizedPrem.toFixed(0)}</span>
+              <span className="text-lg sm:text-xl font-black text-green-500">${realizedPrem.toFixed(0)}</span>
               <span className="text-xs sm:text-sm text-foreground/40 mb-0.5">locked in</span>
-              <span className="ml-auto text-lg sm:text-xl font-black text-orange-400">${inFlightPrem.toFixed(0)}</span>
+              <span className="ml-auto text-lg sm:text-xl font-black text-green-500">${inFlightPrem.toFixed(0)}</span>
               <span className="text-xs sm:text-sm text-foreground/40 mb-0.5">active</span>
             </div>
             <div className="h-3 bg-[var(--surface-2)] rounded-full overflow-hidden flex">
-              <div className="h-full bg-blue-500 rounded-l-full transition-all" style={{ width: `${realizedPct}%` }} />
-              <div className="h-full bg-orange-400 flex-1 rounded-r-full" />
+              <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${realizedPct}%` }} />
+              <div className="h-full bg-green-500/50 flex-1 rounded-r-full" />
             </div>
             <div className="flex justify-between mt-1.5 text-[10px] text-foreground/40">
               <span>{realizedPct.toFixed(0)}% realized</span>
@@ -704,8 +704,8 @@ export function YearTab() {
               )}
               {worstMonth && bestMonth && worstMonth[0] !== bestMonth[0] && (
                 <div className="flex-1">
-                  <p className="text-[9px] sm:text-[10px] text-orange-400 font-semibold uppercase mb-1">Lightest</p>
-                  <p className="text-base sm:text-lg font-black text-orange-400">${worstMonth[1].toFixed(0)}</p>
+                  <p className="text-[9px] sm:text-[10px] text-red-600 font-semibold uppercase mb-1">Lightest</p>
+                  <p className="text-base sm:text-lg font-black text-red-600">${worstMonth[1].toFixed(0)}</p>
                   <p className="text-[11px] text-foreground/50">{monthNames[worstMonth[0].split("-")[1]] ?? worstMonth[0]}</p>
                 </div>
               )}
@@ -736,8 +736,8 @@ export function YearTab() {
             )}
             {s.worst_week && s.worst_week.id !== s.best_week?.id && (
               <div className="flex-1">
-                <p className="text-[10px] text-orange-400 font-semibold uppercase mb-1">Weakest</p>
-                <p className={`text-lg font-black ${s.worst_week.premium >= 0 ? "text-orange-400" : "text-red-500"}`}>{fmt$(s.worst_week.premium)}</p>
+                <p className="text-[10px] text-red-600 font-semibold uppercase mb-1">Weakest</p>
+                <p className={`text-lg font-black ${s.worst_week.premium >= 0 ? "text-red-600" : "text-red-600"}`}>{fmt$(s.worst_week.premium)}</p>
                 <p className="text-xs text-foreground/50">{s.worst_week.week_end}</p>
                 <p className="text-[10px] text-foreground/40">{s.worst_week.position_count} positions</p>
               </div>
@@ -958,7 +958,7 @@ export function YearTab() {
                       if (!p.hasData) return null;
                       return (
                         <circle key={i} cx={xOf(i)} cy={yOf(p.value)} r={i === lastPastIdx ? 3 : 1.8}
-                          fill={p.value >= avgWeeklyPremium ? "#4ade80" : "#f87171"}
+                          fill={p.value >= avgWeeklyPremium ? "#4ade80" : "#dc2626"}
                           stroke="var(--surface)" strokeWidth="1" />
                       );
                     })}
@@ -978,19 +978,19 @@ export function YearTab() {
                   <div className="mt-2 pt-3 border-t border-[var(--border)] grid grid-cols-3 gap-2 text-center">
                     <div>
                       <p className="text-[9px] text-foreground/40 uppercase tracking-wide">Avg / wk</p>
-                      <p className="text-xs font-black text-purple-400">${avgWeeklyPremium.toFixed(0)}</p>
+                      <p className="text-xs font-black text-green-500">${avgWeeklyPremium.toFixed(0)}</p>
                     </div>
                     <div>
                       <p className="text-[9px] text-foreground/40 uppercase tracking-wide">Rest of year proj</p>
                       {(() => {
                         const remWks = allPoints.filter((p) => p.future).length;
                         const proj = avgWeeklyPremium * remWks;
-                        return <p className="text-xs font-black text-blue-400">${proj >= 1000 ? (proj / 1000).toFixed(1) + "k" : proj.toFixed(0)} <span className="text-[9px] font-normal opacity-50">({remWks}wk)</span></p>;
+                        return <p className="text-xs font-black text-green-500">${proj >= 1000 ? (proj / 1000).toFixed(1) + "k" : proj.toFixed(0)} <span className="text-[9px] font-normal opacity-50">({remWks}wk)</span></p>;
                       })()}
                     </div>
                     <div>
                       <p className="text-[9px] text-foreground/40 uppercase tracking-wide">Best wk</p>
-                      <p className="text-xs font-black text-green-400">${Math.max(...pastWeeks.map((p) => p.value), 0).toFixed(0)}</p>
+                      <p className="text-xs font-black text-green-500">${Math.max(...pastWeeks.map((p) => p.value), 0).toFixed(0)}</p>
                     </div>
                   </div>
                 </div>
@@ -1032,16 +1032,16 @@ export function YearTab() {
                 statusClass = "bg-[var(--surface-2)] text-foreground/40";
               } else if (bucket.dte === 0) {
                 statusLabel = "Today";
-                statusClass = "bg-red-500/20 text-red-400";
+                statusClass = "bg-red-600/20 text-red-600";
               } else if (bucket.dte <= 3) {
                 statusLabel = `${bucket.dte}d`;
-                statusClass = "bg-red-500/15 text-red-400";
+                statusClass = "bg-red-600/15 text-red-600";
               } else if (bucket.dte <= 7) {
                 statusLabel = `${bucket.dte}d`;
-                statusClass = "bg-orange-500/15 text-orange-400";
+                statusClass = "bg-green-500/15 text-green-500";
               } else {
                 statusLabel = `${bucket.dte}d`;
-                statusClass = "bg-green-500/15 text-green-400";
+                statusClass = "bg-green-500/15 text-green-500";
               }
               return (
                 <div
@@ -1058,7 +1058,7 @@ export function YearTab() {
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${statusClass}`}>{statusLabel}</span>
                       </div>
                       <p className={`text-[12px] font-black tabular-nums ${
-                        bucket.totalPremium > 0 ? "text-green-500" : bucket.totalPremium < 0 ? "text-red-500" : "text-foreground/40"
+                        bucket.totalPremium > 0 ? "text-green-500" : bucket.totalPremium < 0 ? "text-red-600" : "text-foreground/40"
                       }`}>{fmt$(bucket.totalPremium)}</p>
                     </div>
                     <div className="flex items-center gap-1 flex-wrap">
@@ -1079,7 +1079,7 @@ export function YearTab() {
                     </div>
                     <p className="text-[11px] text-foreground/60 text-center tabular-nums">{bucket.positions.length}</p>
                     <p className={`text-[12px] font-black tabular-nums text-right ${
-                      bucket.totalPremium > 0 ? "text-green-500" : bucket.totalPremium < 0 ? "text-red-500" : "text-foreground/40"
+                      bucket.totalPremium > 0 ? "text-green-500" : bucket.totalPremium < 0 ? "text-red-600" : "text-foreground/40"
                     }`}>{fmt$(bucket.totalPremium)}</p>
                     <div className="flex justify-end">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${statusClass}`}>{statusLabel}</span>
@@ -1133,9 +1133,9 @@ export function YearTab() {
                       <div className="flex items-center gap-4 text-xs">
                         <span className="text-foreground/50">{w.position_count} pos</span>
                         <span className="text-green-500 font-semibold">${w.premium.toFixed(2)}</span>
-                        {hasClose && <span className="text-red-400 font-semibold">-${cost.toFixed(2)}</span>}
+                        {hasClose && <span className="text-red-600 font-semibold">-${cost.toFixed(2)}</span>}
                         {hasClose && (
-                          <span className={`font-bold ${net >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          <span className={`font-bold ${net >= 0 ? "text-green-500" : "text-red-600"}`}>
                             net {net >= 0 ? "$" : "-$"}{Math.abs(net).toFixed(2)}
                           </span>
                         )}
@@ -1150,16 +1150,16 @@ export function YearTab() {
                       </span>
                       <span className="text-[12px] font-bold tabular-nums">
                         {hasClose
-                          ? <span className="text-red-400">-${cost.toFixed(2)}</span>
+                          ? <span className="text-red-600">-${cost.toFixed(2)}</span>
                           : <span className="text-foreground/30">—</span>}
                       </span>
                       <span className="text-[12px] font-bold tabular-nums">
                         {hasClose
-                          ? <span className={net >= 0 ? "text-emerald-400" : "text-red-400"}>
+                          ? <span className={net >= 0 ? "text-green-500" : "text-red-600"}>
                               {net >= 0 ? "$" : "-$"}{Math.abs(net).toFixed(2)}
                             </span>
                           : w.premium > 0
-                            ? <span className="text-emerald-400">${w.premium.toFixed(2)}</span>
+                            ? <span className="text-green-500">${w.premium.toFixed(2)}</span>
                             : <span className="text-foreground/30">—</span>}
                       </span>
                       <div className="flex justify-end">

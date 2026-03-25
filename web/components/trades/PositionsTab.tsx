@@ -191,18 +191,18 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Week P&amp;L</p>
-              <p className={`text-base font-black ${totalPremium >= 0 ? "text-green-500" : "text-red-400"}`}>
+              <p className={`text-base font-black ${totalPremium >= 0 ? "text-green-500" : "text-red-600"}`}>
                 {totalPremium >= 0 ? "$" : "-$"}{Math.abs(totalPremium).toFixed(2)}
               </p>
               <p className="text-[10px] text-foreground/40 mt-0.5">
                 ${weekAllGross.toFixed(2)} gross
-                {weekCostToClose > 0 && <span className="text-red-400/70"> − ${weekCostToClose.toFixed(2)} closed</span>}
+                {weekCostToClose > 0 && <span className="text-red-600/70"> − ${weekCostToClose.toFixed(2)} closed</span>}
               </p>
             </div>
             {hasClosed && (
-              <div className={`border rounded-xl p-3 ${weekNetRealized >= 0 ? "bg-[var(--surface)] border-[var(--border)]" : "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"}`}>
+              <div className={`border rounded-xl p-3 ${weekNetRealized >= 0 ? "bg-[var(--surface)] border-[var(--border)]" : "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"}`}>
                 <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Net Realized</p>
-                <p className={`text-base font-black ${weekNetRealized >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                <p className={`text-base font-black ${weekNetRealized >= 0 ? "text-green-500" : "text-red-600"}`}>
                   {weekNetRealized >= 0 ? "$" : "-$"}{Math.abs(weekNetRealized).toFixed(2)}
                 </p>
                 <p className="text-[10px] text-foreground/40 mt-0.5">locked in (closed positions)</p>
@@ -211,32 +211,32 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             {weeklyBasisReduction != null && (
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
                 <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weekly Basis ↓</p>
-                <p className="text-base font-black text-emerald-400">-${weeklyBasisReduction.toFixed(2)}<span className="text-xs font-normal text-foreground/40">/sh</span></p>
+                <p className="text-base font-black text-green-500">-${weeklyBasisReduction.toFixed(2)}<span className="text-xs font-normal text-foreground/40">/sh</span></p>
                 <p className="text-[10px] text-foreground/40 mt-0.5">this week&apos;s premium ÷ shares</p>
               </div>
             )}
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active Positions</p>
-              <p className="text-base font-black text-blue-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {thisWeekPositions.length}</span></p>
+              <p className="text-base font-black text-green-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {thisWeekPositions.length}</span></p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Avg Prem / $1K</p>
               {avgPremPerK != null
-                ? <p className="text-base font-black text-blue-400">${avgPremPerK.toFixed(2)}</p>
+                ? <p className="text-base font-black text-green-500">${avgPremPerK.toFixed(2)}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">this week&apos;s positions</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Stock Value at Stake</p>
               {stockValue > 0
-                ? <p className="text-base font-black text-yellow-500">${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-red-600">${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               {stockCoveragePct != null && <p className="text-[10px] text-foreground/40 mt-0.5">{stockCoveragePct.toFixed(2)}% covered</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Value</p>
               {week.account_value != null
-                ? <p className="text-base font-black text-purple-400">${week.account_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-green-500">${week.account_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">this week</p>
             </div>
@@ -244,9 +244,9 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Coverage</p>
               {coveragePct != null ? (
                 <>
-                  <p className="text-base font-black text-orange-400">{coveragePct.toFixed(2)}%</p>
+                  <p className="text-base font-black text-green-500">{coveragePct.toFixed(2)}%</p>
                   <div className="mt-1 h-1 bg-[var(--surface-2)] rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, coveragePct)}%` }} />
+                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, coveragePct)}%` }} />
                   </div>
                 </>
               ) : (
@@ -256,26 +256,26 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Capital at Risk</p>
               {totalCapAtRisk > 0
-                ? <p className="text-base font-black text-red-400">${totalCapAtRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-red-600">${totalCapAtRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">active strike obligations</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">In-Flight Prem</p>
               {inFlightPrem > 0
-                ? <p className="text-base font-black text-cyan-400">${inFlightPrem.toFixed(2)}</p>
+                ? <p className="text-base font-black text-green-500">${inFlightPrem.toFixed(2)}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">locked: ${realizedPrem.toFixed(2)}</p>
             </div>
             {/* ITM Calls at Risk */}
             <div className={`border rounded-xl p-3 col-span-1 ${
               itmCalls.length > 0
-                ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-800"
+                ? "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"
                 : "bg-[var(--surface)] border-[var(--border)]"
             }`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmCalls.length > 0 ? "text-orange-500" : "text-foreground/60"
+                  itmCalls.length > 0 ? "text-red-600" : "text-foreground/60"
                 }`}>
                   Calls at Risk
                 </p>
@@ -292,10 +292,10 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 </>
               ) : (
                 <>
-                  <p className="text-base font-black text-orange-500">
+                  <p className="text-base font-black text-red-600">
                     ${(itmCallValue + itmCallPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] text-orange-400/80 mt-0.5">
+                  <p className="text-[10px] text-red-600/80 mt-0.5">
                     {itmCalls.length} ITM · ${itmCallValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -303,7 +303,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                       const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
-                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500">
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600">
                           {p.symbol} ${p.strike}{depth != null ? ` (+${depth.toFixed(1)})` : ""}
                         </span>
                       );
@@ -315,12 +315,12 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             {/* ITM Puts at Risk */}
             <div className={`border rounded-xl p-3 col-span-1 ${
               itmPuts.length > 0
-                ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"
+                ? "bg-red-100/60 dark:bg-red-900/40 border-red-500 dark:border-red-700"
                 : "bg-[var(--surface)] border-[var(--border)]"
             }`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmPuts.length > 0 ? "text-red-500" : "text-foreground/60"
+                  itmPuts.length > 0 ? "text-red-600" : "text-foreground/60"
                 }`}>
                   Puts at Risk
                 </p>
@@ -337,10 +337,10 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 </>
               ) : (
                 <>
-                  <p className="text-base font-black text-red-500">
+                  <p className="text-base font-black text-red-600">
                     ${(itmPutValue + itmPutPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] text-red-400/80 mt-0.5">
+                  <p className="text-[10px] text-red-600/80 mt-0.5">
                     {itmPuts.length} ITM · ${itmPutValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -348,7 +348,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                       const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
-                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500">
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600">
                           {p.symbol} ${p.strike}{depth != null ? ` (${depth.toFixed(1)} deep)` : ""}
                         </span>
                       );
@@ -387,7 +387,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             </span>
             <button
               onClick={() => setShowReopen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 text-xs font-semibold hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-2)] text-foreground/60 text-xs font-semibold hover:bg-[var(--surface-3)] border border-[var(--border)] transition"
             >
               <LockOpen size={11} /> Re-open Week
             </button>

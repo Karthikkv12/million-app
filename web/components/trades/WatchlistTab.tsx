@@ -38,8 +38,8 @@ function RatingBadge({ rating }: { rating: string | null }) {
     "Strong Buy":   "bg-green-500/15 text-green-500",
     "Buy":          "bg-green-500/10 text-green-400",
     "Hold":         "bg-yellow-500/10 text-yellow-500",
-    "Underperform": "bg-red-500/10 text-red-400",
-    "Sell":         "bg-red-500/15 text-red-500",
+    "Underperform": "bg-red-600/10 text-red-600",
+    "Sell":         "bg-red-600/15 text-red-600",
   };
   const cls = map[rating] ?? "bg-foreground/5 text-foreground/40";
   return (
@@ -263,7 +263,7 @@ function WatchlistTable({
                             <div className="h-1 w-full rounded-full bg-foreground/10 relative">
                               <div
                                 className={`absolute top-0 left-0 h-full rounded-full ${
-                                  rangePct! >= 80 ? "bg-green-500" : rangePct! >= 40 ? "bg-blue-400" : "bg-red-400"
+                                  rangePct! >= 80 ? "bg-green-500" : rangePct! >= 40 ? "bg-blue-400" : "bg-red-600"
                                 }`}
                                 style={{ width: `${rangePct}%` }}
                               />
@@ -287,7 +287,7 @@ function WatchlistTable({
                     {hasError ? (
                       <span className="text-foreground/30">—</span>
                     ) : (
-                      <div className={`flex items-center justify-end gap-0.5 font-semibold ${isUp ? "text-green-500" : isDown ? "text-red-400" : "text-foreground/40"}`}>
+                      <div className={`flex items-center justify-end gap-0.5 font-semibold ${isUp ? "text-green-500" : isDown ? "text-red-600" : "text-foreground/40"}`}>
                         {isUp && <TrendingUp size={10} />}
                         {isDown && <TrendingDown size={10} />}
                         {!isUp && !isDown && <Minus size={10} />}
@@ -351,7 +351,7 @@ function WatchlistTable({
                     {q?.eps_ttm == null ? (
                       <span className="text-foreground/30">—</span>
                     ) : (
-                      <span className={q.eps_ttm >= 0 ? "text-green-400" : "text-red-400"}>
+                      <span className={q.eps_ttm >= 0 ? "text-green-400" : "text-red-600"}>
                         ${q.eps_ttm.toFixed(2)}
                       </span>
                     )}
@@ -366,7 +366,7 @@ function WatchlistTable({
                     {q?.eps_growth == null ? (
                       <span className="text-foreground/30">—</span>
                     ) : (
-                      <span className={`font-semibold ${q.eps_growth >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <span className={`font-semibold ${q.eps_growth >= 0 ? "text-green-400" : "text-red-600"}`}>
                         {q.eps_growth >= 0 ? "+" : ""}{(q.eps_growth * 100).toFixed(1)}%
                       </span>
                     )}
@@ -697,7 +697,7 @@ export function WatchlistTab() {
           <span className="px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20 font-semibold text-green-500">
             ▲ {gainers} up
           </span>
-          <span className="px-2 py-1 rounded-full bg-red-500/10 border border-red-500/20 font-semibold text-red-400">
+          <span className="px-2 py-1 rounded-full bg-red-600/10 border border-red-600/20 font-semibold text-red-600">
             ▼ {losers} down
           </span>
         </div>
