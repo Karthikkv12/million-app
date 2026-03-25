@@ -5,6 +5,61 @@
 
 ---
 
+## v2.6.0 — Watchlist Tab, ITM Risk Split (Calls/Puts), Nav Rename, AccountTab Restructure
+**Released:** 2026-03-25
+**Branch:** `develop`
+**Commit:** `c967a1f`
+
+### ✨ Changes
+
+#### Watchlist Tab — `web/components/trades/WatchlistTab.tsx` *(new file)*
+- Full watchlist component: add symbols manually (with `TickerSearchInput`), remove inline with two-step confirmation, sync from all active positions/holdings in one click
+- **Live quotes** via `fetchWatchlistQuotes` — 28-field `WatchlistQuote` per symbol, auto-refreshes every 5 min
+- **Sector filter tabs** — auto-generated from live sector data; "Other" bucket for uncategorised; tab counts update live
+- **Sortable columns** — click any of: Change %, Volume, Rel Volume, Mkt Cap, P/E, Beta; toggle asc/desc with arrow indicators
+- **52W range bar** — coloured by position: green (near high) / blue (mid) / red (near low)
+- **Analyst rating badge** — green for Buy/Strong Buy, yellow for Hold, red for Sell/Underperform
+- **Gainers/losers summary pills** — green ▲ up count, red ▼ down count, neutral total
+- **Rel Volume colour** — orange for >2× (unusual activity), green for >1×, muted otherwise
+- **Beta colour** — orange/bold for β>1.5 (high risk), blue for β<0.5 (defensive)
+- **EPS TTM & EPS Growth** — green for positive, red for negative
+- Loading skeleton rows, error state, empty state with help text
+- Search bar filters by symbol, company name, or sector across the current tab
+
+#### Positions Tab — `web/components/trades/PositionsTab.tsx`
+- **ITM risk split into two independent cards** (was one combined card):
+  - **"Calls at Risk"** (orange theme) — ITM covered calls; shows `+X.X` depth above strike
+  - **"Puts at Risk"** (red theme) — ITM cash-secured puts; shows `X.X deep` below strike
+- Each card: live ● badge, position count, net proceeds (strike value + prem collected), per-symbol depth chips
+- "Clear" in green when nothing ITM for that leg type
+- Removed `itmPositions` / `itmAssignmentValue` / `itmNetProceeds` in favour of per-leg `itmCalls` / `itmPuts` locals
+
+#### Navigation — `Navbar.tsx` + `BottomNav.tsx`
+- Renamed "Trades" label → **"Portfolio"** on both desktop navbar and mobile bottom nav
+
+#### Account Tab — `web/components/trades/AccountTab.tsx`
+- Restructured to receive week lifecycle as props: `weeks`, `weeksLoading`, `selectedWeekId`, `onSelectWeek`, `onNewWeek`
+- `WeekSelector` now rendered **inside** AccountTab (removed from global page header)
+- Unified **8-card KPI grid** (4 PSB cards + 4 metric cards) at `p-3.5` / `text-lg`
+
+#### Portfolio Page — `web/app/(app)/trades/page.tsx`
+- Added **7th tab**: `{ key: "watchlist", label: "Watchlist" }` + `<WatchlistTab />` render
+- `PortfolioSummaryBar` / `WeekSelector` removed from global render; weeks props passed to `AccountTab`
+- Tab type union extended to include `"watchlist"`
+
+#### Backend — Watchlist API *(new)*
+- `backend_api/routers/watchlist.py`: `GET /watchlist`, `PUT /watchlist/{symbol}`, `DELETE /watchlist/{symbol}`, `POST /watchlist/sync`
+- `logic/watchlist.py`: `sync_watchlist_from_positions()` — pulls all unique symbols from active positions + holdings and upserts them
+- `database/models.py`: `WatchlistSymbol` model (`id`, `user_id`, `symbol`, `company_name`, `source`, `notes`, `is_active`, `added_at`, `updated_at`)
+- `alembic/versions/0022_cash_deposits.py`, `0023_watchlist.py`: schema migrations
+
+#### API Client — `web/lib/api.ts`
+- `WatchlistQuote` interface (28 fields): symbol, name, price, prev_close, change, change_pct, volume, avg_volume, rel_volume, market_cap, market_cap_fmt, pe_ratio, forward_pe, eps_ttm, eps_growth, div_yield, sector, industry, analyst_rating, beta, week_52_high, week_52_low, day_high, day_low, fifty_day_avg, two_hundred_day_avg, error
+- `WatchlistSymbol` interface: id, symbol, company_name, source, notes, is_active, added_at, updated_at
+- New functions: `fetchWatchlist`, `upsertWatchlistSymbol`, `deleteWatchlistSymbol`, `syncWatchlist`, `fetchWatchlistQuotes`
+
+---
+
 ## v2.5.9 — Positions Tab: Week P&L card, Net Realized card; Performance Tab: Net Realized table, status fix
 **Released:** 2026-03-25
 **Branch:** `develop`
