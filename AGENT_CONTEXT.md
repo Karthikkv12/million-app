@@ -209,6 +209,7 @@ source .venv/bin/activate && python -m pytest tests/ -q --ignore=tests/test_api_
 
 | Version | What |
 |---------|------|
+| v2.5.9 | PositionsTab: "This Week Premium" → "Week P&L" (net of buy-backs, subtitle shows gross − closed). Net Realized card (closed positions only). Closed thead DTE column added + bg/padding fix. YearTab: Net Realized history table (all weeks newest-first, gross/cost/net columns). `isEffectivelyComplete` fix (removed dateless third condition, `.slice(0,10)` on `week_end`). |
 | v2.5.8 | UI: Week selector year redesigned as `<select>` dropdown; week dropdown widened to `w-[320px]`; `weekLabel()` fixed to local-time parsing (avoids UTC off-by-one "Invalid Date"). AccountTab: account legend replaced with hidden "Accounts ▾" toggle panel (pill buttons, strike-through for hidden, dashed for inactive); table uses `table-fixed` + `<colgroup>` for equal-width columns. YearTab: monthly premium bar chart capped to last 12 months (`.slice(-12)`). |
 | v2.5.7 | Full Bug Audit Fix: 14 Bugs Across All Trades Tabs (see VERSIONS.md). |
 | v2.5.6 | Holdings: soft-delete guard (lots with event history → CLOSED not destroyed), ↻ Re-enter button on closed holdings, _recalculate_adj_basis dual-path (PremiumLedger primary, HoldingEvent basis_delta fallback). Fixed SOFI/EOSE/BBAI closed adj_basis in DB. Fixed admin/users page (was 500 — mismatched service function names, wrong schema alias). Audit cleanup: JWT renamed million-* → optionflow-*, trading_journal.db removed from backup list, DEV_GUIDE wrong path fixed. |
@@ -267,6 +268,7 @@ These are the highest-impact features in priority order:
 9. **Holdings soft-delete** — `delete_holding()` in `logic/holdings.py` soft-closes lots that have HoldingEvent history (sets status=CLOSED, shares=0) instead of hard-deleting. Only hard-deletes fresh lots with zero event history. Use the "↻ Re-enter" button in HoldingsTab to reactivate a closed lot.
 10. **adj_basis = f(avg_cost)** — `_recalculate_adj_basis` uses PremiumLedger rows as primary source; falls back to summing `basis_delta` from HoldingEvents. This means editing avg_cost on any holding (active or closed) correctly recomputes adj_basis.
 11. **JWT audience** — Changed from `million-app` → `optionflow-app` (issuer: `million-api` → `optionflow-api`) in v2.5.6. Existing sessions were invalidated — users must log in again after this deploy.
+12. **`premium_out` is stored negative** — In `option_positions`, `premium_out` (buy-back cost) is a negative number (e.g. `-1.30` = paid $1.30). Net P&L per position = `(premium_in + premium_out) × contracts × 100`. When computing cost-to-close totals always use `Math.abs(premium_out)`; never subtract a raw `premium_out` sum (double-count bug).
 
 ---
 

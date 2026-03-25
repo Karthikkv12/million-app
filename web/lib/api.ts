@@ -306,6 +306,12 @@ export interface WeeklySnapshot {
   week_start: string;
   week_end: string;
   account_value: number | null;
+  acct_label_1: string | null;
+  acct_val_1: number | null;
+  acct_label_2: string | null;
+  acct_val_2: number | null;
+  acct_label_3: string | null;
+  acct_val_3: number | null;
   is_complete: boolean;
   completed_at: string | null;
   notes: string | null;
@@ -372,6 +378,12 @@ export interface WeekBreakdown {
   week_end: string;
   is_complete: boolean;
   account_value: number | null;
+  acct_label_1: string | null;
+  acct_val_1: number | null;
+  acct_label_2: string | null;
+  acct_val_2: number | null;
+  acct_label_3: string | null;
+  acct_val_3: number | null;
   premium: number;
   realized_pnl: number;
   position_count: number;
@@ -404,15 +416,60 @@ export interface SymbolSummary {
   assigned: number;
 }
 
+// ── Broker Accounts ───────────────────────────────────────────────────────────
+
+export interface BrokerAccount {
+  id: number;
+  name: string;
+  color: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface AccountBalance {
+  account_id: number;
+  week_date: string;  // "YYYY-MM-DD"
+  balance: number;
+}
+
+export const fetchBrokerAccounts = () =>
+  api.get<BrokerAccount[]>("/portfolio/broker-accounts");
+
+export const createBrokerAccount = (body: { name: string; color?: string; sort_order?: number }) =>
+  api.post<BrokerAccount>("/portfolio/broker-accounts", body);
+
+export const updateBrokerAccount = (id: number, body: Partial<{ name: string; color: string; sort_order: number; is_active: boolean }>) =>
+  api.patch<BrokerAccount>(`/portfolio/broker-accounts/${id}`, body);
+
+export const deleteBrokerAccount = (id: number) =>
+  api.del<{ status: string }>(`/portfolio/broker-accounts/${id}`);
+
+export const fetchAccountBalances = (year: number) =>
+  api.get<AccountBalance[]>(`/portfolio/account-balances?year=${year}`);
+
+export const fetchAccountBalanceYears = () =>
+  api.get<number[]>("/portfolio/account-balances/years");
+
+export const upsertAccountBalance = (body: { account_id: number; week_date: string; balance: number }) =>
+  api.put<AccountBalance>("/portfolio/account-balances", body);
+
+export const deleteAccountBalance = (account_id: number, week_date: string) =>
+  api.del<{ status: string }>(`/portfolio/account-balances/${account_id}/${week_date}`);
+
 // Weeks
 export const fetchWeeks = () => api.get<WeeklySnapshot[]>("/portfolio/weeks");
 export const getOrCreateWeek = (for_date?: string) =>
   api.post<WeeklySnapshot>("/portfolio/weeks", { for_date: for_date ?? null });
 export const fetchWeek = (id: number) => api.get<WeeklySnapshot>(`/portfolio/weeks/${id}`);
-export const updateWeek = (id: number, body: { account_value?: number; notes?: string }) =>
+export interface SubAccountPayload {
+  acct_label_1?: string; acct_val_1?: number;
+  acct_label_2?: string; acct_val_2?: number;
+  acct_label_3?: string; acct_val_3?: number;
+}
+export const updateWeek = (id: number, body: { account_value?: number; notes?: string } & SubAccountPayload) =>
   api.patch<WeeklySnapshot>(`/portfolio/weeks/${id}`, body);
-export const completeWeek = (id: number, account_value?: number) =>
-  api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/complete`, { account_value: account_value ?? null });
+export const completeWeek = (id: number, payload?: { account_value?: number } & SubAccountPayload) =>
+  api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/complete`, payload ?? {});
 export const reopenWeek = (id: number) =>
   api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/reopen`, {});
 

@@ -437,6 +437,9 @@ def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
 
         if "status" in data:
             h.status = data["status"]
+            # When manually closing, zero out shares so the holding is fully closed
+            if data["status"] == "CLOSED":
+                h.shares = 0
 
         if close_event:
             session.add(close_event)

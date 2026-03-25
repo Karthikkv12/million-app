@@ -44,7 +44,12 @@ function nextFriday(from?: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-const HIDDEN_ACCOUNTS_KEY = "optionflow_hidden_accounts";
+const HIDDEN_ACCOUNTS_KEY  = "optionflow_hidden_accounts";
+const AREA_RANGE_KEY       = "optionflow_acct_area_range";
+const WOW_RANGE_KEY        = "optionflow_acct_wow_range";
+
+type ChartRange = "1M" | "3M" | "1Y" | "5Y" | "MAX";
+const RANGE_LABELS: ChartRange[] = ["1M", "3M", "1Y", "5Y", "MAX"];
 
 export function AccountTab() {
   const qc = useQueryClient();
@@ -101,6 +106,19 @@ export function AccountTab() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAcctName, setNewAcctName] = useState("");
   const [showAccountsPanel, setShowAccountsPanel] = useState(false);
+
+  // Chart time-range selectors (independent, persisted)
+  const VALID_RANGES: ChartRange[] = ["1M", "3M", "1Y", "5Y", "MAX"];
+  const [areaRange, setAreaRange] = useState<ChartRange>(() => {
+    if (typeof window === "undefined") return "MAX";
+    const v = localStorage.getItem(AREA_RANGE_KEY);
+    return (v && VALID_RANGES.includes(v as ChartRange) ? v as ChartRange : "MAX");
+  });
+  const [wowRange, setWowRange] = useState<ChartRange>(() => {
+    if (typeof window === "undefined") return "MAX";
+    const v = localStorage.getItem(WOW_RANGE_KEY);
+    return (v && VALID_RANGES.includes(v as ChartRange) ? v as ChartRange : "MAX");
+  });
 
   // Auto-create the upcoming Friday's week on mount
   const ensureWeekMut = useMutation({
@@ -207,13 +225,18 @@ export function AccountTab() {
   const valueMap = new Map<string, number>();
   for (const r of withValue) valueMap.set(r.week_end, r.account_value!);
 
-  // Build a contiguous scaffold from first data point to today
+  // Build a contiguous scaffold from max(first data point, 5Y ago) to today
+  // so range buttons always have enough weeks to show even when data is sparse
+  const today = new Date();
   const allChartFridays: string[] = [];
   if (withValue.length > 0) {
-    const start = new Date(withValue[0].week_end + "T00:00:00");
-    // find the Friday on or before start
-    while (start.getDay() !== 5) start.setDate(start.getDate() - 1);
-    const today = new Date();
+    const fiveYearsAgo = new Date(today); fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const dataStart = new Date(withValue[0].week_end + "T00:00:00");
+    // Snap dataStart back to Friday
+    while (dataStart.getDay() !== 5) dataStart.setDate(dataStart.getDate() - 1);
+    // Use whichever is earlier: dataStart or 5Y ago (snapped to Friday)
+    while (fiveYearsAgo.getDay() !== 5) fiveYearsAgo.setDate(fiveYearsAgo.getDate() - 1);
+    const start = dataStart < fiveYearsAgo ? dataStart : fiveYearsAgo;
     const cur = new Date(start);
     while (cur <= today) {
       allChartFridays.push(cur.toISOString().slice(0, 10));
@@ -221,21 +244,61 @@ export function AccountTab() {
     }
   }
 
+  // ── Range cutoff ─────────────────────────────────────────────────────────
+  function rangeCutoff(range: string): string | null {
+    const d = new Date(today);
+    if (range === "MAX") return null;
+    if (range === "1M")  { d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); }
+    if (range === "3M")  { d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); }
+    if (range === "1Y")  { d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); }
+    if (range === "5Y")  { d.setFullYear(d.getFullYear() - 5); return d.toISOString().slice(0, 10); }
+    return null;
+  }
+  const areaCutoff   = rangeCutoff(areaRange);
+  const wowCutoff    = rangeCutoff(wowRange);
+  const areaFridays  = areaCutoff ? allChartFridays.filter((iso) => iso >= areaCutoff!) : allChartFridays;
+  const wowFridays   = wowCutoff  ? allChartFridays.filter((iso) => iso >= wowCutoff!)  : allChartFridays;
+
   const MONTH_LETTER = ["J","F","M","A","M","J","J","A","S","O","N","D"];
-  // Only label quarter-start months (Jan=0, Apr=3, Jul=6, Oct=9) to avoid crowding
   const QUARTER_MONTHS = new Set([0, 3, 6, 9]);
 
-  const chartData = allChartFridays.map((iso, i) => {
+  // Tick label strategy — range-aware
+  function makeTick(iso: string, prevIso: string | undefined, totalVisible: number, range: ChartRange): string {
     const d = new Date(iso + "T00:00:00");
-    const prevIso = allChartFridays[i - 1];
-    const yearChanged = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
-    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
     const mo = d.getMonth();
-    const tick = (monthChanged && QUARTER_MONTHS.has(mo))
-      ? (yearChanged ? `${MONTH_LETTER[mo]}'${String(d.getFullYear()).slice(2)}` : MONTH_LETTER[mo])
-      : "";
-    return { label: iso, tick, value: valueMap.get(iso) ?? null };
-  });
+    const yr2 = `'${String(d.getFullYear()).slice(2)}`; // "'26"
+    const yearChanged  = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
+    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
+
+    if (range === "MAX") {
+      // Quarterly data points, label = 2-digit year on year change only
+      if (!monthChanged || !QUARTER_MONTHS.has(mo)) return "";
+      return yearChanged ? yr2 : "";
+    }
+    if (range === "5Y") {
+      // Monthly data points, label = 2-digit year on year change only
+      if (!monthChanged) return "";
+      return yearChanged ? yr2 : "";
+    }
+    // Sub-year ranges — original behaviour
+    if (totalVisible <= 8) {
+      return `${MONTH_LETTER[mo]}${d.getDate()}`;
+    } else if (totalVisible <= 26) {
+      return monthChanged
+        ? (yearChanged ? `${MONTH_LETTER[mo]}${yr2}` : MONTH_LETTER[mo])
+        : "";
+    } else {
+      return (monthChanged && QUARTER_MONTHS.has(mo))
+        ? (yearChanged ? `${MONTH_LETTER[mo]}${yr2}` : MONTH_LETTER[mo])
+        : "";
+    }
+  }
+
+  const chartData = areaFridays.map((iso, i) => ({
+    label: iso,
+    tick: makeTick(iso, areaFridays[i - 1], areaFridays.length, areaRange),
+    value: valueMap.get(iso) ?? null,
+  }));
 
   const hasArea = chartData.some((d) => d.value != null);
   const hasWoW  = changes.length >= 2;
@@ -246,17 +309,11 @@ export function AccountTab() {
     : `$${v}`;
 
   const chgMap = new Map(changes.filter((c) => c.chg != null).map((c) => [c.week_end, c.chg!]));
-  const wowData = allChartFridays.map((iso, i) => {
-    const d = new Date(iso + "T00:00:00");
-    const prevIso = allChartFridays[i - 1];
-    const yearChanged = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
-    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
-    const mo = d.getMonth();
-    const tick = (monthChanged && QUARTER_MONTHS.has(mo))
-      ? (yearChanged ? `${MONTH_LETTER[mo]}'${String(d.getFullYear()).slice(2)}` : MONTH_LETTER[mo])
-      : "";
-    return { label: iso, tick, chg: chgMap.get(iso) ?? null };
-  });
+  const wowData = wowFridays.map((iso, i) => ({
+    label: iso,
+    tick: makeTick(iso, wowFridays[i - 1], wowFridays.length, wowRange),
+    chg: chgMap.get(iso) ?? null,
+  }));
 
   return (
     <div className="space-y-6">
@@ -300,10 +357,25 @@ export function AccountTab() {
           {/* Account Value */}
           {hasArea && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-1">
                 <TrendingUp size={13} className="text-green-500" />
-                <h3 className="text-sm font-bold text-foreground">Account Value — All Time</h3>
-                <span className="ml-auto text-[10px] text-foreground/40">{withValue.length} wks</span>
+                <h3 className="text-sm font-bold text-foreground">Account Value</h3>
+                <span className="ml-auto text-[10px] text-foreground/40">{chartData.filter(d => d.value != null).length} wks</span>
+              </div>
+              <div className="flex items-center gap-1 mb-3">
+                {RANGE_LABELS.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setAreaRange(r); try { localStorage.setItem(AREA_RANGE_KEY, r); } catch {} }}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors ${
+                      areaRange === r
+                        ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                        : "text-foreground/40 hover:text-foreground/70"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
               <ResponsiveContainer width="100%" height={190}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
@@ -320,7 +392,7 @@ export function AccountTab() {
                   />
                   <Tooltip
                     formatter={(v: unknown) => v == null ? ["—", "Value"] : [`$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Value"]}
-                    labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                    labelFormatter={(_l: unknown, payload?: ReadonlyArray<{ payload?: { label?: string } }>) => {
                       const iso = payload?.[0]?.payload?.label;
                       if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                       return String(_l);
@@ -345,10 +417,25 @@ export function AccountTab() {
           {/* Week-over-Week change */}
           {hasWoW && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-1">
                 <Activity size={13} className="text-blue-400" />
-                <h3 className="text-sm font-bold text-foreground">Week-over-Week Δ — All Time</h3>
-                <span className="ml-auto text-[10px] text-foreground/40">{changes.filter((c) => c.chg != null).length} wks</span>
+                <h3 className="text-sm font-bold text-foreground">Week-over-Week</h3>
+                <span className="ml-auto text-[10px] text-foreground/40">{wowData.filter(d => d.chg != null).length} wks</span>
+              </div>
+              <div className="flex items-center gap-1 mb-3">
+                {RANGE_LABELS.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setWowRange(r); try { localStorage.setItem(WOW_RANGE_KEY, r); } catch {} }}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors ${
+                      wowRange === r
+                        ? "bg-blue-500/20 text-blue-400 border border-blue-500/40"
+                        : "text-foreground/40 hover:text-foreground/70"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
               <ResponsiveContainer width="100%" height={190}>
                 <BarChart data={wowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }} barCategoryGap="10%">
@@ -358,7 +445,7 @@ export function AccountTab() {
                   <ReferenceLine y={0} stroke="var(--border)" strokeWidth={1} />
                   <Tooltip
                     formatter={(v: unknown) => v == null ? ["—", "Change"] : [`${Number(v) >= 0 ? "+" : ""}$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, "Change"]}
-                    labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                    labelFormatter={(_l: unknown, payload?: ReadonlyArray<{ payload?: { label?: string } }>) => {
                       const iso = payload?.[0]?.payload?.label;
                       if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                       return String(_l);

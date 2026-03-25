@@ -5,6 +5,27 @@
 
 ---
 
+## v2.5.9 — Positions Tab: Week P&L card, Net Realized card; Performance Tab: Net Realized table, status fix
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### ✨ Changes
+
+#### Positions Tab — `PositionsTab.tsx`
+- **"This Week Premium" → "Week P&L"**: renamed and reworked to show `totalPremium` (gross collected − buy-backs already paid), which is the true current net. Subtitle shows `$X gross − $Y closed` inline so both numbers are visible at a glance. Card goes red if net is negative.
+- **"Net Realized" card**: shows only the locked-in premium from closed/expired/assigned positions this week (net of buy-backs). Only appears when there are closed positions. Replaces the old separate "Cost to Close" card.
+- **Buy-back math fix**: `premium_out` is stored as a negative number — previous `weekCostToClose` was summing the raw negative value then subtracting it, effectively doubling the profit. Fixed to use `Math.abs(premium_out)`.
+- **Closed section header fix**: `<thead>` in Closed This Week table was using `bg-[var(--surface-2)]` (same as section header bar), making them visually merge. Changed to `bg-[var(--surface)]` + `py-2`.
+- **Closed section column fix**: Closed This Week table was missing the `DTE` column header, causing header/row misalignment. Added `DTE` to match the 13-column `PositionRow` output.
+
+#### Performance Tab — `YearTab.tsx`
+- **"Net Realized" table**: new card at the bottom of the Performance tab showing every week (newest first) with columns: Date, Pos count, Gross Collected, Cost to Close, Net Realized, Status. Uses `allPositions` grouped by `week_id` — same math as Positions tab cards.
+- **Status badge fix**: was using `w.is_complete` (DB flag only) — old weeks never formally closed showed "Open". Now uses `isEffectivelyComplete(w)` (same logic as all other Performance tab calculations).
+- **`isEffectivelyComplete` fix**: removed third condition `(w.position_count > 0 && w.premium > 0)` which had no date guard and incorrectly marked future weeks (e.g. Mar 27) as Complete. Added `.slice(0,10)` to `week_end` comparison for reliable string date comparison against `todayStr`.
+- **Date format**: Net Realized table date column now matches Premium by Expiry format (`toLocaleDateString("en-US", { month: "short", day: "numeric" })`).
+
+---
+
 ## v2.5.8 — UI Polish: Week Selector, Account Toggle Panel, Equal-Width Table, 12-Month Chart Cap
 **Released:** 2026-03-14
 **Branch:** `develop → main`

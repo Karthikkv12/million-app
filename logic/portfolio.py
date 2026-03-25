@@ -20,6 +20,8 @@ from database.models import (
     OptionPositionStatus,
     StockAssignment,
     PremiumLedger,
+    BrokerAccount,
+    AccountBalance,
 )
 
 
@@ -121,6 +123,12 @@ def _snap_to_dict(s: WeeklySnapshot) -> dict:
         "week_start":    s.week_start.isoformat(),
         "week_end":      s.week_end.isoformat(),
         "account_value": s.account_value,
+        "acct_label_1":  s.acct_label_1,
+        "acct_val_1":    s.acct_val_1,
+        "acct_label_2":  s.acct_label_2,
+        "acct_val_2":    s.acct_val_2,
+        "acct_label_3":  s.acct_label_3,
+        "acct_val_3":    s.acct_val_3,
         "is_complete":   s.is_complete,
         "completed_at":  s.completed_at.isoformat() if s.completed_at else None,
         "notes":         s.notes,
@@ -270,8 +278,16 @@ def get_week(*, user_id: int, week_id: int) -> dict | None:
 
 
 def update_week(*, user_id: int, week_id: int, account_value: float | None = None,
-                notes: str | None = None) -> dict:
-    """Update the Friday account value and/or notes for a week."""
+                notes: str | None = None,
+                acct_label_1: str | None = None, acct_val_1: float | None = None,
+                acct_label_2: str | None = None, acct_val_2: float | None = None,
+                acct_label_3: str | None = None, acct_val_3: float | None = None) -> dict:
+    """Update the Friday account value and/or notes for a week.
+
+    If any of acct_val_1/2/3 are provided the sum is written to account_value
+    automatically.  Passing account_value directly still works for backwards
+    compatibility (used when only a single number is provided).
+    """
     session = _portfolio_session()
     try:
         s = session.query(WeeklySnapshot).filter(
@@ -280,7 +296,25 @@ def update_week(*, user_id: int, week_id: int, account_value: float | None = Non
         ).first()
         if s is None:
             raise ValueError("Week not found")
-        if account_value is not None:
+        # Sub-account labels
+        if acct_label_1 is not None:
+            s.acct_label_1 = acct_label_1
+        if acct_label_2 is not None:
+            s.acct_label_2 = acct_label_2
+        if acct_label_3 is not None:
+            s.acct_label_3 = acct_label_3
+        # Sub-account values — update stored fields
+        sub_updated = any(v is not None for v in (acct_val_1, acct_val_2, acct_val_3))
+        if acct_val_1 is not None:
+            s.acct_val_1 = acct_val_1
+        if acct_val_2 is not None:
+            s.acct_val_2 = acct_val_2
+        if acct_val_3 is not None:
+            s.acct_val_3 = acct_val_3
+        # Auto-sum if any sub-value was touched
+        if sub_updated:
+            s.account_value = (s.acct_val_1 or 0) + (s.acct_val_2 or 0) + (s.acct_val_3 or 0)
+        elif account_value is not None:
             s.account_value = account_value
         if notes is not None:
             s.notes = notes
@@ -291,7 +325,10 @@ def update_week(*, user_id: int, week_id: int, account_value: float | None = Non
         session.close()
 
 
-def mark_week_complete(*, user_id: int, week_id: int, account_value: float | None = None) -> dict:
+def mark_week_complete(*, user_id: int, week_id: int, account_value: float | None = None,
+                       acct_label_1: str | None = None, acct_val_1: float | None = None,
+                       acct_label_2: str | None = None, acct_val_2: float | None = None,
+                       acct_label_3: str | None = None, acct_val_3: float | None = None) -> dict:
     """
     Mark a week as complete and carry all ACTIVE positions forward into the
     next week (creating it if necessary).
@@ -308,7 +345,24 @@ def mark_week_complete(*, user_id: int, week_id: int, account_value: float | Non
             # Already complete — idempotent, just return current state
             return _snap_to_dict(snap)
 
-        if account_value is not None:
+        # Sub-account labels
+        if acct_label_1 is not None:
+            snap.acct_label_1 = acct_label_1
+        if acct_label_2 is not None:
+            snap.acct_label_2 = acct_label_2
+        if acct_label_3 is not None:
+            snap.acct_label_3 = acct_label_3
+        # Sub-account values
+        sub_updated = any(v is not None for v in (acct_val_1, acct_val_2, acct_val_3))
+        if acct_val_1 is not None:
+            snap.acct_val_1 = acct_val_1
+        if acct_val_2 is not None:
+            snap.acct_val_2 = acct_val_2
+        if acct_val_3 is not None:
+            snap.acct_val_3 = acct_val_3
+        if sub_updated:
+            snap.account_value = (snap.acct_val_1 or 0) + (snap.acct_val_2 or 0) + (snap.acct_val_3 or 0)
+        elif account_value is not None:
             snap.account_value = account_value
         snap.is_complete  = True
         snap.completed_at = datetime.utcnow()
@@ -821,11 +875,12 @@ def portfolio_summary(*, user_id: int) -> dict:
             seen_origin2.add(origin_id)
             if p.week_id not in week_premium:
                 continue
-            # Use gross premium_in (same as Premium tab's total_premium_sold)
-            # so the week-by-week figure matches what you actually collected.
             gross = (p.premium_in or 0.0) * p.contracts * 100
             net   = _net_premium(p) * p.contracts * 100
-            week_premium[p.week_id] += gross
+            # For CLOSED positions (bought back), use net so buyback costs
+            # reduce the week's premium total. For active/expired/assigned,
+            # use gross (premium_in) as the week contribution.
+            week_premium[p.week_id] += net if p.status == OptionPositionStatus.CLOSED else gross
             week_pos_count[p.week_id] += 1
             if p.status in (OptionPositionStatus.CLOSED, OptionPositionStatus.EXPIRED):
                 week_realized[p.week_id] += net
@@ -839,6 +894,12 @@ def portfolio_summary(*, user_id: int) -> dict:
                 "week_end":      w.week_end.date().isoformat(),
                 "is_complete":   w.is_complete,
                 "account_value": w.account_value,
+                "acct_label_1":  w.acct_label_1,
+                "acct_val_1":    w.acct_val_1,
+                "acct_label_2":  w.acct_label_2,
+                "acct_val_2":    w.acct_val_2,
+                "acct_label_3":  w.acct_label_3,
+                "acct_val_3":    w.acct_val_3,
                 "premium":       prem,
                 "realized_pnl":  round(week_realized[w.id], 2),
                 "position_count": week_pos_count[w.id],
@@ -982,3 +1043,222 @@ def _float_or_none(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+# ── Broker Accounts ───────────────────────────────────────────────────────────
+
+def _account_to_dict(a: BrokerAccount) -> dict:
+    return {
+        "id":         a.id,
+        "name":       a.name,
+        "color":      a.color,
+        "sort_order": a.sort_order,
+        "is_active":  a.is_active,
+    }
+
+
+def list_broker_accounts(*, user_id: int) -> list[dict]:
+    session = _portfolio_session()
+    try:
+        accounts = (
+            session.query(BrokerAccount)
+            .filter(BrokerAccount.user_id == user_id)
+            .order_by(BrokerAccount.sort_order, BrokerAccount.id)
+            .all()
+        )
+        return [_account_to_dict(a) for a in accounts]
+    finally:
+        session.close()
+
+
+def create_broker_account(*, user_id: int, name: str, color: str | None = None,
+                          sort_order: int = 0) -> dict:
+    session = _portfolio_session()
+    try:
+        a = BrokerAccount(
+            user_id=user_id, name=name, color=color,
+            sort_order=sort_order, is_active=True,
+            created_at=datetime.utcnow(),
+        )
+        session.add(a)
+        session.commit()
+        session.refresh(a)
+        return _account_to_dict(a)
+    finally:
+        session.close()
+
+
+def update_broker_account(*, user_id: int, account_id: int,
+                          name: str | None = None, color: str | None = None,
+                          sort_order: int | None = None,
+                          is_active: bool | None = None) -> dict:
+    session = _portfolio_session()
+    try:
+        a = session.query(BrokerAccount).filter(
+            BrokerAccount.id == account_id,
+            BrokerAccount.user_id == user_id,
+        ).first()
+        if a is None:
+            raise ValueError("Account not found")
+        if name is not None:
+            a.name = name
+        if color is not None:
+            a.color = color
+        if sort_order is not None:
+            a.sort_order = sort_order
+        if is_active is not None:
+            a.is_active = is_active
+        session.commit()
+        session.refresh(a)
+        return _account_to_dict(a)
+    finally:
+        session.close()
+
+
+def delete_broker_account(*, user_id: int, account_id: int) -> None:
+    session = _portfolio_session()
+    try:
+        a = session.query(BrokerAccount).filter(
+            BrokerAccount.id == account_id,
+            BrokerAccount.user_id == user_id,
+        ).first()
+        if a is None:
+            raise ValueError("Account not found")
+        # Soft-delete: mark inactive
+        a.is_active = False
+        session.commit()
+    finally:
+        session.close()
+
+
+# ── Account Balances ──────────────────────────────────────────────────────────
+
+def _recompute_week_total(session, user_id: int, week_date) -> None:
+    """Sum all account balances for a Friday and write to weekly_snapshots.account_value."""
+    from datetime import date as _date
+    if isinstance(week_date, _date):
+        week_date_d = week_date
+    else:
+        week_date_d = week_date.date() if hasattr(week_date, 'date') else week_date
+
+    total = (
+        session.query(AccountBalance)
+        .filter(
+            AccountBalance.user_id == user_id,
+            AccountBalance.week_date == week_date_d,
+        )
+        .all()
+    )
+    new_sum = sum(b.balance for b in total) if total else None
+
+    # Find the matching weekly_snapshot (week_end on the same date)
+    from datetime import datetime as _dt
+    week_end_dt = _dt.combine(week_date_d, _dt.min.time())
+    snap = session.query(WeeklySnapshot).filter(
+        WeeklySnapshot.user_id == user_id,
+        WeeklySnapshot.week_end >= week_end_dt,
+        WeeklySnapshot.week_end < _dt.combine(week_date_d, _dt.max.time()),
+    ).first()
+    if snap is not None and new_sum is not None:
+        snap.account_value = round(new_sum, 2)
+        session.add(snap)
+
+
+def upsert_account_balance(*, user_id: int, account_id: int,
+                           week_date, balance: float) -> dict:
+    """Insert or update a balance entry; recomputes weekly_snapshots total."""
+    from datetime import date as _date, datetime as _dt
+    if not isinstance(week_date, _date):
+        week_date = _dt.strptime(str(week_date), "%Y-%m-%d").date()
+
+    session = _portfolio_session()
+    try:
+        existing = session.query(AccountBalance).filter(
+            AccountBalance.account_id == account_id,
+            AccountBalance.week_date == week_date,
+        ).first()
+        if existing:
+            existing.balance = balance
+            b = existing
+        else:
+            b = AccountBalance(
+                user_id=user_id, account_id=account_id,
+                week_date=week_date, balance=balance,
+            )
+            session.add(b)
+        session.flush()
+        _recompute_week_total(session, user_id, week_date)
+        session.commit()
+        return {
+            "account_id": b.account_id,
+            "week_date":  str(b.week_date),
+            "balance":    b.balance,
+        }
+    finally:
+        session.close()
+
+
+def delete_account_balance(*, user_id: int, account_id: int, week_date) -> None:
+    from datetime import date as _date, datetime as _dt
+    if not isinstance(week_date, _date):
+        week_date = _dt.strptime(str(week_date), "%Y-%m-%d").date()
+    session = _portfolio_session()
+    try:
+        b = session.query(AccountBalance).filter(
+            AccountBalance.account_id == account_id,
+            AccountBalance.week_date == week_date,
+        ).first()
+        if b:
+            session.delete(b)
+            session.flush()
+            _recompute_week_total(session, user_id, week_date)
+            session.commit()
+    finally:
+        session.close()
+
+
+def list_account_balance_years(*, user_id: int) -> list[int]:
+    """Return sorted list of distinct years that have any account_balance rows."""
+    from datetime import date as _date
+    session = _portfolio_session()
+    try:
+        rows = (
+            session.query(AccountBalance.week_date)
+            .filter(AccountBalance.user_id == user_id)
+            .distinct()
+            .all()
+        )
+        years = sorted({r.week_date.year for r in rows}, reverse=True)
+        current = _date.today().year
+        if current not in years:
+            years.insert(0, current)
+        return years
+    finally:
+        session.close()
+
+
+def list_account_balances(*, user_id: int, year: int) -> list[dict]:
+    """Return all balances for a given year, keyed by week_date."""
+    from datetime import date as _date
+    session = _portfolio_session()
+    try:
+        rows = (
+            session.query(AccountBalance)
+            .filter(
+                AccountBalance.user_id == user_id,
+                AccountBalance.week_date >= _date(year, 1, 1),
+                AccountBalance.week_date <= _date(year, 12, 31),
+            )
+            .order_by(AccountBalance.week_date)
+            .all()
+        )
+        return [
+            {
+                "account_id": r.account_id,
+                "week_date":  str(r.week_date),
+                "balance":    r.balance,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()

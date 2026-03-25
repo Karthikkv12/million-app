@@ -59,6 +59,8 @@ export function PositionForm({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["positions", weekId] });
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      qc.invalidateQueries({ queryKey: ["premiumDashboard"] });
       onDone();
     },
     onError: (e: Error) => setErr(e.message),

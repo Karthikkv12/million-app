@@ -23,7 +23,6 @@ from logic.portfolio import (
     get_assignment_for_position,
     get_or_create_week,
     get_week,
-    list_all_positions,
     list_positions,
     list_weeks,
     mark_week_complete,
@@ -34,14 +33,6 @@ from logic.portfolio import (
     update_position,
     update_week,
     parse_dt,
-    list_broker_accounts,
-    create_broker_account,
-    update_broker_account,
-    delete_broker_account,
-    upsert_account_balance,
-    delete_account_balance,
-    list_account_balances,
-    list_account_balance_years,
 )
 from logic.premium_ledger import get_premium_dashboard, get_premium_summary, sync_ledger_from_positions
 from logic import services as _services
@@ -90,9 +81,6 @@ def update_week_route(week_id: int, body: WeekUpdateRequest, user=Depends(get_cu
         return update_week(
             user_id=int(user["sub"]), week_id=week_id,
             account_value=body.account_value, notes=body.notes,
-            acct_label_1=body.acct_label_1, acct_val_1=body.acct_val_1,
-            acct_label_2=body.acct_label_2, acct_val_2=body.acct_val_2,
-            acct_label_3=body.acct_label_3, acct_val_3=body.acct_val_3,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -106,9 +94,6 @@ def mark_week_complete_route(
         return mark_week_complete(
             user_id=int(user["sub"]), week_id=week_id,
             account_value=body.account_value,
-            acct_label_1=body.acct_label_1, acct_val_1=body.acct_val_1,
-            acct_label_2=body.acct_label_2, acct_val_2=body.acct_val_2,
-            acct_label_3=body.acct_label_3, acct_val_3=body.acct_val_3,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -123,12 +108,6 @@ def reopen_week_route(week_id: int, user=Depends(get_current_user)) -> Dict[str,
 
 
 # ── Positions ─────────────────────────────────────────────────────────────────
-
-@router.get("/positions", response_model=List[Dict[str, Any]])
-def list_all_positions_route(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
-    """Return all positions across all weeks for the authenticated user."""
-    return list_all_positions(user_id=int(user["sub"]))
-
 
 @router.get("/weeks/{week_id}/positions", response_model=List[Dict[str, Any]])
 def list_positions_route(week_id: int, user=Depends(get_current_user)) -> List[Dict[str, Any]]:
@@ -318,76 +297,3 @@ def upsert_portfolio_value_history(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return PortfolioSnapshotOut.model_validate(row)
-
-
-# ── Broker Accounts ───────────────────────────────────────────────────────────
-
-@router.get("/broker-accounts", response_model=List[Dict[str, Any]])
-def list_broker_accounts_route(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
-    return list_broker_accounts(user_id=int(user["sub"]))
-
-
-@router.post("/broker-accounts", response_model=Dict[str, Any])
-def create_broker_account_route(body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
-    return create_broker_account(
-        user_id=int(user["sub"]),
-        name=body["name"],
-        color=body.get("color"),
-        sort_order=body.get("sort_order", 0),
-    )
-
-
-@router.patch("/broker-accounts/{account_id}", response_model=Dict[str, Any])
-def update_broker_account_route(account_id: int, body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
-    try:
-        return update_broker_account(
-            user_id=int(user["sub"]), account_id=account_id,
-            name=body.get("name"), color=body.get("color"),
-            sort_order=body.get("sort_order"), is_active=body.get("is_active"),
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.delete("/broker-accounts/{account_id}")
-def delete_broker_account_route(account_id: int, user=Depends(get_current_user)) -> Dict[str, str]:
-    try:
-        delete_broker_account(user_id=int(user["sub"]), account_id=account_id)
-        return {"status": "ok"}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ── Account Balances ──────────────────────────────────────────────────────────
-
-@router.get("/account-balances/years", response_model=List[int])
-def list_account_balance_years_route(user=Depends(get_current_user)) -> List[int]:
-    return list_account_balance_years(user_id=int(user["sub"]))
-
-
-@router.get("/account-balances", response_model=List[Dict[str, Any]])
-def list_account_balances_route(
-    year: int = Query(...), user=Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    return list_account_balances(user_id=int(user["sub"]), year=year)
-
-
-@router.put("/account-balances", response_model=Dict[str, Any])
-def upsert_account_balance_route(body: Dict[str, Any], user=Depends(get_current_user)) -> Dict[str, Any]:
-    try:
-        return upsert_account_balance(
-            user_id=int(user["sub"]),
-            account_id=int(body["account_id"]),
-            week_date=body["week_date"],
-            balance=float(body["balance"]),
-        )
-    except (KeyError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.delete("/account-balances/{account_id}/{week_date}")
-def delete_account_balance_route(
-    account_id: int, week_date: str, user=Depends(get_current_user)
-) -> Dict[str, str]:
-    delete_account_balance(user_id=int(user["sub"]), account_id=account_id, week_date=week_date)
-    return {"status": "ok"}

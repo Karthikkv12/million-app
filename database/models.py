@@ -25,7 +25,7 @@ import os
 from functools import lru_cache
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, Float,
+    Boolean, Column, Date, DateTime, Enum, Float,
     Index, Integer, String, Text, create_engine,
     MetaData,
 )
@@ -212,13 +212,44 @@ class WeeklySnapshot(PortfolioBase):
     user_id       = Column(Integer, nullable=False, index=True)
     week_start    = Column(DateTime, nullable=False, index=True)
     week_end      = Column(DateTime, nullable=False, index=True)
-    account_value = Column(Float, nullable=True)
+    account_value = Column(Float, nullable=True)   # auto-computed sum of acct_val_1+2+3
+    acct_label_1  = Column(String, nullable=True)
+    acct_val_1    = Column(Float, nullable=True)
+    acct_label_2  = Column(String, nullable=True)
+    acct_val_2    = Column(Float, nullable=True)
+    acct_label_3  = Column(String, nullable=True)
+    acct_val_3    = Column(Float, nullable=True)
     is_complete   = Column(Boolean, nullable=False, default=False, index=True)
     completed_at  = Column(DateTime, nullable=True)
     notes         = Column(Text, nullable=True)
     created_at    = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 Index("ux_weekly_snapshots_user_week_end", WeeklySnapshot.user_id, WeeklySnapshot.week_end, unique=True)
+
+
+class BrokerAccount(PortfolioBase):
+    __tablename__ = "broker_accounts"
+    __table_args__ = {"schema": _schema("portfolio")}
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, nullable=False, index=True)
+    name       = Column(String, nullable=False)
+    color      = Column(String, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active  = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AccountBalance(PortfolioBase):
+    __tablename__ = "account_balances"
+    __table_args__ = (
+        Index("ux_account_balances_acct_week", "account_id", "week_date", unique=True),
+        {"schema": _schema("portfolio")},
+    )
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, nullable=False, index=True)
+    account_id = Column(Integer, nullable=False, index=True)
+    week_date  = Column(Date, nullable=False, index=True)
+    balance    = Column(Float, nullable=False)
 
 class OptionPosition(PortfolioBase):
     __tablename__ = "option_positions"

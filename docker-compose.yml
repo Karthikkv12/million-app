@@ -1,0 +1,67 @@
+# docker-compose.yml — local Postgres testing before pushing to AWS
+# Usage:
+#   docker compose up --build
+#   docker compose down -v   (wipe DB volumes)
+
+services:
+
+  # ── PostgreSQL (mirrors RDS config) ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: optionflow
+      POSTGRES_PASSWORD: optionflow_dev
+      POSTGRES_DB: optionflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U optionflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Run all 5 Alembic migrations against Postgres ────────────────────────
+  migrate:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://optionflow:optionflow_dev@postgres:5432/optionflow
+    # Run all 5 schema migrations then exit
+    command: >
+      sh -c "
+        for db in users trades portfolio budget markets; do
+          ALEMBIC_DB=$$db alembic upgrade head;
+        done
+      "
+    restart: "no"
+
+  # ── FastAPI backend ───────────────────────────────────────────────────────
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://optionflow:optionflow_dev@postgres:5432/optionflow
+      JWT_SECRET: dev-secret-change-in-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      CORS_ALLOW_ORIGINS: "http://localhost:3000,http://localhost:3002"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
