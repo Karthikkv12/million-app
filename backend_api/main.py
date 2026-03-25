@@ -119,7 +119,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-from .routers import auth, trades, portfolio, budget, markets, admin  # noqa: E402
+from .routers import auth, trades, portfolio, budget, markets, admin, watchlist  # noqa: E402
 
 app.include_router(auth.router)
 app.include_router(trades.router)
@@ -127,6 +127,7 @@ app.include_router(portfolio.router)
 app.include_router(budget.router)
 app.include_router(markets.router)
 app.include_router(admin.router)
+app.include_router(watchlist.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

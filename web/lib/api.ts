@@ -447,6 +447,9 @@ export const deleteBrokerAccount = (id: number) =>
 export const fetchAccountBalances = (year: number) =>
   api.get<AccountBalance[]>(`/portfolio/account-balances?year=${year}`);
 
+export const fetchAllAccountBalances = () =>
+  api.get<AccountBalance[]>("/portfolio/account-balances/all");
+
 export const fetchAccountBalanceYears = () =>
   api.get<number[]>("/portfolio/account-balances/years");
 
@@ -455,6 +458,24 @@ export const upsertAccountBalance = (body: { account_id: number; week_date: stri
 
 export const deleteAccountBalance = (account_id: number, week_date: string) =>
   api.del<{ status: string }>(`/portfolio/account-balances/${account_id}/${week_date}`);
+
+// Cash Deposits
+export interface CashDeposit {
+  id: number;
+  week_date: string;  // "YYYY-MM-DD" Friday
+  amount: number;     // positive = deposit, negative = withdrawal
+  note: string | null;
+  created_at: string;
+}
+
+export const fetchCashDeposits = () =>
+  api.get<CashDeposit[]>("/portfolio/cash-deposits");
+
+export const upsertCashDeposit = (body: { week_date: string; amount: number; note?: string; id?: number }) =>
+  api.put<CashDeposit>("/portfolio/cash-deposits", body);
+
+export const deleteCashDeposit = (id: number) =>
+  api.del<{ status: string }>(`/portfolio/cash-deposits/${id}`);
 
 // Weeks
 export const fetchWeeks = () => api.get<WeeklySnapshot[]>("/portfolio/weeks");
@@ -790,3 +811,83 @@ export interface MarketQuote {
 export const fetchMarketQuotes = (symbols: string[]) =>
   api.get<MarketQuote[]>(`/market/quotes?symbols=${symbols.map(s => s.toUpperCase()).join(",")}`);
 
+// ── Watchlist rich quotes ─────────────────────────────────────────────────────
+
+export interface WatchlistQuote {
+  symbol:            string;
+  name:              string | null;
+  price:             number | null;
+  prev_close:        number | null;
+  change:            number | null;
+  change_pct:        number | null;
+  volume:            number | null;
+  avg_volume:        number | null;
+  rel_volume:        number | null;
+  market_cap:        number | null;
+  market_cap_fmt:    string | null;
+  pe_ratio:          number | null;
+  forward_pe:        number | null;
+  eps_ttm:           number | null;
+  eps_growth:        number | null;
+  div_yield:         number | null;
+  sector:            string | null;
+  industry:          string | null;
+  analyst_rating:    string | null;
+  beta:              number | null;
+  week_52_high:      number | null;
+  week_52_low:       number | null;
+  day_high:          number | null;
+  day_low:           number | null;
+  fifty_day_avg:     number | null;
+  two_hundred_day_avg: number | null;
+  error:             string | null;
+}
+
+/** Fetch rich watchlist quotes (price, P/E, EPS, market cap, sector, analyst rating, etc.) */
+export const fetchWatchlistQuotes = (symbols: string[]) =>
+  api.get<WatchlistQuote[]>(`/market/watchlist-quotes?symbols=${symbols.map(s => s.toUpperCase()).join(",")}`);
+
+
+// ── Watchlist ─────────────────────────────────────────────────────────────────
+
+export interface WatchlistSymbol {
+  id:           number;
+  symbol:       string;
+  company_name: string | null;
+  /** "manual" | "position" | "holding" */
+  source:       string;
+  notes:        string | null;
+  is_active:    boolean;
+  added_at:     string;
+  updated_at:   string;
+}
+
+/** Fetch all active watchlist symbols for the current user. */
+export const fetchWatchlist = () =>
+  api.get<WatchlistSymbol[]>("/watchlist");
+
+/**
+ * Add or reactivate a symbol in the watchlist (manual source).
+ * company_name and notes are optional.
+ */
+export const upsertWatchlistSymbol = (
+  symbol: string,
+  opts: { company_name?: string; notes?: string } = {},
+) =>
+  api.put<WatchlistSymbol>(`/watchlist/${symbol.toUpperCase()}`, {
+    symbol: symbol.toUpperCase(),
+    ...opts,
+  });
+
+/** Soft-delete a symbol from the watchlist. */
+export const deleteWatchlistSymbol = (symbol: string) =>
+  api.del<void>(`/watchlist/${symbol.toUpperCase()}`);
+
+/**
+ * Trigger a full sync: scans all existing positions + holdings
+ * and registers any symbols not yet in the watchlist.
+ */
+export const syncWatchlist = () =>
+  api.post<{ positions_synced: number; holdings_synced: number; total_added: number }>(
+    "/watchlist/sync",
+  );

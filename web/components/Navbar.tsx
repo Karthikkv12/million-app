@@ -17,7 +17,7 @@ const NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { href: "/options-flow", label: "Options Flow", icon: Zap             },
   { href: "/markets",      label: "Markets",      icon: Globe           },
-  { href: "/trades",       label: "Trades",       icon: BarChart2       },
+  { href: "/trades",       label: "Portfolio",    icon: BarChart2       },
   // shelved – uncomment to restore:
   // { href: "/orders",       label: "Orders",       icon: ClipboardList   },
   // { href: "/accounts",     label: "Accounts",     icon: Wallet          },

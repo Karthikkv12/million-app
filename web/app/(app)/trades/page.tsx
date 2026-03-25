@@ -5,13 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchWeeks, getOrCreateWeek, WeeklySnapshot } from "@/lib/api";
 import { BarChart2 } from "lucide-react";
 import { PageHeader, EmptyState, Tabs, RefreshButton } from "@/components/ui";
-import { PortfolioSummaryBar, WeekSelector } from "@/components/trades/PortfolioSummaryBar";
+
 import { PositionsTab } from "@/components/trades/PositionsTab";
 import { SymbolsTab } from "@/components/trades/SymbolsTab";
 import { YearTab } from "@/components/trades/YearTab";
 import { PremiumTab } from "@/components/trades/PremiumTab";
 import { AccountTab } from "@/components/trades/AccountTab";
 import { HoldingsTab } from "@/components/trades/HoldingsTab";
+import { WatchlistTab } from "@/components/trades/WatchlistTab";
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
@@ -23,7 +24,7 @@ export default function PortfolioPage() {
   } = useQuery({ queryKey: ["weeks"], queryFn: fetchWeeks, staleTime: 30_000 });
 
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"account" | "holdings" | "positions" | "symbols" | "premium" | "year">("account");
+  const [tab, setTab] = useState<"account" | "holdings" | "positions" | "symbols" | "premium" | "year" | "watchlist">("account");
   const [autoSelected, setAutoSelected] = useState(false);
 
   if (!autoSelected && weeks.length > 0) {
@@ -78,26 +79,13 @@ export default function PortfolioPage() {
         }
       />
 
-      <PortfolioSummaryBar />
 
-      <div className="mb-5">
-        {weeksLoading ? (
-          <div className="h-10 w-64 rounded-xl bg-[var(--surface-2)] animate-pulse" />
-        ) : (
-          <WeekSelector
-            weeks={weeks}
-            selectedId={selectedWeek?.id ?? null}
-            onSelect={setSelectedWeekId}
-            onNewWeek={() => newWeekMut.mutate()}
-          />
-        )}
-      </div>
 
       {!weeksLoading && (
         <div className="mb-5">
           <Tabs
             active={tab}
-            onChange={(k) => setTab(k as "account" | "holdings" | "positions" | "symbols" | "premium" | "year")}
+            onChange={(k) => setTab(k as "account" | "holdings" | "positions" | "symbols" | "premium" | "year" | "watchlist")}
             tabs={[
               { key: "account",   label: "Account"     },
               { key: "holdings",  label: "Holdings"    },
@@ -105,6 +93,7 @@ export default function PortfolioPage() {
               { key: "symbols",   label: "Activity"    },
               { key: "premium",   label: "Premium"     },
               { key: "year",      label: "Performance" },
+              { key: "watchlist", label: "Watchlist"   },
             ]}
           />
         </div>
@@ -124,10 +113,11 @@ export default function PortfolioPage() {
           )
       )}
 
-      {tab === "symbols"  && <SymbolsTab />}
-      {tab === "year"     && <YearTab />}
-      {tab === "premium"  && <PremiumTab />}
-      {tab === "account"  && <AccountTab />}
+      {tab === "symbols"    && <SymbolsTab />}
+      {tab === "year"       && <YearTab />}
+      {tab === "premium"    && <PremiumTab />}
+      {tab === "watchlist"  && <WatchlistTab />}
+      {tab === "account"  && <AccountTab weeks={weeks} weeksLoading={weeksLoading} selectedWeekId={selectedWeek?.id ?? null} onSelectWeek={setSelectedWeekId} onNewWeek={() => newWeekMut.mutate()} />}
     </div>
   );
 }

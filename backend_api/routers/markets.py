@@ -158,6 +158,137 @@ def net_flow_history(
     ]
 
 
+@router.get("/market/watchlist-quotes", response_model=List[Dict[str, Any]])
+async def watchlist_quotes(symbols: str, _user=Depends(get_current_user)) -> List[Dict[str, Any]]:
+    """
+    Rich per-symbol data for the watchlist table.
+    Returns price, change %, volume, rel-volume, market cap, P/E, EPS TTM,
+    EPS growth, dividend yield %, sector, analyst recommendation, beta,
+    52-week high/low, and more — all from yfinance .info (TTL-cached 5 min).
+    """
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not syms or len(syms) > 150:
+        raise HTTPException(status_code=400, detail="Provide 1–150 comma-separated symbols")
+
+    def _sf(v: Any) -> Optional[float]:
+        try:
+            return float(v) if v is not None else None
+        except Exception:
+            return None
+
+    def _fmt_mktcap(v: Optional[float]) -> Optional[str]:
+        if v is None:
+            return None
+        if v >= 1e12:
+            return f"{v/1e12:.2f}T"
+        if v >= 1e9:
+            return f"{v/1e9:.2f}B"
+        if v >= 1e6:
+            return f"{v/1e6:.2f}M"
+        return str(int(v))
+
+    def _fetch_one(sym: str) -> Dict[str, Any]:
+        cache_key = f"wl:{sym}"
+        cached = _STOCK_INFO_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            ticker = yf.Ticker(sym)
+            info: Dict[str, Any] = {}
+            try:
+                info = ticker.info or {}
+            except Exception:
+                pass
+            fast = None
+            try:
+                fast = ticker.fast_info
+            except Exception:
+                pass
+
+            def _fi(attr: str) -> Optional[float]:
+                try:
+                    v = getattr(fast, attr, None)
+                    return float(v) if v is not None else None
+                except Exception:
+                    return None
+
+            price      = _sf(info.get("regularMarketPrice")) or _fi("last_price")
+            prev       = _sf(info.get("regularMarketPreviousClose")) or _sf(info.get("previousClose")) or _fi("previous_close")
+            change     = round(price - prev, 4) if price is not None and prev is not None else None
+            change_pct = round((change / prev) * 100, 4) if change is not None and prev else None
+
+            volume     = _sf(info.get("regularMarketVolume")) or _fi("three_month_average_volume")
+            avg_vol    = _sf(info.get("averageVolume")) or _sf(info.get("averageDailyVolume10Day"))
+            rel_vol    = round(volume / avg_vol, 2) if volume and avg_vol else None
+
+            mktcap_raw = _sf(info.get("marketCap")) or _fi("market_cap")
+
+            # EPS growth: yfinance exposes earningsGrowth (TTM yoy)
+            eps_growth = _sf(info.get("earningsGrowth"))
+
+            # Analyst recommendation
+            rec = info.get("recommendationKey") or info.get("recommendation")
+            rec_label_map = {
+                "strong_buy": "Strong Buy",
+                "buy":        "Buy",
+                "hold":       "Hold",
+                "underperform": "Underperform",
+                "sell":       "Sell",
+            }
+            rec_label = rec_label_map.get((rec or "").lower(), rec or None)
+
+            result = {
+                "symbol":        sym,
+                "name":          info.get("longName") or info.get("shortName") or sym,
+                "price":         price,
+                "prev_close":    prev,
+                "change":        change,
+                "change_pct":    change_pct,
+                "volume":        int(volume) if volume else None,
+                "avg_volume":    int(avg_vol) if avg_vol else None,
+                "rel_volume":    rel_vol,
+                "market_cap":    mktcap_raw,
+                "market_cap_fmt": _fmt_mktcap(mktcap_raw),
+                "pe_ratio":      _sf(info.get("trailingPE")),
+                "forward_pe":    _sf(info.get("forwardPE")),
+                "eps_ttm":       _sf(info.get("trailingEps")),
+                "eps_growth":    eps_growth,
+                "div_yield":     _sf(info.get("dividendYield")),
+                "sector":        info.get("sector"),
+                "industry":      info.get("industry"),
+                "analyst_rating": rec_label,
+                "beta":          _sf(info.get("beta")),
+                "week_52_high":  _sf(info.get("fiftyTwoWeekHigh")) or _fi("year_high"),
+                "week_52_low":   _sf(info.get("fiftyTwoWeekLow")) or _fi("year_low"),
+                "day_high":      _sf(info.get("dayHigh")) or _fi("day_high"),
+                "day_low":       _sf(info.get("dayLow")) or _fi("day_low"),
+                "fifty_day_avg": _sf(info.get("fiftyDayAverage")) or _fi("fifty_day_average"),
+                "two_hundred_day_avg": _sf(info.get("twoHundredDayAverage")) or _fi("two_hundred_day_average"),
+                "error":         None,
+            }
+            _STOCK_INFO_CACHE[cache_key] = result
+            return result
+        except Exception as exc:
+            return {
+                "symbol": sym, "name": sym, "price": None, "prev_close": None,
+                "change": None, "change_pct": None, "volume": None, "avg_volume": None,
+                "rel_volume": None, "market_cap": None, "market_cap_fmt": None,
+                "pe_ratio": None, "forward_pe": None, "eps_ttm": None, "eps_growth": None,
+                "div_yield": None, "sector": None, "industry": None,
+                "analyst_rating": None, "beta": None,
+                "week_52_high": None, "week_52_low": None,
+                "day_high": None, "day_low": None,
+                "fifty_day_avg": None, "two_hundred_day_avg": None,
+                "error": str(exc),
+            }
+
+    loop = asyncio.get_event_loop()
+    tasks = [loop.run_in_executor(None, _fetch_one, sym) for sym in syms]
+    results = await asyncio.gather(*tasks)
+    return list(results)
+
+
 @router.get("/market/quotes")  # intentionally unauthenticated — used by Next.js server-side renders
 async def market_quotes(symbols: str) -> List[Dict[str, Any]]:
     syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]

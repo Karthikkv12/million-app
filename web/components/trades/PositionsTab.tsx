@@ -163,18 +163,21 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         const weekNetRealized = weekGrossCollected - weekCostToClose;
         const hasClosed = closedPositions.length > 0;
 
-        // ITM Assignment Risk card — live, updates with liveSpotMap every 30s
-        const itmPositions = positions.filter((p) => {
-          if (p.status !== "ACTIVE") return false;
+        // ITM Assignment Risk — split by Calls and Puts, live data
+        const itmCalls = positions.filter((p) => {
+          if (p.status !== "ACTIVE" || p.option_type !== "CALL") return false;
           const spot = liveSpotMap.get(p.symbol);
-          if (spot == null || spot <= 0) return false;
-          if (p.option_type === "CALL") return spot > p.strike;
-          if (p.option_type === "PUT")  return spot < p.strike;
-          return false;
+          return spot != null && spot > p.strike;
         });
-        const itmAssignmentValue = itmPositions.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
-        const itmPremCollected   = itmPositions.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
-        const itmNetProceeds     = itmAssignmentValue + itmPremCollected;
+        const itmPuts = positions.filter((p) => {
+          if (p.status !== "ACTIVE" || p.option_type !== "PUT") return false;
+          const spot = liveSpotMap.get(p.symbol);
+          return spot != null && spot < p.strike;
+        });
+        const itmCallValue    = itmCalls.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
+        const itmCallPrem     = itmCalls.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
+        const itmPutValue     = itmPuts.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
+        const itmPutPrem      = itmPuts.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
         // Gross collected across ALL this week's positions (open + closed)
         const weekAllGross = thisWeekPositions.reduce(
           (acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0
@@ -182,7 +185,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         // totalPremium already nets out premium_out on closed positions (backend-computed total_premium)
         // so: net current = totalPremium = weekAllGross − buy-backs paid so far
 
-        const hasLiveData        = liveSpotMap.size > 0;
+        const hasLiveData = liveSpotMap.size > 0;
 
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
@@ -264,17 +267,17 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">locked: ${realizedPrem.toFixed(2)}</p>
             </div>
-            {/* ITM Assignment Risk — live card, only shown when live quotes loaded */}
-            <div className={`border rounded-xl p-3 col-span-2 sm:col-span-2 xl:col-span-2 ${
-              itmPositions.length > 0
-                ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"
+            {/* ITM Calls at Risk */}
+            <div className={`border rounded-xl p-3 col-span-1 ${
+              itmCalls.length > 0
+                ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-800"
                 : "bg-[var(--surface)] border-[var(--border)]"
             }`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmPositions.length > 0 ? "text-red-500" : "text-foreground/60"
+                  itmCalls.length > 0 ? "text-orange-500" : "text-foreground/60"
                 }`}>
-                  ITM / Assignment Risk
+                  Calls at Risk
                 </p>
                 {hasLiveData && (
                   <span className="text-[8px] px-1 py-0.5 rounded-full bg-green-500/15 text-green-500 font-bold tracking-wide">● LIVE</span>
@@ -282,23 +285,67 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               </div>
               {!hasLiveData ? (
                 <p className="text-base font-black text-foreground/30">Loading…</p>
-              ) : itmPositions.length === 0 ? (
+              ) : itmCalls.length === 0 ? (
                 <>
-                  <p className="text-base font-black text-green-500">All Clear</p>
-                  <p className="text-[10px] text-foreground/40 mt-0.5">no active positions ITM</p>
+                  <p className="text-base font-black text-green-500">Clear</p>
+                  <p className="text-[10px] text-foreground/40 mt-0.5">no calls ITM</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-black text-orange-500">
+                    ${(itmCallValue + itmCallPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[10px] text-orange-400/80 mt-0.5">
+                    {itmCalls.length} ITM · ${itmCallValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} strike
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {itmCalls.map((p) => {
+                      const spot  = liveSpotMap.get(p.symbol);
+                      const depth = spot != null ? Math.abs(spot - p.strike) : null;
+                      return (
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500">
+                          {p.symbol} ${p.strike}{depth != null ? ` (+${depth.toFixed(1)})` : ""}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            {/* ITM Puts at Risk */}
+            <div className={`border rounded-xl p-3 col-span-1 ${
+              itmPuts.length > 0
+                ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"
+                : "bg-[var(--surface)] border-[var(--border)]"
+            }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className={`text-[10px] font-semibold uppercase tracking-wide ${
+                  itmPuts.length > 0 ? "text-red-500" : "text-foreground/60"
+                }`}>
+                  Puts at Risk
+                </p>
+                {hasLiveData && (
+                  <span className="text-[8px] px-1 py-0.5 rounded-full bg-green-500/15 text-green-500 font-bold tracking-wide">● LIVE</span>
+                )}
+              </div>
+              {!hasLiveData ? (
+                <p className="text-base font-black text-foreground/30">Loading…</p>
+              ) : itmPuts.length === 0 ? (
+                <>
+                  <p className="text-base font-black text-green-500">Clear</p>
+                  <p className="text-[10px] text-foreground/40 mt-0.5">no puts ITM</p>
                 </>
               ) : (
                 <>
                   <p className="text-base font-black text-red-500">
-                    ${itmNetProceeds.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    ${(itmPutValue + itmPutPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-[10px] text-red-400/80 mt-0.5">
-                    {itmPositions.length} ITM · ${itmAssignmentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
-                    {" + "}${itmPremCollected.toLocaleString(undefined, { maximumFractionDigits: 0 })} prem
+                    {itmPuts.length} ITM · ${itmPutValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {itmPositions.map((p) => {
-                      const spot = liveSpotMap.get(p.symbol);
+                    {itmPuts.map((p) => {
+                      const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
                         <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500">

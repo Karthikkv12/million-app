@@ -12,9 +12,12 @@ import {
   updateBrokerAccount,
   getOrCreateWeek,
   BrokerAccount,
+  WeeklySnapshot,
 } from "@/lib/api";
+import { WeekSelector } from "@/components/trades/PortfolioSummaryBar";
+import { fmt$ } from "./TradesHelpers";
 import { EmptyState, SkeletonCard } from "@/components/ui";
-import { TrendingUp, Activity, Plus, X, ChevronDown } from "lucide-react";
+import { TrendingUp, Activity, Plus, X, ChevronDown, DollarSign, AlertCircle } from "lucide-react";
 
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -51,7 +54,19 @@ const WOW_RANGE_KEY        = "optionflow_acct_wow_range";
 type ChartRange = "1M" | "3M" | "1Y" | "5Y" | "MAX";
 const RANGE_LABELS: ChartRange[] = ["1M", "3M", "1Y", "5Y", "MAX"];
 
-export function AccountTab() {
+export function AccountTab({
+  weeks = [],
+  weeksLoading = false,
+  selectedWeekId = null,
+  onSelectWeek,
+  onNewWeek,
+}: {
+  weeks?: WeeklySnapshot[];
+  weeksLoading?: boolean;
+  selectedWeekId?: number | null;
+  onSelectWeek?: (id: number) => void;
+  onNewWeek?: () => void;
+}) {
   const qc = useQueryClient();
   const { data: s, isLoading: summaryLoading } = useQuery({
     queryKey: ["portfolioSummary"],
@@ -318,34 +333,84 @@ export function AccountTab() {
   return (
     <div className="space-y-6">
 
-      {/* ── KPI strip ── */}
+      {/* ── Week selector ── */}
+      <div>
+        {weeksLoading ? (
+          <div className="h-10 w-64 rounded-xl bg-[var(--surface-2)] animate-pulse" />
+        ) : (
+          <WeekSelector
+            weeks={weeks}
+            selectedId={selectedWeekId}
+            onSelect={onSelectWeek ?? (() => {})}
+            onNewWeek={onNewWeek ?? (() => {})}
+          />
+        )}
+      </div>
+
+      {/* ── Unified 8-card grid (4 summary + 4 KPI) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* PSB card 1 — Total Premium */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <DollarSign size={11} className="text-green-500" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Total Premium</p>
+          </div>
+          <p className="text-lg font-black text-green-500">${s.total_premium_collected.toFixed(2)}</p>
+        </div>
+        {/* PSB card 2 — Realized P/L */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingUp size={11} className="text-blue-500" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Realized P/L</p>
+          </div>
+          <p className={`text-lg font-black ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt$(s.realized_pnl)}</p>
+        </div>
+        {/* PSB card 3 — Active Positions */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Activity size={11} className="text-blue-400" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Active Positions</p>
+          </div>
+          <p className="text-lg font-black text-blue-500">{s.active_positions}</p>
+        </div>
+        {/* PSB card 4 — Est. Tax */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <AlertCircle size={11} className="text-orange-400" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Est. Tax ({(s.cap_gains_tax_rate * 100).toFixed(0)}%)</p>
+          </div>
+          <p className="text-lg font-black text-orange-400">${s.estimated_tax.toFixed(2)}</p>
+        </div>
+        {/* KPI card 1 — Latest Value */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Latest Value</p>
-          <p className="text-xl font-black text-green-500">
+          <p className="text-lg font-black text-green-500">
             {latest ? `$${latest.account_value!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">{latest?.week_end ?? ""}</p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 2 — Last Week Δ */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Last Week Δ</p>
-          <p className={`text-xl font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-500"}`}>
             {latest?.chg != null ? `${latest.chg >= 0 ? "+" : ""}$${latest.chg.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">vs prior Friday</p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 3 — Total Growth */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Total Growth</p>
-          <p className={`text-xl font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-blue-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-blue-500" : "text-red-500"}`}>
             {totalGrowth != null ? `${totalGrowth >= 0 ? "+" : ""}$${totalGrowth.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">
             {totalGrowthPct != null ? `${totalGrowthPct >= 0 ? "+" : ""}${totalGrowthPct.toFixed(1)}%` : "since first entry"}
           </p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 4 — Weeks Logged */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weeks Logged</p>
-          <p className="text-xl font-black text-purple-400">{withValue.length}</p>
+          <p className="text-lg font-black text-purple-400">{withValue.length}</p>
           <p className="text-[10px] text-foreground/50 mt-0.5">of {rows.length} total weeks</p>
         </div>
       </div>

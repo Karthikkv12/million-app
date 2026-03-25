@@ -324,7 +324,16 @@ def create_holding(*, user_id: int, data: dict) -> dict:
             session.add(event)
             session.commit()
             session.refresh(prior)
-            return _holding_to_dict(prior, session)
+            result = _holding_to_dict(prior, session)
+
+        # Auto-register in watchlist
+        try:
+            from logic.watchlist import upsert_symbol as _wl_upsert
+            _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
+        except Exception:
+            pass
+
+        return result
 
         # ── No prior CLOSED lot — create fresh ───────────────────────────────
         h = StockHolding(
@@ -343,7 +352,16 @@ def create_holding(*, user_id: int, data: dict) -> dict:
         session.add(h)
         session.commit()
         session.refresh(h)
-        return _holding_to_dict(h, session)
+        fresh_result = _holding_to_dict(h, session)
+
+        # Auto-register in watchlist
+        try:
+            from logic.watchlist import upsert_symbol as _wl_upsert
+            _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
+        except Exception:
+            pass
+
+        return fresh_result
     finally:
         session.close()
 

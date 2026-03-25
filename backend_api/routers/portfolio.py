@@ -42,6 +42,10 @@ from logic.portfolio import (
     delete_account_balance,
     list_account_balances,
     list_account_balance_years,
+    list_all_account_balances,
+    list_cash_deposits,
+    upsert_cash_deposit,
+    delete_cash_deposit,
 )
 from logic.premium_ledger import get_premium_dashboard, get_premium_summary, sync_ledger_from_positions
 from logic import services as _services
@@ -365,6 +369,12 @@ def list_account_balance_years_route(user=Depends(get_current_user)) -> List[int
     return list_account_balance_years(user_id=int(user["sub"]))
 
 
+@router.get("/account-balances/all", response_model=List[Dict[str, Any]])
+def list_all_account_balances_route(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
+    """Return every account balance row across all years (for chart use)."""
+    return list_all_account_balances(user_id=int(user["sub"]))
+
+
 @router.get("/account-balances", response_model=List[Dict[str, Any]])
 def list_account_balances_route(
     year: int = Query(...), user=Depends(get_current_user)
@@ -391,3 +401,39 @@ def delete_account_balance_route(
 ) -> Dict[str, str]:
     delete_account_balance(user_id=int(user["sub"]), account_id=account_id, week_date=week_date)
     return {"status": "ok"}
+
+
+# ── Cash Deposits ─────────────────────────────────────────────────────────────
+
+@router.get("/cash-deposits", response_model=List[Dict[str, Any]])
+def list_cash_deposits_route(user=Depends(get_current_user)) -> List[Dict[str, Any]]:
+    """Return all cash deposit/withdrawal events, oldest first."""
+    return list_cash_deposits(user_id=int(user["sub"]))
+
+
+@router.put("/cash-deposits", response_model=Dict[str, Any])
+def upsert_cash_deposit_route(
+    body: Dict[str, Any], user=Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Create or update a cash deposit. Pass id in body to update an existing row."""
+    try:
+        return upsert_cash_deposit(
+            user_id=int(user["sub"]),
+            week_date=body["week_date"],
+            amount=float(body["amount"]),
+            note=body.get("note"),
+            deposit_id=int(body["id"]) if body.get("id") else None,
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/cash-deposits/{deposit_id}")
+def delete_cash_deposit_route(
+    deposit_id: int, user=Depends(get_current_user)
+) -> Dict[str, str]:
+    try:
+        delete_cash_deposit(user_id=int(user["sub"]), deposit_id=deposit_id)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

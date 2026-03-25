@@ -611,9 +611,18 @@ def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
         session.add(pos)
         session.commit()
         session.refresh(pos)
-        return _pos_to_dict(pos)
+        result = _pos_to_dict(pos)
     finally:
         session.close()
+
+    # Auto-register in watchlist (fire-and-forget — never block position creation)
+    try:
+        from logic.watchlist import upsert_symbol as _wl_upsert
+        _wl_upsert(user_id=user_id, symbol=result["symbol"], source="position")
+    except Exception:
+        pass
+
+    return result
 
 
 def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
@@ -1262,3 +1271,134 @@ def list_account_balances(*, user_id: int, year: int) -> list[dict]:
         ]
     finally:
         session.close()
+
+
+def list_all_account_balances(*, user_id: int) -> list[dict]:
+    """Return all balances across all years for chart use."""
+    session = _portfolio_session()
+    try:
+        rows = (
+            session.query(AccountBalance)
+            .filter(AccountBalance.user_id == user_id)
+            .order_by(AccountBalance.week_date)
+            .all()
+        )
+        return [
+            {
+                "account_id": r.account_id,
+                "week_date":  str(r.week_date),
+                "balance":    r.balance,
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+# ── Cash Deposits ─────────────────────────────────────────────────────────────
+
+def list_cash_deposits(*, user_id: int) -> list[dict]:
+    """Return all cash deposit/withdrawal events for the user, oldest first."""
+    from database.models import CashDeposit
+    session = _portfolio_session()
+    try:
+        rows = (
+            session.query(CashDeposit)
+            .filter(CashDeposit.user_id == user_id)
+            .order_by(CashDeposit.week_date)
+            .all()
+        )
+        return [
+            {
+                "id":         r.id,
+                "week_date":  str(r.week_date),
+                "amount":     r.amount,
+                "note":       r.note,
+                "created_at": str(r.created_at),
+            }
+            for r in rows
+        ]
+    finally:
+        session.close()
+
+
+def upsert_cash_deposit(
+    *,
+    user_id: int,
+    week_date,
+    amount: float,
+    note: str | None = None,
+    deposit_id: int | None = None,
+) -> dict:
+    """
+    Insert or update a cash deposit row.
+    If deposit_id is provided, update that specific row.
+    Otherwise create a new row (multiple deposits on the same Friday are allowed).
+    """
+    from datetime import date as _date
+    from database.models import CashDeposit
+    import pandas as _pd
+
+    # Normalise week_date to a Python date
+    if isinstance(week_date, str):
+        week_date = _pd.to_datetime(week_date).date()
+
+    session = _portfolio_session()
+    try:
+        if deposit_id is not None:
+            row = (
+                session.query(CashDeposit)
+                .filter(CashDeposit.id == deposit_id, CashDeposit.user_id == user_id)
+                .first()
+            )
+            if row is None:
+                raise ValueError(f"Cash deposit {deposit_id} not found")
+            row.week_date = week_date
+            row.amount = float(amount)
+            if note is not None:
+                row.note = str(note)[:255] if note else None
+        else:
+            row = CashDeposit(
+                user_id=user_id,
+                week_date=week_date,
+                amount=float(amount),
+                note=str(note)[:255] if note else None,
+                created_at=__import__("datetime").datetime.utcnow(),
+            )
+            session.add(row)
+
+        session.commit()
+        session.refresh(row)
+        return {
+            "id":         row.id,
+            "week_date":  str(row.week_date),
+            "amount":     row.amount,
+            "note":       row.note,
+            "created_at": str(row.created_at),
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def delete_cash_deposit(*, user_id: int, deposit_id: int) -> None:
+    from database.models import CashDeposit
+    session = _portfolio_session()
+    try:
+        row = (
+            session.query(CashDeposit)
+            .filter(CashDeposit.id == deposit_id, CashDeposit.user_id == user_id)
+            .first()
+        )
+        if row is None:
+            raise ValueError(f"Cash deposit {deposit_id} not found")
+        session.delete(row)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
