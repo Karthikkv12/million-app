@@ -159,26 +159,33 @@ in logs or chat; ask before changing anything in GitHub, Cloudflare or Railway s
 
 ## 6. Order of work
 
-Each step is its own branch off `develop` and its own PR into `develop`. Before each
+Step 0 (the owner) comes first. Each step is its own branch off `develop` and its own PR into `develop`. Before each
 push: `pytest`, `npm run build`, and screenshots at 1280px and 390px in light and
 dark. Never push to `main`. Keep optflw.com running; develop on port 3002.
 
 1. **Land the heatmap work.** Tag `pre-new-build`, merge `feat/flow-heatmaps` into
    `develop` (it's based on old `main`, so expect conflicts on files `develop`
    changed), delete the Drop list, and fix the second accent color.
+   Protect `main`/`develop` with required CI and turn on CodeQL.
 2. **Core.** `core/settings.py`, `core/db.py`, `core/deps.py`. Replace every
    `logic.services` import with a direct one, delete the facade, and make the tests
-   use a settings or DB fixture instead of monkeypatching.
+   use a settings or DB fixture instead of monkeypatching. Secrets only from
+   Settings, CORS limited to optflw.com, security headers on.
 3. **Providers and flow.** The market-data interface with Yahoo and Tradier. Move the
    gamma math, caches and poller into `modules/flow` + `workers/`, ORM only.
 4. **Modules under `/api/v1`.** auth → market → watchlist → portfolio → budget, with
-   typed responses and `ENABLED_MODULES`. Old paths stay as aliases.
+   typed responses and `ENABLED_MODULES`. Old paths stay as aliases. Every route
+   requires auth or a rate limit, there's an isolation test per module, and
+   `/restore-db` is removed.
 5. **One database.** A script that copies the five files into one, with real foreign
    keys and a fresh baseline migration. Back up first with `scripts/backup_dbs.py`.
+   Host it encrypted with scheduled, tested backups.
 6. **Website on the new API.** Generate the TS client, move the AI chat to the
    backend, add the flow SSE stream, and finish the shell, type floor and wide layout.
+   httpOnly cookie auth, two-factor login, Sentry and new-device alerts.
 7. **Bring back Portfolio and Budget** in the new style (`/portfolio/[tab]`,
-   `/money/[tab]`).
-8. **Phone app** on the same `/api/v1` and generated client.
+   `/money/[tab]`). Short pen test before outside users.
+8. **Phone app** on the same `/api/v1` and generated client. Keychain or Keystore
+   tokens, no third-party keys, App Attest or Play Integrity.
 
 Stop after each step and report what changed before starting the next.
