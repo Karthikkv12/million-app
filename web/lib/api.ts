@@ -180,7 +180,7 @@ export interface GexResult {
   total_volume: number;
   flow_by_expiry: FlowByExpiry[];
   top_flow_strikes: TopFlowStrike[];
-  data_source: "tradier" | "yfinance";
+  data_source: "yfinance";
   error: string | null;
 }
 
@@ -657,24 +657,6 @@ export interface PremiumDashboard {
 
 export const fetchPremiumDashboard = () =>
   api.get<PremiumDashboard>("/portfolio/premium-dashboard");
-
-// ── Orders ───────────────────────────────────────────────────────────────────
-
-export interface Order {
-  id: number;
-  symbol: string;
-  instrument: string;
-  action: string;
-  strategy?: string;
-  quantity: number;
-  limit_price?: number;
-  status: string;
-  created_at: string;
-  filled_at?: string;
-  filled_price?: number;
-}
-
-export const fetchOrders = () => api.get<Order[]>("/orders");
 
 // ── Accounts ─────────────────────────────────────────────────────────────────
 

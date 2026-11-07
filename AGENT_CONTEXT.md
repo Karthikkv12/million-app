@@ -57,7 +57,7 @@ To restart: `launchctl unload ~/Library/LaunchAgents/com.optflw.X.plist && launc
 | Field | Value |
 |-------|-------|
 | Username | `karthik.kv12` |
-| Password | `Karthik@123456` |
+| Password | *(not stored here: ask the owner)* |
 | Role | `admin` |
 
 ---
@@ -281,7 +281,7 @@ curl -s http://localhost:8000/health
 # Login and test an endpoint
 TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"karthik.kv12","password":"Karthik@123456"}' \
+  -d "{\"username\":\"karthik.kv12\",\"password\":\"$OPTIONFLOW_PASSWORD\"}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 curl -s http://localhost:8000/budget -H "Authorization: Bearer $TOKEN"
 

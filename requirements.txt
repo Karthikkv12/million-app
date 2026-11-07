@@ -1,15 +1,12 @@
 pandas
 sqlalchemy
 yfinance
-pytest
 passlib[bcrypt]
 alembic
 psycopg[binary]
 fastapi
 uvicorn[standard]
 PyJWT
-google-genai
-httpx
 python-multipart
 python-dotenv
 cachetools

@@ -7,7 +7,7 @@
  *     value={input}
  *     onChange={setInput}
  *     onSelect={(symbol) => doSearch(symbol)}
- *     accentColor="#6b82f8"          // optional — colours the button
+ *     accentColor="…"                // ignored: the button always uses ink
  *     placeholder="Ticker…"          // optional
  *     actionLabel="LOAD"             // optional button label
  *   />
@@ -43,7 +43,6 @@ export default function TickerSearchInput({
   value,
   onChange,
   onSelect,
-  accentColor  = "#6b82f8",
   placeholder  = "Ticker or company…",
   actionLabel  = "LOAD",
   className    = "",
@@ -56,8 +55,9 @@ export default function TickerSearchInput({
   const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef   = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
-  // Set to true the moment user picks something; cleared when they type a new char
-  const closedRef      = useRef(false);
+  // Set to true the moment user picks something; cleared when they type a new char.
+  // Starts true so a pre-filled value (e.g. a saved ticker) doesn't pop the dropdown on load.
+  const closedRef      = useRef(true);
 
   const closeDropdown = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -186,8 +186,7 @@ export default function TickerSearchInput({
     <div ref={containerRef} className={`relative ${className}`}>
       <form
         onSubmit={handleSubmit}
-        className="flex items-stretch rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]"
-        style={{ outline: `1.5px solid ${accentColor}33` }}
+        className="flex items-stretch rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)] focus-within:border-[var(--border-strong)]"
       >
         <span className="flex items-center pl-3 pr-1.5 text-foreground/70 shrink-0">
           {loading
@@ -207,8 +206,7 @@ export default function TickerSearchInput({
         />
         <button
           type="submit"
-          className="flex items-center justify-center px-4 text-[11px] font-bold tracking-wider shrink-0 transition-opacity hover:opacity-90"
-          style={{ background: accentColor, color: "#fff" }}
+          className="flex items-center justify-center px-4 text-[11px] font-bold tracking-wider shrink-0 bg-foreground text-background transition-opacity hover:opacity-90"
         >
           {actionLabel}
         </button>

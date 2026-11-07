@@ -12,9 +12,7 @@ import EconomicCalendar from "@/components/dashboard/EconomicCalendar";
 
 const QUICK = [
   { href: "/options-flow", label: "GEX Flow",    sub: "Gamma exposure data",  color: "from-purple-500 to-purple-700" },
-  { href: "/trades",       label: "Trades",      sub: "View all positions",   color: "from-blue-500 to-blue-700" },
-  { href: "/accounts",     label: "Accounts",    sub: "Manage portfolios",    color: "from-emerald-500 to-emerald-700" },
-  { href: "/budget",       label: "Budget",      sub: "Track expenses",       color: "from-orange-500 to-orange-600" },
+  { href: "/markets",      label: "Markets",     sub: "Sectors & breadth",    color: "from-blue-500 to-blue-700" },
 ];
 
 export default function DashboardPage() {
@@ -73,7 +71,7 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <SectionLabel>Quick Actions</SectionLabel>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {QUICK.map(({ href, label, sub, color }) => (
           <Link key={href} href={href}
             className="relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white group hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-sm">

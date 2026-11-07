@@ -149,7 +149,6 @@ def mock_yfinance(monkeypatch):
         return spot, pd.DataFrame(all_rows)
 
     monkeypatch.setattr(gmod, "_fetch_chain_yfinance", _fake_fetch)
-    monkeypatch.setattr(gmod, "_tradier_token", lambda: None)
     # Clear any cached results between tests
     gmod._gex_cache.clear() if hasattr(gmod, "_gex_cache") else None
 

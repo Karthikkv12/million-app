@@ -52,7 +52,7 @@ export function EmptyState({ icon: Icon, title, body, action }: EmptyProps) {
       <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center mb-4 shadow-inner">
         <Icon size={28} className="text-foreground/50" strokeWidth={1.4} />
       </div>
-      <p className="text-base font-bold text-foreground mb-1">{title}</p>
+      <p className="text-base font-semibold text-foreground mb-1">{title}</p>
       {body && <p className="text-sm text-foreground/70 max-w-xs leading-relaxed">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -62,7 +62,8 @@ export function EmptyState({ icon: Icon, title, body, action }: EmptyProps) {
 // ── Section label ─────────────────────────────────────────────────────────────
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-[10px] font-bold text-foreground uppercase tracking-[0.12em] mb-3">
+    <h2 className="eyebrow mb-3 flex items-center gap-2">
+      <span className="h-px w-4 bg-foreground/30" />
       {children}
     </h2>
   );
@@ -81,8 +82,8 @@ interface StatCardProps {
 }
 export function StatCard({
   label, value, sub, icon: Icon,
-  iconColor = "text-blue-500",
-  iconBg    = "bg-blue-50 dark:bg-blue-900/20",
+  iconColor = "text-foreground/60",
+  iconBg    = "bg-foreground/[0.05]",
   trend,
   onClick,
 }: StatCardProps) {
@@ -93,18 +94,18 @@ export function StatCard({
       className={clsx(
         "text-left bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 w-full transition-all duration-200 group",
         onClick
-          ? "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:shadow-blue-500/5 active:scale-[0.98] cursor-pointer"
+          ? "hover:border-[var(--border-strong)] active:scale-[0.98] cursor-pointer"
           : "card-hover",
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-bold text-foreground/70 uppercase tracking-[0.1em]">{label}</p>
+        <p className="font-mono text-[10px] text-foreground/55 uppercase tracking-[0.16em]">{label}</p>
         <span className={clsx("p-2 rounded-xl", iconBg)}>
           <Icon size={14} className={iconColor} strokeWidth={2} />
         </span>
       </div>
       <p className={clsx(
-        "text-xl sm:text-2xl font-black leading-tight",
+        "text-xl sm:text-2xl font-semibold tracking-tight tabular-nums leading-tight",
         trend === "up"   ? "text-emerald-500" :
         trend === "down" ? "text-red-500"      :
         "text-foreground",
@@ -122,10 +123,10 @@ interface PageHeaderProps {
 }
 export function PageHeader({ title, sub, action }: PageHeaderProps) {
   return (
-    <div className="flex items-start justify-between mb-6 gap-4">
+    <div className="flex items-end justify-between mb-8 gap-4">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight leading-tight">{title}</h1>
-        {sub && <p className="text-sm text-foreground/70 mt-0.5 leading-relaxed">{sub}</p>}
+        <h1 className="text-3xl sm:text-[40px] font-semibold text-foreground tracking-[-0.035em] leading-[1.05]">{title}</h1>
+        {sub && <p className="text-[15px] text-foreground/60 mt-2 leading-relaxed">{sub}</p>}
       </div>
       {action && <div className="shrink-0 mt-0.5">{action}</div>}
     </div>
@@ -155,9 +156,9 @@ export function RefreshButton({ onRefresh, isRefreshing = false }: {
       className={clsx(
         "relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200",
         "bg-[var(--surface)] border border-[var(--border)]",
-        "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20",
-        "active:scale-90 shadow-sm",
-        active && "border-blue-400 bg-blue-50 dark:bg-blue-900/20",
+        "hover:border-[var(--border-strong)]",
+        "active:scale-90",
+        active && "border-[var(--border-strong)]",
       )}
     >
       {/* outer glow ring */}
@@ -175,7 +176,7 @@ export function RefreshButton({ onRefresh, isRefreshing = false }: {
         strokeWidth={2.2}
         className={clsx(
           "text-foreground/70 transition-colors duration-200",
-          active ? "text-blue-500 animate-[spin_0.7s_linear_infinite]" : "hover:text-blue-500",
+          active ? "text-foreground animate-[spin_0.7s_linear_infinite]" : "hover:text-foreground",
         )}
       />
     </button>
@@ -185,7 +186,7 @@ export function RefreshButton({ onRefresh, isRefreshing = false }: {
 // ── Error banner ──────────────────────────────────────────────────────────────
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="p-4 bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800/50 rounded-2xl text-sm text-red-600 dark:text-red-400 leading-relaxed">
+    <div className="p-4 bg-red-500/[0.06] border border-red-500/20 rounded-2xl text-sm text-red-600 dark:text-red-400 leading-relaxed">
       {message}
     </div>
   );
@@ -201,7 +202,7 @@ interface TabsProps {
 export function Tabs({ tabs, active, onChange, className }: TabsProps) {
   return (
     <div className={clsx("overflow-x-auto scrollbar-none -mx-1 px-1", className)}>
-      <div className="flex gap-1 bg-[var(--surface-2)] p-1 rounded-xl w-max min-w-full sm:w-fit sm:min-w-0">
+      <div className="flex gap-1 border border-[var(--border)] bg-[var(--surface)] p-1 rounded-xl w-max min-w-full sm:w-fit sm:min-w-0">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
@@ -209,8 +210,8 @@ export function Tabs({ tabs, active, onChange, className }: TabsProps) {
             className={clsx(
               "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 whitespace-nowrap",
               active === key
-                ? "bg-[var(--surface)] text-foreground shadow-sm border border-[var(--border)]"
-                : "text-foreground/70 hover:text-foreground dark:hover:text-foreground",
+                ? "bg-foreground text-background"
+                : "text-foreground/60 hover:text-foreground",
             )}
           >
             {label}
@@ -228,14 +229,14 @@ export function Badge({ children, variant = "default", className }: {
   className?: string;
 }) {
   const styles = {
-    default: "bg-[var(--surface-2)] text-foreground",
-    success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    danger:  "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
-    warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-    info:    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    default: "bg-foreground/[0.06] text-foreground/80",
+    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    danger:  "bg-red-500/10 text-red-600 dark:text-red-400",
+    warning: "bg-warm/10 text-warm",
+    info:    "bg-accent/10 text-accent",
   };
   return (
-    <span className={clsx("inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide", styles[variant], className)}>
+    <span className={clsx("inline-flex items-center font-mono text-[10px] px-2 py-0.5 rounded-md uppercase tracking-[0.12em]", styles[variant], className)}>
       {children}
     </span>
   );
@@ -253,7 +254,7 @@ export function Card({ children, className, onClick }: {
       onClick={onClick}
       className={clsx(
         "bg-[var(--surface)] border border-[var(--border)] rounded-2xl transition-all duration-200",
-        onClick && "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md active:scale-[0.99] w-full text-left cursor-pointer",
+        onClick && "hover:border-[var(--border-strong)] active:scale-[0.99] w-full text-left cursor-pointer",
         className,
       )}
     >
