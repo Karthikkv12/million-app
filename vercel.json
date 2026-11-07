@@ -10,6 +10,7 @@
     }
   ],
   "env": {
-    "BACKEND_URL": "@backend_url"
+    "BACKEND_URL": "@backend_url",
+    "NEXT_PUBLIC_API_URL": "/api"
   }
 }

@@ -1,0 +1,108 @@
+name: Deploy Backend to AWS ECS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend_api/**'
+      - 'database/**'
+      - 'logic/**'
+      - 'alembic/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+
+env:
+  AWS_REGION: us-east-1                          # ← change to your region
+  ECR_REPOSITORY: optionflow-api
+  ECS_CLUSTER: optionflow-cluster
+  ECS_SERVICE: optionflow-api-service
+  TASK_DEFINITION: aws/ecs-task-definition.json
+  CONTAINER_NAME: optionflow-api
+
+permissions:
+  id-token: write   # required for OIDC token
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Configure AWS credentials via OIDC (no long-lived keys) ─────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-optionflow
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── 3. Login to Amazon ECR ─────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── 4. Build & push Docker image ───────────────────────────────────────
+      - name: Build and push image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+                       -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # ── 5. Run Alembic migrations against RDS ─────────────────────────────
+      #   Uses a one-off ECS task (avoids opening the DB to the internet)
+      - name: Run database migrations
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for db in users trades portfolio budget markets; do
+            echo "Migrating schema: $db"
+            aws ecs run-task \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --task-definition ${{ env.TASK_DEFINITION }} \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.ECS_SUBNET_IDS }}],securityGroups=[${{ secrets.ECS_SECURITY_GROUP_ID }}],assignPublicIp=ENABLED}" \
+              --overrides "{
+                \"containerOverrides\": [{
+                  \"name\": \"${{ env.CONTAINER_NAME }}\",
+                  \"command\": [\"sh\",\"-c\",\"ALEMBIC_DB=$db alembic upgrade head\"],
+                  \"environment\": [{\"name\":\"ALEMBIC_DB\",\"value\":\"$db\"}]
+                }]
+              }" \
+              --wait
+          done
+
+      # ── 6. Update ECS task definition with new image ───────────────────────
+      - name: Update ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      # ── 7. Deploy to ECS service ───────────────────────────────────────────
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ── 8. Smoke test the health endpoint ─────────────────────────────────
+      - name: Health check
+        run: |
+          sleep 10
+          curl --fail https://${{ secrets.ALB_DNS_NAME }}/health \
+            || (echo "Health check failed!" && exit 1)

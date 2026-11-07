@@ -14,10 +14,22 @@ class WeekCreateRequest(BaseModel):
 class WeekUpdateRequest(BaseModel):
     account_value: Optional[float] = None
     notes: Optional[str] = None
+    acct_label_1: Optional[str] = None
+    acct_val_1: Optional[float] = None
+    acct_label_2: Optional[str] = None
+    acct_val_2: Optional[float] = None
+    acct_label_3: Optional[str] = None
+    acct_val_3: Optional[float] = None
 
 
 class WeekCompleteRequest(BaseModel):
     account_value: Optional[float] = None
+    acct_label_1: Optional[str] = None
+    acct_val_1: Optional[float] = None
+    acct_label_2: Optional[str] = None
+    acct_val_2: Optional[float] = None
+    acct_label_3: Optional[str] = None
+    acct_val_3: Optional[float] = None
 
 
 # ── Positions ─────────────────────────────────────────────────────────────────
@@ -80,7 +92,7 @@ class StockHoldingCreateRequest(BaseModel):
 
 
 class StockHoldingUpdateRequest(BaseModel):
-    shares: Optional[float] = Field(default=None, gt=0)
+    shares: Optional[float] = Field(default=None, ge=0)
     cost_basis: Optional[float] = None
     avg_cost: Optional[float] = None
     company_name: Optional[str] = None

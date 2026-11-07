@@ -5,6 +5,133 @@
 
 ---
 
+## v2.6.2 — Mobile/iPad Optimization + ITM Card Color Polish
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### 📱 Mobile & Tablet Optimization
+
+#### `PositionsTab.tsx`
+- **Metrics grid** — `2-col` on phone → `3-col` on tablet (md) → `5-col` on desktop (lg) → `10-col` on wide (xl)
+- Metric value font sizes scale with screen size (`text-sm sm:text-base`)
+- **Action buttons** (Add Position, Mark Complete, Re-open Week) — larger touch targets with `min-h-[36px]` and `active:` states
+- All table/card breakpoints moved from `sm` (640px) to `lg` (1024px) so iPad shows the card view instead of the cramped table
+
+#### `PositionRow.tsx`
+- **Card view** (mobile-friendly) now shows on **all screens < 1024px** (phones and iPads)
+- **Desktop table** only shown at `lg` (1024px+) where there's enough horizontal room
+- Action buttons (Edit, Delete) get larger touch targets: `text-xs px-3 py-2 min-h-[36px]` with `active:` pressed states
+
+#### `PositionForm.tsx`
+- Form grid: `1-col on xs` → `2-col on sm` → `3-col on md` → `4-col on lg`
+- **Submit button** — full-width on mobile (`w-full sm:w-auto`), taller touch target (`py-3 min-h-[44px]`)
+- Close `×` button enlarged to `min-h-[36px] min-w-[36px]` for easier tap
+
+### 🎨 Color Fixes
+
+#### `PositionsTab.tsx`
+- **ITM Calls/Puts at Risk cards** — only the dollar value stays `text-red-600`; label, subtitle, and symbol chips are neutral
+- **Net Realized card** — removed red background (`bg-red-100/60 dark:bg-red-900/40`) when negative; only the dollar value text is red
+
+### ⚙️ Port Cleanup
+- Eliminated all `3002` references across `package.json`, `dev.sh`, `docker-compose.yml`, `next.config.mjs` — all dev scripts now exclusively use port `3000`
+
+---
+
+## v2.6.1 — UI Color Standardization (green-500 / red-600)
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### 🎨 Changes
+
+#### Color Standardization — 6 trade component files
+- Unified all positive/gain colors to `text-green-500` (was mix of `text-emerald-400`, `text-blue-500`, `text-purple-400`, `text-green-500`)
+- Unified all negative/loss colors to `text-red-600` (was mix of `text-red-400`, `text-red-500`)
+- `AccountTab.tsx` — Realized P/L icon, Active Positions, Total Growth, Weeks Logged, Est. Tax, chart legend, week delta, table delta
+- `PositionsTab.tsx` — Week P&L, Net Realized card (bg + text), Weekly Basis ↓, cost-to-close annotation
+- `PremiumTab.tsx` — color token updates throughout premium metrics
+- `SymbolsTab.tsx` — symbol-level P&L and metric colors
+- `WatchlistTab.tsx` — quote change/loss color tokens
+- `YearTab.tsx` — year-level P&L and table row colors
+
+---
+
+## v2.6.0 — Watchlist Tab, ITM Risk Split (Calls/Puts), Nav Rename, AccountTab Restructure
+**Released:** 2026-03-25
+**Branch:** `develop`
+**Commit:** `c967a1f`
+
+### ✨ Changes
+
+#### Watchlist Tab — `web/components/trades/WatchlistTab.tsx` *(new file)*
+- Full watchlist component: add symbols manually (with `TickerSearchInput`), remove inline with two-step confirmation, sync from all active positions/holdings in one click
+- **Live quotes** via `fetchWatchlistQuotes` — 28-field `WatchlistQuote` per symbol, auto-refreshes every 5 min
+- **Sector filter tabs** — auto-generated from live sector data; "Other" bucket for uncategorised; tab counts update live
+- **Sortable columns** — click any of: Change %, Volume, Rel Volume, Mkt Cap, P/E, Beta; toggle asc/desc with arrow indicators
+- **52W range bar** — coloured by position: green (near high) / blue (mid) / red (near low)
+- **Analyst rating badge** — green for Buy/Strong Buy, yellow for Hold, red for Sell/Underperform
+- **Gainers/losers summary pills** — green ▲ up count, red ▼ down count, neutral total
+- **Rel Volume colour** — orange for >2× (unusual activity), green for >1×, muted otherwise
+- **Beta colour** — orange/bold for β>1.5 (high risk), blue for β<0.5 (defensive)
+- **EPS TTM & EPS Growth** — green for positive, red for negative
+- Loading skeleton rows, error state, empty state with help text
+- Search bar filters by symbol, company name, or sector across the current tab
+
+#### Positions Tab — `web/components/trades/PositionsTab.tsx`
+- **ITM risk split into two independent cards** (was one combined card):
+  - **"Calls at Risk"** (orange theme) — ITM covered calls; shows `+X.X` depth above strike
+  - **"Puts at Risk"** (red theme) — ITM cash-secured puts; shows `X.X deep` below strike
+- Each card: live ● badge, position count, net proceeds (strike value + prem collected), per-symbol depth chips
+- "Clear" in green when nothing ITM for that leg type
+- Removed `itmPositions` / `itmAssignmentValue` / `itmNetProceeds` in favour of per-leg `itmCalls` / `itmPuts` locals
+
+#### Navigation — `Navbar.tsx` + `BottomNav.tsx`
+- Renamed "Trades" label → **"Portfolio"** on both desktop navbar and mobile bottom nav
+
+#### Account Tab — `web/components/trades/AccountTab.tsx`
+- Restructured to receive week lifecycle as props: `weeks`, `weeksLoading`, `selectedWeekId`, `onSelectWeek`, `onNewWeek`
+- `WeekSelector` now rendered **inside** AccountTab (removed from global page header)
+- Unified **8-card KPI grid** (4 PSB cards + 4 metric cards) at `p-3.5` / `text-lg`
+
+#### Portfolio Page — `web/app/(app)/trades/page.tsx`
+- Added **7th tab**: `{ key: "watchlist", label: "Watchlist" }` + `<WatchlistTab />` render
+- `PortfolioSummaryBar` / `WeekSelector` removed from global render; weeks props passed to `AccountTab`
+- Tab type union extended to include `"watchlist"`
+
+#### Backend — Watchlist API *(new)*
+- `backend_api/routers/watchlist.py`: `GET /watchlist`, `PUT /watchlist/{symbol}`, `DELETE /watchlist/{symbol}`, `POST /watchlist/sync`
+- `logic/watchlist.py`: `sync_watchlist_from_positions()` — pulls all unique symbols from active positions + holdings and upserts them
+- `database/models.py`: `WatchlistSymbol` model (`id`, `user_id`, `symbol`, `company_name`, `source`, `notes`, `is_active`, `added_at`, `updated_at`)
+- `alembic/versions/0022_cash_deposits.py`, `0023_watchlist.py`: schema migrations
+
+#### API Client — `web/lib/api.ts`
+- `WatchlistQuote` interface (28 fields): symbol, name, price, prev_close, change, change_pct, volume, avg_volume, rel_volume, market_cap, market_cap_fmt, pe_ratio, forward_pe, eps_ttm, eps_growth, div_yield, sector, industry, analyst_rating, beta, week_52_high, week_52_low, day_high, day_low, fifty_day_avg, two_hundred_day_avg, error
+- `WatchlistSymbol` interface: id, symbol, company_name, source, notes, is_active, added_at, updated_at
+- New functions: `fetchWatchlist`, `upsertWatchlistSymbol`, `deleteWatchlistSymbol`, `syncWatchlist`, `fetchWatchlistQuotes`
+
+---
+
+## v2.5.9 — Positions Tab: Week P&L card, Net Realized card; Performance Tab: Net Realized table, status fix
+**Released:** 2026-03-25
+**Branch:** `develop`
+
+### ✨ Changes
+
+#### Positions Tab — `PositionsTab.tsx`
+- **"This Week Premium" → "Week P&L"**: renamed and reworked to show `totalPremium` (gross collected − buy-backs already paid), which is the true current net. Subtitle shows `$X gross − $Y closed` inline so both numbers are visible at a glance. Card goes red if net is negative.
+- **"Net Realized" card**: shows only the locked-in premium from closed/expired/assigned positions this week (net of buy-backs). Only appears when there are closed positions. Replaces the old separate "Cost to Close" card.
+- **Buy-back math fix**: `premium_out` is stored as a negative number — previous `weekCostToClose` was summing the raw negative value then subtracting it, effectively doubling the profit. Fixed to use `Math.abs(premium_out)`.
+- **Closed section header fix**: `<thead>` in Closed This Week table was using `bg-[var(--surface-2)]` (same as section header bar), making them visually merge. Changed to `bg-[var(--surface)]` + `py-2`.
+- **Closed section column fix**: Closed This Week table was missing the `DTE` column header, causing header/row misalignment. Added `DTE` to match the 13-column `PositionRow` output.
+
+#### Performance Tab — `YearTab.tsx`
+- **"Net Realized" table**: new card at the bottom of the Performance tab showing every week (newest first) with columns: Date, Pos count, Gross Collected, Cost to Close, Net Realized, Status. Uses `allPositions` grouped by `week_id` — same math as Positions tab cards.
+- **Status badge fix**: was using `w.is_complete` (DB flag only) — old weeks never formally closed showed "Open". Now uses `isEffectivelyComplete(w)` (same logic as all other Performance tab calculations).
+- **`isEffectivelyComplete` fix**: removed third condition `(w.position_count > 0 && w.premium > 0)` which had no date guard and incorrectly marked future weeks (e.g. Mar 27) as Complete. Added `.slice(0,10)` to `week_end` comparison for reliable string date comparison against `todayStr`.
+- **Date format**: Net Realized table date column now matches Premium by Expiry format (`toLocaleDateString("en-US", { month: "short", day: "numeric" })`).
+
+---
+
 ## v2.5.8 — UI Polish: Week Selector, Account Toggle Panel, Equal-Width Table, 12-Month Chart Cap
 **Released:** 2026-03-14
 **Branch:** `develop → main`

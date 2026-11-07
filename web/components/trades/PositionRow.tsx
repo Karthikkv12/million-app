@@ -1,17 +1,14 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMarketQuotes, OptionPosition, getTokens } from "@/lib/api";
+import { fetchMarketQuotes, OptionPosition } from "@/lib/api";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { fmt$, fmtDate, STATUS_COLORS } from "./TradesHelpers";
+import { fmt$, fmtDate } from "./TradesHelpers";
 import { StatusSelect } from "./StatusSelect";
 import { AssignmentPanel } from "./AssignmentPanel";
 
 export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPosition; onEdit: () => void; onDelete: () => void; liveSpot?: number | null }) {
   const [expanded, setExpanded] = useState(false);
-  const [showAi, setShowAi] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
   const isCarriedForward = pos.carried === true;
 
   const liveMoneyness = useMemo(() => {
@@ -57,71 +54,10 @@ export function PositionRow({ pos, onEdit, onDelete, liveSpot }: { pos: OptionPo
     : null;
   const dteColor = dte == null ? "" : dte <= 0 ? "text-red-500" : dte <= 3 ? "text-orange-500" : dte <= 7 ? "text-yellow-500" : "text-foreground/60";
 
-  const fetchAiAnalysis = async () => {
-    setShowAi((v) => !v);
-    if (aiAnalysis || aiLoading) return;
-    setAiLoading(true);
-    setAiAnalysis("");
-    const { access } = getTokens();
-    const netPLLine = premOutCell?.isClosed
-      ? `Net P&L: $${premOutCell.netPL.toFixed(0)} (${premOutCell.isLoss ? "LOSS" : "profit"})`
-      : "";
-    const prompt = `Analyze this single options position and give concise, actionable advice in 3-4 sentences:
-
-Symbol: ${pos.symbol}
-Strike: $${pos.strike}
-Type: ${pos.option_type}
-Contracts: ${pos.contracts}
-Status: ${pos.status}
-DTE: ${dte != null ? (dte === 0 ? `Expires today` : dte < 0 ? `Expired` : `${dte} days left`) : "unknown"}
-Premium In: ${pos.premium_in != null ? `$${pos.premium_in.toFixed(2)}/share` : "unknown"}
-${pos.moneyness ? `Moneyness: ${pos.moneyness} (spot at sale: $${pos.spot_price?.toFixed(2) ?? "unknown"})` : ""}
-${pos.extrinsic_value != null && pos.intrinsic_value != null ? `Extrinsic (theta income): $${pos.extrinsic_value.toFixed(2)}/sh | Intrinsic: $${pos.intrinsic_value.toFixed(2)}/sh` : ""}
-Prem/$1K: ${premPerK != null ? `$${premPerK.toFixed(2)}` : "unknown"}
-ROI: ${roi != null ? `${roi.toFixed(2)}%` : "unknown"}
-Sold: ${pos.sold_date ?? "unknown"}
-Expiry: ${pos.expiry_date ?? "unknown"}
-${netPLLine}
-${pos.margin != null ? `Margin: $${pos.margin.toFixed(0)}` : ""}
-
-What do you think of this position? Should I roll, close early, or hold to expiry? What are the key risks?`;
-
-    try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], accessToken: access }),
-      });
-      if (!res.ok || !res.body) {
-        let msg = "Failed to get analysis.";
-        try { const j = await res.json(); msg = j.error ?? msg; } catch {}
-        setAiAnalysis(`⚠️ ${msg}`);
-        setAiLoading(false);
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value, { stream: true });
-        setAiAnalysis(text);
-      }
-    } catch {
-      setAiAnalysis("Error fetching analysis.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  // Silence unused import warning
-  void STATUS_COLORS;
-
   return (
     <>
-      {/* ── Mobile card (< sm) ── */}
-      <div className={`sm:hidden border-b border-[var(--border)] px-3 py-3 ${isCarriedForward ? "opacity-90" : ""}`}>
+      {/* ── Mobile/Tablet card (< lg) ── */}
+      <div className={`lg:hidden border-b border-[var(--border)] px-3 py-3 ${isCarriedForward ? "opacity-90" : ""}`}>
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -185,12 +121,6 @@ What do you think of this position? Should I roll, close early, or hold to expir
               </div>
             </div>
           )}
-          {pos.margin != null && !isCarriedForward && (
-            <div>
-              <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">Margin</span>
-              <span className="text-sm text-foreground/60">${pos.margin.toFixed(0)}</span>
-            </div>
-          )}
           {premPerK != null && (
             <div>
               <span className="text-[10px] text-foreground/40 uppercase tracking-wide block">/$1K</span>
@@ -217,19 +147,14 @@ What do you think of this position? Should I roll, close early, or hold to expir
             )}
             {!isCarriedForward && (
               <>
-                <button onClick={onEdit} className="text-[10px] px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 transition">Edit</button>
+                <button onClick={onEdit} className="text-xs px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 active:bg-blue-200 transition min-h-[36px]">Edit</button>
                 <button
                   onClick={() => { if (window.confirm(`Delete ${pos.symbol} $${pos.strike} ${pos.option_type}?\n\nThis will permanently remove this trade from all weeks.`)) onDelete(); }}
-                  className="text-[10px] px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition"
+                  className="text-xs px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 active:bg-red-200 transition min-h-[36px]"
                 >Delete</button>
               </>
             )}
-            <button
-              onClick={fetchAiAnalysis}
-              className="text-[10px] px-2.5 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-500 font-semibold hover:bg-purple-100 transition flex items-center gap-1"
-            >
-              ✨ {showAi ? "Hide" : "Analyze"}
-            </button>
+
           </div>
         )}
 
@@ -239,28 +164,11 @@ What do you think of this position? Should I roll, close early, or hold to expir
           </div>
         )}
 
-        {showAi && (
-          <div className="mt-2 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/40 px-3 py-2.5">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wide">✨ AI Analysis</span>
-              {aiLoading && <span className="text-[10px] text-purple-400 animate-pulse">thinking…</span>}
-            </div>
-            {aiLoading && !aiAnalysis && (
-              <div className="flex gap-1 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            )}
-            {aiAnalysis && (
-              <p className="text-[11px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{aiAnalysis}</p>
-            )}
-          </div>
-        )}
+
       </div>
 
-      {/* ── Desktop table row (≥ sm) ── */}
-      <tr className={`hidden sm:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
+      {/* ── Desktop table row (≥ lg) ── */}
+      <tr className={`hidden lg:table-row border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${isCarriedForward ? "opacity-90" : ""}`}>
         <td className="px-3 py-2.5 font-bold text-foreground">
           {pos.symbol}
           {isCarriedForward && (
@@ -269,7 +177,7 @@ What do you think of this position? Should I roll, close early, or hold to expir
         </td>
         <td className="px-3 py-2.5 text-foreground/80 text-sm text-center">{pos.contracts}</td>
         <td className="px-3 py-2.5 text-foreground text-sm">${pos.strike.toFixed(2)}</td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-2.5 min-w-[7rem]">
           <div className="flex items-center gap-1 flex-wrap">
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${pos.option_type === "PUT" ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
               {pos.option_type}
@@ -342,11 +250,6 @@ What do you think of this position? Should I roll, close early, or hold to expir
           </td>
         )}
         {!isCarriedForward && (
-          <td className="px-3 py-2.5 text-foreground/70 text-xs">
-            {pos.margin != null ? `$${pos.margin.toFixed(0)}` : "—"}
-          </td>
-        )}
-        {!isCarriedForward && (
           <td className="px-3 py-2.5">
             <div className="flex items-center gap-1.5">
               {pos.status === "ASSIGNED" && (
@@ -357,11 +260,7 @@ What do you think of this position? Should I roll, close early, or hold to expir
                   {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />} Stock
                 </button>
               )}
-              <button
-                onClick={fetchAiAnalysis}
-                className="text-[10px] px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-500 font-semibold hover:bg-purple-100 transition"
-                title="AI Analysis"
-              >✨</button>
+
               {!isCarriedForward && (
                 <>
                   <button onClick={onEdit} className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-500 font-semibold hover:bg-blue-100 transition">Edit</button>
@@ -376,34 +275,13 @@ What do you think of this position? Should I roll, close early, or hold to expir
         )}
       </tr>
       {expanded && pos.status === "ASSIGNED" && (
-        <tr className="hidden sm:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
+        <tr className="hidden lg:table-row border-b border-[var(--border)] bg-yellow-50/30 dark:bg-yellow-900/5">
           <td colSpan={10} className="px-4 pb-3">
             <AssignmentPanel pos={pos} />
           </td>
         </tr>
       )}
-      {showAi && (
-        <tr className="hidden sm:table-row border-b border-[var(--border)] bg-purple-50/30 dark:bg-purple-900/5">
-          <td colSpan={10} className="px-4 py-3">
-            <div className="flex items-start gap-2">
-              <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 shrink-0 mt-0.5">✨ AI Analysis</span>
-              {aiLoading && !aiAnalysis && (
-                <div className="flex gap-1 items-center pt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              )}
-              {aiLoading && aiAnalysis && (
-                <span className="text-[10px] text-purple-400 animate-pulse shrink-0 mt-0.5">…</span>
-              )}
-              {aiAnalysis && (
-                <p className="text-[12px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{aiAnalysis}</p>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
+
     </>
   );
 }

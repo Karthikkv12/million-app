@@ -306,6 +306,12 @@ export interface WeeklySnapshot {
   week_start: string;
   week_end: string;
   account_value: number | null;
+  acct_label_1: string | null;
+  acct_val_1: number | null;
+  acct_label_2: string | null;
+  acct_val_2: number | null;
+  acct_label_3: string | null;
+  acct_val_3: number | null;
   is_complete: boolean;
   completed_at: string | null;
   notes: string | null;
@@ -372,6 +378,12 @@ export interface WeekBreakdown {
   week_end: string;
   is_complete: boolean;
   account_value: number | null;
+  acct_label_1: string | null;
+  acct_val_1: number | null;
+  acct_label_2: string | null;
+  acct_val_2: number | null;
+  acct_label_3: string | null;
+  acct_val_3: number | null;
   premium: number;
   realized_pnl: number;
   position_count: number;
@@ -404,15 +416,81 @@ export interface SymbolSummary {
   assigned: number;
 }
 
+// ── Broker Accounts ───────────────────────────────────────────────────────────
+
+export interface BrokerAccount {
+  id: number;
+  name: string;
+  color: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface AccountBalance {
+  account_id: number;
+  week_date: string;  // "YYYY-MM-DD"
+  balance: number;
+}
+
+export const fetchBrokerAccounts = () =>
+  api.get<BrokerAccount[]>("/portfolio/broker-accounts");
+
+export const createBrokerAccount = (body: { name: string; color?: string; sort_order?: number }) =>
+  api.post<BrokerAccount>("/portfolio/broker-accounts", body);
+
+export const updateBrokerAccount = (id: number, body: Partial<{ name: string; color: string; sort_order: number; is_active: boolean }>) =>
+  api.patch<BrokerAccount>(`/portfolio/broker-accounts/${id}`, body);
+
+export const deleteBrokerAccount = (id: number) =>
+  api.del<{ status: string }>(`/portfolio/broker-accounts/${id}`);
+
+export const fetchAccountBalances = (year: number) =>
+  api.get<AccountBalance[]>(`/portfolio/account-balances?year=${year}`);
+
+export const fetchAllAccountBalances = () =>
+  api.get<AccountBalance[]>("/portfolio/account-balances/all");
+
+export const fetchAccountBalanceYears = () =>
+  api.get<number[]>("/portfolio/account-balances/years");
+
+export const upsertAccountBalance = (body: { account_id: number; week_date: string; balance: number }) =>
+  api.put<AccountBalance>("/portfolio/account-balances", body);
+
+export const deleteAccountBalance = (account_id: number, week_date: string) =>
+  api.del<{ status: string }>(`/portfolio/account-balances/${account_id}/${week_date}`);
+
+// Cash Deposits
+export interface CashDeposit {
+  id: number;
+  week_date: string;  // "YYYY-MM-DD" Friday
+  amount: number;     // positive = deposit, negative = withdrawal
+  note: string | null;
+  created_at: string;
+}
+
+export const fetchCashDeposits = () =>
+  api.get<CashDeposit[]>("/portfolio/cash-deposits");
+
+export const upsertCashDeposit = (body: { week_date: string; amount: number; note?: string; id?: number }) =>
+  api.put<CashDeposit>("/portfolio/cash-deposits", body);
+
+export const deleteCashDeposit = (id: number) =>
+  api.del<{ status: string }>(`/portfolio/cash-deposits/${id}`);
+
 // Weeks
 export const fetchWeeks = () => api.get<WeeklySnapshot[]>("/portfolio/weeks");
 export const getOrCreateWeek = (for_date?: string) =>
   api.post<WeeklySnapshot>("/portfolio/weeks", { for_date: for_date ?? null });
 export const fetchWeek = (id: number) => api.get<WeeklySnapshot>(`/portfolio/weeks/${id}`);
-export const updateWeek = (id: number, body: { account_value?: number; notes?: string }) =>
+export interface SubAccountPayload {
+  acct_label_1?: string; acct_val_1?: number;
+  acct_label_2?: string; acct_val_2?: number;
+  acct_label_3?: string; acct_val_3?: number;
+}
+export const updateWeek = (id: number, body: { account_value?: number; notes?: string } & SubAccountPayload) =>
   api.patch<WeeklySnapshot>(`/portfolio/weeks/${id}`, body);
-export const completeWeek = (id: number, account_value?: number) =>
-  api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/complete`, { account_value: account_value ?? null });
+export const completeWeek = (id: number, payload?: { account_value?: number } & SubAccountPayload) =>
+  api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/complete`, payload ?? {});
 export const reopenWeek = (id: number) =>
   api.post<WeeklySnapshot>(`/portfolio/weeks/${id}/reopen`, {});
 
@@ -733,3 +811,83 @@ export interface MarketQuote {
 export const fetchMarketQuotes = (symbols: string[]) =>
   api.get<MarketQuote[]>(`/market/quotes?symbols=${symbols.map(s => s.toUpperCase()).join(",")}`);
 
+// ── Watchlist rich quotes ─────────────────────────────────────────────────────
+
+export interface WatchlistQuote {
+  symbol:            string;
+  name:              string | null;
+  price:             number | null;
+  prev_close:        number | null;
+  change:            number | null;
+  change_pct:        number | null;
+  volume:            number | null;
+  avg_volume:        number | null;
+  rel_volume:        number | null;
+  market_cap:        number | null;
+  market_cap_fmt:    string | null;
+  pe_ratio:          number | null;
+  forward_pe:        number | null;
+  eps_ttm:           number | null;
+  eps_growth:        number | null;
+  div_yield:         number | null;
+  sector:            string | null;
+  industry:          string | null;
+  analyst_rating:    string | null;
+  beta:              number | null;
+  week_52_high:      number | null;
+  week_52_low:       number | null;
+  day_high:          number | null;
+  day_low:           number | null;
+  fifty_day_avg:     number | null;
+  two_hundred_day_avg: number | null;
+  error:             string | null;
+}
+
+/** Fetch rich watchlist quotes (price, P/E, EPS, market cap, sector, analyst rating, etc.) */
+export const fetchWatchlistQuotes = (symbols: string[]) =>
+  api.get<WatchlistQuote[]>(`/market/watchlist-quotes?symbols=${symbols.map(s => s.toUpperCase()).join(",")}`);
+
+
+// ── Watchlist ─────────────────────────────────────────────────────────────────
+
+export interface WatchlistSymbol {
+  id:           number;
+  symbol:       string;
+  company_name: string | null;
+  /** "manual" | "position" | "holding" */
+  source:       string;
+  notes:        string | null;
+  is_active:    boolean;
+  added_at:     string;
+  updated_at:   string;
+}
+
+/** Fetch all active watchlist symbols for the current user. */
+export const fetchWatchlist = () =>
+  api.get<WatchlistSymbol[]>("/watchlist");
+
+/**
+ * Add or reactivate a symbol in the watchlist (manual source).
+ * company_name and notes are optional.
+ */
+export const upsertWatchlistSymbol = (
+  symbol: string,
+  opts: { company_name?: string; notes?: string } = {},
+) =>
+  api.put<WatchlistSymbol>(`/watchlist/${symbol.toUpperCase()}`, {
+    symbol: symbol.toUpperCase(),
+    ...opts,
+  });
+
+/** Soft-delete a symbol from the watchlist. */
+export const deleteWatchlistSymbol = (symbol: string) =>
+  api.del<void>(`/watchlist/${symbol.toUpperCase()}`);
+
+/**
+ * Trigger a full sync: scans all existing positions + holdings
+ * and registers any symbols not yet in the watchlist.
+ */
+export const syncWatchlist = () =>
+  api.post<{ positions_synced: number; holdings_synced: number; total_added: number }>(
+    "/watchlist/sync",
+  );

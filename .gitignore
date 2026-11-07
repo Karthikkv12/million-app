@@ -14,8 +14,17 @@ env/
 # macOS
 .DS_Store
 
-# SQLite DB
-trading_journal.db
+# SQLite databases — never commit live data
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files — never commit secrets
+.env
+.env.local
+.env.production
+.env.*.local
+# (keep .env.production.example — it's a safe template)
 
 # Local auth/session store
 .browser_sessions.sqlite
@@ -25,6 +34,7 @@ trading_journal.db
 .uvicorn.log
 .streamlit.pid
 .streamlit.log
+.nextjs.pid
 
 # Snapshots and local artifacts
 /snapshots/
@@ -36,8 +46,10 @@ trading_journal.db
 .vscode/
 .idea/
 
-# Node
+# Node / Next.js
 node_modules/
+web/.next/
+web/out/
 backups/
 
 # Server logs (setup_mac_server.sh)

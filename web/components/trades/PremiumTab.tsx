@@ -67,20 +67,20 @@ export function PremiumTab() {
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Realized (Locked In)</p>
-          <p className="text-2xl font-black text-blue-500">${grand_total.realized_premium.toFixed(2)}</p>
+          <p className="text-2xl font-black text-green-500">${grand_total.realized_premium.toFixed(2)}</p>
           <p className="text-[10px] text-foreground/50 mt-0.5">{pctRealized.toFixed(1)}% of total collected</p>
         </div>
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">In-Flight (Active)</p>
-          <p className="text-2xl font-black text-orange-400">${grand_total.unrealized_premium.toFixed(2)}</p>
+          <p className="text-2xl font-black text-green-500">${grand_total.unrealized_premium.toFixed(2)}</p>
           <p className="text-[10px] text-foreground/50 mt-0.5">locks in when options close/expire</p>
         </div>
       </div>
 
       {/* ── Legend ── */}
       <div className="flex flex-wrap gap-3 text-[11px] text-foreground/60">
-        <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Realized = closed/expired, permanently reduces cost basis</span>
-        <span><span className="inline-block w-2 h-2 rounded-full bg-orange-400 mr-1" />In-Flight = active positions, reduces live adj basis until settled</span>
+        <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" />Realized = closed/expired, permanently reduces cost basis</span>
+        <span><span className="inline-block w-2 h-2 rounded-full bg-green-500/60 mr-1" />In-Flight = active positions, reduces live adj basis until settled</span>
       </div>
 
       {/* ── By-symbol table (active holdings only) ── */}
@@ -134,13 +134,13 @@ export function PremiumTab() {
                         <td className="px-4 py-3 text-right text-foreground/70">${row.cost_basis.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right">
                           {hasRealized
-                            ? <span className="text-blue-500 font-semibold">${row.adj_basis_stored.toFixed(2)}</span>
+                            ? <span className="text-green-500 font-semibold">${row.adj_basis_stored.toFixed(2)}</span>
                             : <span className="text-foreground/40">${row.adj_basis_stored.toFixed(2)}</span>
                           }
                         </td>
                         <td className="px-4 py-3 text-right">
                           {hasUnrealized || hasRealized ? (
-                            <span className={hasRealized ? "text-green-500 font-semibold" : "text-orange-400 font-semibold"}>
+                            <span className={hasRealized ? "text-green-500 font-semibold" : "text-green-500 font-semibold"}>
                               ${row.live_adj_basis.toFixed(2)}
                               {!hasRealized && <span className="ml-1 text-[9px] font-normal opacity-60">in-flight</span>}
                             </span>
@@ -151,12 +151,12 @@ export function PremiumTab() {
                         <td className="px-4 py-3 text-right font-semibold text-green-500">${row.total_premium_sold.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right">
                           {row.realized_premium > 0
-                            ? <span className="text-blue-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
+                            ? <span className="text-green-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
                             : <span className="text-foreground/30">—</span>}
                         </td>
                         <td className="px-4 py-3 text-right">
                           {row.unrealized_premium > 0
-                            ? <span className="text-orange-400 font-semibold">${row.unrealized_premium.toFixed(2)}</span>
+                            ? <span className="text-green-500 font-semibold">${row.unrealized_premium.toFixed(2)}</span>
                             : <span className="text-foreground/30">—</span>}
                         </td>
                         <td className="px-4 py-3 text-right text-foreground/60">{row.positions}</td>
@@ -169,10 +169,10 @@ export function PremiumTab() {
                       <td className="px-4 py-3 text-foreground text-[11px] uppercase tracking-wide">Total</td>
                       <td colSpan={3} />
                       <td className="px-4 py-3 text-right text-green-500">${grand_total.total_premium_sold.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right text-blue-500">
+                      <td className="px-4 py-3 text-right text-green-500">
                         {grand_total.realized_premium > 0 ? `$${grand_total.realized_premium.toFixed(2)}` : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right text-orange-400">
+                      <td className="px-4 py-3 text-right text-green-500">
                         {grand_total.unrealized_premium > 0 ? `$${grand_total.unrealized_premium.toFixed(2)}` : "—"}
                       </td>
                       <td />
@@ -206,17 +206,17 @@ export function PremiumTab() {
                             <td className="px-4 py-3 font-bold text-foreground">{row.symbol}</td>
                             <td className="px-4 py-3 text-right text-foreground/50">${row.cost_basis.toFixed(2)}</td>
                             <td className="px-4 py-3 text-right">
-                              <span className={basisReduction > 0 ? "text-blue-500 font-semibold" : "text-foreground/70"}>
+                              <span className={basisReduction > 0 ? "text-green-500 font-semibold" : "text-foreground/70"}>
                                 ${row.adj_basis_stored.toFixed(2)}
                               </span>
                               {basisReduction > 0 && (
-                                <span className="ml-1 text-[10px] text-blue-400/70">(−${basisReduction.toFixed(2)})</span>
+                                <span className="ml-1 text-[10px] text-green-500/50">(−${basisReduction.toFixed(2)})</span>
                               )}
                             </td>
                             <td className="px-4 py-3 text-right font-semibold text-green-500">${row.total_premium_sold.toFixed(2)}</td>
                             <td className="px-4 py-3 text-right">
                               {row.realized_premium > 0
-                                ? <span className="text-blue-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
+                                ? <span className="text-green-500 font-semibold">${row.realized_premium.toFixed(2)}</span>
                                 : <span className="text-foreground/30">—</span>}
                             </td>
                             <td className="px-4 py-3 text-right text-foreground/60">{row.positions}</td>
@@ -253,13 +253,13 @@ export function PremiumTab() {
                   </div>
                   {week.realized_premium > 0 && (
                     <div className="text-right">
-                      <span className="text-xs text-blue-500 font-semibold">${week.realized_premium.toFixed(2)}</span>
+                      <span className="text-xs text-green-500 font-semibold">${week.realized_premium.toFixed(2)}</span>
                       <span className="text-[10px] text-foreground/40 ml-1">realized</span>
                     </div>
                   )}
                   {week.unrealized_premium > 0 && (
                     <div className="text-right">
-                      <span className="text-xs text-orange-400 font-semibold">${week.unrealized_premium.toFixed(2)}</span>
+                      <span className="text-xs text-green-500 font-semibold">${week.unrealized_premium.toFixed(2)}</span>
                       <span className="text-[10px] text-foreground/40 ml-1">in-flight</span>
                     </div>
                   )}
@@ -285,12 +285,12 @@ export function PremiumTab() {
                           <td className="px-4 py-2 text-right text-green-500 font-semibold">${sym.sold.toFixed(2)}</td>
                           <td className="px-4 py-2 text-right">
                             {sym.realized > 0
-                              ? <span className="text-blue-500 font-semibold">${sym.realized.toFixed(2)}</span>
+                              ? <span className="text-green-500 font-semibold">${sym.realized.toFixed(2)}</span>
                               : <span className="text-foreground/30">—</span>}
                           </td>
                           <td className="px-4 py-2 text-right">
                             {sym.unrealized > 0
-                              ? <span className="text-orange-400 font-semibold">${sym.unrealized.toFixed(2)}</span>
+                              ? <span className="text-green-500 font-semibold">${sym.unrealized.toFixed(2)}</span>
                               : <span className="text-foreground/30">—</span>}
                           </td>
                         </tr>
@@ -319,7 +319,7 @@ export function PremiumTab() {
         return (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart2 size={14} className="text-blue-500" />
+              <BarChart2 size={14} className="text-green-500" />
               <h3 className="text-sm font-bold text-foreground">Premium per Share</h3>
               <span className="ml-auto text-[10px] text-foreground/40">how hard each holding is working</span>
             </div>
@@ -330,11 +330,11 @@ export function PremiumTab() {
                   <div key={r.symbol} className="flex items-center gap-3">
                     <span className="text-xs font-bold text-foreground w-12 shrink-0">{r.symbol}</span>
                     <div className="flex-1 h-5 bg-[var(--surface-2)] rounded-lg overflow-hidden">
-                      <div className="h-full bg-blue-500/70 rounded-lg flex items-center px-2 transition-all" style={{ width: `${barPct}%` }}>
+                      <div className="h-full bg-green-500/70 rounded-lg flex items-center px-2 transition-all" style={{ width: `${barPct}%` }}>
                         {barPct > 25 && <span className="text-[10px] font-bold text-white">${r.perShare.toFixed(2)}/sh</span>}
                       </div>
                     </div>
-                    {barPct <= 25 && <span className="text-[10px] font-semibold text-blue-400 shrink-0">${r.perShare.toFixed(2)}/sh</span>}
+                    {barPct <= 25 && <span className="text-[10px] font-semibold text-green-500 shrink-0">${r.perShare.toFixed(2)}/sh</span>}
                     <span className="text-[10px] text-foreground/40 w-16 text-right shrink-0">{r.shares} shares</span>
                   </div>
                 );
@@ -349,13 +349,13 @@ export function PremiumTab() {
         <p className="text-[11px] font-bold text-foreground/80 uppercase tracking-wide mb-2">Notation</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
           <div><span className="font-semibold text-foreground/80">Avg Cost</span> — original purchase price per share (never changes)</div>
-          <div><span className="font-semibold text-foreground/80">Adj Basis</span> — cost basis after <span className="text-blue-400">closed/expired</span> premium locks in. Shown dimmed when no options have closed yet (equals original cost until then)</div>
+          <div><span className="font-semibold text-foreground/80">Adj Basis</span> — cost basis after <span className="text-green-500">closed/expired</span> premium locks in. Shown dimmed when no options have closed yet (equals original cost until then)</div>
           <div><span className="font-semibold text-foreground/80">Live Adj</span> — true current breakeven = Adj Basis − in-flight premium/share</div>
           <div><span className="font-semibold text-foreground/80">BE (Breakeven)</span> — same as Live Adj; price below which you start losing money today</div>
           <div><span className="font-semibold text-foreground/80">CC (Covered Call)</span> — sell a call against shares you own</div>
           <div><span className="font-semibold text-foreground/80">CSP (Cash-Secured Put)</span> — sell a put holding cash</div>
-          <div><span className="font-semibold text-blue-400">Realized $</span> — premium permanently locked in from <span className="font-semibold">closed or expired</span> positions</div>
-          <div><span className="font-semibold text-orange-400">In-Flight $</span> — premium from <span className="font-semibold">still-active</span> positions</div>
+          <div><span className="font-semibold text-green-500">Realized $</span> — premium permanently locked in from <span className="font-semibold">closed or expired</span> positions</div>
+          <div><span className="font-semibold text-green-500">In-Flight $</span> — premium from <span className="font-semibold">still-active</span> positions</div>
           <div><span className="font-semibold text-foreground/80"># Pos</span> — number of original option positions logged against this holding</div>
           <div><span className="font-semibold text-foreground/80">Sold $</span> — gross premium ever collected (realized + in-flight combined)</div>
         </div>

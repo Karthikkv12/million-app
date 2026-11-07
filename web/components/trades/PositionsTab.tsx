@@ -37,21 +37,39 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
 
   const deleteMut = useMutation({
     mutationFn: deletePosition,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["positions", week.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["positions", week.id] });
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      qc.invalidateQueries({ queryKey: ["premiumDashboard"] });
+    },
   });
 
   const thisWeekPositions = useMemo(() => positions.filter((p) => !p.carried), [positions]);
   const carriedPositions   = useMemo(() => positions.filter((p) => p.carried === true), [positions]);
 
+  const CLOSED_STATUSES = ["CLOSED", "EXPIRED", "ASSIGNED", "ROLLED"];
+  const openPositions   = useMemo(() => thisWeekPositions.filter((p) => !CLOSED_STATUSES.includes(p.status)), [thisWeekPositions]);
+  const closedPositions = useMemo(() => thisWeekPositions.filter((p) => CLOSED_STATUSES.includes(p.status)),  [thisWeekPositions]);
+
   const bySymbol = useMemo(() => {
     const map = new Map<string, OptionPosition[]>();
-    for (const p of thisWeekPositions) {
+    for (const p of openPositions) {
       const arr = map.get(p.symbol) ?? [];
       arr.push(p);
       map.set(p.symbol, arr);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [thisWeekPositions]);
+  }, [openPositions]);
+
+  const bySymbolClosed = useMemo(() => {
+    const map = new Map<string, OptionPosition[]>();
+    for (const p of closedPositions) {
+      const arr = map.get(p.symbol) ?? [];
+      arr.push(p);
+      map.set(p.symbol, arr);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [closedPositions]);
 
   const bySymbolCarried = useMemo(() => {
     const map = new Map<string, OptionPosition[]>();
@@ -67,7 +85,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
 
   const weeklyBasisReduction = useMemo(() => {
     const byHolding = new Map<number, { totalPremDollars: number; shares: number }>();
-    for (const p of thisWeekPositions) {
+    for (const p of openPositions) {
       if (p.holding_id == null || p.premium_in == null) continue;
       const holding = holdings.find((h) => h.id === p.holding_id);
       if (!holding) continue;
@@ -83,9 +101,9 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
       totalShares  += shares;
     });
     return totalShares > 0 ? totalDollars / totalShares : null;
-  }, [thisWeekPositions, holdings]);
+  }, [openPositions, holdings]);
 
-  const activeCount = thisWeekPositions.filter((p) => p.status === "ACTIVE").length;
+  const activeCount = openPositions.filter((p) => p.status === "ACTIVE").length;
 
   const activeSymbols = useMemo(() => {
     const seen = new Set<string>();
@@ -134,55 +152,91 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
         const inFlightPrem = premDash?.grand_total.unrealized_premium ?? 0;
         const realizedPrem = premDash?.grand_total.realized_premium   ?? 0;
 
-        // ITM Assignment Risk card — live, updates with liveSpotMap every 30s
-        const itmPositions = positions.filter((p) => {
-          if (p.status !== "ACTIVE") return false;
+        // Week realized cost (buy-backs) and net P&L — scoped to this week's non-carried positions
+        // premium_out is stored as a negative number (debit), matching PositionRow's (premIn + premOut) formula
+        const weekCostToClose = closedPositions.reduce(
+          (acc, p) => acc + Math.abs(p.premium_out ?? 0) * p.contracts * 100, 0
+        );
+        const weekGrossCollected = closedPositions.reduce(
+          (acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0
+        );
+        const weekNetRealized = weekGrossCollected - weekCostToClose;
+        const hasClosed = closedPositions.length > 0;
+
+        // ITM Assignment Risk — split by Calls and Puts, live data
+        const itmCalls = positions.filter((p) => {
+          if (p.status !== "ACTIVE" || p.option_type !== "CALL") return false;
           const spot = liveSpotMap.get(p.symbol);
-          if (spot == null || spot <= 0) return false;
-          if (p.option_type === "CALL") return spot > p.strike;
-          if (p.option_type === "PUT")  return spot < p.strike;
-          return false;
+          return spot != null && spot > p.strike;
         });
-        const itmAssignmentValue = itmPositions.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
-        const itmPremCollected   = itmPositions.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
-        const itmNetProceeds     = itmAssignmentValue + itmPremCollected;
-        const hasLiveData        = liveSpotMap.size > 0;
+        const itmPuts = positions.filter((p) => {
+          if (p.status !== "ACTIVE" || p.option_type !== "PUT") return false;
+          const spot = liveSpotMap.get(p.symbol);
+          return spot != null && spot < p.strike;
+        });
+        const itmCallValue    = itmCalls.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
+        const itmCallPrem     = itmCalls.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
+        const itmPutValue     = itmPuts.reduce((acc, p) => acc + p.strike * p.contracts * 100, 0);
+        const itmPutPrem      = itmPuts.reduce((acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0);
+        // Gross collected across ALL this week's positions (open + closed)
+        const weekAllGross = thisWeekPositions.reduce(
+          (acc, p) => acc + (p.premium_in ?? 0) * p.contracts * 100, 0
+        );
+        // totalPremium already nets out premium_out on closed positions (backend-computed total_premium)
+        // so: net current = totalPremium = weekAllGross − buy-backs paid so far
+
+        const hasLiveData = liveSpotMap.size > 0;
 
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2 mb-4">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">This Week Premium</p>
-              <p className="text-base font-black text-green-500">${totalPremium.toFixed(2)}</p>
+              <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Week P&amp;L</p>
+              <p className={`text-sm sm:text-base font-black ${totalPremium >= 0 ? "text-green-500" : "text-red-600"}`}>
+                {totalPremium >= 0 ? "$" : "-$"}{Math.abs(totalPremium).toFixed(2)}
+              </p>
+              <p className="text-[10px] text-foreground/40 mt-0.5">
+                ${weekAllGross.toFixed(2)} gross
+                {weekCostToClose > 0 && <span className="text-red-600/70"> − ${weekCostToClose.toFixed(2)} closed</span>}
+              </p>
             </div>
+            {hasClosed && (
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
+                <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Net Realized</p>
+                <p className={`text-base font-black ${weekNetRealized >= 0 ? "text-green-500" : "text-red-600"}`}>
+                  {weekNetRealized >= 0 ? "$" : "-$"}{Math.abs(weekNetRealized).toFixed(2)}
+                </p>
+                <p className="text-[10px] text-foreground/40 mt-0.5">locked in (closed positions)</p>
+              </div>
+            )}
             {weeklyBasisReduction != null && (
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
                 <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weekly Basis ↓</p>
-                <p className="text-base font-black text-emerald-400">-${weeklyBasisReduction.toFixed(2)}<span className="text-xs font-normal text-foreground/40">/sh</span></p>
+                <p className="text-base font-black text-green-500">-${weeklyBasisReduction.toFixed(2)}<span className="text-xs font-normal text-foreground/40">/sh</span></p>
                 <p className="text-[10px] text-foreground/40 mt-0.5">this week&apos;s premium ÷ shares</p>
               </div>
             )}
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Active Positions</p>
-              <p className="text-base font-black text-blue-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {thisWeekPositions.length}</span></p>
+              <p className="text-base font-black text-green-500">{activeCount} <span className="text-xs font-normal text-foreground/40">/ {thisWeekPositions.length}</span></p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Avg Prem / $1K</p>
               {avgPremPerK != null
-                ? <p className="text-base font-black text-blue-400">${avgPremPerK.toFixed(2)}</p>
+                ? <p className="text-base font-black text-green-500">${avgPremPerK.toFixed(2)}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">this week&apos;s positions</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Stock Value at Stake</p>
               {stockValue > 0
-                ? <p className="text-base font-black text-yellow-500">${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-red-600">${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               {stockCoveragePct != null && <p className="text-[10px] text-foreground/40 mt-0.5">{stockCoveragePct.toFixed(2)}% covered</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Value</p>
               {week.account_value != null
-                ? <p className="text-base font-black text-purple-400">${week.account_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-green-500">${week.account_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">this week</p>
             </div>
@@ -190,9 +244,9 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Portfolio Coverage</p>
               {coveragePct != null ? (
                 <>
-                  <p className="text-base font-black text-orange-400">{coveragePct.toFixed(2)}%</p>
+                  <p className="text-base font-black text-green-500">{coveragePct.toFixed(2)}%</p>
                   <div className="mt-1 h-1 bg-[var(--surface-2)] rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, coveragePct)}%` }} />
+                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, coveragePct)}%` }} />
                   </div>
                 </>
               ) : (
@@ -202,28 +256,22 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Capital at Risk</p>
               {totalCapAtRisk > 0
-                ? <p className="text-base font-black text-red-400">${totalCapAtRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                ? <p className="text-base font-black text-red-600">${totalCapAtRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">active strike obligations</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">In-Flight Prem</p>
               {inFlightPrem > 0
-                ? <p className="text-base font-black text-cyan-400">${inFlightPrem.toFixed(2)}</p>
+                ? <p className="text-base font-black text-green-500">${inFlightPrem.toFixed(2)}</p>
                 : <p className="text-base font-black text-foreground/30">—</p>}
               <p className="text-[10px] text-foreground/40 mt-0.5">locked: ${realizedPrem.toFixed(2)}</p>
             </div>
-            {/* ITM Assignment Risk — live card, only shown when live quotes loaded */}
-            <div className={`border rounded-xl p-3 col-span-2 sm:col-span-2 xl:col-span-2 ${
-              itmPositions.length > 0
-                ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800"
-                : "bg-[var(--surface)] border-[var(--border)]"
-            }`}>
+            {/* ITM Calls at Risk */}
+            <div className="border rounded-xl p-3 col-span-1 bg-[var(--surface)] border-[var(--border)]">
               <div className="flex items-center gap-1.5 mb-1">
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  itmPositions.length > 0 ? "text-red-500" : "text-foreground/60"
-                }`}>
-                  ITM / Assignment Risk
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                  Calls at Risk
                 </p>
                 {hasLiveData && (
                   <span className="text-[8px] px-1 py-0.5 rounded-full bg-green-500/15 text-green-500 font-bold tracking-wide">● LIVE</span>
@@ -231,26 +279,64 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
               </div>
               {!hasLiveData ? (
                 <p className="text-base font-black text-foreground/30">Loading…</p>
-              ) : itmPositions.length === 0 ? (
+              ) : itmCalls.length === 0 ? (
                 <>
-                  <p className="text-base font-black text-green-500">All Clear</p>
-                  <p className="text-[10px] text-foreground/40 mt-0.5">no active positions ITM</p>
+                  <p className="text-base font-black text-green-500">Clear</p>
+                  <p className="text-[10px] text-foreground/40 mt-0.5">no calls ITM</p>
                 </>
               ) : (
                 <>
-                  <p className="text-base font-black text-red-500">
-                    ${itmNetProceeds.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  <p className="text-base font-black text-red-600">
+                    ${(itmCallValue + itmCallPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-[10px] text-red-400/80 mt-0.5">
-                    {itmPositions.length} ITM · ${itmAssignmentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
-                    {" + "}${itmPremCollected.toLocaleString(undefined, { maximumFractionDigits: 0 })} prem
+                  <p className="text-[10px] text-foreground/60 mt-0.5">
+                    {itmCalls.length} ITM · ${itmCallValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} strike
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {itmPositions.map((p) => {
-                      const spot = liveSpotMap.get(p.symbol);
+                    {itmCalls.map((p) => {
+                      const spot  = liveSpotMap.get(p.symbol);
                       const depth = spot != null ? Math.abs(spot - p.strike) : null;
                       return (
-                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500">
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--border)] text-foreground">
+                          {p.symbol} ${p.strike}{depth != null ? ` (+${depth.toFixed(1)})` : ""}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            {/* ITM Puts at Risk */}
+            <div className="border rounded-xl p-3 col-span-1 bg-[var(--surface)] border-[var(--border)]">
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                  Puts at Risk
+                </p>
+                {hasLiveData && (
+                  <span className="text-[8px] px-1 py-0.5 rounded-full bg-green-500/15 text-green-500 font-bold tracking-wide">● LIVE</span>
+                )}
+              </div>
+              {!hasLiveData ? (
+                <p className="text-base font-black text-foreground/30">Loading…</p>
+              ) : itmPuts.length === 0 ? (
+                <>
+                  <p className="text-base font-black text-green-500">Clear</p>
+                  <p className="text-[10px] text-foreground/40 mt-0.5">no puts ITM</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-black text-red-600">
+                    ${(itmPutValue + itmPutPrem).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[10px] text-foreground/60 mt-0.5">
+                    {itmPuts.length} ITM · ${itmPutValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} at strike
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {itmPuts.map((p) => {
+                      const spot  = liveSpotMap.get(p.symbol);
+                      const depth = spot != null ? Math.abs(spot - p.strike) : null;
+                      return (
+                        <span key={p.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--border)] text-foreground">
                           {p.symbol} ${p.strike}{depth != null ? ` (${depth.toFixed(1)} deep)` : ""}
                         </span>
                       );
@@ -268,15 +354,15 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
           {!week.is_complete && (
             <button
               onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 active:bg-blue-800 transition min-h-[36px]"
             >
-              <Plus size={12} /> Add Position
+              <Plus size={13} /> Add Position
             </button>
           )}
           {!week.is_complete && positions.length > 0 && (
             <button
               onClick={() => setShowComplete(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 active:bg-green-800 transition min-h-[36px]"
             >
               <CheckCircle2 size={12} /> <span className="hidden sm:inline">Mark Week Complete</span><span className="sm:hidden">Complete</span>
             </button>
@@ -289,7 +375,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             </span>
             <button
               onClick={() => setShowReopen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 text-xs font-semibold hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--surface-2)] text-foreground/60 text-xs font-semibold hover:bg-[var(--surface-3)] active:bg-[var(--surface-3)] border border-[var(--border)] transition min-h-[36px]"
             >
               <LockOpen size={11} /> Re-open Week
             </button>
@@ -319,9 +405,14 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
 
       {!isLoading && positions.length > 0 && (
         <div className="space-y-4">
-          {thisWeekPositions.length > 0 && (
+          {/* ── Open / Active positions ── */}
+          {openPositions.length > 0 && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-              <div className="sm:hidden divide-y divide-[var(--border)]">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-foreground/70">Open Positions</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-foreground/50 font-semibold">{openPositions.length}</span>
+              </div>
+              <div className="lg:hidden divide-y divide-[var(--border)]">
                 {bySymbol.map(([, rows]) =>
                   rows.map((p) => (
                     <PositionRow
@@ -334,11 +425,11 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                   ))
                 )}
               </div>
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-[var(--surface-2)]">
-                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "DTE", "Prem In", "Prem Out", "/$1K", "ROI", "Status", "Margin", "Actions"].map((h) => (
+                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "DTE", "Prem In", "Prem Out", "/$1K", "ROI", "Status", "Actions"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -361,6 +452,54 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
             </div>
           )}
 
+          {/* ── Closed / Expired / Assigned this week ── */}
+          {closedPositions.length > 0 && (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden opacity-80">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-foreground/50">Closed This Week</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-foreground/40 font-semibold">{closedPositions.length}</span>
+                <span className="text-[10px] text-foreground/40 hidden sm:inline">— realized P&amp;L locked in</span>
+              </div>
+              <div className="lg:hidden divide-y divide-[var(--border)]">
+                {bySymbolClosed.map(([, rows]) =>
+                  rows.map((p) => (
+                    <PositionRow
+                      key={p.id}
+                      pos={p}
+                      liveSpot={null}
+                      onEdit={() => { setEditing(p); setShowForm(false); }}
+                      onDelete={() => deleteMut.mutate(p.id)}
+                    />
+                  ))
+                )}
+              </div>
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-[10px] text-foreground/40 uppercase tracking-wide bg-[var(--surface)]">
+                      {["Symbol", "Cts", "Strike", "P/C", "Sold", "Expiry", "DTE", "Prem In", "Prem Out", "Net P&L", "Status", "Actions"].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bySymbolClosed.map(([, rows]) =>
+                      rows.map((p) => (
+                        <PositionRow
+                          key={p.id}
+                          pos={p}
+                          liveSpot={null}
+                          onEdit={() => { setEditing(p); setShowForm(false); }}
+                          onDelete={() => deleteMut.mutate(p.id)}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {carriedPositions.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -368,7 +507,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                 <span className="text-[10px] text-foreground/40 hidden sm:inline">— still open, P&amp;L realises when you close them</span>
               </div>
               <div className="bg-[var(--surface)] border border-amber-200 dark:border-amber-800/50 rounded-2xl overflow-hidden">
-                <div className="sm:hidden divide-y divide-[var(--border)]">
+                <div className="lg:hidden divide-y divide-[var(--border)]">
                   {bySymbolCarried.map(([, rows]) =>
                     rows.map((p) => (
                       <PositionRow
@@ -381,7 +520,7 @@ export function PositionsTab({ week }: { week: WeeklySnapshot }) {
                     ))
                   )}
                 </div>
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[10px] text-foreground/60 uppercase tracking-wide bg-amber-50/60 dark:bg-amber-900/10">

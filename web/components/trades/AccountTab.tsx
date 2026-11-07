@@ -12,9 +12,12 @@ import {
   updateBrokerAccount,
   getOrCreateWeek,
   BrokerAccount,
+  WeeklySnapshot,
 } from "@/lib/api";
+import { WeekSelector } from "@/components/trades/PortfolioSummaryBar";
+import { fmt$ } from "./TradesHelpers";
 import { EmptyState, SkeletonCard } from "@/components/ui";
-import { TrendingUp, Activity, Plus, X, ChevronDown } from "lucide-react";
+import { TrendingUp, Activity, Plus, X, ChevronDown, DollarSign, AlertCircle } from "lucide-react";
 
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -44,9 +47,26 @@ function nextFriday(from?: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-const HIDDEN_ACCOUNTS_KEY = "optionflow_hidden_accounts";
+const HIDDEN_ACCOUNTS_KEY  = "optionflow_hidden_accounts";
+const AREA_RANGE_KEY       = "optionflow_acct_area_range";
+const WOW_RANGE_KEY        = "optionflow_acct_wow_range";
 
-export function AccountTab() {
+type ChartRange = "1M" | "3M" | "1Y" | "5Y" | "MAX";
+const RANGE_LABELS: ChartRange[] = ["1M", "3M", "1Y", "5Y", "MAX"];
+
+export function AccountTab({
+  weeks = [],
+  weeksLoading = false,
+  selectedWeekId = null,
+  onSelectWeek,
+  onNewWeek,
+}: {
+  weeks?: WeeklySnapshot[];
+  weeksLoading?: boolean;
+  selectedWeekId?: number | null;
+  onSelectWeek?: (id: number) => void;
+  onNewWeek?: () => void;
+}) {
   const qc = useQueryClient();
   const { data: s, isLoading: summaryLoading } = useQuery({
     queryKey: ["portfolioSummary"],
@@ -101,6 +121,19 @@ export function AccountTab() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAcctName, setNewAcctName] = useState("");
   const [showAccountsPanel, setShowAccountsPanel] = useState(false);
+
+  // Chart time-range selectors (independent, persisted)
+  const VALID_RANGES: ChartRange[] = ["1M", "3M", "1Y", "5Y", "MAX"];
+  const [areaRange, setAreaRange] = useState<ChartRange>(() => {
+    if (typeof window === "undefined") return "MAX";
+    const v = localStorage.getItem(AREA_RANGE_KEY);
+    return (v && VALID_RANGES.includes(v as ChartRange) ? v as ChartRange : "MAX");
+  });
+  const [wowRange, setWowRange] = useState<ChartRange>(() => {
+    if (typeof window === "undefined") return "MAX";
+    const v = localStorage.getItem(WOW_RANGE_KEY);
+    return (v && VALID_RANGES.includes(v as ChartRange) ? v as ChartRange : "MAX");
+  });
 
   // Auto-create the upcoming Friday's week on mount
   const ensureWeekMut = useMutation({
@@ -207,13 +240,18 @@ export function AccountTab() {
   const valueMap = new Map<string, number>();
   for (const r of withValue) valueMap.set(r.week_end, r.account_value!);
 
-  // Build a contiguous scaffold from first data point to today
+  // Build a contiguous scaffold from max(first data point, 5Y ago) to today
+  // so range buttons always have enough weeks to show even when data is sparse
+  const today = new Date();
   const allChartFridays: string[] = [];
   if (withValue.length > 0) {
-    const start = new Date(withValue[0].week_end + "T00:00:00");
-    // find the Friday on or before start
-    while (start.getDay() !== 5) start.setDate(start.getDate() - 1);
-    const today = new Date();
+    const fiveYearsAgo = new Date(today); fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const dataStart = new Date(withValue[0].week_end + "T00:00:00");
+    // Snap dataStart back to Friday
+    while (dataStart.getDay() !== 5) dataStart.setDate(dataStart.getDate() - 1);
+    // Use whichever is earlier: dataStart or 5Y ago (snapped to Friday)
+    while (fiveYearsAgo.getDay() !== 5) fiveYearsAgo.setDate(fiveYearsAgo.getDate() - 1);
+    const start = dataStart < fiveYearsAgo ? dataStart : fiveYearsAgo;
     const cur = new Date(start);
     while (cur <= today) {
       allChartFridays.push(cur.toISOString().slice(0, 10));
@@ -221,21 +259,61 @@ export function AccountTab() {
     }
   }
 
+  // ── Range cutoff ─────────────────────────────────────────────────────────
+  function rangeCutoff(range: string): string | null {
+    const d = new Date(today);
+    if (range === "MAX") return null;
+    if (range === "1M")  { d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); }
+    if (range === "3M")  { d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); }
+    if (range === "1Y")  { d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); }
+    if (range === "5Y")  { d.setFullYear(d.getFullYear() - 5); return d.toISOString().slice(0, 10); }
+    return null;
+  }
+  const areaCutoff   = rangeCutoff(areaRange);
+  const wowCutoff    = rangeCutoff(wowRange);
+  const areaFridays  = areaCutoff ? allChartFridays.filter((iso) => iso >= areaCutoff!) : allChartFridays;
+  const wowFridays   = wowCutoff  ? allChartFridays.filter((iso) => iso >= wowCutoff!)  : allChartFridays;
+
   const MONTH_LETTER = ["J","F","M","A","M","J","J","A","S","O","N","D"];
-  // Only label quarter-start months (Jan=0, Apr=3, Jul=6, Oct=9) to avoid crowding
   const QUARTER_MONTHS = new Set([0, 3, 6, 9]);
 
-  const chartData = allChartFridays.map((iso, i) => {
+  // Tick label strategy — range-aware
+  function makeTick(iso: string, prevIso: string | undefined, totalVisible: number, range: ChartRange): string {
     const d = new Date(iso + "T00:00:00");
-    const prevIso = allChartFridays[i - 1];
-    const yearChanged = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
-    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
     const mo = d.getMonth();
-    const tick = (monthChanged && QUARTER_MONTHS.has(mo))
-      ? (yearChanged ? `${MONTH_LETTER[mo]}'${String(d.getFullYear()).slice(2)}` : MONTH_LETTER[mo])
-      : "";
-    return { label: iso, tick, value: valueMap.get(iso) ?? null };
-  });
+    const yr2 = `'${String(d.getFullYear()).slice(2)}`; // "'26"
+    const yearChanged  = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
+    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
+
+    if (range === "MAX") {
+      // Quarterly data points, label = 2-digit year on year change only
+      if (!monthChanged || !QUARTER_MONTHS.has(mo)) return "";
+      return yearChanged ? yr2 : "";
+    }
+    if (range === "5Y") {
+      // Monthly data points, label = 2-digit year on year change only
+      if (!monthChanged) return "";
+      return yearChanged ? yr2 : "";
+    }
+    // Sub-year ranges — original behaviour
+    if (totalVisible <= 8) {
+      return `${MONTH_LETTER[mo]}${d.getDate()}`;
+    } else if (totalVisible <= 26) {
+      return monthChanged
+        ? (yearChanged ? `${MONTH_LETTER[mo]}${yr2}` : MONTH_LETTER[mo])
+        : "";
+    } else {
+      return (monthChanged && QUARTER_MONTHS.has(mo))
+        ? (yearChanged ? `${MONTH_LETTER[mo]}${yr2}` : MONTH_LETTER[mo])
+        : "";
+    }
+  }
+
+  const chartData = areaFridays.map((iso, i) => ({
+    label: iso,
+    tick: makeTick(iso, areaFridays[i - 1], areaFridays.length, areaRange),
+    value: valueMap.get(iso) ?? null,
+  }));
 
   const hasArea = chartData.some((d) => d.value != null);
   const hasWoW  = changes.length >= 2;
@@ -246,49 +324,93 @@ export function AccountTab() {
     : `$${v}`;
 
   const chgMap = new Map(changes.filter((c) => c.chg != null).map((c) => [c.week_end, c.chg!]));
-  const wowData = allChartFridays.map((iso, i) => {
-    const d = new Date(iso + "T00:00:00");
-    const prevIso = allChartFridays[i - 1];
-    const yearChanged = !prevIso || prevIso.slice(0, 4) !== iso.slice(0, 4);
-    const monthChanged = !prevIso || prevIso.slice(5, 7) !== iso.slice(5, 7);
-    const mo = d.getMonth();
-    const tick = (monthChanged && QUARTER_MONTHS.has(mo))
-      ? (yearChanged ? `${MONTH_LETTER[mo]}'${String(d.getFullYear()).slice(2)}` : MONTH_LETTER[mo])
-      : "";
-    return { label: iso, tick, chg: chgMap.get(iso) ?? null };
-  });
+  const wowData = wowFridays.map((iso, i) => ({
+    label: iso,
+    tick: makeTick(iso, wowFridays[i - 1], wowFridays.length, wowRange),
+    chg: chgMap.get(iso) ?? null,
+  }));
 
   return (
     <div className="space-y-6">
 
-      {/* ── KPI strip ── */}
+      {/* ── Week selector ── */}
+      <div>
+        {weeksLoading ? (
+          <div className="h-10 w-64 rounded-xl bg-[var(--surface-2)] animate-pulse" />
+        ) : (
+          <WeekSelector
+            weeks={weeks}
+            selectedId={selectedWeekId}
+            onSelect={onSelectWeek ?? (() => {})}
+            onNewWeek={onNewWeek ?? (() => {})}
+          />
+        )}
+      </div>
+
+      {/* ── Unified 8-card grid (4 summary + 4 KPI) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* PSB card 1 — Total Premium */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <DollarSign size={11} className="text-green-500" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Total Premium</p>
+          </div>
+          <p className="text-lg font-black text-green-500">${s.total_premium_collected.toFixed(2)}</p>
+        </div>
+        {/* PSB card 2 — Realized P/L */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingUp size={11} className="text-green-500" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Realized P/L</p>
+          </div>
+          <p className={`text-lg font-black ${s.realized_pnl >= 0 ? "text-green-500" : "text-red-600"}`}>{fmt$(s.realized_pnl)}</p>
+        </div>
+        {/* PSB card 3 — Active Positions */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Activity size={11} className="text-green-500" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Active Positions</p>
+          </div>
+          <p className="text-lg font-black text-green-500">{s.active_positions}</p>
+        </div>
+        {/* PSB card 4 — Est. Tax */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <AlertCircle size={11} className="text-red-600" />
+            <p className="text-[9px] font-semibold text-foreground/60 uppercase tracking-wide">Est. Tax ({(s.cap_gains_tax_rate * 100).toFixed(0)}%)</p>
+          </div>
+          <p className="text-lg font-black text-red-600">${s.estimated_tax.toFixed(2)}</p>
+        </div>
+        {/* KPI card 1 — Latest Value */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Latest Value</p>
-          <p className="text-xl font-black text-green-500">
+          <p className="text-lg font-black text-green-500">
             {latest ? `$${latest.account_value!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">{latest?.week_end ?? ""}</p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 2 — Last Week Δ */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Last Week Δ</p>
-          <p className={`text-xl font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${latest?.chg == null ? "text-foreground/40" : latest.chg >= 0 ? "text-green-500" : "text-red-600"}`}>
             {latest?.chg != null ? `${latest.chg >= 0 ? "+" : ""}$${latest.chg.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">vs prior Friday</p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 3 — Total Growth */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Total Growth</p>
-          <p className={`text-xl font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-blue-500" : "text-red-500"}`}>
+          <p className={`text-lg font-black ${totalGrowth == null ? "text-foreground/40" : totalGrowth >= 0 ? "text-green-500" : "text-red-600"}`}>
             {totalGrowth != null ? `${totalGrowth >= 0 ? "+" : ""}$${totalGrowth.toFixed(0)}` : "—"}
           </p>
           <p className="text-[10px] text-foreground/50 mt-0.5">
             {totalGrowthPct != null ? `${totalGrowthPct >= 0 ? "+" : ""}${totalGrowthPct.toFixed(1)}%` : "since first entry"}
           </p>
         </div>
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+        {/* KPI card 4 — Weeks Logged */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
           <p className="text-[10px] font-semibold text-foreground/60 uppercase tracking-wide mb-1">Weeks Logged</p>
-          <p className="text-xl font-black text-purple-400">{withValue.length}</p>
+          <p className="text-lg font-black text-green-500">{withValue.length}</p>
           <p className="text-[10px] text-foreground/50 mt-0.5">of {rows.length} total weeks</p>
         </div>
       </div>
@@ -300,10 +422,25 @@ export function AccountTab() {
           {/* Account Value */}
           {hasArea && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-1">
                 <TrendingUp size={13} className="text-green-500" />
-                <h3 className="text-sm font-bold text-foreground">Account Value — All Time</h3>
-                <span className="ml-auto text-[10px] text-foreground/40">{withValue.length} wks</span>
+                <h3 className="text-sm font-bold text-foreground">Account Value</h3>
+                <span className="ml-auto text-[10px] text-foreground/40">{chartData.filter(d => d.value != null).length} wks</span>
+              </div>
+              <div className="flex items-center gap-1 mb-3">
+                {RANGE_LABELS.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setAreaRange(r); try { localStorage.setItem(AREA_RANGE_KEY, r); } catch {} }}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors ${
+                      areaRange === r
+                        ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                        : "text-foreground/40 hover:text-foreground/70"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
               <ResponsiveContainer width="100%" height={190}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
@@ -320,7 +457,7 @@ export function AccountTab() {
                   />
                   <Tooltip
                     formatter={(v: unknown) => v == null ? ["—", "Value"] : [`$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Value"]}
-                    labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                    labelFormatter={(_l: unknown, payload?: ReadonlyArray<{ payload?: { label?: string } }>) => {
                       const iso = payload?.[0]?.payload?.label;
                       if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                       return String(_l);
@@ -345,10 +482,25 @@ export function AccountTab() {
           {/* Week-over-Week change */}
           {hasWoW && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-1">
                 <Activity size={13} className="text-blue-400" />
-                <h3 className="text-sm font-bold text-foreground">Week-over-Week Δ — All Time</h3>
-                <span className="ml-auto text-[10px] text-foreground/40">{changes.filter((c) => c.chg != null).length} wks</span>
+                <h3 className="text-sm font-bold text-foreground">Week-over-Week</h3>
+                <span className="ml-auto text-[10px] text-foreground/40">{wowData.filter(d => d.chg != null).length} wks</span>
+              </div>
+              <div className="flex items-center gap-1 mb-3">
+                {RANGE_LABELS.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setWowRange(r); try { localStorage.setItem(WOW_RANGE_KEY, r); } catch {} }}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors ${
+                      wowRange === r
+                        ? "bg-blue-500/20 text-blue-400 border border-blue-500/40"
+                        : "text-foreground/40 hover:text-foreground/70"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
               <ResponsiveContainer width="100%" height={190}>
                 <BarChart data={wowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }} barCategoryGap="10%">
@@ -358,7 +510,7 @@ export function AccountTab() {
                   <ReferenceLine y={0} stroke="var(--border)" strokeWidth={1} />
                   <Tooltip
                     formatter={(v: unknown) => v == null ? ["—", "Change"] : [`${Number(v) >= 0 ? "+" : ""}$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, "Change"]}
-                    labelFormatter={(_l: unknown, payload?: Array<{ payload?: { label?: string } }>) => {
+                    labelFormatter={(_l: unknown, payload?: ReadonlyArray<{ payload?: { label?: string } }>) => {
                       const iso = payload?.[0]?.payload?.label;
                       if (iso) return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                       return String(_l);
@@ -376,7 +528,7 @@ export function AccountTab() {
               </ResponsiveContainer>
               <div className="flex items-center gap-4 pt-2 border-t border-[var(--border)] mt-1">
                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-green-500" /><span className="text-[10px] text-foreground/50">Gain</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-red-400" /><span className="text-[10px] text-foreground/50">Loss</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-red-600" /><span className="text-[10px] text-foreground/50">Loss</span></div>
                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-slate-500" /><span className="text-[10px] text-foreground/50">Flat</span></div>
               </div>
             </div>
@@ -614,7 +766,7 @@ export function AccountTab() {
                       {/* Delta */}
                       <td className="px-3 py-2 text-right">
                         {delta != null ? (
-                          <span className={`text-[11px] font-semibold tabular-nums ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-400" : "text-foreground/40"}`}>
+                          <span className={`text-[11px] font-semibold tabular-nums ${delta > 0 ? "text-green-500" : delta < 0 ? "text-red-600" : "text-foreground/40"}`}>
                             {delta > 0 ? "+" : ""}{delta.toLocaleString()}
                           </span>
                         ) : (

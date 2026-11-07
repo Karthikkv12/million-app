@@ -137,25 +137,30 @@ echo "All servers starting..."
 ```
 OptionFlow_main/            ← repo root (branch: develop)
 ├── backend_api/            ← FastAPI Python backend
+│   └── routers/
+│       ├── watchlist.py    ← Watchlist CRUD + sync (v2.6.0)
+│       └── markets.py      ← Market quotes incl. watchlist-quotes endpoint
 ├── web/                    ← Next.js frontend
 │   ├── app/
 │   │   └── (app)/
-│   │       ├── trades/page.tsx     ← slim 134-line orchestrator (v2.5.0)
+│   │       ├── trades/page.tsx     ← slim orchestrator (7 tabs as of v2.6.0)
 │   │       └── budget/page.tsx     ← slim 272-line orchestrator (v2.5.0)
 │   ├── components/
-│   │   ├── trades/         ← 13 component files (split from trades/page in v2.5.0)
+│   │   ├── trades/         ← 14 component files
 │   │   │   ├── TradesHelpers.ts, TradeModals.tsx, PositionForm.tsx
 │   │   │   ├── StatusSelect.tsx, AssignmentPanel.tsx, PositionRow.tsx
 │   │   │   ├── PositionsTab.tsx, SymbolsTab.tsx, YearTab.tsx
 │   │   │   ├── PremiumTab.tsx, AccountTab.tsx, HoldingsTab.tsx
-│   │   │   └── PortfolioSummaryBar.tsx
+│   │   │   ├── PortfolioSummaryBar.tsx
+│   │   │   └── WatchlistTab.tsx    ← Watchlist (v2.6.0)
 │   │   └── budget/         ← 5 component files (split from budget/page in v2.5.0)
 │   │       ├── BudgetHelpers.ts, BudgetSection.tsx, BudgetCharts.tsx
 │   │       ├── BudgetAnnualSummary.tsx, CCSection.tsx
 │   └── lib/                ← API client, auth, hooks
 ├── database/               ← SQLAlchemy models (5-DB architecture)
 ├── logic/                  ← Domain service modules (auth, budget, portfolio, gamma)
-├── alembic/                ← DB migrations
+│   └── watchlist.py        ← sync_watchlist_from_positions (v2.6.0)
+├── alembic/                ← DB migrations (0023 migrations as of v2.6.0)
 ├── scripts/                ← Utility scripts (backup_dbs.py)
 ├── backups/                ← Auto-generated DB snapshots (gitignored)
 ├── users.db                ← Auth database

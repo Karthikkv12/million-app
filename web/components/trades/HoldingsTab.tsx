@@ -124,19 +124,6 @@ function HoldingRow({ h, onEdit, onClose, onDelete, onReenter, closedTable }: {
     );
   };
 
-  // Small reopened indicator for ACTIVE holdings with prior assignment history
-  const ReopenedBadge = () => {
-    if (!wasReopened) return null;
-    const label = assignType === "CC_ASSIGNED" ? "Re-entered after call-away" : "Re-entered after assignment";
-    return (
-      <span
-        title={`${label} on ${assignDate ?? "?"}. Adj basis carries forward all prior premium history.`}
-        className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-700 cursor-help"
-      >
-        ↻ {assignType === "CC_ASSIGNED" ? "Wheel continues" : "Re-entered"}
-      </span>
-    );
-  };
 
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ["holdingEvents", h.id],
@@ -198,7 +185,6 @@ function HoldingRow({ h, onEdit, onClose, onDelete, onReenter, closedTable }: {
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-foreground text-base">{h.symbol}</span>
-                <ReopenedBadge />
               </div>
               {h.company_name && <div className="text-[10px] text-foreground/50">{h.company_name}</div>}
             </div>
@@ -307,7 +293,6 @@ function HoldingRow({ h, onEdit, onClose, onDelete, onReenter, closedTable }: {
             <td className="px-3 py-2.5 w-32 max-w-[8rem]">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-foreground">{h.symbol}</span>
-                <ReopenedBadge />
               </div>
               {h.company_name && <div className="text-[10px] text-foreground/50 truncate max-w-[7rem]">{h.company_name}</div>}
             </td>
@@ -357,7 +342,6 @@ function HoldingRow({ h, onEdit, onClose, onDelete, onReenter, closedTable }: {
             <td className="px-3 py-2.5 w-32 max-w-[8rem]">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-foreground">{h.symbol}</span>
-                <ReopenedBadge />
               </div>
               {h.company_name && <div className="text-[10px] text-foreground/50 truncate max-w-[7rem]">{h.company_name}</div>}
               <BasisCarryHint />
@@ -484,11 +468,13 @@ export function HoldingsTab() {
     mutationFn: ({ id, closePrice, currentNotes }: { id: number; closePrice: number; currentNotes: string | null }) =>
       updateHolding(id, {
         status: "CLOSED",
-        shares: 0,
         close_price: closePrice,
         notes: [currentNotes, `Closed @ $${closePrice.toFixed(2)}`].filter(Boolean).join(" · "),
       } as Partial<StockHolding> & { close_price: number }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["holdings"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+      qc.invalidateQueries({ queryKey: ["premiumDashboard"] });
+    },
   });
 
   const [seedMsg, setSeedMsg] = useState<string | null>(null);

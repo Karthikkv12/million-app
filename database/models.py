@@ -25,7 +25,7 @@ import os
 from functools import lru_cache
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, Float,
+    Boolean, Column, Date, DateTime, Enum, Float,
     Index, Integer, String, Text, create_engine,
     MetaData,
 )
@@ -212,13 +212,91 @@ class WeeklySnapshot(PortfolioBase):
     user_id       = Column(Integer, nullable=False, index=True)
     week_start    = Column(DateTime, nullable=False, index=True)
     week_end      = Column(DateTime, nullable=False, index=True)
-    account_value = Column(Float, nullable=True)
+    account_value = Column(Float, nullable=True)   # auto-computed sum of acct_val_1+2+3
+    acct_label_1  = Column(String, nullable=True)
+    acct_val_1    = Column(Float, nullable=True)
+    acct_label_2  = Column(String, nullable=True)
+    acct_val_2    = Column(Float, nullable=True)
+    acct_label_3  = Column(String, nullable=True)
+    acct_val_3    = Column(Float, nullable=True)
     is_complete   = Column(Boolean, nullable=False, default=False, index=True)
     completed_at  = Column(DateTime, nullable=True)
     notes         = Column(Text, nullable=True)
     created_at    = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 Index("ux_weekly_snapshots_user_week_end", WeeklySnapshot.user_id, WeeklySnapshot.week_end, unique=True)
+
+
+class BrokerAccount(PortfolioBase):
+    __tablename__ = "broker_accounts"
+    __table_args__ = {"schema": _schema("portfolio")}
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, nullable=False, index=True)
+    name       = Column(String, nullable=False)
+    color      = Column(String, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active  = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AccountBalance(PortfolioBase):
+    __tablename__ = "account_balances"
+    __table_args__ = (
+        Index("ux_account_balances_acct_week", "account_id", "week_date", unique=True),
+        {"schema": _schema("portfolio")},
+    )
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, nullable=False, index=True)
+    account_id = Column(Integer, nullable=False, index=True)
+    week_date  = Column(Date, nullable=False, index=True)
+    balance    = Column(Float, nullable=False)
+
+
+class CashDeposit(PortfolioBase):
+    """
+    Records cash added to or withdrawn from the account on a specific Friday.
+
+    These entries are used to distinguish true trading P&L from capital injections
+    when computing Week-over-Week deltas and Total Growth.
+
+    amount  > 0 = deposit (cash added)
+    amount  < 0 = withdrawal (cash removed)
+    """
+    __tablename__ = "cash_deposits"
+    __table_args__ = {"schema": _schema("portfolio")}
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, nullable=False, index=True)
+    week_date  = Column(Date, nullable=False, index=True)   # The Friday this deposit hit
+    amount     = Column(Float, nullable=False)               # +ve deposit, -ve withdrawal
+    note       = Column(String, nullable=True)               # e.g. "Wire transfer", "Withdrawal"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+Index("ux_cash_deposits_user_week", CashDeposit.user_id, CashDeposit.week_date)
+
+
+class WatchlistSymbol(PortfolioBase):
+    """
+    Per-user watchlist of stock symbols.
+
+    Symbols are auto-registered when a position or holding is created (source='position'
+    or source='holding').  Users can also add symbols manually (source='manual').
+    Once a symbol is in the watchlist it is NEVER auto-deleted — only the user can
+    remove it.  is_active=False means soft-deleted by the user.
+    """
+    __tablename__ = "watchlist_symbols"
+    __table_args__ = {"schema": _schema("portfolio")}
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, nullable=False, index=True)
+    symbol       = Column(String, nullable=False, index=True)
+    company_name = Column(String, nullable=True)
+    source       = Column(String, nullable=False, default="manual")   # manual | position | holding
+    notes        = Column(String, nullable=True)
+    is_active    = Column(Boolean, nullable=False, default=True, index=True)
+    added_at     = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at   = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+Index("ux_watchlist_user_symbol", WatchlistSymbol.user_id, WatchlistSymbol.symbol, unique=True)
+
 
 class OptionPosition(PortfolioBase):
     __tablename__ = "option_positions"

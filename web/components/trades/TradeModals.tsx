@@ -12,7 +12,7 @@ export function CompleteWeekModal({ week, onDone }: { week: WeeklySnapshot; onDo
   const [val, setVal] = useState(week.account_value?.toFixed(2) ?? "");
   const [err, setErr] = useState("");
   const mut = useMutation({
-    mutationFn: () => completeWeek(week.id, val ? parseFloat(val) : undefined),
+    mutationFn: () => completeWeek(week.id, val ? { account_value: parseFloat(val) } : undefined),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["weeks"] });
       qc.invalidateQueries({ queryKey: ["positions", week.id] });
