@@ -39,3 +39,6 @@ trading_journal.db
 # Node
 node_modules/
 backups/
+
+# Server logs (setup_mac_server.sh)
+/logs/
