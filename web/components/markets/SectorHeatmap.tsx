@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { Panel, Change, heatColor } from "@/components/ui";
 
 interface StockTile {
   symbol: string;
@@ -139,26 +140,6 @@ export const SECTORS: Record<SectorKey, { label: string; stocks: StockTile[] }> 
   },
 };
 
-// ── Color helpers ──────────────────────────────────────────────────────────────
-
-function pctColor(pct: number | null): string {
-  if (pct == null) return "bg-gray-800/60 text-foreground/70";
-  if (pct >  4)  return "bg-green-700 text-white";
-  if (pct >  2)  return "bg-green-600 text-white";
-  if (pct >  0.5)return "bg-green-500/80 text-white";
-  if (pct > -0.5)return "bg-gray-700/60 text-foreground";
-  if (pct > -2)  return "bg-red-500/80 text-white";
-  if (pct > -4)  return "bg-red-600 text-white";
-  return              "bg-red-700 text-white";
-}
-
-function borderColor(pct: number | null): string {
-  if (pct == null) return "border-gray-700/30";
-  if (pct > 0.5)  return "border-green-500/30";
-  if (pct < -0.5) return "border-red-500/30";
-  return "border-gray-600/30";
-}
-
 // ── Quote fetching ─────────────────────────────────────────────────────────────
 
 async function fetchQuotes(symbols: string[]): Promise<QuoteMap> {
@@ -238,54 +219,35 @@ export function SectorCard({ sector, quotes, loading }: Props) {
     .filter((v): v is number => v != null);
   const avgChange = changes.length ? changes.reduce((a, b) => a + b, 0) / changes.length : null;
 
-  // Use 3 rows for sectors with ≥7 stocks, 2 rows for smaller sectors
   const targetRows = stocks.length >= 7 ? 3 : 2;
   const rows = toBalancedRows(stocks, targetRows);
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 flex flex-col gap-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest">{label}</p>
-        {avgChange != null && (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pctColor(avgChange)}`}>
-            {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
-          </span>
-        )}
-      </div>
-
-      {/* Heatmap rows — each row fills 100% width, tiles sized by weight share */}
-      <div className="flex flex-col gap-[2px]">
+    <Panel title={label} actions={avgChange != null ? <Change pct={avgChange} /> : null} bodyClassName="p-2">
+      <div className="flex flex-col gap-[3px]">
         {rows.map((row, ri) => {
-          // Row height proportional to this row's weight vs total
           const rowWeight = row.reduce((s, x) => s + x.stock.weight, 0);
-          const rowH = Math.max(32, Math.round((rowWeight / totalWeight) * 160));
+          const rowH = Math.max(40, Math.round((rowWeight / totalWeight) * 180));
           return (
-            <div key={ri} className="flex gap-[2px]" style={{ height: `${rowH}px` }}>
+            <div key={ri} className="flex gap-[3px]" style={{ height: `${rowH}px` }}>
               {row.map(({ stock, widthPct }) => {
-                const q   = quotes[stock.symbol];
+                const q = quotes[stock.symbol];
                 const pct = q?.changePct ?? null;
-                const big = widthPct >= 28;
-                const med = widthPct >= 14;
+                const c = heatColor(pct);
+                const showSym = widthPct >= 11 && rowH >= 34;
+                const showPct = widthPct >= 18 && rowH >= 46;
+                const tip = `${stock.name} (${stock.symbol})\n${pct != null ? (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "No quote"}${q?.price != null ? "\n$" + q.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}`;
                 return (
                   <div
                     key={stock.symbol}
-                    title={`${stock.name} (${stock.symbol})\n${pct != null ? (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}\n${q?.price != null ? "$" + q.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}`}
-                    style={{ width: `${widthPct}%` }}
-                    className={`flex-shrink-0 rounded-md border flex flex-col justify-center items-center overflow-hidden cursor-default transition-all hover:brightness-110 hover:scale-[1.02] ${
-                      pctColor(pct)} ${borderColor(pct)} ${loading ? "animate-pulse" : ""}`}
+                    title={tip}
+                    aria-label={tip.replace(/\n/g, ", ")}
+                    style={{ width: `${widthPct}%`, background: c.bg, color: c.fg }}
+                    className={`flex min-w-0 shrink-0 flex-col items-center justify-center overflow-hidden rounded-md transition hover:brightness-110 ${loading ? "animate-pulse" : ""}`}
                   >
-                    <p className={`font-bold leading-none truncate w-full text-center px-0.5 ${
-                      big ? "text-[10px]" : med ? "text-[9px]" : "text-[8px]"
-                    }`}>{stock.symbol}</p>
-                    {pct != null ? (
-                      <p className={`font-semibold leading-none mt-0.5 ${
-                        big ? "text-[9px]" : med ? "text-[8px]" : "text-[7px]"
-                      }`}>
-                        {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
-                      </p>
-                    ) : (
-                      <p className="text-[7px] opacity-40">—</p>
+                    {showSym && <span className="max-w-full truncate px-1 font-mono text-[12px] font-medium leading-tight">{stock.symbol}</span>}
+                    {showPct && pct != null && (
+                      <span className="font-mono text-[11px] leading-tight tabular-nums opacity-85">{pct >= 0 ? "+" : ""}{pct.toFixed(2)}%</span>
                     )}
                   </div>
                 );
@@ -294,7 +256,7 @@ export function SectorCard({ sector, quotes, loading }: Props) {
           );
         })}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -333,14 +295,14 @@ export default function SectorHeatmaps() {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest">Sector Heatmaps</p>
+        <p className="eyebrow flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Sector heatmaps</p>
         <div className="flex items-center gap-2">
           {lastUpdated && (
-            <span className="text-[10px] text-foreground/70">
+            <span className="font-mono text-[11px] text-foreground/55">
               {lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
           )}
-          <button onClick={load} className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold transition">↻ Refresh</button>
+          <button onClick={load} className="btn-ghost h-8 px-3 text-[13px]">Refresh</button>
         </div>
       </div>
       {error && <p className="text-xs text-red-400 mb-2">Could not load quote data — will retry automatically.</p>}

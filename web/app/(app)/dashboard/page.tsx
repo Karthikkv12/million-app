@@ -5,37 +5,36 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { ArrowRight } from "lucide-react";
-import { PageHeader, SectionLabel } from "@/components/ui";
+import { SectionHeader } from "@/components/ui";
 import MarketCards from "@/components/dashboard/MarketCards";
 import VixPanel from "@/components/dashboard/VixPanel";
 import EconomicCalendar from "@/components/dashboard/EconomicCalendar";
 
-const QUICK = [
-  { href: "/options-flow", label: "GEX Flow",    sub: "Gamma exposure data",  color: "from-purple-500 to-purple-700" },
-  { href: "/markets",      label: "Markets",     sub: "Sectors & breadth",    color: "from-blue-500 to-blue-700" },
+const JUMP = [
+  { href: "/options-flow", label: "Flow", sub: "Strike × expiry gamma board with king node, flip and walls." },
+  { href: "/markets",      label: "Markets", sub: "Breadth, sector ETFs, movers and sector heatmaps." },
 ];
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [lookupQuery, setLookupQuery] = useState("");
 
-  const handleLookup = (e: React.FormEvent) => {
-    e.preventDefault();
-    const t = lookupQuery.trim().toUpperCase();
-    if (t) router.push(`/stocks/${t}`);
-  };
-
   return (
-    <div className="p-4 sm:p-6 w-full overflow-x-hidden">
-
-      <PageHeader
-        title={user?.username ? `Hey, ${user.username} 👋` : "Dashboard"}
-        sub="Your portfolio at a glance."
-      />
-
-      {/* ── Slim stock search bar ── */}
-      <div className="mb-6">
+    <div className="mx-auto w-full max-w-screen-xl px-4 pb-16 pt-8 sm:px-6">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
+        <div className="min-w-0">
+          <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Today</p>
+          <h1 className="text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">
+            {greeting()}{user?.username ? `, ${user.username}` : ""}
+          </h1>
+          <p className="mt-2 text-[15px] text-foreground/60">Indexes, volatility and the day's calendar.</p>
+        </div>
         <TickerSearchInput
           value={lookupQuery}
           onChange={setLookupQuery}
@@ -43,48 +42,37 @@ export default function DashboardPage() {
             setLookupQuery(sym);
             router.push(`/stocks/${encodeURIComponent(sym.trim().toUpperCase())}`);
           }}
-          placeholder="Search ticker or company — AAPL, Apple, Nifty…"
-          actionLabel="View"
-          className="w-full max-w-xl"
+          placeholder="Look up a ticker or company"
+          actionLabel="Open"
+          className="w-full sm:w-96"
         />
       </div>
 
-      {/* Market ticker cards */}
       <MarketCards />
 
-      {/* ── VIX ── */}
-      <div className="mb-6 sm:mb-8">
-        <p className="text-[11px] font-bold text-foreground uppercase tracking-widest mb-3">Volatility</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <VixPanel />
-          <VixPanel
-            symbol="%5EINDIAVIX"
-            title="India VIX"
-            sublabel="NSE India Volatility Index"
-            gradId="indiaVixGrad"
-          />
-        </div>
+      <SectionHeader label="Volatility" />
+      <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <VixPanel />
+        <VixPanel symbol="%5EINDIAVIX" title="India VIX" sublabel="NSE India Volatility Index" gradId="indiaVixGrad" />
       </div>
 
-      {/* ── Economic Calendar ── */}
       <EconomicCalendar />
 
-      {/* Quick actions */}
-      <SectionLabel>Quick Actions</SectionLabel>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        {QUICK.map(({ href, label, sub, color }) => (
+      <SectionHeader label="Jump to" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {JUMP.map(({ href, label, sub }) => (
           <Link key={href} href={href}
-            className="relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white group hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-sm">
-            <div className={`absolute inset-0 bg-gradient-to-br ${color}`} />
-            <div className="relative">
-              <p className="font-bold text-sm sm:text-base">{label}</p>
-              <p className="text-[11px] text-white/70 mt-0.5">{sub}</p>
-              <ArrowRight size={14} className="mt-3 opacity-70 group-hover:translate-x-1 transition-transform" />
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)]">
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/55">OptionFlow / {label}</p>
+              <p className="mt-1.5 text-[15px] text-foreground/75">{sub}</p>
             </div>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-foreground transition group-hover:translate-x-0.5 group-hover:bg-foreground group-hover:text-background">
+              <ArrowRight size={16} />
+            </span>
           </Link>
         ))}
       </div>
-
     </div>
   );
 }

@@ -29,10 +29,10 @@ export function KeyLevelsRuler({ data }: Props) {
       {/* header */}
       <div className="flex items-center gap-2 mb-4">
         <Target size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Key Levels Ruler
         </span>
-        <span className="text-[8px] text-foreground/50 ml-auto">
+        <span className="text-[11px] text-foreground/50 ml-auto">
           Put Wall → Spot → Call Wall
         </span>
       </div>
@@ -67,12 +67,15 @@ export function KeyLevelsRuler({ data }: Props) {
                 borderColor: "var(--surface)",
               }}
             />
-            <div className="text-center mt-1">
-              <p className="text-[8px] font-bold whitespace-nowrap" style={{ color: lv.color }}>
+            <div
+              className={`mt-1 ${pct(lv.value) > 85 ? "text-right" : pct(lv.value) < 15 ? "text-left" : "text-center"}`}
+              style={{ transform: `translateX(${pct(lv.value) > 85 ? "-42%" : pct(lv.value) < 15 ? "42%" : "0"})` }}
+            >
+              <p className="text-[11px] font-bold whitespace-nowrap" style={{ color: lv.color }}>
                 {lv.label}
               </p>
               <p
-                className="text-[9px] font-black tabular-nums"
+                className="text-[11px] font-black tabular-nums"
                 style={{ color: lv.color }}
               >
                 ${lv.value.toFixed(0)}

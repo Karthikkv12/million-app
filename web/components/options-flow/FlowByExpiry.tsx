@@ -14,7 +14,7 @@ export function FlowByExpiry({ data }: Props) {
     <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
       <div className="flex items-center gap-2 mb-2.5">
         <Activity size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Flow by Expiry
         </span>
       </div>
@@ -34,14 +34,14 @@ export function FlowByExpiry({ data }: Props) {
               }`}
             >
               <span
-                className={`text-[8px] font-mono truncate font-bold ${
+                className={`text-[11px] font-mono truncate font-bold ${
                   dte0 ? "text-amber-400" : "text-foreground/70"
                 }`}
               >
                 {dte0 ? "⚡ 0DTE" : fe.expiry}
               </span>
               <span
-                className={`text-[9px] font-black tabular-nums shrink-0 ${
+                className={`text-[11px] font-black tabular-nums shrink-0 ${
                   isPos ? "text-emerald-400" : "text-red-400"
                 }`}
               >

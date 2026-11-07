@@ -42,7 +42,7 @@ export function FlowMomentumChart({ symbol, accentColor = "var(--foreground)" }:
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Zap size={10} className="text-foreground/60" />
-          <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+          <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
             Flow Momentum
           </span>
         </div>
@@ -52,7 +52,7 @@ export function FlowMomentumChart({ symbol, accentColor = "var(--foreground)" }:
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition ${
                 d === days
                   ? "bg-[var(--foreground)] text-[var(--background)]"
                   : "bg-[var(--surface-2)] text-foreground/60 hover:text-foreground"
@@ -77,14 +77,14 @@ export function FlowMomentumChart({ symbol, accentColor = "var(--foreground)" }:
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="ts"
-              tick={{ fontSize: 8, fill: "#9ca3af" }}
+              tick={{ fontSize: 11, fill: "#9ca3af" }}
               tickLine={false}
               interval={Math.max(1, Math.floor(chartData.length / 6))}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               tickFormatter={(v: any) => String(v).slice(11, 16)}
             />
             <YAxis
-              tick={{ fontSize: 9, fill: "#9ca3af" }}
+              tick={{ fontSize: 11, fill: "#9ca3af" }}
               tickLine={false}
               axisLine={false}
               width={44}

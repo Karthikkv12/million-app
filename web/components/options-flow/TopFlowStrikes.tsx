@@ -13,7 +13,7 @@ export function TopFlowStrikes({ data }: Props) {
     <div className="px-4 py-3 border-b border-[var(--border)]">
       <div className="flex items-center gap-2 mb-2.5">
         <BarChart2 size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Top Flow Strikes
         </span>
       </div>
@@ -25,7 +25,7 @@ export function TopFlowStrikes({ data }: Props) {
           const isCall = tf.bias === "call";
 
           return (
-            <div key={tf.strike} className="flex items-center gap-2 text-[10px]">
+            <div key={tf.strike} className="flex items-center gap-2 text-[11px]">
               <span className="w-[52px] font-black tabular-nums text-foreground shrink-0">
                 ${tf.strike.toFixed(0)}
               </span>
@@ -40,14 +40,14 @@ export function TopFlowStrikes({ data }: Props) {
                 />
               </div>
               <span
-                className={`shrink-0 font-black text-[8px] flex items-center gap-0.5 ${
+                className={`shrink-0 font-black text-[11px] flex items-center gap-0.5 ${
                   isCall ? "text-emerald-400" : "text-red-400"
                 }`}
               >
                 {isCall ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
                 {isCall ? "CALL" : "PUT"}
               </span>
-              <span className="text-foreground/70 tabular-nums shrink-0 font-mono text-[9px]">
+              <span className="text-foreground/70 tabular-nums shrink-0 font-mono text-[11px]">
                 ${(Math.abs(tf.net) / 1e6).toFixed(1)}M
               </span>
             </div>

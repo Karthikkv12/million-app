@@ -32,10 +32,10 @@ export function GexProfileChart({ data, accentColor = "var(--foreground)" }: Pro
       {/* header */}
       <div className="flex items-center gap-2 mb-3">
         <BarChart2 size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           GEX Profile
         </span>
-        <span className="text-[8px] text-foreground/50 ml-auto">
+        <span className="text-[11px] text-foreground/50 ml-auto">
           Call (green) · Put (red) — top 20 strikes
         </span>
       </div>
@@ -45,7 +45,7 @@ export function GexProfileChart({ data, accentColor = "var(--foreground)" }: Pro
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis
             type="number"
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
+            tick={{ fontSize: 11, fill: "#9ca3af" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => `${v.toFixed(1)}B`}
@@ -54,7 +54,7 @@ export function GexProfileChart({ data, accentColor = "var(--foreground)" }: Pro
             dataKey="strike"
             type="category"
             width={44}
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
+            tick={{ fontSize: 11, fill: "#9ca3af" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => `$${v}`}
@@ -79,7 +79,7 @@ export function GexProfileChart({ data, accentColor = "var(--foreground)" }: Pro
               stroke={accentColor}
               strokeDasharray="4 2"
               strokeWidth={1.5}
-              label={{ value: "SPOT", position: "insideTopRight", fontSize: 9, fill: accentColor }}
+              label={{ value: "SPOT", position: "insideTopRight", fontSize: 11, fill: accentColor }}
             />
           )}
           <Bar dataKey="call" fill="#22c55e" radius={[0, 3, 3, 0]} maxBarSize={12} />

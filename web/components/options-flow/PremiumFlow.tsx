@@ -21,7 +21,7 @@ export function PremiumFlow({ data }: Props) {
     <div className="px-4 py-3 border-b border-[var(--border)]">
       <div className="flex items-center gap-2 mb-3">
         <Zap size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Premium Flow
         </span>
       </div>
@@ -30,10 +30,10 @@ export function PremiumFlow({ data }: Props) {
         {/* Call premium bar */}
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wide">
+            <span className="text-[11px] text-emerald-400 font-black uppercase tracking-wide">
               Calls
             </span>
-            <span className="text-[10px] font-black text-emerald-400 tabular-nums">
+            <span className="text-[11px] font-black text-emerald-400 tabular-nums">
               ${(callPrem / 1e6).toFixed(1)}M
             </span>
           </div>
@@ -47,7 +47,7 @@ export function PremiumFlow({ data }: Props) {
 
         {/* P/C ratio badge */}
         <div className="flex flex-col items-center px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] shrink-0">
-          <span className="text-[8px] text-foreground/70 uppercase tracking-widest font-bold">
+          <span className="text-[11px] text-foreground/70 uppercase tracking-widest font-bold">
             P/C
           </span>
           <span
@@ -62,10 +62,10 @@ export function PremiumFlow({ data }: Props) {
         {/* Put premium bar */}
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-[9px] text-red-400 font-black uppercase tracking-wide">
+            <span className="text-[11px] text-red-400 font-black uppercase tracking-wide">
               Puts
             </span>
-            <span className="text-[10px] font-black text-red-400 tabular-nums">
+            <span className="text-[11px] font-black text-red-400 tabular-nums">
               ${(putPrem / 1e6).toFixed(1)}M
             </span>
           </div>

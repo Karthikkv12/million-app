@@ -24,7 +24,7 @@ export function InsightBar({ data }: Props) {
         isCallBias ? "bg-emerald-500/[0.04]" : "bg-red-500/[0.04]"
       }`}
     >
-      <div className="flex items-center gap-2 text-[10px] text-foreground/80">
+      <div className="flex items-center gap-2 text-[11px] text-foreground/80">
         {isCallBias ? (
           <TrendingDown size={11} className="text-emerald-400 shrink-0" />
         ) : (

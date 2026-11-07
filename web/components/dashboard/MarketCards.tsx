@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Change, Pill, SectionHeader } from "@/components/ui";
 
 // ── Session helpers ────────────────────────────────────────────────────────────
 
@@ -138,56 +138,38 @@ function fmtPct(v: number): string {
 
 function QuoteCard({ inst, quote }: { inst: Instrument; quote: Quote | undefined }) {
   const loading = !quote;
-  const up   = (quote?.change ?? 0) >= 0;
-  const zero = quote?.change === 0;
-
-  const ChangeIcon = zero ? Minus : up ? TrendingUp : TrendingDown;
-  const colorCls   = zero
-    ? "text-foreground/70"
-    : up
-    ? "text-green-500"
-    : "text-red-500";
-  const bgCls = zero
-    ? "bg-[var(--surface-2)]"
-    : up
-    ? "bg-green-50 dark:bg-green-900/20"
-    : "bg-red-50 dark:bg-red-900/20";
-
+  const pct = quote?.changePct ?? null;
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 card-hover flex flex-col gap-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[11px] font-semibold text-foreground/70 uppercase tracking-wide leading-none">
-            {inst.label}
-          </p>
-          <p className="text-[10px] text-foreground/50 mt-0.5">{inst.sublabel}</p>
+    <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--border-strong)]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[14px] font-medium text-foreground">{inst.label}</p>
+          <p className="truncate font-mono text-[11px] uppercase tracking-[0.1em] text-foreground/50">{inst.sublabel}</p>
         </div>
-        <span className={`p-2 rounded-xl ${inst.accent}`}>
-          <ChangeIcon size={15} className={inst.iconColor} />
-        </span>
+        {/* tiny direction bar: how big today's move is, capped at 3% */}
+        {pct != null && (
+          <span className="mt-1 flex h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-foreground/[0.07]" aria-hidden>
+            <span
+              className={pct >= 0 ? "bg-emerald-500" : "bg-red-500"}
+              style={{ width: `${Math.min(Math.abs(pct) / 3, 1) * 100}%`, marginLeft: pct >= 0 ? 0 : "auto" }}
+            />
+          </span>
+        )}
       </div>
-
-      {/* Price */}
       {loading ? (
         <div className="space-y-2">
           <div className="skeleton h-7 w-28 rounded-lg" />
           <div className="skeleton h-4 w-20 rounded-lg" />
         </div>
       ) : quote?.price == null ? (
-        <p className="text-xl font-black text-foreground/70">—</p>
+        <p className="font-mono text-2xl text-foreground/40">—</p>
       ) : (
-        <>
-          <p className="text-xl sm:text-2xl font-black text-foreground leading-none">
+        <div className="grid gap-1">
+          <p className="font-mono text-[22px] font-medium leading-none tracking-tight tabular-nums text-foreground">
             {fmtPrice(inst.symbol, quote.price)}
           </p>
-          <div className={`inline-flex items-center gap-1.5 self-start px-2 py-1 rounded-lg ${bgCls}`}>
-            <ChangeIcon size={11} className={colorCls} />
-            <span className={`text-xs font-bold ${colorCls}`}>
-              {fmtChange(quote.change!)} ({fmtPct(quote.changePct!)})
-            </span>
-          </div>
-        </>
+          <Change value={quote.change} pct={quote.changePct} />
+        </div>
       )}
     </div>
   );
@@ -223,55 +205,39 @@ export default function MarketCards() {
     return () => { clearInterval(quoteTimer); clearInterval(sessionTimer); };
   }, [load]);
 
-  const sessionLabel = futures ? "Futures" : "Regular Session";
-  const sessionColor = futures ? "text-amber-500" : "text-green-500";
-  const sessionDot   = futures ? "bg-amber-400" : "bg-green-400";
+  const updated = lastUpdated?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="mb-6 sm:mb-8">
-      {/* Row label + session badge */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest">Markets</p>
-        <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${sessionDot}`} />
-          <span className={`text-[11px] font-semibold ${sessionColor}`}>{sessionLabel}</span>
-          {lastUpdated && (
-            <span className="text-[10px] text-foreground/70 hidden sm:inline">
-              · {lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </span>
-          )}
-        </div>
-      </div>
-
+    <div className="mb-10 grid gap-8">
       {error && (
-        <p className="text-xs text-red-400 mb-2">Could not load market data — will retry automatically.</p>
+        <p className="rounded-xl border border-red-500/25 bg-red-500/[0.06] px-4 py-3 text-[13px] text-red-700 dark:text-red-300">
+          Couldn't load market data. Retrying every 30 seconds.
+        </p>
       )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {instruments.map((inst) => (
-          <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />
-        ))}
-      </div>
-
-      {/* ── India markets row ─────────────────────────────────────────── */}
-      <div className="mt-4">
-        <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest mb-3">India Markets</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {INDIA.map((inst) => (
-            <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />
-          ))}
+      <section>
+        <SectionHeader
+          label={futures ? "US index futures" : "US indexes"}
+          meta={<>
+            <Pill tone={futures ? "warn" : "good"} dot>{futures ? "Futures session" : "Regular session"}</Pill>
+            {updated && <span className="hidden font-mono text-[11px] sm:inline">{updated}</span>}
+          </>}
+        />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {instruments.map((inst) => <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />)}
         </div>
-      </div>
-
-      {/* ── Commodities row ───────────────────────────────────────────── */}
-      <div className="mt-4">
-        <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest mb-3">Commodities</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {COMMODITIES.map((inst) => (
-            <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />
-          ))}
+      </section>
+      <section>
+        <SectionHeader label="India" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {INDIA.map((inst) => <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />)}
         </div>
-      </div>
+      </section>
+      <section>
+        <SectionHeader label="Commodities" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {COMMODITIES.map((inst) => <QuoteCard key={inst.symbol} inst={inst} quote={quotes[inst.symbol]} />)}
+        </div>
+      </section>
     </div>
   );
 }

@@ -84,7 +84,7 @@ export function DealerNarrative({ data }: Props) {
       {/* header */}
       <div className="flex items-center gap-2 mb-3">
         <BookOpen size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Dealer Narrative
         </span>
       </div>

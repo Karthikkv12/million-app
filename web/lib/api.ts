@@ -716,7 +716,7 @@ export const adminListUsers = () => api.get<AdminUser[]>("/admin/users");
 export const adminCreateUser = (username: string, password: string, role: "admin" | "user") =>
   api.post<AdminUser>("/admin/users", { username, password, role });
 
-export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean }) =>
+export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean; password?: string }) =>
   api.patch<AdminUser>(`/admin/users/${user_id}`, patch);
 
 export const adminDeleteUser = async (user_id: number): Promise<void> => {
