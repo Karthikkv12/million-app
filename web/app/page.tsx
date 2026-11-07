@@ -1,308 +1,121 @@
 "use client";
 import Link from "next/link";
-import { motion, useInView, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { ArrowRight, Moon, Sun } from "lucide-react";
+import { Logo } from "@/components/Navbar";
+import { SampleBoard } from "@/components/marketing/SampleBoard";
+import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TODO: PAYWALL
-//
-// Gate authenticated app routes behind a subscription check.
-// Suggested implementation:
-//
-//  1. Plans & Pricing
-//     - Free tier  : landing page only (read-only demo data)
-//     - Pro  ($X/mo): full platform access (live flow, GEX, heatmap, journal)
-//     - Team ($Y/mo): multi-user seats + API access
-//
-//  2. Payment provider
-//     - Stripe Checkout / Stripe Billing (subscriptions + webhooks)
-//     - Store `stripe_customer_id`, `plan`, `status`, `period_end` on the User model
-//
-//  3. Backend (FastAPI / app.py)
-//     - POST /billing/checkout  → create Stripe Checkout session, return URL
-//     - POST /billing/portal    → create Stripe Customer Portal session
-//     - POST /billing/webhook   → handle checkout.session.completed,
-//                                  customer.subscription.updated/deleted
-//     - GET  /billing/status    → return { plan, status, period_end }
-//
-//  4. Frontend middleware (web/middleware.ts)
-//     - On every request to /(app)/* check subscription status via JWT claim or
-//       a quick /billing/status fetch; redirect to /pricing if not subscribed.
-//
-//  5. Pricing page  (web/app/pricing/page.tsx)
-//     - Show plan cards with feature lists and "Subscribe" CTA
-//     - On click → call /billing/checkout → redirect to Stripe-hosted page
-//     - After payment → Stripe webhook updates DB → user lands on /dashboard
-//
-//  6. Account / billing settings  (web/app/(app)/settings/billing/page.tsx)
-//     - Show current plan + renewal date
-//     - "Manage Subscription" → call /billing/portal → redirect to Stripe portal
-//
-// ─────────────────────────────────────────────────────────────────────────────
+// TODO: PAYWALL — plans, Stripe billing and a /pricing page are planned.
+// See the previous version of this file (git history) for the full outline.
 
-// ── Animation helpers ─────────────────────────────────────────────────────────
-
-function FadeUp({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-60px" });
-  return (
-    <motion.div ref={ref} className={className}
-      initial={{ opacity: 0, y: 32 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}>
-      {children}
-    </motion.div>
-  );
-}
-
-function FadeIn({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-60px" });
-  return (
-    <motion.div ref={ref} className={className}
-      initial={{ opacity: 0 }}
-      animate={inView ? { opacity: 1 } : {}}
-      transition={{ duration: 0.6, delay }}>
-      {children}
-    </motion.div>
-  );
-}
-
-// ── Particle field ────────────────────────────────────────────────────────────
-
-const PARTICLES = Array.from({ length: 120 }, (_, i) => ({
-  id: i,
-  x:  (i * 37 + 11) % 100,   // deterministic spread, no Math.random (SSR safe)
-  y:  (i * 53 + 7)  % 100,
-  r:  0.8 + (i % 4) * 0.5,   // 0.8px / 1.3px / 1.8px / 2.3px
-  dur: 5 + (i % 9) * 1.8,    // 5-19s orbit
-  dx:  ((i % 7) - 3) * 16,   // -48 to +48 px drift
-  dy:  ((i % 5) - 2) * 13,   // -26 to +26 px drift
-  delay: (i * 0.27) % 5,
-}));
-
-function ParticleField() {
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {PARTICLES.map((p) => (
-        <motion.span
-          key={p.id}
-          className="absolute rounded-full"
-          style={{
-            left:   `${p.x}%`,
-            top:    `${p.y}%`,
-            width:  p.r * 2,
-            height: p.r * 2,
-            background: p.id % 3 === 0
-              ? "rgba(99,130,248,0.55)"
-              : p.id % 3 === 1
-              ? "rgba(148,97,251,0.45)"
-              : "rgba(245,158,11,0.4)",
-            boxShadow: `0 0 ${p.r * 4}px ${p.r}px ${p.id % 3 === 0 ? "rgba(99,130,248,0.3)" : p.id % 3 === 1 ? "rgba(148,97,251,0.25)" : "rgba(245,158,11,0.25)"}`,
-          }}
-          animate={{
-            x: [0, p.dx, -p.dx * 0.6, 0],
-            y: [0, p.dy, p.dy * 0.4, 0],
-            opacity: [0.3, 0.9, 0.5, 0.3],
-            scale:   [1, 1.4, 0.8, 1],
-          }}
-          transition={{
-            duration: p.dur,
-            delay:    p.delay,
-            repeat:   Infinity,
-            ease:     "easeInOut",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-// ── Feature data ─────────────────────────────────────────────────────────────
-
-const FEATURES = [
+const READS = [
   {
-    icon: "⚡",
-    title: "Options Flow",
-    desc: "GEX by strike, dealer positioning, call/put walls, and flip levels across any ticker.",
-    color: "from-amber-500/20 to-amber-600/5",
-    border: "border-amber-500/30",
-    tag: "Core Product",
-    tagColor: "bg-amber-500/15 text-amber-400",
+    term: "King node",
+    body: "The strike and expiry holding the most gamma. Price tends to get pulled toward it, or pinned at it, into expiry.",
+    swatch: "bg-[#fde725]",
   },
   {
-    icon: "🌍",
-    title: "Markets",
-    desc: "Sector heatmaps, live VIX, market breadth, top movers, and all 11 SPDR ETFs in one view.",
-    color: "from-blue-500/20 to-blue-600/5",
-    border: "border-blue-500/30",
-    tag: "Market Overview",
-    tagColor: "bg-blue-500/15 text-blue-400",
+    term: "Gamma flip",
+    body: "Where dealer exposure changes sign. Above it dealers dampen moves; below it they add to them.",
+    swatch: "bg-accent",
+  },
+  {
+    term: "Call and put walls",
+    body: "The largest positive and negative strikes. They often act as a ceiling and a floor for the session.",
+    swatch: "bg-gradient-to-r from-[#35b779] to-[#5a1f80]",
   },
 ];
 
-const STATS = [
-  { value: "10",   label: "App Pages"         },
-  { value: "11",   label: "Sector ETFs"       },
-  { value: "500+", label: "Symbols Tracked"   },
-  { value: "v1.8", label: "Latest Release"    },
+const MODULES = [
+  { name: "Flow", desc: "Strike × expiry GEX board with king node, spot, flip and walls. Five palettes, including colour-blind safe ones." },
+  { name: "Markets", desc: "Sector heatmaps sized by market cap, VIX, breadth and the 11 SPDR sector ETFs." },
+  { name: "Dashboard", desc: "Index cards, volatility and the economic calendar for the day ahead." },
 ];
 
-// ── Components ───────────────────────────────────────────────────────────────
+function ThemeButton() {
+  const { theme, toggle } = useTheme();
+  return (
+    <button
+      onClick={toggle}
+      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
+    >
+      {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+    </button>
+  );
+}
 
 function Nav() {
+  const { user } = useAuth();
   return (
-    <nav className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#0c0e14]/80 border-b border-white/5">
-      <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-        {/* Logo */}
+    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Logo href="/" />
+        <nav className="hidden items-center gap-7 text-sm text-foreground/65 md:flex">
+          <a href="#read" className="transition hover:text-foreground">How to read it</a>
+          <a href="#modules" className="transition hover:text-foreground">What's inside</a>
+        </nav>
         <div className="flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="#F59E0B"
-            className="drop-shadow-[0_0_6px_rgba(245,158,11,0.9)]">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </svg>
-          <span className="font-black text-white tracking-tight text-lg">Option<span className="text-amber-400">Flow</span></span>
-        </div>
-        {/* CTA */}
-        <div className="flex items-center gap-3">
-          <Link href="/login"
-            className="text-sm px-4 py-1.5 rounded-lg bg-white text-black font-semibold hover:bg-white/90 transition">
-            Sign in
-          </Link>
+          <ThemeButton />
+          {user ? (
+            <Link href="/options-flow" className="btn-primary h-9 px-4">Open app</Link>
+          ) : (
+            <Link href="/login" className="btn-primary h-9 px-4">Sign in</Link>
+          )}
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
 
 function Hero() {
-  const { scrollY } = useScroll();
-  const blobY = useTransform(scrollY, [0, 400], [0, -60]);
-
+  const { user } = useAuth();
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-5 overflow-hidden">
-      {/* Background glow blobs — parallax */}
-      <motion.div className="absolute inset-0 pointer-events-none" style={{ y: blobY }}>
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-white/[0.03] blur-[140px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] rounded-full bg-amber-500/5 blur-[100px]" />
-        <div className="absolute inset-0 opacity-[0.025]"
-          style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "64px 64px" }} />
-      </motion.div>
-
-      {/* Floating particles */}
-      <ParticleField />
-
-      <div className="relative max-w-4xl mx-auto">
-        {/* Brand name — staggered letter entrance */}
-        <motion.div className="flex items-center justify-center gap-3 mb-4"
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
-          <motion.svg width="36" height="36" viewBox="0 0 24 24" fill="#F59E0B"
-            className="drop-shadow-[0_0_12px_rgba(245,158,11,0.8)] shrink-0"
-            animate={{ rotate: [0, -8, 8, -4, 0] }}
-            transition={{ delay: 0.8, duration: 0.6, ease: "easeInOut" }}>
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </motion.svg>
-          <span className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white">
-            Option<span className="text-amber-400">Flow</span>
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          className="text-2xl sm:text-4xl lg:text-5xl font-black text-white leading-[1.1] tracking-tight mb-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-          Trade smarter with{" "}
-          <span className="text-amber-400">
-            real edge
-          </span>
-        </motion.h1>
-
-        {/* Sub */}
-        <motion.p
-          className="text-base sm:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}>
-          OptionFlow is a full-stack trading analytics platform — options flow, GEX and dealer positioning,
-          sector heatmaps, live market breadth, and an AI assistant in one place.
-        </motion.p>
-
-        {/* CTAs */}
-        <motion.div
-          className="flex flex-col sm:flex-row items-center justify-center gap-3"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}>
-          <Link href="/login"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white text-black font-bold text-base hover:bg-white/90 hover:scale-[1.03] active:scale-[0.97] transition-all">
-            Sign in →
-          </Link>
-        </motion.div>
-      </div>
-
-      {/* Scroll hint */}
-      <motion.div
-        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/50"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.6 }}
-        style={{ animationName: "bounce" }}>
-        <motion.div animate={{ y: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 1.4, ease: "easeInOut" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-        </motion.div>
-      </motion.div>
-    </section>
-  );
-}
-
-function Stats() {
-  return (
-    <section className="py-12 border-y border-white/5 bg-white/[0.02]">
-      <div className="max-w-4xl mx-auto px-5 grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
-        {STATS.map(({ value, label }, i) => (
-          <FadeUp key={label} delay={i * 0.1}>
-            <p className="text-3xl sm:text-4xl font-black text-white mb-1">{value}</p>
-            <p className="text-xs text-white/50 uppercase tracking-widest font-semibold">{label}</p>
-          </FadeUp>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Features() {
-  return (
-    <section id="features" className="py-24 px-5">
-      <div className="max-w-6xl mx-auto">
-        {/* Section header */}
-        <FadeUp className="text-center mb-16">
-          <p className="text-xs font-bold text-foreground/50 uppercase tracking-widest mb-3">Everything you need</p>
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4">
-            Built for serious traders
-          </h2>
-          <p className="text-white/60 max-w-xl mx-auto text-base">
-            From options flow to double-entry accounting — every feature you need to trade with conviction.
+    <section className="dot-grid relative overflow-hidden">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pt-24">
+        <div className="min-w-0">
+          <p className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Gamma exposure · dealer positioning</p>
+          <h1 className="text-balance text-[44px] font-semibold leading-[1.02] tracking-[-0.04em] text-foreground sm:text-6xl">
+            See where dealers <span className="gradient-text">have to hedge.</span>
+          </h1>
+          <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-foreground/65">
+            OptionFlow maps gamma exposure across every strike and expiry, so the levels that move price
+            (the king node, the flip, the walls) are on screen before you size in.
           </p>
-        </FadeUp>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={user ? "/options-flow" : "/login"} className="btn-primary h-11 px-5">
+              {user ? "Open the flow board" : "Sign in"} <ArrowRight size={16} />
+            </Link>
+            <a href="#read" className="btn-ghost h-11 px-5">How to read the board</a>
+          </div>
+          <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[12px] text-foreground/55">
+            <li>Any optionable ticker</li>
+            <li>Data from Yahoo Finance, ~15 min delayed</li>
+            <li>Light and dark</li>
+          </ul>
+        </div>
+        <SampleBoard className="min-w-0" />
+      </div>
+    </section>
+  );
+}
 
-        {/* Feature grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURES.map((f, i) => (
-            <FadeUp key={f.title} delay={i * 0.07}>
-              <motion.div
-                className={`relative rounded-2xl border ${f.border} bg-gradient-to-b ${f.color} p-5 flex flex-col gap-3 h-full`}
-                whileHover={{ scale: 1.03, y: -4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}>
-                <div className="text-2xl">{f.icon}</div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <h3 className="font-bold text-white text-sm">{f.title}</h3>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${f.tagColor}`}>{f.tag}</span>
-                  </div>
-                  <p className="text-xs text-white/60 leading-relaxed">{f.desc}</p>
-                </div>
-              </motion.div>
-            </FadeUp>
+function HowToRead() {
+  return (
+    <section id="read" className="scroll-mt-20 border-t border-[var(--border)]">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <p className="eyebrow mb-3 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />How to read it</p>
+        <h2 className="max-w-2xl text-balance text-3xl font-semibold tracking-[-0.03em] text-foreground sm:text-4xl">
+          Three levels do most of the work.
+        </h2>
+        <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] md:grid-cols-3">
+          {READS.map((r) => (
+            <div key={r.term} className="grid content-start gap-3 bg-[var(--surface)] p-6">
+              <span className={`h-2 w-10 rounded-full ${r.swatch}`} aria-hidden />
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">{r.term}</h3>
+              <p className="text-[15px] leading-relaxed text-foreground/65">{r.body}</p>
+            </div>
           ))}
         </div>
       </div>
@@ -310,240 +123,43 @@ function Features() {
   );
 }
 
-function Highlight() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
+function Modules() {
   return (
-    <section className="py-24 px-5 bg-white/[0.015] border-y border-white/5" ref={ref}>
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        {/* Left: text */}
-        <motion.div
-          initial={{ opacity: 0, x: -40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3">⚡ Core Product</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-5">
-            Options Flow is the edge<br />most traders don&apos;t have
-          </h2>
-          <p className="text-white/60 text-base leading-relaxed mb-8">
-            Gamma exposure tells you where dealers are hedged and where they&apos;re not.
-            OptionFlow surfaces GEX across any ticker — so you can see the magnetic levels,
-            flip points, and vol regime before you size in.
-          </p>
-          <ul className="space-y-3">
-            {[
-              "GEX by strike — see where dealers are long/short gamma",
-              "Dealer net positioning across the full options chain",
-              "Multi-ticker panels — compare any symbols side by side",
-              "Call / put wall identification at a glance",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-white/80">
-                <span className="mt-0.5 text-amber-400 shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-
-        {/* Right: GEX heatmap snapshot */}
-        <motion.div
-          className="relative rounded-2xl border border-amber-500/20 bg-[#0f1018] p-5 shadow-2xl"
-          initial={{ opacity: 0, x: 40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}>
-          {/* Window chrome */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+    <section id="modules" className="scroll-mt-20 border-t border-[var(--border)] bg-[var(--surface-2)]/50">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <p className="eyebrow mb-3 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />What's inside</p>
+        <h2 className="max-w-2xl text-balance text-3xl font-semibold tracking-[-0.03em] text-foreground sm:text-4xl">
+          One desk for the options picture.
+        </h2>
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          {MODULES.map((m) => (
+            <div key={m.name} className="card overflow-hidden">
+              <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-4 py-2.5">
+                <span className="h-2 w-2 rounded-full bg-foreground/15" />
+                <span className="h-2 w-2 rounded-full bg-foreground/15" />
+                <span className="h-2 w-2 rounded-full bg-foreground/15" />
+                <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/55">OptionFlow / {m.name}</span>
               </div>
-              <span className="text-[10px] text-white/50 ml-1 font-mono">optionflow · GEX · SPY</span>
+              <p className="p-5 text-[15px] leading-relaxed text-foreground/70">{m.desc}</p>
             </div>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 font-bold tracking-wide">● LIVE</span>
-          </div>
-
-          {/* Stat row */}
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {[
-              { label: "Net GEX",    value: "+$2.4B",  color: "text-green-400",  bg: "bg-green-500/10"  },
-              { label: "Call Wall",  value: "580",      color: "text-green-400",  bg: "bg-green-500/10"  },
-              { label: "Put Wall",   value: "550",      color: "text-red-400",    bg: "bg-red-500/10"    },
-              { label: "Flip",       value: "565",      color: "text-amber-400",  bg: "bg-amber-500/10"  },
-            ].map(({ label, value, color, bg }) => (
-              <div key={label} className={`${bg} rounded-lg p-2 text-center`}>
-                <p className="text-[8px] text-white/50 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className={`text-xs font-black ${color}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* GEX heatmap grid — strikes × expiry */}
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[8px] text-white/50 uppercase tracking-widest mb-1.5">Strike →</span>
-              <span className="text-[8px] text-white/50 uppercase tracking-widest">← Expiry</span>
-            </div>
-            {/* Header row */}
-            <div className="grid mb-1" style={{ gridTemplateColumns: "40px repeat(10, 1fr)" }}>
-              <span />
-              {[545,550,555,560,565,570,575,580,585,590].map(s => (
-                <span key={s} className="text-[7px] text-white/50 text-center">{s}</span>
-              ))}
-            </div>
-            {/* Heatmap rows */}
-            {[
-              { exp: "0DTE",  vals: [5,15,80,95,100,85,40,20,10,5]  },
-              { exp: "1W",    vals: [8,20,55,75,90,70,45,25,12,6]   },
-              { exp: "2W",    vals: [10,25,45,60,70,55,38,20,10,5]  },
-              { exp: "1M",    vals: [6,15,30,45,55,42,28,15,8,4]    },
-              { exp: "2M",    vals: [4,10,20,30,38,30,20,10,5,3]    },
-            ].map(({ exp, vals }) => (
-              <div key={exp} className="grid mb-0.5 items-center" style={{ gridTemplateColumns: "40px repeat(10, 1fr)" }}>
-                <span className="text-[8px] text-white/50 font-mono">{exp}</span>
-                {vals.map((v, i) => {
-                  const isCall = i >= 5;
-                  const intensity = v / 100;
-                  const bg = isCall
-                    ? `rgba(34,197,94,${intensity * 0.7})`
-                    : `rgba(239,68,68,${intensity * 0.7})`;
-                  return (
-                    <div key={i} className="h-5 rounded-sm mx-px flex items-center justify-center"
-                      style={{ background: bg }}>
-                      {v > 40 && <span className="text-[6px] font-bold text-white/80">{v}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            {/* Axis label */}
-            <div className="flex justify-end gap-4 mt-2">
-              <span className="flex items-center gap-1 text-[8px] text-red-400"><span className="w-2 h-2 rounded-sm bg-red-500/50 inline-block" />Negative GEX</span>
-              <span className="flex items-center gap-1 text-[8px] text-green-400"><span className="w-2 h-2 rounded-sm bg-green-500/50 inline-block" />Positive GEX</span>
-            </div>
-          </div>
-
-          {/* Bottom bar chart — net GEX by strike */}
-          <div className="border-t border-white/5 pt-3">
-            <p className="text-[8px] text-white/50 uppercase tracking-widest mb-2">Net GEX by Strike ($M)</p>
-            <div className="flex items-end gap-0.5 h-12">
-              {[-20,-45,-80,-120,-60,40,90,150,110,70].map((v, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end">
-                  {v > 0
-                    ? <div className="w-full rounded-t-sm" style={{ height: `${(v/150)*100}%`, background: "#22c55e90" }} />
-                    : <div className="w-full rounded-b-sm self-start" style={{ height: `${(Math.abs(v)/150)*100}%`, background: "#ef444490", marginTop: "auto" }} />
-                  }
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[7px] text-white/50 mt-1">
-              {[545,550,555,560,565,570,575,580,585,590].map(s => <span key={s}>{s}</span>)}
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function HeatmapHighlight() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-  return (
-    <section className="py-24 px-5" ref={ref}>
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        {/* Left: mock heatmap */}
-        <motion.div
-          className="rounded-2xl border border-blue-500/20 bg-gradient-to-b from-blue-500/10 to-transparent p-6 order-2 lg:order-1"
-          initial={{ opacity: 0, x: -40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-4">Technology Sector</p>
-          <div className="space-y-2">
-            {[
-              [{ label: "AAPL", pct: 38, color: "#22c55e" }, { label: "MSFT", pct: 32, color: "#22c55e" }, { label: "NVDA", pct: 30, color: "#ef4444" }],
-              [{ label: "GOOGL", pct: 25, color: "#22c55e" }, { label: "META", pct: 22, color: "#22c55e" }, { label: "AMZN", pct: 28, color: "#eab308" }, { label: "TSLA", pct: 15, color: "#ef4444" }],
-              [{ label: "AVGO", pct: 18, color: "#22c55e" }, { label: "AMD", pct: 14, color: "#ef4444" }, { label: "ORCL", pct: 12, color: "#22c55e" }, { label: "ADBE", pct: 10, color: "#eab308" }, { label: "CRM", pct: 10, color: "#22c55e" }],
-            ].map((row, ri) => (
-              <div key={ri} className="flex gap-1 h-10">
-                {row.map(({ label, pct, color }) => (
-                  <div key={label} className="flex items-center justify-center rounded text-[9px] font-bold text-white"
-                    style={{ width: `${pct}%`, background: color + "40", border: `1px solid ${color}60` }}>
-                    {label}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-4 text-[9px] text-white/50">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500/60 inline-block" /> Gaining</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500/60 inline-block" /> Declining</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-yellow-500/60 inline-block" /> Flat</span>
-            <span className="ml-auto">Sized by market cap</span>
-          </div>
-        </motion.div>
-
-        {/* Right: text */}
-        <motion.div
-          className="order-1 lg:order-2"
-          initial={{ opacity: 0, x: 40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">🌍 Markets Page</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-5">
-            The whole market,<br />at a glance
-          </h2>
-          <p className="text-white/60 text-base leading-relaxed mb-8">
-            Sector heatmaps sized by real market cap weights, live VIX and India VIX charts,
-            market breadth, fear & greed, top movers, and SPDR ETF performance — all on one page.
-          </p>
-          <ul className="space-y-3">
-            {[
-              "8 sector heatmaps + Magnificent 7",
-              "Tiles proportional to market cap ($B)",
-              "VIX + India VIX with X/Y axes and regime badges",
-              "Top gainers and losers updated in real time",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-white/80">
-                <span className="mt-0.5 text-blue-400 shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function CTA() {
-  return (
-    <section className="py-24 px-5">
-      <div className="max-w-3xl mx-auto text-center">
-        <FadeUp>
-        <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-blue-600/15 via-violet-600/10 to-transparent p-12 sm:p-16 overflow-hidden">
-          {/* Glow */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 rounded-full bg-blue-600/20 blur-[80px]" />
-          </div>
-          <div className="relative">
-            <div className="text-4xl mb-4">⚡</div>
-            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 tracking-tight">
-              Ready to trade with edge?
-            </h2>
-            <p className="text-white/60 mb-8 text-base">
-              Sign up free. No credit card required. Start reading options flow in minutes.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link href="/login"
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold text-base hover:opacity-90 transition shadow-xl shadow-blue-900/40">
-                Sign in →
-              </Link>
-            </div>
-          </div>
+          ))}
         </div>
-        </FadeUp>
+      </div>
+    </section>
+  );
+}
+
+function Closing() {
+  const { user } = useAuth();
+  return (
+    <section className="border-t border-[var(--border)]">
+      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-16 sm:px-6 md:flex-row md:items-center">
+        <h2 className="max-w-xl text-balance text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">
+          Open the board before the open.
+        </h2>
+        <Link href={user ? "/options-flow" : "/login"} className="btn-primary h-11 px-5">
+          {user ? "Open the flow board" : "Sign in"} <ArrowRight size={16} />
+        </Link>
       </div>
     </section>
   );
@@ -551,35 +167,26 @@ function CTA() {
 
 function Footer() {
   return (
-    <footer className="border-t border-white/5 py-8 px-5">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-          <span className="font-black text-white text-sm">Option<span className="text-amber-400">Flow</span></span>
-          <span className="text-white/50 text-xs ml-2">© 2026</span>
-        </div>
-        <p className="text-xs text-white/50">Options Flow · GEX · AI Assistant · Market Intelligence</p>
+    <footer className="border-t border-[var(--border)]">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-[13px] text-foreground/50 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <span>© 2026 OptionFlow</span>
+        <span>For information only, not investment advice. Market data is delayed about 15 minutes.</span>
       </div>
     </footer>
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
-
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0c0e14] text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <Nav />
-      <main className="pt-14">
+      <main>
         <Hero />
-        <Stats />
-        <Features />
-        <Highlight />
-        <HeatmapHighlight />
-        <CTA />
+        <HowToRead />
+        <Modules />
+        <Closing />
       </main>
       <Footer />
     </div>
   );
 }
-

@@ -61,7 +61,7 @@ const ramp = (stops: RGB[], t: number): RGB => {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 };
 
-function cellColor(v: number, vmax: number, palette: Palette): { bg: string; fg: string } {
+export function cellColor(v: number, vmax: number, palette: Palette): { bg: string; fg: string } {
   const t = vmax ? Math.sqrt(Math.min(Math.abs(v) / vmax, 1)) : 0; // sqrt keeps mid nodes visible
   let c: RGB;
   if (palette in SIGNED) {
