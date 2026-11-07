@@ -1,227 +1,523 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchAuthSessions, fetchAuthEvents, revokeSession, changePassword, AuthSession, AuthEvent } from "@/lib/api";
-import { Shield, Monitor, Key, CheckCircle, XCircle } from "lucide-react";
-import { PageHeader, Badge } from "@/components/ui";
+import {
+  fetchAuthSessions, fetchAuthEvents, revokeSession, changePassword, logoutAll,
+  AuthSession, AuthEvent,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
+import {
+  Monitor, Smartphone, Tablet, Terminal, Eye, EyeOff, Check, LogIn, LogOut,
+  RefreshCw, KeyRound, ShieldAlert, ShieldX, Sun, Moon,
+} from "lucide-react";
+import { clsx } from "clsx";
 
-const EVENT_COLOR: Record<string, string> = {
-  login:           "text-green-500",
-  logout:          "text-foreground/70",
-  refresh:         "text-blue-400",
-  signup:          "text-purple-500",
-  change_password: "text-yellow-500",
-  failed_login:    "text-red-500",
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function parseUA(ua?: string): { label: string; kind: "desktop" | "phone" | "tablet" | "script" } {
+  if (!ua) return { label: "Unknown device", kind: "desktop" };
+  if (/^(node|python|curl|axios|undici|okhttp)/i.test(ua)) return { label: "Script or API client", kind: "script" };
+  const browser =
+    /Edg\//.test(ua) ? "Edge" :
+    /OPR\//.test(ua) ? "Opera" :
+    /Firefox\//.test(ua) ? "Firefox" :
+    /CriOS|Chrome\//.test(ua) ? "Chrome" :
+    /Safari\//.test(ua) ? "Safari" : "Browser";
+  const os =
+    /iPhone/.test(ua) ? "iPhone" :
+    /iPad/.test(ua) ? "iPad" :
+    /Android/.test(ua) ? "Android" :
+    /Mac OS X|Macintosh/.test(ua) ? "macOS" :
+    /Windows/.test(ua) ? "Windows" :
+    /CrOS/.test(ua) ? "ChromeOS" :
+    /Linux/.test(ua) ? "Linux" : "";
+  const kind = /iPhone|Android.*Mobile/.test(ua) ? "phone" : /iPad|Android/.test(ua) ? "tablet" : "desktop";
+  return { label: os ? `${browser} on ${os}` : browser, kind };
+}
+
+function ago(iso?: string): string {
+  if (!iso) return "—";
+  const t = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z").getTime();
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hr ago`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
+  return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+const EVENT_META: Record<string, { label: string; icon: typeof LogIn; tone: "neutral" | "good" | "bad" | "warn" }> = {
+  login:             { label: "Signed in",              icon: LogIn,       tone: "good" },
+  logout:            { label: "Signed out",             icon: LogOut,      tone: "neutral" },
+  logout_all:        { label: "Signed out everywhere",  icon: LogOut,      tone: "warn" },
+  refresh:           { label: "Session refreshed",      icon: RefreshCw,   tone: "neutral" },
+  change_password:   { label: "Password changed",       icon: KeyRound,    tone: "warn" },
+  revoke_session:    { label: "Device signed out",      icon: ShieldX,     tone: "warn" },
+  login_throttled:   { label: "Too many sign-in attempts", icon: ShieldAlert, tone: "bad" },
+  refresh_throttled: { label: "Too many refresh attempts", icon: ShieldAlert, tone: "bad" },
+  signup:            { label: "Account created",        icon: Check,       tone: "good" },
 };
 
-const inp = "w-full border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm bg-[var(--surface)] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500";
+const TONE = {
+  neutral: "text-foreground/55 bg-foreground/[0.05]",
+  good:    "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
+  warn:    "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+  bad:     "text-red-600 dark:text-red-400 bg-red-500/10",
+};
 
-function ChangePasswordSection() {
-  const [current, setCurrent] = useState("");
-  const [next, setNext]       = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [ok, setOk]           = useState(false);
-  const [err, setErr]         = useState("");
+// ── Layout pieces ─────────────────────────────────────────────────────────────
 
-  const mut = useMutation({
-    mutationFn: () => {
-      if (next !== confirm) throw new Error("Passwords do not match");
-      if (next.length < 8) throw new Error("Password must be at least 8 characters");
-      return changePassword(current, next);
-    },
-    onSuccess: () => { setOk(true); setCurrent(""); setNext(""); setConfirm(""); setErr(""); },
-    onError: (e: Error) => { setErr(e.message); setOk(false); },
-  });
+const SECTIONS = [
+  { id: "profile",    label: "Profile" },
+  { id: "appearance", label: "Appearance" },
+  { id: "password",   label: "Password" },
+  { id: "devices",    label: "Devices" },
+  { id: "activity",   label: "Sign-in activity" },
+];
 
+function Section({ id, title, sub, action, children }: {
+  id: string; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode;
+}) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
-      <div className="flex items-center gap-3 mb-4">
-        <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30"><Key size={16} className="text-blue-500" /></span>
-        <h2 className="font-bold text-foreground">Change Password</h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        {[
-          { label: "Current Password", val: current, set: setCurrent },
-          { label: "New Password",     val: next,    set: setNext    },
-          { label: "Confirm Password", val: confirm, set: setConfirm },
-        ].map(({ label, val, set }) => (
-          <div key={label}>
-            <label className="text-xs text-foreground/70 block mb-1">{label}</label>
-            <input type="password" value={val} onChange={(e) => set(e.target.value)} autoComplete="off" className={inp} />
+    <section id={id} className="scroll-mt-24">
+      <div className="card overflow-hidden">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h2>
+            {sub && <p className="mt-0.5 text-[13px] leading-relaxed text-foreground/60">{sub}</p>}
           </div>
-        ))}
+          {action}
+        </header>
+        <div>{children}</div>
       </div>
-      {err && <p className="text-xs text-red-500 mb-3">{err}</p>}
-      {ok  && <p className="text-xs text-green-500 mb-3 flex items-center gap-1"><CheckCircle size={12} /> Password changed successfully!</p>}
-      <button onClick={() => mut.mutate()} disabled={mut.isPending || !current || !next || !confirm}
-        className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
-        {mut.isPending ? "Saving…" : "Update Password"}
-      </button>
+    </section>
+  );
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+function ProfileSection() {
+  const { user, logout } = useAuth();
+  const name = user?.username ?? "";
+  return (
+    <Section id="profile" title="Profile" sub="The account you're signed in with.">
+      <div className="flex flex-wrap items-center gap-4 px-5 py-5">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-foreground text-lg font-semibold text-background">
+          {name.slice(0, 1).toUpperCase() || "?"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold text-foreground">{name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[var(--border-strong)] px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-foreground/70">
+              {user?.role ?? "user"}
+            </span>
+            <span className="font-mono text-[11px] text-foreground/50">ID {user?.user_id}</span>
+          </div>
+        </div>
+        <button className="btn-ghost" onClick={() => logout()}>
+          <LogOut size={15} /> Sign out
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+// ── Appearance ────────────────────────────────────────────────────────────────
+
+function AppearanceSection() {
+  const { theme, toggle } = useTheme();
+  const options = [
+    { id: "light", label: "Light", icon: Sun },
+    { id: "dark",  label: "Dark",  icon: Moon },
+  ] as const;
+  return (
+    <Section id="appearance" title="Appearance" sub="Saved on this device.">
+      <div className="px-5 py-5">
+        <div role="radiogroup" aria-label="Theme" className="grid max-w-sm grid-cols-2 gap-3">
+          {options.map(({ id, label, icon: Icon }) => {
+            const on = theme === id;
+            return (
+              <button
+                key={id}
+                role="radio"
+                aria-checked={on}
+                onClick={() => { if (!on) toggle(); }}
+                className={clsx(
+                  "group rounded-xl border p-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                  on ? "border-foreground" : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                )}
+              >
+                <div className={clsx(
+                  "flex h-16 flex-col gap-1.5 rounded-lg border p-2",
+                  id === "light" ? "border-black/10 bg-[#f6f6f3]" : "border-white/10 bg-[#0a0a0a]",
+                )}>
+                  <div className={clsx("h-1.5 w-10 rounded-full", id === "light" ? "bg-black/70" : "bg-white/80")} />
+                  <div className={clsx("h-1.5 w-16 rounded-full", id === "light" ? "bg-black/15" : "bg-white/20")} />
+                  <div className="mt-auto flex gap-1">
+                    <div className="h-3 w-6 rounded-sm bg-[#22968a]" />
+                    <div className="h-3 w-6 rounded-sm bg-[#53318f]" />
+                    <div className="h-3 w-6 rounded-sm bg-[#fde725]" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between px-1">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground"><Icon size={14} />{label}</span>
+                  {on && <Check size={15} className="text-foreground" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ── Password ──────────────────────────────────────────────────────────────────
+
+// Mirrors the backend policy in logic/auth_services.py (_validate_password_policy).
+const RULES = [
+  { label: "At least 12 characters", test: (p: string) => p.length >= 12, required: true },
+  { label: "Upper and lower case",   test: (p: string) => /[a-z]/.test(p) && /[A-Z]/.test(p), required: true },
+  { label: "A number",               test: (p: string) => /\d/.test(p), required: true },
+  { label: "A symbol (recommended)", test: (p: string) => /[^A-Za-z0-9]/.test(p), required: false },
+];
+
+function PasswordField({ id, label, value, onChange, autoComplete }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; autoComplete: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="grid gap-1.5">
+      <label htmlFor={id} className="text-[13px] font-medium text-foreground/80">{label}</label>
+      <div className="relative">
+        <input
+          id={id}
+          type={show ? "text" : "password"}
+          value={value}
+          autoComplete={autoComplete}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 pr-10 text-sm text-foreground outline-none transition focus:border-foreground/40 focus:ring-2 focus:ring-accent/30"
+        />
+        <button
+          type="button"
+          onClick={() => setShow((s) => !s)}
+          aria-label={show ? "Hide password" : "Show password"}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-foreground/45 hover:text-foreground"
+        >
+          {show ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </div>
     </div>
   );
 }
 
-function SessionsSection() {
+function PasswordSection() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const passed = RULES.filter((r) => r.test(next)).length;
+  const mismatch = confirm.length > 0 && next !== confirm;
+  const requiredOk = RULES.every((r) => !r.required || r.test(next));
+  const ready = current.length > 0 && requiredOk && next === confirm;
+
+  const mut = useMutation({
+    mutationFn: () => changePassword(current, next),
+    onSuccess: () => { setCurrent(""); setNext(""); setConfirm(""); },
+  });
+
+  return (
+    <Section id="password" title="Password" sub="Changing it signs out your other devices.">
+      <form
+        className="grid grid-cols-1 gap-6 px-5 py-5 md:grid-cols-[minmax(0,1fr)_220px]"
+        onSubmit={(e) => { e.preventDefault(); if (ready) mut.mutate(); }}
+      >
+        <div className="grid max-w-md gap-4">
+          <PasswordField id="pw-current" label="Current password" value={current} onChange={setCurrent} autoComplete="current-password" />
+          <PasswordField id="pw-new" label="New password" value={next} onChange={setNext} autoComplete="new-password" />
+          <PasswordField id="pw-confirm" label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+          {mismatch && <p className="text-[13px] text-red-600 dark:text-red-400">The new passwords don't match.</p>}
+          {mut.isError && <p className="text-[13px] text-red-600 dark:text-red-400">{(mut.error as Error).message || "Couldn't change the password. Check your current password and try again."}</p>}
+          {mut.isSuccess && <p className="flex items-center gap-1.5 text-[13px] text-emerald-600 dark:text-emerald-400"><Check size={14} /> Password changed.</p>}
+          <div>
+            <button type="submit" className="btn-primary" disabled={!ready || mut.isPending}>
+              {mut.isPending ? "Changing…" : "Change password"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid content-start gap-3">
+          <div className="grid grid-cols-4 gap-1" aria-hidden>
+            {RULES.map((_, i) => (
+              <div key={i} className={clsx(
+                "h-1 rounded-full transition-colors",
+                i < passed ? (requiredOk ? "bg-emerald-500" : "bg-amber-500") : "bg-foreground/10",
+              )} />
+            ))}
+          </div>
+          <ul className="grid gap-1.5">
+            {RULES.map((r) => {
+              const ok = r.test(next);
+              return (
+                <li key={r.label} className={clsx("flex items-center gap-2 text-[13px]", ok ? "text-foreground" : "text-foreground/50")}>
+                  <span className={clsx("flex h-4 w-4 items-center justify-center rounded-full border",
+                    ok ? "border-emerald-500 bg-emerald-500 text-white" : "border-[var(--border-strong)]")}>
+                    {ok && <Check size={10} strokeWidth={3} />}
+                  </span>
+                  {r.label}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </form>
+    </Section>
+  );
+}
+
+// ── Devices ───────────────────────────────────────────────────────────────────
+
+const KIND_ICON = { desktop: Monitor, phone: Smartphone, tablet: Tablet, script: Terminal };
+
+function DevicesSection() {
   const qc = useQueryClient();
-  const { data: sessions = [], isLoading } = useQuery<AuthSession[]>({ queryKey: ["auth-sessions"], queryFn: fetchAuthSessions, staleTime: 30_000 });
+  const { logout } = useAuth();
+  const [confirmAll, setConfirmAll] = useState(false);
+  const { data: sessions = [], isLoading } = useQuery<AuthSession[]>({
+    queryKey: ["auth-sessions"], queryFn: fetchAuthSessions, staleTime: 30_000,
+  });
   const revoke = useMutation({
     mutationFn: (id: number) => revokeSession(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["auth-sessions"] }),
   });
+  const all = useMutation({ mutationFn: logoutAll, onSuccess: () => logout() });
+
+  // The API doesn't flag the current session; treat the most recently used
+  // session from this exact browser as "this browser".
+  const currentId = useMemo(() => {
+    if (typeof navigator === "undefined") return undefined;
+    const mine = sessions
+      .filter((s) => s.is_current || s.user_agent === navigator.userAgent)
+      .sort((a, b) => (b.last_used_at ?? b.created_at).localeCompare(a.last_used_at ?? a.created_at));
+    return mine[0]?.id;
+  }, [sessions]);
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
-        <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30"><Monitor size={16} className="text-purple-500" /></span>
-        <div>
-          <h2 className="font-bold text-foreground text-sm">Active Sessions</h2>
-          <p className="text-xs text-foreground/70">Revoke a session to force sign-out on that device.</p>
-        </div>
-      </div>
-
-      {isLoading && (
-        <div className="p-4 space-y-2">
-          {[1,2].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}
-        </div>
-      )}
-      {!isLoading && sessions.length === 0 && <p className="text-sm text-foreground/70 p-5">No active sessions.</p>}
-
-      {sessions.length > 0 && (
-        <>
-          {/* Mobile */}
-          <div className="flex flex-col divide-y divide-[var(--border)] md:hidden">
-            {sessions.map((s) => (
-              <div key={s.id} className={`p-4 ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    {s.is_current && <Badge variant="info" className="mr-1">current</Badge>}
-                    <span className="text-xs font-mono text-foreground/70">{s.ip_address ?? "—"}</span>
-                    <p className="text-xs text-foreground/70 mt-1 truncate max-w-[240px]">{s.user_agent ? s.user_agent.slice(0, 50) : "—"}</p>
-                    <p className="text-[10px] text-foreground/70 mt-0.5">Created {s.created_at.slice(0, 16).replace("T", " ")}</p>
+    <Section
+      id="devices"
+      title="Devices"
+      sub="Where your account is signed in. Signing a device out ends its session right away."
+      action={
+        confirmAll ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-foreground/70">Sign out of every device, including this one?</span>
+            <button className="btn-ghost h-8 px-3" onClick={() => setConfirmAll(false)}>Cancel</button>
+            <button className="btn h-8 bg-red-600 px-3 text-white hover:bg-red-700" onClick={() => all.mutate()} disabled={all.isPending}>
+              Sign out all
+            </button>
+          </div>
+        ) : (
+          <button className="btn-ghost h-8 px-3" onClick={() => setConfirmAll(true)} disabled={sessions.length === 0}>
+            Sign out everywhere
+          </button>
+        )
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-3 px-5 py-5">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-10" />)}</div>
+      ) : sessions.length === 0 ? (
+        <p className="px-5 py-8 text-center text-sm text-foreground/60">No active sessions.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--border)]">
+          {sessions.map((s) => {
+            const { label, kind } = parseUA(s.user_agent);
+            const Icon = KIND_ICON[kind];
+            const isMe = s.id === currentId;
+            return (
+              <li key={s.id} className="flex items-center gap-4 px-5 py-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-foreground/70">
+                  <Icon size={17} strokeWidth={1.8} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                    {isMe && (
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.1em] text-accent">
+                        This browser
+                      </span>
+                    )}
                   </div>
-                  {!s.is_current && (
-                    <button onClick={() => revoke.mutate(s.id)} disabled={revoke.isPending}
-                      className="text-xs px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition disabled:opacity-50 shrink-0 ml-3">
-                      Revoke
-                    </button>
+                  <p className="mt-0.5 truncate text-[13px] text-foreground/55">
+                    Active {ago(s.last_used_at ?? s.created_at)}
+                    {s.ip_address ? <> · <span className="font-mono">{s.ip_address}</span></> : null}
+                    {" · "}signed in {ago(s.created_at)}
+                  </p>
+                </div>
+                {!isMe && (
+                  <button
+                    className="btn-ghost h-8 shrink-0 px-3 text-[13px]"
+                    onClick={() => revoke.mutate(s.id)}
+                    disabled={revoke.isPending && revoke.variables === s.id}
+                  >
+                    Sign out
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────────
+
+type Filter = "important" | "failed" | "all";
+
+function ActivitySection() {
+  const [filter, setFilter] = useState<Filter>("important");
+  const { data: events = [], isLoading } = useQuery<AuthEvent[]>({
+    queryKey: ["auth-events"], queryFn: fetchAuthEvents, staleTime: 60_000,
+  });
+  const shown = events.filter((e) =>
+    filter === "all" ? true :
+    filter === "failed" ? !e.success || e.event_type.endsWith("_throttled") :
+    e.event_type !== "refresh",
+  );
+  const failedCount = events.filter((e) => !e.success || e.event_type.endsWith("_throttled")).length;
+  const [expanded, setExpanded] = useState(false);
+
+  // Collapse runs of the same event (e.g. twelve sign-ins in a row) into one row.
+  const groups = useMemo(() => {
+    const out: { first: AuthEvent; last: AuthEvent; count: number }[] = [];
+    for (const e of shown) {
+      const g = out[out.length - 1];
+      if (g && g.first.event_type === e.event_type && g.first.success === e.success
+          && (g.first.user_agent ?? "") === (e.user_agent ?? "") && (g.first.ip_address ?? "") === (e.ip_address ?? "")) {
+        g.count += 1; g.last = e;
+      } else {
+        out.push({ first: e, last: e, count: 1 });
+      }
+    }
+    return out;
+  }, [shown]);
+  const LIMIT = 6;
+  const visible = expanded ? groups : groups.slice(0, LIMIT);
+
+  return (
+    <Section
+      id="activity"
+      title="Sign-in activity"
+      sub="The last 25 security events on your account."
+      action={
+        <div role="tablist" aria-label="Filter activity" className="flex rounded-lg border border-[var(--border)] p-0.5">
+          {([
+            ["important", "Important"],
+            ["failed", `Failed${failedCount ? ` · ${failedCount}` : ""}`],
+            ["all", "All"],
+          ] as [Filter, string][]).map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={filter === id}
+              onClick={() => setFilter(id)}
+              className={clsx(
+                "rounded-md px-2.5 py-1 text-[13px] font-medium transition",
+                filter === id ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-3 px-5 py-5">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-8" />)}</div>
+      ) : groups.length === 0 ? (
+        <p className="px-5 py-8 text-center text-sm text-foreground/60">
+          {filter === "failed" ? "No failed or blocked attempts. Good." : "Nothing here yet."}
+        </p>
+      ) : (
+        <ol className="relative px-5 py-3">
+          {visible.map(({ first: e, last, count }) => {
+            const meta = EVENT_META[e.event_type] ?? { label: e.event_type.replace(/_/g, " "), icon: ShieldAlert, tone: "neutral" as const };
+            const tone = e.success ? meta.tone : "bad";
+            const Icon = e.success ? meta.icon : ShieldAlert;
+            const device = e.user_agent ? parseUA(e.user_agent).label : null;
+            return (
+              <li key={e.id} className="flex items-start gap-3 py-2.5">
+                <span className={clsx("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full", TONE[tone])}>
+                  <Icon size={14} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-foreground">
+                    {e.success ? meta.label : `${meta.label} failed`}
+                    {count > 1 && <span className="ml-2 font-mono text-[12px] text-foreground/50">×{count}</span>}
+                  </p>
+                  {(device || e.ip_address || count > 1) && (
+                    <p className="truncate text-[13px] text-foreground/55">
+                      {[device, e.ip_address, count > 1 ? `since ${ago(last.created_at)}` : null].filter(Boolean).join(" · ")}
+                    </p>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] text-foreground/70 uppercase tracking-wide bg-[var(--surface-2)]">
-                  {["Created", "Last Used", "IP", "Device", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((s) => (
-                  <tr key={s.id} className={`border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${s.is_current ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}>
-                    <td className="px-4 py-3 text-foreground/70 text-xs">{s.created_at.slice(0, 16).replace("T", " ")}</td>
-                    <td className="px-4 py-3 text-foreground/70 text-xs">{s.last_used_at ? s.last_used_at.slice(0, 16).replace("T", " ") : "—"}</td>
-                    <td className="px-4 py-3 text-foreground/70 text-xs font-mono">{s.ip_address ?? "—"}</td>
-                    <td className="px-4 py-3 text-foreground/70 text-xs truncate max-w-[200px]">
-                      {s.is_current && <Badge variant="info" className="mr-1">current</Badge>}
-                      {s.user_agent ? s.user_agent.slice(0, 60) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {!s.is_current && (
-                        <button onClick={() => revoke.mutate(s.id)} disabled={revoke.isPending}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 font-semibold hover:bg-red-100 transition disabled:opacity-50">
-                          Revoke
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+                <time
+                  dateTime={e.created_at}
+                  title={new Date(e.created_at.endsWith("Z") ? e.created_at : e.created_at + "Z").toLocaleString()}
+                  className="shrink-0 pt-0.5 font-mono text-[12px] tabular-nums text-foreground/50"
+                >
+                  {ago(e.created_at)}
+                </time>
+              </li>
+            );
+          })}
+          {groups.length > LIMIT && (
+            <li className="pt-2">
+              <button className="text-[13px] font-medium text-foreground/60 hover:text-foreground" onClick={() => setExpanded((x) => !x)}>
+                {expanded ? "Show less" : `Show ${groups.length - LIMIT} more`}
+              </button>
+            </li>
+          )}
+        </ol>
       )}
-    </div>
+    </Section>
   );
 }
 
-function EventsSection() {
-  const { data: events = [], isLoading } = useQuery<AuthEvent[]>({ queryKey: ["auth-events"], queryFn: fetchAuthEvents, staleTime: 60_000 });
-
-  return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
-        <span className="p-2 rounded-xl bg-yellow-50 dark:bg-yellow-900/30"><Shield size={16} className="text-yellow-500" /></span>
-        <div>
-          <h2 className="font-bold text-foreground text-sm">Auth Event Log</h2>
-          <p className="text-xs text-foreground/70">Last 25 security events on your account.</p>
-        </div>
-      </div>
-
-      {isLoading && (
-        <div className="p-4 space-y-2">
-          {[1,2,3].map(i => <div key={i} className="skeleton h-10 rounded-xl" />)}
-        </div>
-      )}
-      {!isLoading && events.length === 0 && <p className="text-sm text-foreground/70 p-5">No events recorded.</p>}
-
-      {events.length > 0 && (
-        <>
-          {/* Mobile */}
-          <div className="flex flex-col divide-y divide-[var(--border)] md:hidden overflow-y-auto max-h-[320px]">
-            {events.map((e) => (
-              <div key={e.id} className="flex items-center justify-between p-3">
-                <div>
-                  <span className={`text-xs font-mono font-bold ${EVENT_COLOR[e.event_type] ?? "text-foreground/70"}`}>{e.event_type}</span>
-                  <p className="text-[10px] text-foreground/70">{e.created_at.slice(0, 16).replace("T", " ")} · {e.ip_address ?? "—"}</p>
-                </div>
-                {e.success ? <CheckCircle size={14} className="text-green-500 shrink-0" /> : <XCircle size={14} className="text-red-500 shrink-0" />}
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop */}
-          <div className="hidden md:block overflow-y-auto max-h-[320px]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] text-foreground/70 uppercase tracking-wide sticky top-0 bg-[var(--surface)] bg-[var(--surface-2)]">
-                  {["Time", "Event", "Result", "IP"].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((e) => (
-                  <tr key={e.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors">
-                    <td className="px-4 py-2.5 text-foreground/70 text-xs whitespace-nowrap">{e.created_at.slice(0, 16).replace("T", " ")}</td>
-                    <td className={`px-4 py-2.5 font-mono text-xs font-semibold ${EVENT_COLOR[e.event_type] ?? "text-foreground/70"}`}>{e.event_type}</td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant={e.success ? "success" : "danger"}>{e.success ? "OK" : "FAIL"}</Badge>
-                      </td>
-                    <td className="px-4 py-2.5 text-foreground/70 font-mono text-xs">{e.ip_address ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   return (
-    <div className="p-4 sm:p-6 max-w-screen-lg mx-auto w-full overflow-x-hidden">
-      <PageHeader title="Settings" />
-      <div className="flex flex-col gap-5">
-        <ChangePasswordSection />
-        <SessionsSection />
-        <EventsSection />
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-8 sm:px-6">
+      <div className="mb-8">
+        <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Account</p>
+        <h1 className="text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">Settings</h1>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <nav aria-label="Settings sections" className="hidden lg:block">
+          <ul className="sticky top-24 grid gap-0.5">
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <a href={`#${s.id}`} className="block rounded-lg px-3 py-1.5 text-sm text-foreground/60 transition hover:bg-[var(--surface-2)] hover:text-foreground">
+                  {s.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="grid min-w-0 grid-cols-1 gap-6">
+          <ProfileSection />
+          <AppearanceSection />
+          <PasswordSection />
+          <DevicesSection />
+          <ActivitySection />
+        </div>
       </div>
     </div>
   );

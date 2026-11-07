@@ -694,6 +694,7 @@ export const revokeSession = (id: number) => api.post(`/auth/sessions/${id}/revo
 export const fetchAuthEvents = () => api.get<AuthEvent[]>("/auth/events");
 export const changePassword = (currentPassword: string, newPassword: string) =>
   api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+export const logoutAll = () => api.post("/auth/logout-all");
 
 // ── Cash ─────────────────────────────────────────────────────────────────────
 
