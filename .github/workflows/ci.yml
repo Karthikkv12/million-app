@@ -38,7 +38,7 @@ jobs:
         run: |
           pip install pytest-cov -q
           python -m pytest tests/ -q --tb=no \
-            --cov=logic --cov=backend_api \
+            --cov=optionflow --cov=backend_api \
             --cov-report=term-missing \
             --ignore=tests/test_gex_live.py
         env:

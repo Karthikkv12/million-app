@@ -1,4 +1,4 @@
-"""logic/trade_services.py — Accounts and account-linked holdings."""
+"""optionflow/modules/portfolio/trading_accounts.py — Accounts and account-linked holdings."""
 from __future__ import annotations
 
 import logging

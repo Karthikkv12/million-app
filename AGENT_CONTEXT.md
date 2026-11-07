@@ -101,7 +101,7 @@ optionflow/core/
 Never call `os.getenv` in app code — add a field to `Settings` instead.
 
 **API layout (plan step 4):** `optionflow/main.py` (`create_app()`) mounts each module in `ENABLED_MODULES`
-(default `auth,market,flow,watchlist`; also `portfolio`, `budget`) at **`/api/v1/...`** and at the legacy path.
+(default `auth,market,flow,watchlist`; also `portfolio`, `budget`: fully migrated, off by default) at **`/api/v1/...`** and at the legacy path.
 Modules live in `optionflow/modules/<name>/` (`router.py` HTTP only → `service.py` plain functions → typed `schemas.py`).
 Services raise `optionflow.core.errors` (`NotFound`, `Conflict`, …). Errors on `/api/v1` are `{"error": {"code", "message"}}`;
 legacy paths keep `{"detail": …}`. Market data only via `optionflow.providers.get_market_data()`.
@@ -142,7 +142,7 @@ logic/
 
 **Rules:**
 - Every new route goes in the correct router file, NOT in main.py
-- Use `df_records()` from `backend_api.utils` — never duplicate it
+- Response models live in each module's `schemas.py`; datetimes are serialized as ISO strings by the `Str` type
 - Always use `logger = logging.getLogger("optionflow.<module>")` — no `print()` for errors
 - Response models: always declare `response_model=` on every route
 - Use `model_validate(dict)` (Pydantic v2) not manual `Foo(field=dict["field"], ...)`
@@ -277,7 +277,7 @@ These are the highest-impact features in priority order:
 4. **Node.js** is at a custom path: `/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin/`. Always set `PATH` before running npm/node commands.
 5. **`.next` cache corruption** — if the frontend returns 500, `rm -rf web/.next` and restart.
 6. **Zoom locked on iOS/iPadOS** — `maximumScale=1, userScalable=no` is intentional (app-like feel).
-7. **schemas is a package, not a file** — `backend_api/schemas/` is a directory with `__init__.py`. Import from `backend_api.schemas` as before; do NOT create a new `schemas.py` file.
+7. **Schemas live per module** — `optionflow/modules/<name>/schemas.py` (the old `backend_api/schemas/` package is gone). Import from `backend_api.schemas` as before; do NOT create a new `schemas.py` file.
 8. **brokers/ folder is gone** — broker abstraction and order system removed in v2.4.0. Do not re-add.
 9. **Holdings soft-delete** — `delete_holding()` in `logic/holdings.py` soft-closes lots that have HoldingEvent history (sets status=CLOSED, shares=0) instead of hard-deleting. Only hard-deletes fresh lots with zero event history. Use the "↻ Re-enter" button in HoldingsTab to reactivate a closed lot.
 10. **adj_basis = f(avg_cost)** — `_recalculate_adj_basis` uses PremiumLedger rows as primary source; falls back to summing `basis_delta` from HoldingEvents. This means editing avg_cost on any holding (active or closed) correctly recomputes adj_basis.

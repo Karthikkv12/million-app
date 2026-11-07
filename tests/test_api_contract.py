@@ -320,3 +320,18 @@ def test_openapi_lists_only_v1_paths():
     paths = TestClient(app).get("/openapi.json").json()["paths"]
     assert paths and all(p.startswith("/api/v1/") for p in paths), [p for p in paths if not p.startswith("/api/v1/")]
     assert "/api/v1/options/gamma-exposure/{symbol}" in paths and "/api/v1/auth/login" in paths
+
+
+def test_watchlist_sync_registers_portfolio_symbols(db_engine_and_session):
+    """Sync reads symbols through the portfolio service, not its tables."""
+    from optionflow.modules.portfolio import holdings, positions, weeks
+    from optionflow.modules.watchlist import service as watchlist
+    week = weeks.get_or_create_week(user_id=1)
+    positions.create_position(user_id=1, week_id=week["id"], data={"symbol": "nvda", "contracts": 1, "strike": 100,
+                                                                 "option_type": "PUT", "premium_in": 1.0})
+    holdings.create_holding(user_id=1, data={"symbol": "TSLA", "shares": 10, "cost_basis": 200.0})
+    for w in watchlist.list_watchlist(user_id=1):                 # creating them auto-registers; start clean
+        watchlist.remove_symbol(user_id=1, symbol=w["symbol"])
+    assert watchlist.sync_all(user_id=1) == {"positions_synced": 1, "holdings_synced": 1, "total_added": 2}
+    assert sorted(w["symbol"] for w in watchlist.list_watchlist(user_id=1)) == ["NVDA", "TSLA"]
+    assert watchlist.sync_all(user_id=1)["total_added"] == 0       # idempotent

@@ -1,7 +1,6 @@
 """optionflow/modules/watchlist/service.py — the user's watchlist.
 
-NOTE: sync_from_positions / sync_from_holdings read portfolio tables directly;
-plan step 4b switches them to the portfolio module's service.
+Symbols for sync come from the portfolio module's service, never its tables.
 """
 from __future__ import annotations
 
@@ -9,7 +8,7 @@ from datetime import datetime
 from typing import Literal
 
 from optionflow.core.db import get_portfolio_session as _portfolio_session
-from database.models import WatchlistSymbol, OptionPosition, StockHolding
+from database.models import WatchlistSymbol
 
 
 SymbolSource = Literal["manual", "position", "holding"]
@@ -183,20 +182,11 @@ def bulk_register(
 
 def sync_from_positions(*, user_id: int) -> int:
     """
-    Scan ALL OptionPositions for this user and register any symbols not yet
+    Take every option-position symbol for this user and register any symbols not yet
     in the watchlist.  Returns the count of newly added/reactivated symbols.
     """
-    session = _portfolio_session()
-    try:
-        symbols = [
-            row.symbol
-            for row in session.query(OptionPosition.symbol)
-            .filter(OptionPosition.user_id == user_id)
-            .distinct()
-            .all()
-        ]
-    finally:
-        session.close()
+    from optionflow.modules.portfolio import service as portfolio  # lazy: portfolio also calls this module
+    symbols = portfolio.position_symbols(user_id)
 
     before = {r["symbol"] for r in list_watchlist(user_id=user_id)}
     bulk_register(user_id=user_id, symbols=symbols, source="position")
@@ -206,20 +196,11 @@ def sync_from_positions(*, user_id: int) -> int:
 
 def sync_from_holdings(*, user_id: int) -> int:
     """
-    Scan ALL StockHoldings for this user and register any symbols not yet
+    Take every stock-holding symbol for this user and register any symbols not yet
     in the watchlist.  Returns the count of newly added/reactivated symbols.
     """
-    session = _portfolio_session()
-    try:
-        symbols = [
-            row.symbol
-            for row in session.query(StockHolding.symbol)
-            .filter(StockHolding.user_id == user_id)
-            .distinct()
-            .all()
-        ]
-    finally:
-        session.close()
+    from optionflow.modules.portfolio import service as portfolio  # lazy: portfolio also calls this module
+    symbols = portfolio.holding_symbols(user_id)
 
     before = {r["symbol"] for r in list_watchlist(user_id=user_id)}
     bulk_register(user_id=user_id, symbols=symbols, source="holding")

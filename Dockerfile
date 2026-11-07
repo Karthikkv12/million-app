@@ -31,7 +31,6 @@ COPY alembic/         ./alembic/
 COPY alembic.ini      .
 COPY backend_api/     ./backend_api/
 COPY database/        ./database/
-COPY logic/           ./logic/
 COPY optionflow/      ./optionflow/
 
 # Non-root user for security

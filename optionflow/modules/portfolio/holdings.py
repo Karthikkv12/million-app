@@ -551,7 +551,7 @@ def apply_position_status_change(
       CC + ASSIGNED           → shares called away, realized gain recorded
       PUT + ASSIGNED          → add shares, blend cost basis
     """
-    from logic.premium_ledger import upsert_ledger_row, get_premium_summary
+    from optionflow.modules.portfolio.premium_ledger import upsert_ledger_row, get_premium_summary
 
     session = _portfolio_session()
     try:
@@ -903,3 +903,11 @@ def _parse_dt(val: Any) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def distinct_symbols(*, user_id: int) -> list[str]:
+    session = _portfolio_session()
+    try:
+        return [r.symbol for r in session.query(StockHolding.symbol).filter(StockHolding.user_id == user_id).distinct().all()]
+    finally:
+        session.close()

@@ -1,10 +1,10 @@
-"""Regression tests for logic.holdings.create_holding.
+"""Regression tests for portfolio holdings.create_holding.
 
 Commit c967a1f moved `return result` out of the reactivation branch, so
 creating a holding for a symbol with no prior closed lot raised
 UnboundLocalError and the "create fresh" path was unreachable.
 """
-from logic import holdings
+from optionflow.modules.portfolio import holdings
 from optionflow.modules.watchlist import service as watchlist
 
 

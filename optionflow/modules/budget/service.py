@@ -1,4 +1,4 @@
-"""logic/budget_services.py — Cash, budget, overrides, CC weeks, and double-entry ledger."""
+"""optionflow/modules/budget/service.py — Cash, budget, overrides, CC weeks, and double-entry ledger."""
 from __future__ import annotations
 
 import logging
@@ -605,3 +605,32 @@ def list_ledger_entries(*, user_id: int, limit: int = 100, offset: int = 0) -> l
         return out
     finally:
         session.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Flows used by the API (moved from the budget router)
+# ══════════════════════════════════════════════════════════════════════════════
+from optionflow.core import errors as _err  # noqa: E402
+
+
+def cash_balance(*, user_id: int, currency: str = "USD") -> dict:
+    cur = str(currency or "USD").strip().upper() or "USD"
+    return {"currency": cur, "balance": float(get_cash_balance(user_id=user_id, currency=cur))}
+
+
+def update_cash_or_404(cash_id: int, user_id: int, **changes):
+    row = update_cash(cash_id, user_id, **changes)
+    if row is None:
+        raise _err.NotFound("Cash entry not found")
+    return row
+
+
+def delete_cash_or_404(cash_id: int, user_id: int) -> None:
+    if not delete_cash(cash_id, user_id):
+        raise _err.NotFound("Cash entry not found")
+
+
+def remove_budget_entry(budget_id: int, *, user_id: int) -> None:
+    """Delete a budget entry and its monthly overrides."""
+    delete_budget_overrides_for_entry(budget_id, user_id=user_id)
+    delete_budget(budget_id, user_id=user_id)

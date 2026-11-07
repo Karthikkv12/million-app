@@ -979,9 +979,32 @@
  },
  {
   "body": {
-   "detail": "'account_id'"
+   "detail": [
+    {
+     "input": {
+      "week_date": "2026-11-06"
+     },
+     "loc": [
+      "body",
+      "account_id"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    },
+    {
+     "input": {
+      "week_date": "2026-11-06"
+     },
+     "loc": [
+      "body",
+      "balance"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    }
+   ]
   },
-  "status": 400,
+  "status": 422,
   "step": "PUT account-balances missing"
  },
  {
@@ -1044,9 +1067,21 @@
  },
  {
   "body": {
-   "detail": "'week_date'"
+   "detail": [
+    {
+     "input": {
+      "amount": 5
+     },
+     "loc": [
+      "body",
+      "week_date"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    }
+   ]
   },
-  "status": 400,
+  "status": 422,
   "step": "PUT cash-deposits missing"
  },
  {

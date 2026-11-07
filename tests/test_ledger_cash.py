@@ -1,6 +1,6 @@
 import pandas as pd
 
-from logic import budget_services
+from optionflow.modules.budget import service as budget_services
 
 
 def test_cash_flow_posts_balanced_ledger_entry(db_engine_and_session):

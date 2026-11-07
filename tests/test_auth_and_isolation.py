@@ -1,4 +1,4 @@
-from logic import trade_services
+from optionflow.modules.portfolio import trading_accounts as trade_services
 from optionflow.modules.auth import service as auth_services
 
 

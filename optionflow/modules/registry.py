@@ -31,15 +31,12 @@ def _watchlist() -> List[APIRouter]:
 
 
 def _portfolio() -> List[APIRouter]:
-    # Moves into optionflow/modules/portfolio in plan step 4b.
-    from backend_api.routers.portfolio import router as portfolio
-    from backend_api.routers.trades import router as accounts
-    return [portfolio, accounts]
+    from optionflow.modules.portfolio.router import accounts_router, router
+    return [router, accounts_router]
 
 
 def _budget() -> List[APIRouter]:
-    # Moves into optionflow/modules/budget in plan step 4b.
-    from backend_api.routers.budget import router
+    from optionflow.modules.budget.router import router
     return [router]
 
 
