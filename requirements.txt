@@ -5,6 +5,7 @@ passlib[bcrypt]
 alembic
 psycopg[binary]
 fastapi
+pydantic-settings>=2.4,<3
 uvicorn[standard]
 PyJWT
 python-multipart

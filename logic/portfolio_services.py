@@ -5,9 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 import pandas as pd
-from sqlalchemy.orm import sessionmaker
-
-from database.models import get_portfolio_session
+from optionflow.core.db import get_portfolio_session
 
 _logger = logging.getLogger("optionflow.portfolio")
 
@@ -15,15 +13,8 @@ _logger = logging.getLogger("optionflow.portfolio")
 # ── Session helper ────────────────────────────────────────────────────────────
 
 def _portfolio_session():
-    """Session for portfolio.db. Respects monkeypatched logic.services.engine."""
-    try:
-        import logic.services as _svc
-        if getattr(_svc, "engine", None) is not None:
-            return sessionmaker(bind=_svc.engine)()
-    except Exception:
-        pass
-    import database.models as _dbm
-    return _dbm.get_portfolio_session()
+    """Session for portfolio.db."""
+    return get_portfolio_session()
 
 
 # ── Snapshots ─────────────────────────────────────────────────────────────────

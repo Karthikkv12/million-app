@@ -6,7 +6,7 @@ Also cross-checks ledger rows vs actual OptionPosition data.
 import sys
 sys.path.insert(0, ".")
 
-from logic.services import _portfolio_session
+from optionflow.core.db import get_portfolio_session as _portfolio_session
 from database.models import StockHolding, PremiumLedger, OptionPosition, OptionPositionStatus
 
 sess = _portfolio_session()

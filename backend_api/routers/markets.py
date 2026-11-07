@@ -14,7 +14,7 @@ import yfinance as yf
 from cachetools import TTLCache
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..deps import get_current_user
+from optionflow.core.deps import get_current_user
 from ..state import (
     _RANGE_INTERVAL,
     backfill_history,

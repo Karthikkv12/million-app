@@ -13,7 +13,7 @@ from logic.watchlist import (
     sync_from_positions,
     sync_from_holdings,
 )
-from ..deps import get_current_user
+from optionflow.core.deps import get_current_user
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 

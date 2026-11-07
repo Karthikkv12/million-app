@@ -21,9 +21,9 @@ def main():
         os.environ['DATABASE_URL'] = args.pg
 
     # Import app code paths
-    from database.models import init_db
+    from optionflow.core.db import init_db
     init_db()
-    from logic.services import create_user
+    from logic.auth_services import create_user
 
     try:
         uid = create_user(args.user, args.password)

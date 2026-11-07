@@ -1,33 +1,28 @@
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import jwt
 
+from optionflow.core.settings import get_settings
+
 
 def _jwt_secret() -> str:
-    secret = os.getenv("JWT_SECRET")
-    if not secret:
-        # Dev-friendly default; set JWT_SECRET in production.
-        secret = "dev-insecure-secret"
-    return secret
+    # Dev-friendly default; set JWT_SECRET in production.
+    return get_settings().jwt_secret or "dev-insecure-secret"
 
 
 def _jwt_issuer() -> str:
-    return os.getenv("JWT_ISSUER", "optionflow-api")
+    return get_settings().jwt_issuer
 
 
 def _jwt_audience() -> str:
-    return os.getenv("JWT_AUDIENCE", "optionflow-app")
+    return get_settings().jwt_audience
 
 
 def _default_access_minutes() -> int:
-    try:
-        # Default to short-lived access tokens; rely on refresh tokens for longevity.
-        return int(os.getenv("ACCESS_TOKEN_EXPIRES_MINUTES", "15"))
-    except Exception:
-        return 15
+    # Short-lived access tokens; refresh tokens provide longevity.
+    return get_settings().access_token_expires_minutes
 
 
 def create_access_token(

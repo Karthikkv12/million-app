@@ -3,14 +3,13 @@
 All route logic lives in backend_api/routers/*.py.
 Shared state (caches, poller, flow-DB helpers) lives in backend_api/state.py.
 This module only:
-  1. Loads .env
+  1. Reads settings (optionflow.core.settings, which loads .env)
   2. Creates the FastAPI app and registers middleware, routers and exception handlers
   3. Runs DB init & starts background poller on startup
 """
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -21,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
-from database.models import (
+from optionflow.core.db import (
     init_db,
     get_users_session,
     get_trades_session,
@@ -29,6 +28,7 @@ from database.models import (
     get_portfolio_session,
     get_markets_session,
 )
+from optionflow.core.settings import get_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,25 +36,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("optionflow.main")
-
-# ── Load .env ─────────────────────────────────────────────────────────────────
-
-def _load_dotenv() -> None:
-    env_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-    if not os.path.isfile(env_path):
-        return
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            key = key.strip()
-            val = val.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = val
-
-_load_dotenv()
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
@@ -78,8 +59,7 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 
-_cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
-_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+_cors_origins = get_settings().cors_origins
 _cors_is_wildcard = len(_cors_origins) == 1 and _cors_origins[0] == "*"
 app.add_middleware(
     CORSMiddleware,

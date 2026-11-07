@@ -29,7 +29,8 @@ import re
 from datetime import datetime
 from typing import Any
 
-from logic.services import get_session, _portfolio_session
+from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_trades_session as get_session
 from database.models import (
     PremiumLedger,
     StockHolding,

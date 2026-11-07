@@ -15,23 +15,19 @@ PostgreSQL mode  (set DATABASE_URL=postgresql://... in environment):
   All five domains share one connection pool.  Domain isolation is preserved
   via schemas rather than separate files.
 
+Engines, sessions and init_db() live in optionflow/core/db.py.
 The dialect switch is fully transparent to all business logic — session helpers,
 engine getters, and the test monkeypatch fixtures all work identically in both
 modes.
 """
 from __future__ import annotations
 
-import os
-from functools import lru_cache
-
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Enum, Float,
-    Index, Integer, String, Text, create_engine,
+    Index, Integer, String, Text,
     MetaData,
 )
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.orm import declarative_base
 import enum
 from datetime import datetime
 
@@ -41,8 +37,8 @@ _EPOCH_UTC_NAIVE = datetime(1970, 1, 1)
 
 def _is_postgres() -> bool:
     """Return True when a PostgreSQL DATABASE_URL is configured."""
-    url = os.getenv("DATABASE_URL", "")
-    return url.startswith("postgresql") or url.startswith("postgres")
+    from optionflow.core.settings import get_settings
+    return get_settings().is_postgres
 
 
 def _schema(name: str) -> str | None:
@@ -507,124 +503,3 @@ class PriceSnapshot(MarketsBase):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 Index("ux_price_snapshots_symbol_date", PriceSnapshot.symbol, PriceSnapshot.date, unique=True)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENGINE FACTORY
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENGINE FACTORY
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _db_path(filename: str) -> str:
-    """Return a SQLite URL for the given filename, respecting DB_DIR and per-db overrides."""
-    env_key  = f"DATABASE_URL_{filename.upper().replace('.DB','').replace('-','_')}"
-    override = os.getenv(env_key)
-    if override:
-        return override
-    base = os.getenv("DB_DIR", ".")
-    return f"sqlite:///{base}/{filename}"
-
-
-def _make_engine(url: str) -> Engine:
-    if url.startswith("sqlite"):
-        return create_engine(url, connect_args={"check_same_thread": False}, poolclass=NullPool)
-    return create_engine(
-        url,
-        pool_pre_ping=True,
-        pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
-        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-        pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
-    )
-
-
-def _postgres_url() -> str:
-    """Return the single shared Postgres URL (DATABASE_URL env var)."""
-    return os.environ["DATABASE_URL"]
-
-
-@lru_cache(maxsize=1)
-def get_users_engine() -> Engine:
-    if _is_postgres():
-        return _make_engine(_postgres_url())
-    return _make_engine(_db_path("users.db"))
-
-@lru_cache(maxsize=1)
-def get_trades_engine() -> Engine:
-    if _is_postgres():
-        return _make_engine(_postgres_url())
-    return _make_engine(_db_path("trades.db"))
-
-@lru_cache(maxsize=1)
-def get_portfolio_engine() -> Engine:
-    if _is_postgres():
-        return _make_engine(_postgres_url())
-    return _make_engine(_db_path("portfolio.db"))
-
-@lru_cache(maxsize=1)
-def get_budget_engine() -> Engine:
-    if _is_postgres():
-        return _make_engine(_postgres_url())
-    return _make_engine(_db_path("budget.db"))
-
-@lru_cache(maxsize=1)
-def get_markets_engine() -> Engine:
-    if _is_postgres():
-        return _make_engine(_postgres_url())
-    return _make_engine(_db_path("markets.db"))
-
-# Legacy alias — points to trades.db for backwards compat
-def get_engine() -> Engine:
-    return get_trades_engine()
-
-
-# ── Session factories ──────────────────────────────────────────────────────────
-
-def get_users_session():
-    return sessionmaker(bind=get_users_engine())()
-
-def get_trades_session():
-    return sessionmaker(bind=get_trades_engine())()
-
-def get_portfolio_session():
-    return sessionmaker(bind=get_portfolio_engine())()
-
-def get_budget_session():
-    return sessionmaker(bind=get_budget_engine())()
-
-def get_markets_session():
-    return sessionmaker(bind=get_markets_engine())()
-
-def reset_engine_cache() -> None:
-    get_users_engine.cache_clear()
-    get_trades_engine.cache_clear()
-    get_portfolio_engine.cache_clear()
-    get_budget_engine.cache_clear()
-    get_markets_engine.cache_clear()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# INIT
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def init_db():
-    """Create all tables across all five domains. Safe to call multiple times.
-
-    In Postgres mode, also creates the logical schemas (auth, trades, portfolio,
-    budget, markets) if they don't already exist, then runs CREATE TABLE IF NOT
-    EXISTS for every model — all on the shared engine.
-    """
-    if _is_postgres():
-        eng = get_users_engine()  # all engines point to the same URL
-        from sqlalchemy import text
-        with eng.connect() as conn:
-            for schema in ("auth", "trades", "portfolio", "budget", "markets"):
-                conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-            conn.commit()
-        for base in (UsersBase, TradesBase, PortfolioBase, BudgetBase, MarketsBase):
-            base.metadata.create_all(eng)
-    else:
-        UsersBase.metadata.create_all(get_users_engine())
-        TradesBase.metadata.create_all(get_trades_engine())
-        PortfolioBase.metadata.create_all(get_portfolio_engine())
-        BudgetBase.metadata.create_all(get_budget_engine())
-        MarketsBase.metadata.create_all(get_markets_engine())

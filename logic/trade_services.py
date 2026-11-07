@@ -4,14 +4,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy.orm import sessionmaker
-
-from database.models import (
-    Account,
-    StockHolding,
-    get_portfolio_session,
-    get_trades_session,
-)
+from database.models import Account, StockHolding
+from optionflow.core.db import get_portfolio_session, get_trades_session
 
 _logger = logging.getLogger("optionflow.trades")
 
@@ -19,27 +13,13 @@ _logger = logging.getLogger("optionflow.trades")
 # ── Session helpers ───────────────────────────────────────────────────────────
 
 def _get_trades_session():
-    """Session for trades.db. Respects monkeypatched logic.services.engine."""
-    try:
-        import logic.services as _svc
-        if getattr(_svc, "engine", None) is not None:
-            return sessionmaker(bind=_svc.engine)()
-    except Exception:
-        pass
-    import database.models as _dbm
-    return _dbm.get_trades_session()
+    """Session for trades.db."""
+    return get_trades_session()
 
 
 def _get_portfolio_session():
-    """Session for portfolio.db. Respects monkeypatched logic.services.engine."""
-    try:
-        import logic.services as _svc
-        if getattr(_svc, "engine", None) is not None:
-            return sessionmaker(bind=_svc.engine)()
-    except Exception:
-        pass
-    import database.models as _dbm
-    return _dbm.get_portfolio_session()
+    """Session for portfolio.db."""
+    return get_portfolio_session()
 
 
 # Canonical alias for trades.db session used by accounts + holdings.

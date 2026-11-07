@@ -1,68 +1,72 @@
+"""Shared pytest fixtures.
+
+- Settings: every test runs with test settings that ignore the developer's
+  `.env` (session-wide), and can change individual values with
+  `settings_override(...)`.
+- Database: `db_engine_and_session` routes every data domain to one shared
+  in-memory SQLite engine through `optionflow.core.db.use_engine`.
+"""
 import pytest
-from sqlalchemy import create_engine, StaticPool
+from sqlalchemy import StaticPool, create_engine
 from sqlalchemy.orm import sessionmaker
 
 import database.models as dbmodels
-import logic.services as services
+from optionflow.core import db as core_db
+from optionflow.core.settings import Settings, get_settings, override_settings
+
+TEST_SETTINGS = dict(
+    jwt_secret="test-secret-do-not-use-in-prod",
+    jwt_audience="optionflow-app",
+    jwt_issuer="optionflow-api",
+)
 
 
-@pytest.fixture(scope='function')
-def db_engine_and_session(monkeypatch):
-    """Provide a single shared in-memory SQLite engine for all domains.
+@pytest.fixture(scope="session", autouse=True)
+def test_settings():
+    """Test settings for the whole run: environment variables still apply, `.env` does not."""
+    with override_settings(Settings(_env_file=None, **TEST_SETTINGS)) as s:
+        yield s
 
-    Using one engine with StaticPool means every session call shares the same
-    connection and in-memory database, so cross-domain queries (e.g. Account on
-    trades.db + StockHolding on portfolio.db) work correctly in tests.
 
-    We patch both database.models and logic.services so every session factory
-    and engine getter — however imported — returns our test engine/session.
+@pytest.fixture
+def settings_override():
+    """Change settings for one test: `settings_override(login_rate_limit_max_failures=3)`."""
+    stack = []
+
+    def _apply(**changes):
+        cm = override_settings(get_settings().model_copy(update=changes))
+        stack.append(cm)
+        return cm.__enter__()
+
+    yield _apply
+    while stack:
+        stack.pop().__exit__(None, None, None)
+
+
+def make_memory_engine():
+    """One in-memory SQLite engine with every domain's tables.
+
+    StaticPool makes every session share the same connection, so cross-domain
+    queries (e.g. Account on trades + StockHolding on portfolio) work.
     """
     engine = create_engine(
-        'sqlite:///:memory:',
+        "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    Session = sessionmaker(bind=engine)
+    for base in (dbmodels.UsersBase, dbmodels.TradesBase, dbmodels.PortfolioBase,
+                 dbmodels.BudgetBase, dbmodels.MarketsBase):
+        base.metadata.create_all(engine)
+    return engine
 
-    # Create tables for every domain on the single shared engine
-    dbmodels.UsersBase.metadata.create_all(engine)
-    dbmodels.TradesBase.metadata.create_all(engine)
-    dbmodels.PortfolioBase.metadata.create_all(engine)
-    dbmodels.BudgetBase.metadata.create_all(engine)
-    dbmodels.MarketsBase.metadata.create_all(engine)
 
-    # Session factory that always returns a session on the shared engine
-    def _sess():
-        return Session()
-
-    # 1. Patch engine getters on database.models
-    monkeypatch.setattr(dbmodels, 'get_users_engine',     lambda: engine)
-    monkeypatch.setattr(dbmodels, 'get_trades_engine',    lambda: engine)
-    monkeypatch.setattr(dbmodels, 'get_portfolio_engine', lambda: engine)
-    monkeypatch.setattr(dbmodels, 'get_budget_engine',    lambda: engine)
-    monkeypatch.setattr(dbmodels, 'get_markets_engine',   lambda: engine)
-
-    # 2. Patch session factories on database.models
-    monkeypatch.setattr(dbmodels, 'get_users_session',     _sess)
-    monkeypatch.setattr(dbmodels, 'get_trades_session',    _sess)
-    monkeypatch.setattr(dbmodels, 'get_portfolio_session', _sess)
-    monkeypatch.setattr(dbmodels, 'get_budget_session',    _sess)
-    monkeypatch.setattr(dbmodels, 'get_markets_session',   _sess)
-
-    # 3. Patch the same names on logic.services (imported as module-level locals)
-    monkeypatch.setattr(services, 'get_users_engine',     lambda: engine)
-    monkeypatch.setattr(services, 'get_trades_engine',    lambda: engine)
-    monkeypatch.setattr(services, 'get_portfolio_engine', lambda: engine)
-    monkeypatch.setattr(services, 'get_budget_engine',    lambda: engine)
-    monkeypatch.setattr(services, 'get_markets_engine',   lambda: engine)
-    monkeypatch.setattr(services, 'get_users_session',     _sess)
-    monkeypatch.setattr(services, 'get_trades_session',    _sess)
-    monkeypatch.setattr(services, 'get_portfolio_session', _sess)
-    monkeypatch.setattr(services, 'get_budget_session',    _sess)
-    monkeypatch.setattr(services, 'get_markets_session',   _sess)
-
-    # 4. Null out services.engine so the legacy get_session() / _*_session()
-    #    helpers fall through to the patched get_*_session functions above.
-    monkeypatch.setattr(services, 'engine', None)
-
-    yield engine, Session
+@pytest.fixture(scope="function")
+def db_engine_and_session():
+    """A fresh in-memory database used by every domain for one test."""
+    engine = make_memory_engine()
+    core_db.use_engine(engine)
+    try:
+        yield engine, sessionmaker(bind=engine)
+    finally:
+        core_db.use_engine(None)
+        engine.dispose()

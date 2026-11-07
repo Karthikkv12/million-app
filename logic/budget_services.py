@@ -5,8 +5,6 @@ import logging
 from datetime import datetime, timezone
 
 import pandas as pd
-from sqlalchemy.orm import sessionmaker
-
 from database.models import (
     Budget,
     BudgetOverride,
@@ -18,8 +16,8 @@ from database.models import (
     LedgerEntry,
     LedgerEntryType,
     LedgerLine,
-    get_budget_session,
 )
+from optionflow.core.db import get_budget_session
 
 _logger = logging.getLogger("optionflow.budget")
 
@@ -27,15 +25,8 @@ _logger = logging.getLogger("optionflow.budget")
 # ── Session helper ────────────────────────────────────────────────────────────
 
 def _budget_session():
-    """Session for budget.db. Respects monkeypatched logic.services.engine."""
-    try:
-        import logic.services as _svc
-        if getattr(_svc, "engine", None) is not None:
-            return sessionmaker(bind=_svc.engine)()
-    except Exception:
-        pass
-    import database.models as _dbm
-    return _dbm.get_budget_session()
+    """Session for budget.db."""
+    return get_budget_session()
 
 
 # ── Normalizers ───────────────────────────────────────────────────────────────

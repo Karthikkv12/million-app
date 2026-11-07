@@ -8,9 +8,8 @@ from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database.models import (
-    get_portfolio_session, BrokerAccount, AccountBalance, WeeklySnapshot
-)
+from database.models import BrokerAccount, AccountBalance, WeeklySnapshot
+from optionflow.core.db import get_portfolio_session
 from datetime import datetime
 
 USER_ID = 1

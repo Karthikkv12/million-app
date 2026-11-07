@@ -4,16 +4,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy.orm import sessionmaker
-
-from database.models import (
-    get_users_engine,
-    get_users_session,
-)
+from optionflow.core.db import get_users_session
+from optionflow.core.settings import get_settings
 
 _logger = logging.getLogger("optionflow.auth")
 
@@ -26,18 +21,9 @@ except Exception as e:
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# ── Compatibility: tests monkeypatch logic.services.engine ───────────────────
-# auth_services reads the monkeypatched value from logic.services at call-time.
 def _users_session():
     """Session for users.db (auth, tokens, events)."""
-    try:
-        import logic.services as _svc
-        if getattr(_svc, "engine", None) is not None:
-            return sessionmaker(bind=_svc.engine)()
-    except Exception:
-        pass
-    import database.models as _dbm
-    return _dbm.get_users_session()
+    return get_users_session()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,24 +35,18 @@ def _normalize_str(x) -> str:
 
 
 def _policy_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except Exception:
-        return int(default)
+    """Password-policy integer from settings (e.g. PASSWORD_MIN_LENGTH)."""
+    return int(getattr(get_settings(), name.lower(), default))
 
 
 def _policy_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return bool(default)
-    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+    """Password-policy flag from settings (e.g. PASSWORD_REQUIRE_UPPER)."""
+    return bool(getattr(get_settings(), name.lower(), default))
 
 
 def _rate_limit_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except Exception:
-        return int(default)
+    """Rate-limit integer from settings (e.g. LOGIN_RATE_LIMIT_MAX_FAILURES)."""
+    return int(getattr(get_settings(), name.lower(), default))
 
 
 def _utc_naive_from_epoch_seconds(epoch_seconds: int) -> datetime:
@@ -78,11 +58,8 @@ def _epoch_seconds_from_utc_naive(dt: datetime) -> int:
 
 
 def _refresh_token_pepper() -> str:
-    return (
-        os.getenv("REFRESH_TOKEN_PEPPER")
-        or os.getenv("JWT_SECRET")
-        or "dev-insecure-secret"
-    )
+    s = get_settings()
+    return s.refresh_token_pepper or s.jwt_secret or "dev-insecure-secret"
 
 
 def _hash_refresh_token(token: str) -> str:
@@ -95,10 +72,7 @@ def _hash_refresh_token(token: str) -> str:
 
 
 def _refresh_token_ttl_days() -> int:
-    try:
-        return int(os.getenv("REFRESH_TOKEN_EXPIRES_DAYS", "30"))
-    except Exception:
-        return 30
+    return get_settings().refresh_token_expires_days
 
 
 # ── Password policy ───────────────────────────────────────────────────────────

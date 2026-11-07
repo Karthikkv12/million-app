@@ -91,12 +91,20 @@ from database.models import (
 
 ## Backend Architecture (`backend_api/`)
 
+**Core (`optionflow/core/`)** — plan step 2:
+```
+optionflow/core/
+  settings.py   # get_settings(): every setting (JWT, password policy, rate limits, CORS, DB, ENABLED_MODULES); reads env, then .env
+  db.py         # engines + sessions per domain (get_users_session …), init_db(), use_engine() test hook
+  deps.py       # FastAPI Depends: get_current_user, require_admin
+```
+Never call `os.getenv` in app code — add a field to `Settings` instead.
+
 ```
 backend_api/
-  main.py          # thin app factory — CORS, middleware, lifespan, health, /health (all 5 DBs)
+  main.py          # thin app factory — CORS, middleware, lifespan, /health (all 5 DBs)
   state.py         # shared GEX cache, background poller, flow-DB helpers
   utils.py         # df_records() — single canonical dict serialiser
-  deps.py          # FastAPI Depends: get_current_user, require_admin
   schemas/         # Pydantic v2 models — split by domain
     __init__.py    # re-exports everything (backward compat)
     auth.py        # auth schemas
@@ -122,7 +130,6 @@ logic/
   portfolio.py          # option positions, weekly portfolio, premium ledger
   holdings.py           # stock holding helpers
   gamma.py              # GEX calculations (core product)
-  services.py           # thin re-export shim (backward compat)
   premium_ledger.py     # premium ledger helpers
 ```
 
@@ -195,13 +202,13 @@ Daily cron at midnight backs up all 6 DB files to `OptionFlow_main/backups/`.
 # Run all tests (except GEX integration test)
 source .venv/bin/activate && python -m pytest tests/ -q --ignore=tests/test_api_gex.py
 
-# All tests should pass: currently 428 passing, 0 failing
+# All tests should pass: currently 474 passing, 0 failing
 ```
 
-**Conftest pattern:** `tests/conftest.py` provides `db_engine_and_session` fixture.
-- Creates a single `StaticPool` in-memory SQLite engine
-- Creates all tables from all 5 Bases
-- Monkeypatches all `get_*_engine` and `get_*_session` on both `database.models` and `logic.services`
+**Conftest pattern:** `tests/conftest.py`
+- `test_settings` (session, autouse): test settings that ignore your `.env`; environment variables still apply
+- `settings_override(**changes)`: change settings for one test, e.g. `settings_override(login_rate_limit_max_failures=3)`
+- `db_engine_and_session`: one `StaticPool` in-memory SQLite engine with all 5 Bases' tables, routed to every domain via `optionflow.core.db.use_engine` (no monkeypatching)
 
 ---
 

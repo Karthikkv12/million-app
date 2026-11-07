@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from logic.services import _portfolio_session
+from optionflow.core.db import get_portfolio_session as _portfolio_session
 from database.models import WatchlistSymbol, OptionPosition, StockHolding
 
 

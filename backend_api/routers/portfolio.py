@@ -48,8 +48,8 @@ from logic.portfolio import (
     delete_cash_deposit,
 )
 from logic.premium_ledger import get_premium_dashboard, get_premium_summary, sync_ledger_from_positions
-from logic import services as _services
-from ..deps import get_current_user
+from logic import portfolio_services
+from optionflow.core.deps import get_current_user
 from ..schemas import (
     AssignmentCreateRequest,
     AssignmentUpdateRequest,
@@ -299,7 +299,7 @@ def list_portfolio_value_history(
     limit: int = Query(default=365, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> List[PortfolioSnapshotOut]:
-    rows = _services.list_portfolio_snapshots(user_id=int(user["sub"]), limit=limit, offset=offset)
+    rows = portfolio_services.list_portfolio_snapshots(user_id=int(user["sub"]), limit=limit, offset=offset)
     return [PortfolioSnapshotOut.model_validate(r) for r in rows]
 
 
@@ -308,7 +308,7 @@ def upsert_portfolio_value_history(
     body: PortfolioSnapshotCreateRequest, user=Depends(get_current_user)
 ) -> PortfolioSnapshotOut:
     try:
-        row = _services.upsert_portfolio_snapshot(
+        row = portfolio_services.upsert_portfolio_snapshot(
             user_id=int(user["sub"]),
             snapshot_date=body.snapshot_date,
             total_value=body.total_value,

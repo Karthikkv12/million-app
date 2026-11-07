@@ -3,14 +3,14 @@ Tests for logic/portfolio.py — weekly options portfolio service layer.
 """
 import datetime
 import pytest
-from logic import services
+from logic import auth_services
 import logic.portfolio as port
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def make_user(name="trader1"):
-    return services.create_user(name, "GoodPassword12")
+    return auth_services.create_user(name, "GoodPassword12")
 
 
 def _monday(offset_weeks=0):
