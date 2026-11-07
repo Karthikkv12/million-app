@@ -1,7 +1,7 @@
 """optionflow/modules/portfolio/accounts.py — Broker accounts, weekly account balances and cash deposits."""
 from __future__ import annotations
 from datetime import datetime
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import WeeklySnapshot, BrokerAccount, AccountBalance
 
 
@@ -18,7 +18,7 @@ def _account_to_dict(a: BrokerAccount) -> dict:
 
 
 def list_broker_accounts(*, user_id: int) -> list[dict]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         accounts = (
             session.query(BrokerAccount)
@@ -33,7 +33,7 @@ def list_broker_accounts(*, user_id: int) -> list[dict]:
 
 def create_broker_account(*, user_id: int, name: str, color: str | None = None,
                           sort_order: int = 0) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         a = BrokerAccount(
             user_id=user_id, name=name, color=color,
@@ -52,7 +52,7 @@ def update_broker_account(*, user_id: int, account_id: int,
                           name: str | None = None, color: str | None = None,
                           sort_order: int | None = None,
                           is_active: bool | None = None) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         a = session.query(BrokerAccount).filter(
             BrokerAccount.id == account_id,
@@ -76,7 +76,7 @@ def update_broker_account(*, user_id: int, account_id: int,
 
 
 def delete_broker_account(*, user_id: int, account_id: int) -> None:
-    session = _portfolio_session()
+    session = get_session()
     try:
         a = session.query(BrokerAccount).filter(
             BrokerAccount.id == account_id,
@@ -131,7 +131,7 @@ def upsert_account_balance(*, user_id: int, account_id: int,
     if not isinstance(week_date, _date):
         week_date = _dt.strptime(str(week_date), "%Y-%m-%d").date()
 
-    session = _portfolio_session()
+    session = get_session()
     try:
         existing = session.query(AccountBalance).filter(
             AccountBalance.account_id == account_id,
@@ -162,7 +162,7 @@ def delete_account_balance(*, user_id: int, account_id: int, week_date) -> None:
     from datetime import date as _date, datetime as _dt
     if not isinstance(week_date, _date):
         week_date = _dt.strptime(str(week_date), "%Y-%m-%d").date()
-    session = _portfolio_session()
+    session = get_session()
     try:
         b = session.query(AccountBalance).filter(
             AccountBalance.account_id == account_id,
@@ -180,7 +180,7 @@ def delete_account_balance(*, user_id: int, account_id: int, week_date) -> None:
 def list_account_balance_years(*, user_id: int) -> list[int]:
     """Return sorted list of distinct years that have any account_balance rows."""
     from datetime import date as _date
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(AccountBalance.week_date)
@@ -200,7 +200,7 @@ def list_account_balance_years(*, user_id: int) -> list[int]:
 def list_account_balances(*, user_id: int, year: int) -> list[dict]:
     """Return all balances for a given year, keyed by week_date."""
     from datetime import date as _date
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(AccountBalance)
@@ -226,7 +226,7 @@ def list_account_balances(*, user_id: int, year: int) -> list[dict]:
 
 def list_all_account_balances(*, user_id: int) -> list[dict]:
     """Return all balances across all years for chart use."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(AccountBalance)
@@ -251,7 +251,7 @@ def list_all_account_balances(*, user_id: int) -> list[dict]:
 def list_cash_deposits(*, user_id: int) -> list[dict]:
     """Return all cash deposit/withdrawal events for the user, oldest first."""
     from database.models import CashDeposit
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(CashDeposit)
@@ -294,7 +294,7 @@ def upsert_cash_deposit(
     if isinstance(week_date, str):
         week_date = _pd.to_datetime(week_date).date()
 
-    session = _portfolio_session()
+    session = get_session()
     try:
         if deposit_id is not None:
             row = (
@@ -336,7 +336,7 @@ def upsert_cash_deposit(
 
 def delete_cash_deposit(*, user_id: int, deposit_id: int) -> None:
     from database.models import CashDeposit
-    session = _portfolio_session()
+    session = get_session()
     try:
         row = (
             session.query(CashDeposit)

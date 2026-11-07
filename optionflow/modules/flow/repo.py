@@ -6,7 +6,7 @@ from typing import Iterable, List, Set
 from sqlalchemy import or_
 
 from database.models import NetFlowSnapshot
-from optionflow.core.db import get_markets_session
+from optionflow.core.db import get_session
 
 _FIELDS = ("symbol", "ts", "price", "call_prem", "put_prem", "net_flow", "total_prem", "volume")
 
@@ -21,7 +21,7 @@ def add_snapshots(rows: Iterable[dict]) -> int:
     objs = [NetFlowSnapshot(**{k: r[k] for k in _FIELDS}) for r in rows]
     if not objs:
         return 0
-    session = get_markets_session()
+    session = get_session()
     try:
         session.add_all(objs)
         session.commit()
@@ -35,7 +35,7 @@ def add_snapshots(rows: Iterable[dict]) -> int:
 
 def existing_timestamps(symbol: str, since_iso: str) -> Set[str]:
     """Timestamps already stored for `symbol` at or after `since_iso`."""
-    session = get_markets_session()
+    session = get_session()
     try:
         rows = (
             session.query(NetFlowSnapshot.ts)
@@ -52,7 +52,7 @@ def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
 
     Matches both timestamp spellings ever written ("…Z" and "…+00:00").
     """
-    session = get_markets_session()
+    session = get_session()
     try:
         q = (
             session.query(

@@ -3,10 +3,7 @@ import pandas as pd
 from optionflow.modules.budget import service as budget_services
 
 
-def test_cash_flow_posts_balanced_ledger_entry(db_engine_and_session):
-    _, _ = db_engine_and_session
-
-    user_id = 1
+def test_cash_flow_posts_balanced_ledger_entry(user_id):
     budget_services.save_cash("DEPOSIT", 100.0, pd.Timestamp("2025-01-01"), "seed", user_id=user_id)
 
     bal = budget_services.get_cash_balance_ledger(user_id=user_id, currency="USD")
@@ -25,10 +22,7 @@ def test_cash_flow_posts_balanced_ledger_entry(db_engine_and_session):
     assert round(sum(float(l["amount"]) for l in e["lines"]), 10) == 0.0
 
 
-def test_cash_withdraw_posts_and_updates_balance(db_engine_and_session):
-    _, _ = db_engine_and_session
-
-    user_id = 7
+def test_cash_withdraw_posts_and_updates_balance(user_id):
     budget_services.save_cash("DEPOSIT", 100.0, pd.Timestamp("2025-01-01"), "seed", user_id=user_id)
     budget_services.save_cash("WITHDRAW", 40.0, pd.Timestamp("2025-01-02"), "atm", user_id=user_id)
 

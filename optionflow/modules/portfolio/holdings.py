@@ -14,8 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from optionflow.core.db import get_portfolio_session as _portfolio_session
-from optionflow.core.db import get_trades_session as get_session
+from optionflow.core.db import get_session
 from database.models import (
     StockHolding,
     HoldingEvent,
@@ -224,7 +223,7 @@ def _recalculate_adj_basis(h: StockHolding, session) -> float:
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def list_holdings(*, user_id: int) -> list[dict]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(StockHolding)
@@ -254,7 +253,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
     This preserves the premium-reduction history, which is the user's real
     advantage from running the covered-call wheel.
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         symbol = str(data["symbol"]).upper().strip()
         new_shares = float(data["shares"])
@@ -368,7 +367,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
 
 
 def update_holding(*, user_id: int, holding_id: int, data: dict) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         h = session.query(StockHolding).filter(
             StockHolding.id == holding_id,
@@ -483,7 +482,7 @@ def delete_holding(*, user_id: int, holding_id: int) -> None:
     If there are no events (a freshly-added lot with no option history), we
     hard-delete as before.
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         h = session.query(StockHolding).filter(
             StockHolding.id == holding_id,
@@ -513,7 +512,7 @@ def delete_holding(*, user_id: int, holding_id: int) -> None:
 
 
 def list_holding_events(*, user_id: int, holding_id: int) -> list[dict]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(HoldingEvent)
@@ -553,7 +552,7 @@ def apply_position_status_change(
     """
     from optionflow.modules.portfolio.premium_ledger import upsert_ledger_row, get_premium_summary
 
-    session = _portfolio_session()
+    session = get_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -777,7 +776,7 @@ def seed_holdings_from_positions(*, user_id: int) -> dict:
     Returns:
         {"created": [<holding_dict>, ...], "linked": N}
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         positions = (
             session.query(OptionPosition)
@@ -857,7 +856,7 @@ def recalculate_all_holdings(*, user_id: int) -> dict:
     This is idempotent — safe to call repeatedly.
     Returns a summary of how many holdings were updated.
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         holdings = (
             session.query(StockHolding)
@@ -906,7 +905,7 @@ def _parse_dt(val: Any) -> datetime | None:
 
 
 def distinct_symbols(*, user_id: int) -> list[str]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         return [r.symbol for r in session.query(StockHolding.symbol).filter(StockHolding.user_id == user_id).distinct().all()]
     finally:

@@ -17,9 +17,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-DB_DOMAINS = ("users", "trades", "portfolio", "budget", "markets")
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=REPO_ROOT / ".env",
@@ -55,13 +52,9 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "*"               # comma-separated
 
     # ── Database ─────────────────────────────────────────────────────────────
-    database_url: str = ""                      # postgresql://… switches every domain to one Postgres
-    db_dir: str = "."                           # folder holding the SQLite files
-    database_url_users: Optional[str] = None    # per-file overrides (SQLite mode)
-    database_url_trades: Optional[str] = None
-    database_url_portfolio: Optional[str] = None
-    database_url_budget: Optional[str] = None
-    database_url_markets: Optional[str] = None
+    database_url: str = ""                      # any SQLAlchemy URL (e.g. postgresql://…); empty = SQLite below
+    db_dir: str = "."                           # folder holding the SQLite file
+    db_file: str = "optionflow.db"              # SQLite file name
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
@@ -82,14 +75,10 @@ class Settings(BaseSettings):
     def enabled_modules_list(self) -> list[str]:
         return [m.strip() for m in self.enabled_modules.split(",") if m.strip()]
 
-    def database_url_for(self, domain: str) -> str:
-        """SQLAlchemy URL for one data domain (users, trades, portfolio, budget, markets)."""
-        if domain not in DB_DOMAINS:
-            raise ValueError(f"unknown database domain: {domain!r}")
-        if self.is_postgres:
-            return self.database_url
-        override = getattr(self, f"database_url_{domain}")
-        return override or f"sqlite:///{self.db_dir}/{domain}.db"
+    @property
+    def resolved_database_url(self) -> str:
+        """The one database: DATABASE_URL, or SQLite at DB_DIR/DB_FILE."""
+        return self.database_url or f"sqlite:///{self.db_dir}/{self.db_file}"
 
 
 _override: Optional[Settings] = None

@@ -1,7 +1,7 @@
 """optionflow/modules/portfolio/positions.py — Option positions within a week."""
 from __future__ import annotations
 from datetime import datetime
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import WeeklySnapshot, OptionPosition, OptionPositionStatus, PremiumLedger
 from optionflow.modules.portfolio._common import _float_or_none, _pos_to_dict, parse_dt
 
@@ -9,7 +9,7 @@ from optionflow.modules.portfolio._common import _float_or_none, _pos_to_dict, p
 # ── Option positions ──────────────────────────────────────────────────────────
 
 def list_positions(*, user_id: int, week_id: int) -> list[dict]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         # Get the week snapshot to know if it's complete
         snap = session.query(WeeklySnapshot).filter(
@@ -96,7 +96,7 @@ def list_positions(*, user_id: int, week_id: int) -> list[dict]:
 
 def list_all_positions(*, user_id: int) -> list[dict]:
     """Return every OptionPosition for the user across all weeks, ordered by expiry_date asc."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         positions = (
             session.query(OptionPosition)
@@ -110,7 +110,7 @@ def list_all_positions(*, user_id: int) -> list[dict]:
 
 
 def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         # Validate week belongs to user
         snap = session.query(WeeklySnapshot).filter(
@@ -164,7 +164,7 @@ def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
 
 
 def update_position(*, user_id: int, position_id: int, data: dict) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -218,7 +218,7 @@ def delete_position(*, user_id: int, position_id: int) -> None:
     This ensures a "wrong trade" entered in week 1 is fully removed and
     never resurfaces as a ghost in the 'Carried from prior weeks' section.
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -263,7 +263,7 @@ def delete_position(*, user_id: int, position_id: int) -> None:
 
 
 def distinct_symbols(*, user_id: int) -> list[str]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         return [r.symbol for r in session.query(OptionPosition.symbol).filter(OptionPosition.user_id == user_id).distinct().all()]
     finally:

@@ -8,16 +8,16 @@ from optionflow.modules.portfolio import holdings
 from optionflow.modules.watchlist import service as watchlist
 
 
-def test_create_new_holding(db_engine_and_session):
-    h = holdings.create_holding(user_id=1, data={"symbol": "aapl", "shares": 100, "cost_basis": 150.0,
+def test_create_new_holding(user_id):
+    h = holdings.create_holding(user_id=user_id, data={"symbol": "aapl", "shares": 100, "cost_basis": 150.0,
                                                  "company_name": "Apple"})
     assert h["symbol"] == "AAPL" and h["shares"] == 100 and h["status"] == "ACTIVE"
     assert h["cost_basis"] == 150.0 and h["adjusted_cost_basis"] == 150.0
-    assert [w["symbol"] for w in watchlist.list_watchlist(user_id=1)] == ["AAPL"]   # auto-registered
+    assert [w["symbol"] for w in watchlist.list_watchlist(user_id=user_id)] == ["AAPL"]   # auto-registered
 
 
-def test_reactivates_closed_holding(db_engine_and_session):
-    h = holdings.create_holding(user_id=1, data={"symbol": "MSFT", "shares": 100, "cost_basis": 400.0})
-    holdings.update_holding(user_id=1, holding_id=h["id"], data={"status": "CLOSED", "close_price": 410.0})
-    again = holdings.create_holding(user_id=1, data={"symbol": "MSFT", "shares": 50, "cost_basis": 420.0})
+def test_reactivates_closed_holding(user_id):
+    h = holdings.create_holding(user_id=user_id, data={"symbol": "MSFT", "shares": 100, "cost_basis": 400.0})
+    holdings.update_holding(user_id=user_id, holding_id=h["id"], data={"status": "CLOSED", "close_price": 410.0})
+    again = holdings.create_holding(user_id=user_id, data={"symbol": "MSFT", "shares": 50, "cost_basis": 420.0})
     assert again["id"] == h["id"] and again["status"] == "ACTIVE"

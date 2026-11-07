@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import WatchlistSymbol
 
 
@@ -32,7 +32,7 @@ def _to_dict(w: WatchlistSymbol) -> dict:
 
 def list_watchlist(*, user_id: int, include_inactive: bool = False) -> list[dict]:
     """Return all watchlist entries for the user, sorted by symbol."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         q = session.query(WatchlistSymbol).filter(
             WatchlistSymbol.user_id == user_id,
@@ -66,7 +66,7 @@ def upsert_symbol(
     symbol = symbol.upper().strip()
     SOURCE_PRIORITY = {"manual": 3, "position": 2, "holding": 1}
 
-    session = _portfolio_session()
+    session = get_session()
     try:
         row = session.query(WatchlistSymbol).filter(
             WatchlistSymbol.user_id == user_id,
@@ -110,7 +110,7 @@ def upsert_symbol(
 def remove_symbol(*, user_id: int, symbol: str) -> None:
     """Soft-delete: mark is_active=False.  Symbol history is preserved."""
     symbol = symbol.upper().strip()
-    session = _portfolio_session()
+    session = get_session()
     try:
         row = session.query(WatchlistSymbol).filter(
             WatchlistSymbol.user_id == user_id,
@@ -142,7 +142,7 @@ def bulk_register(
     if not clean:
         return
 
-    session = _portfolio_session()
+    session = get_session()
     try:
         # Load all existing rows for these symbols in one query
         existing = {

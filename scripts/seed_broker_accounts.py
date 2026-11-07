@@ -9,7 +9,7 @@ from datetime import date, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.models import BrokerAccount, AccountBalance, WeeklySnapshot
-from optionflow.core.db import get_portfolio_session
+from optionflow.core.db import get_session
 from datetime import datetime
 
 USER_ID = 1
@@ -101,7 +101,7 @@ def get_or_create_week(session, user_id: int, friday: date) -> WeeklySnapshot:
 
 
 def main():
-    session = get_portfolio_session()
+    session = get_session()
     try:
         # ── 1. Create broker accounts (skip if already exist) ────────────────
         print("=== Creating broker accounts ===")

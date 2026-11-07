@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from datetime import datetime
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import OptionPosition, OptionPositionStatus, StockAssignment
 from optionflow.modules.portfolio._common import _assignment_to_dict
 
@@ -10,7 +10,7 @@ from optionflow.modules.portfolio._common import _assignment_to_dict
 # ── Stock assignments ─────────────────────────────────────────────────────────
 
 def create_assignment(*, user_id: int, position_id: int, data: dict) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         pos = session.query(OptionPosition).filter(
             OptionPosition.id == position_id,
@@ -46,7 +46,7 @@ def create_assignment(*, user_id: int, position_id: int, data: dict) -> dict:
 
 
 def update_assignment(*, user_id: int, assignment_id: int, data: dict) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         a = session.query(StockAssignment).filter(
             StockAssignment.id == assignment_id,
@@ -71,7 +71,7 @@ def update_assignment(*, user_id: int, assignment_id: int, data: dict) -> dict:
 
 
 def get_assignment_for_position(*, user_id: int, position_id: int) -> dict | None:
-    session = _portfolio_session()
+    session = get_session()
     try:
         a = session.query(StockAssignment).filter(
             StockAssignment.position_id == position_id,
@@ -84,7 +84,7 @@ def get_assignment_for_position(*, user_id: int, position_id: int) -> dict | Non
 
 def list_assignments(*, user_id: int) -> list[dict]:
     """All stock assignments for a user — for the portfolio summary."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         rows = (
             session.query(StockAssignment)

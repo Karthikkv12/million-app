@@ -17,16 +17,9 @@ from database.models import (
     LedgerEntryType,
     LedgerLine,
 )
-from optionflow.core.db import get_budget_session
+from optionflow.core.db import get_session
 
 _logger = logging.getLogger("optionflow.budget")
-
-
-# ── Session helper ────────────────────────────────────────────────────────────
-
-def _budget_session():
-    """Session for budget.db."""
-    return get_budget_session()
 
 
 # ── Normalizers ───────────────────────────────────────────────────────────────
@@ -149,7 +142,7 @@ def _post_cash_ledger_entry(
 # ── Cash ──────────────────────────────────────────────────────────────────────
 
 def save_cash(action, amount, date, notes, user_id=None) -> int:
-    session = _budget_session()
+    session = get_session()
     try:
         action_enum = normalize_cash_action(action)
         new_cash = CashFlow(
@@ -185,7 +178,7 @@ def save_cash(action, amount, date, notes, user_id=None) -> int:
 
 
 def update_cash(cash_id: int, user_id: int, *, action: str | None = None, amount: float | None = None, date=None, notes: str | None = None) -> dict | None:
-    session = _budget_session()
+    session = get_session()
     try:
         row = session.query(CashFlow).filter(CashFlow.id == int(cash_id), CashFlow.user_id == int(user_id)).first()
         if not row:
@@ -214,7 +207,7 @@ def update_cash(cash_id: int, user_id: int, *, action: str | None = None, amount
 
 
 def delete_cash(cash_id: int, user_id: int) -> bool:
-    session = _budget_session()
+    session = get_session()
     try:
         row = session.query(CashFlow).filter(CashFlow.id == int(cash_id), CashFlow.user_id == int(user_id)).first()
         if not row:
@@ -230,7 +223,7 @@ def delete_cash(cash_id: int, user_id: int) -> bool:
 
 
 def list_cash_flows(*, user_id: int, limit: int = 200, offset: int = 0) -> list[dict]:
-    session = _budget_session()
+    session = get_session()
     try:
         rows = (
             session.query(CashFlow)
@@ -253,7 +246,7 @@ def list_cash_flows(*, user_id: int, limit: int = 200, offset: int = 0) -> list[
 
 
 def get_cash_balance_ledger(*, user_id: int, currency: str = "USD") -> float:
-    session = _budget_session()
+    session = get_session()
     try:
         cur = str(currency or "USD").strip().upper() or "USD"
         cash_name = f"Cash ({cur})"
@@ -279,7 +272,7 @@ def get_cash_balance(*, user_id: int, currency: str = "USD") -> float:
 # ── Budget ────────────────────────────────────────────────────────────────────
 
 def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=None, recurrence=None, merchant=None, active_until=None) -> int:
-    session = _budget_session()
+    session = get_session()
     try:
         type_enum = normalize_budget_type(b_type)
         new_item = Budget(
@@ -302,7 +295,7 @@ def save_budget(category, b_type, amount, date, desc, user_id=None, entry_type=N
 
 
 def update_budget(budget_id: int, user_id: int, **kwargs):
-    session = _budget_session()
+    session = get_session()
     try:
         item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
         if not item:
@@ -323,7 +316,7 @@ def update_budget(budget_id: int, user_id: int, **kwargs):
 
 
 def delete_budget(budget_id: int, user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         item = session.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
         if item:
@@ -337,7 +330,7 @@ def delete_budget(budget_id: int, user_id: int):
 
 
 def list_budget_entries(*, user_id: int, limit: int = 500, offset: int = 0) -> list[dict]:
-    session = _budget_session()
+    session = get_session()
     try:
         rows = (
             session.query(Budget)
@@ -365,7 +358,7 @@ def list_budget_entries(*, user_id: int, limit: int = 500, offset: int = 0) -> l
 
 
 def get_budget_summary(*, user_id: int) -> dict:
-    session = _budget_session()
+    session = get_session()
     try:
         rows = session.query(Budget).filter(Budget.user_id == int(user_id)).all()
         by_category: dict[str, float] = {}
@@ -397,7 +390,7 @@ def get_budget_summary(*, user_id: int) -> dict:
 # ── Budget overrides ──────────────────────────────────────────────────────────
 
 def list_budget_overrides(user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         rows = (
             session.query(BudgetOverride)
@@ -418,7 +411,7 @@ def list_budget_overrides(user_id: int):
 
 
 def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount: float, description: str = None):
-    session = _budget_session()
+    session = get_session()
     try:
         existing = session.query(BudgetOverride).filter(
             BudgetOverride.user_id == user_id,
@@ -447,7 +440,7 @@ def upsert_budget_override(user_id: int, budget_id: int, month_key: str, amount:
 
 
 def delete_budget_override(override_id: int, user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         row = session.query(BudgetOverride).filter(
             BudgetOverride.id == override_id, BudgetOverride.user_id == user_id,
@@ -463,7 +456,7 @@ def delete_budget_override(override_id: int, user_id: int):
 
 
 def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         session.query(BudgetOverride).filter(
             BudgetOverride.budget_id == budget_id, BudgetOverride.user_id == user_id,
@@ -479,7 +472,7 @@ def delete_budget_overrides_for_entry(budget_id: int, user_id: int):
 # ── Credit card weeks ─────────────────────────────────────────────────────────
 
 def list_credit_card_weeks(user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         rows = (
             session.query(CreditCardWeek)
@@ -506,7 +499,7 @@ def list_credit_card_weeks(user_id: int):
 
 
 def create_credit_card_week(user_id: int, week_start, balance: float, squared_off: bool = False, paid_amount=None, note=None, card_name=None):
-    session = _budget_session()
+    session = get_session()
     try:
         row = CreditCardWeek(
             user_id=user_id, week_start=pd.to_datetime(week_start),
@@ -527,7 +520,7 @@ def create_credit_card_week(user_id: int, week_start, balance: float, squared_of
 
 
 def update_credit_card_week(row_id: int, user_id: int, **kwargs):
-    session = _budget_session()
+    session = get_session()
     try:
         row = session.query(CreditCardWeek).filter(
             CreditCardWeek.id == row_id, CreditCardWeek.user_id == user_id,
@@ -549,7 +542,7 @@ def update_credit_card_week(row_id: int, user_id: int, **kwargs):
 
 
 def delete_credit_card_week(row_id: int, user_id: int):
-    session = _budget_session()
+    session = get_session()
     try:
         row = session.query(CreditCardWeek).filter(
             CreditCardWeek.id == row_id, CreditCardWeek.user_id == user_id,
@@ -567,7 +560,7 @@ def delete_credit_card_week(row_id: int, user_id: int):
 # ── Ledger ────────────────────────────────────────────────────────────────────
 
 def list_ledger_entries(*, user_id: int, limit: int = 100, offset: int = 0) -> list[dict]:
-    session = _budget_session()
+    session = get_session()
     try:
         es = (
             session.query(LedgerEntry)

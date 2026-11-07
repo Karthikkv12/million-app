@@ -1,7 +1,7 @@
 """optionflow/modules/portfolio/weeks.py — Weekly portfolio snapshots: create, list, update, complete, reopen."""
 from __future__ import annotations
 from datetime import datetime, timedelta
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import WeeklySnapshot, OptionPosition, OptionPositionStatus
 from optionflow.modules.portfolio._common import _snap_to_dict, _week_bounds
 
@@ -11,7 +11,7 @@ from optionflow.modules.portfolio._common import _snap_to_dict, _week_bounds
 def get_or_create_week(*, user_id: int, for_date: datetime | None = None) -> dict:
     """Return the week containing for_date, creating it if necessary."""
     monday, friday = _week_bounds(for_date)
-    session = _portfolio_session()
+    session = get_session()
     try:
         snap = (
             session.query(WeeklySnapshot)
@@ -39,7 +39,7 @@ def get_or_create_week(*, user_id: int, for_date: datetime | None = None) -> dic
 
 def list_weeks(*, user_id: int) -> list[dict]:
     """Return all weeks for this user, newest first."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         snaps = (
             session.query(WeeklySnapshot)
@@ -53,7 +53,7 @@ def list_weeks(*, user_id: int) -> list[dict]:
 
 
 def get_week(*, user_id: int, week_id: int) -> dict | None:
-    session = _portfolio_session()
+    session = get_session()
     try:
         s = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -75,7 +75,7 @@ def update_week(*, user_id: int, week_id: int, account_value: float | None = Non
     automatically.  Passing account_value directly still works for backwards
     compatibility (used when only a single number is provided).
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         s = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -120,7 +120,7 @@ def mark_week_complete(*, user_id: int, week_id: int, account_value: float | Non
     Mark a week as complete and carry all ACTIVE positions forward into the
     next week (creating it if necessary).
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         snap = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,
@@ -213,7 +213,7 @@ def reopen_week(*, user_id: int, week_id: int) -> dict:
          this week (carried_from_id points to a position in week_id).
          Delete those carried copies so they are not orphaned duplicates.
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         snap = session.query(WeeklySnapshot).filter(
             WeeklySnapshot.id == week_id,

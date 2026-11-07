@@ -3,8 +3,8 @@
 - Settings: every test runs with test settings that ignore the developer's
   `.env` (session-wide), and can change individual values with
   `settings_override(...)`.
-- Database: `db_engine_and_session` routes every data domain to one shared
-  in-memory SQLite engine through `optionflow.core.db.use_engine`.
+- Database: `db_engine_and_session` points the app at a fresh in-memory
+  SQLite database (foreign keys enforced) through `optionflow.core.db.use_engine`.
 """
 import pytest
 from sqlalchemy import StaticPool, create_engine
@@ -44,19 +44,17 @@ def settings_override():
 
 
 def make_memory_engine():
-    """One in-memory SQLite engine with every domain's tables.
+    """An in-memory SQLite database with every table.
 
-    StaticPool makes every session share the same connection, so cross-domain
-    queries (e.g. Account on trades + StockHolding on portfolio) work.
+    StaticPool makes every session share the same connection (and so the
+    same in-memory database).
     """
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    for base in (dbmodels.UsersBase, dbmodels.TradesBase, dbmodels.PortfolioBase,
-                 dbmodels.BudgetBase, dbmodels.MarketsBase):
-        base.metadata.create_all(engine)
+    dbmodels.Base.metadata.create_all(engine)   # foreign keys are enforced (core/db.py)
     return engine
 
 
@@ -123,3 +121,10 @@ def fake_market_data():
         use_market_data(None)
         flow_service.clear_cache()
         market_service.clear_caches()
+
+
+@pytest.fixture
+def user_id(db_engine_and_session):
+    """A real user in the test database (rows that reference users need one)."""
+    from optionflow.modules.auth import service as auth_service
+    return auth_service.create_user("fixture_user", "FixturePassword12")

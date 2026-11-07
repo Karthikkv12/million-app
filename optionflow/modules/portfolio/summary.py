@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Any
-from optionflow.core.db import get_portfolio_session as _portfolio_session
+from optionflow.core.db import get_session
 from database.models import WeeklySnapshot, OptionPosition, OptionPositionStatus
 from optionflow.modules.portfolio._common import _net_premium
 
@@ -18,7 +18,7 @@ def portfolio_summary(*, user_id: int) -> dict:
       - Monthly account value series (for chart)
       - Capital gains (sum of realized P&L on closed/expired)
     """
-    session = _portfolio_session()
+    session = get_session()
     try:
         all_positions = (
             session.query(OptionPosition)
@@ -166,7 +166,7 @@ def portfolio_summary(*, user_id: int) -> dict:
 
 def symbol_summary(*, user_id: int) -> list[dict]:
     """Per-symbol aggregated P&L — powers the searchable stock list."""
-    session = _portfolio_session()
+    session = get_session()
     try:
         all_positions = (
             session.query(OptionPosition)

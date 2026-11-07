@@ -5,26 +5,9 @@ import logging
 from datetime import datetime, timezone
 
 from database.models import Account, StockHolding
-from optionflow.core.db import get_portfolio_session, get_trades_session
+from optionflow.core.db import get_session
 
 _logger = logging.getLogger("optionflow.trades")
-
-
-# ── Session helpers ───────────────────────────────────────────────────────────
-
-def _get_trades_session():
-    """Session for trades.db."""
-    return get_trades_session()
-
-
-def _get_portfolio_session():
-    """Session for portfolio.db."""
-    return get_portfolio_session()
-
-
-# Canonical alias for trades.db session used by accounts + holdings.
-def get_session():
-    return _get_trades_session()
 
 
 # ── Accounts ──────────────────────────────────────────────────────────────────
@@ -73,7 +56,7 @@ def list_accounts(*, user_id: int) -> list[dict]:
 
 def list_holdings(*, user_id: int, account_id: int) -> list[dict]:
     trades_session = get_session()
-    portfolio_session = _get_portfolio_session()
+    portfolio_session = get_session()
     try:
         acct = trades_session.query(Account).filter(Account.id == int(account_id), Account.user_id == int(user_id)).first()
         if not acct:
@@ -102,7 +85,7 @@ def list_holdings(*, user_id: int, account_id: int) -> list[dict]:
 
 def upsert_holding(*, user_id: int, account_id: int, symbol: str, quantity: float, avg_cost: float | None = None) -> dict:
     trades_session = get_session()
-    portfolio_session = _get_portfolio_session()
+    portfolio_session = get_session()
     try:
         sym = str(symbol or "").strip().upper()
         if not sym:
@@ -147,7 +130,7 @@ def upsert_holding(*, user_id: int, account_id: int, symbol: str, quantity: floa
 
 
 def delete_holding(*, user_id: int, holding_id: int) -> bool:
-    session = _get_portfolio_session()
+    session = get_session()
     try:
         h = session.query(StockHolding).filter(StockHolding.id == int(holding_id), StockHolding.user_id == int(user_id)).first()
         if not h:

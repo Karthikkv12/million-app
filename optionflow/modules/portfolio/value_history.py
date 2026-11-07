@@ -5,22 +5,15 @@ import logging
 from datetime import datetime, timezone
 
 import pandas as pd
-from optionflow.core.db import get_portfolio_session
+from optionflow.core.db import get_session
 
 _logger = logging.getLogger("optionflow.portfolio")
-
-
-# ── Session helper ────────────────────────────────────────────────────────────
-
-def _portfolio_session():
-    """Session for portfolio.db."""
-    return get_portfolio_session()
 
 
 # ── Snapshots ─────────────────────────────────────────────────────────────────
 
 def list_portfolio_snapshots(*, user_id: int, limit: int = 365, offset: int = 0) -> list[dict]:
-    session = _portfolio_session()
+    session = get_session()
     try:
         from database.models import PortfolioValueHistory
         rows = (
@@ -62,7 +55,7 @@ def upsert_portfolio_snapshot(
     unrealized_pnl: float | None = None,
     notes: str | None = None,
 ) -> dict:
-    session = _portfolio_session()
+    session = get_session()
     try:
         from database.models import PortfolioValueHistory
         snap_dt = pd.to_datetime(snapshot_date).to_pydatetime().replace(tzinfo=None) if snapshot_date is not None else None

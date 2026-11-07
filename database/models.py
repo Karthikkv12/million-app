@@ -1,31 +1,19 @@
 """
-database/models.py — Multi-database / multi-schema architecture for OptionFlow.
+database/models.py — every table in OptionFlow's one database.
 
-SQLite mode  (default, local dev & tests):
-  Five separate .db files, no schemas, everything works as before.
-
-PostgreSQL mode  (set DATABASE_URL=postgresql://... in environment):
-  Single Postgres instance with five logical schemas:
-    auth      — authentication & user management
-    trades    — trade journal, orders, brokerage accounts
-    portfolio — stock holdings, option positions, premium ledger, weekly snapshots
-    budget    — budget, credit card weeks, cash flows, double-entry ledger
-    markets   — market data, GEX/options-flow snapshots, price history
-
-  All five domains share one connection pool.  Domain isolation is preserved
-  via schemas rather than separate files.
-
+One declarative Base, real foreign keys (enforced on SQLite by
+optionflow/core/db.py), and ON DELETE rules that match the app:
+  - a user who owns data can't be deleted (RESTRICT); deactivate instead.
+    Their login tokens go with them; auth events keep the record, unlinked.
+  - deleting a position deletes its assignment and premium-ledger rows;
+    history events keep the record, unlinked.
 Engines, sessions and init_db() live in optionflow/core/db.py.
-The dialect switch is fully transparent to all business logic — session helpers,
-engine getters, and the test monkeypatch fixtures all work identically in both
-modes.
 """
 from __future__ import annotations
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Enum, Float,
-    Index, Integer, String, Text,
-    MetaData,
+    ForeignKey, Index, Integer, String, Text,
 )
 from sqlalchemy.orm import declarative_base
 import enum
@@ -33,32 +21,9 @@ from datetime import datetime
 
 _EPOCH_UTC_NAIVE = datetime(1970, 1, 1)
 
-# ── Dialect helpers ────────────────────────────────────────────────────────────
-
-def _is_postgres() -> bool:
-    """Return True when a PostgreSQL DATABASE_URL is configured."""
-    from optionflow.core.settings import get_settings
-    return get_settings().is_postgres
 
 
-def _schema(name: str) -> str | None:
-    """Return the schema name for Postgres, or None for SQLite.
-
-    SQLAlchemy treats schema=None as 'no schema' and generates plain
-    CREATE TABLE statements — safe for SQLite and in-memory test engines.
-    """
-    return name if _is_postgres() else None
-
-
-# ── Named metadata objects — carry the schema for Postgres DDL ─────────────
-# We bind schema at MetaData level so Alembic's autogenerate sees it, and also
-# set it per-table via __table_args__ so individual queries resolve correctly.
-
-UsersBase     = declarative_base(metadata=MetaData(schema=_schema("auth")))
-TradesBase    = declarative_base(metadata=MetaData(schema=_schema("trades")))
-PortfolioBase = declarative_base(metadata=MetaData(schema=_schema("portfolio")))
-BudgetBase    = declarative_base(metadata=MetaData(schema=_schema("budget")))
-MarketsBase   = declarative_base(metadata=MetaData(schema=_schema("markets")))
+Base = declarative_base()
 
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -99,9 +64,8 @@ class HoldingEventType(enum.Enum):
 # USERS DATABASE  (users.db)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class User(UsersBase):
+class User(Base):
     __tablename__ = "users"
-    __table_args__ = {"schema": _schema("auth")}
     id               = Column(Integer, primary_key=True)
     username         = Column(String, unique=True, index=True, nullable=False)
     password_hash    = Column(String, nullable=False)
@@ -111,11 +75,10 @@ class User(UsersBase):
     role             = Column(String, nullable=False, default="user")
     is_active        = Column(Boolean, nullable=False, default=True)
 
-class RefreshToken(UsersBase):
+class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
-    __table_args__ = {"schema": _schema("auth")}
     id                   = Column(Integer, primary_key=True)
-    user_id              = Column(Integer, nullable=False, index=True)
+    user_id              = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash           = Column(String, nullable=False, unique=True, index=True)
     created_at           = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_ip           = Column(String, nullable=True, index=True)
@@ -126,26 +89,24 @@ class RefreshToken(UsersBase):
     expires_at           = Column(DateTime, nullable=False, index=True)
     revoked_at           = Column(DateTime, nullable=True)
     revoked_reason       = Column(String, nullable=True)
-    replaced_by_token_id = Column(Integer, nullable=True)
+    replaced_by_token_id = Column(Integer, ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True)
 
-class RevokedToken(UsersBase):
+class RevokedToken(Base):
     __tablename__ = "revoked_tokens"
-    __table_args__ = {"schema": _schema("auth")}
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     jti        = Column(String, nullable=False, unique=True, index=True)
     revoked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False, index=True)
 
-class AuthEvent(UsersBase):
+class AuthEvent(Base):
     __tablename__ = "auth_events"
-    __table_args__ = {"schema": _schema("auth")}
     id         = Column(Integer, primary_key=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     event_type = Column(String, nullable=False, index=True)
     success    = Column(Boolean, nullable=False, default=False, index=True)
     username   = Column(String, nullable=True, index=True)
-    user_id    = Column(Integer, nullable=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     ip         = Column(String, nullable=True, index=True)
     user_agent = Column(String, nullable=True)
     detail     = Column(String, nullable=True)
@@ -154,11 +115,10 @@ class AuthEvent(UsersBase):
 # TRADES DATABASE  (trades.db)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class Account(TradesBase):
+class Account(Base):
     __tablename__ = "accounts"
-    __table_args__ = {"schema": _schema("trades")}
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     name       = Column(String, nullable=False)
     broker     = Column(String, nullable=True)
     currency   = Column(String, nullable=False, default="USD")
@@ -168,13 +128,12 @@ class Account(TradesBase):
 # PORTFOLIO DATABASE  (portfolio.db)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class StockHolding(PortfolioBase):
+class StockHolding(Base):
     """Merged replacement for old `holdings` + `stock_holdings` tables."""
     __tablename__ = "stock_holdings"
-    __table_args__ = {"schema": _schema("portfolio")}
     id                  = Column(Integer, primary_key=True)
-    user_id             = Column(Integer, nullable=False, index=True)
-    account_id          = Column(Integer, nullable=True, index=True)
+    user_id             = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    account_id          = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True)
     symbol              = Column(String, nullable=False, index=True)
     company_name        = Column(String, nullable=True)
     shares              = Column(Float, nullable=False)
@@ -187,13 +146,12 @@ class StockHolding(PortfolioBase):
     created_at          = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at          = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class HoldingEvent(PortfolioBase):
+class HoldingEvent(Base):
     __tablename__ = "holding_events"
-    __table_args__ = {"schema": _schema("portfolio")}
     id            = Column(Integer, primary_key=True)
-    user_id       = Column(Integer, nullable=False, index=True)
-    holding_id    = Column(Integer, nullable=False, index=True)
-    position_id   = Column(Integer, nullable=True, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    holding_id    = Column(Integer, ForeignKey("stock_holdings.id", ondelete="CASCADE"), nullable=False, index=True)
+    position_id   = Column(Integer, ForeignKey("option_positions.id", ondelete="SET NULL"), nullable=True, index=True)
     event_type    = Column(Enum(HoldingEventType), nullable=False, index=True)
     shares_delta  = Column(Float, nullable=True)
     basis_delta   = Column(Float, nullable=True)
@@ -201,11 +159,10 @@ class HoldingEvent(PortfolioBase):
     description   = Column(String, nullable=True)
     created_at    = Column(DateTime, nullable=False, default=datetime.utcnow)
 
-class WeeklySnapshot(PortfolioBase):
+class WeeklySnapshot(Base):
     __tablename__ = "weekly_snapshots"
-    __table_args__ = {"schema": _schema("portfolio")}
     id            = Column(Integer, primary_key=True)
-    user_id       = Column(Integer, nullable=False, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     week_start    = Column(DateTime, nullable=False, index=True)
     week_end      = Column(DateTime, nullable=False, index=True)
     account_value = Column(Float, nullable=True)   # auto-computed sum of acct_val_1+2+3
@@ -223,11 +180,10 @@ class WeeklySnapshot(PortfolioBase):
 Index("ux_weekly_snapshots_user_week_end", WeeklySnapshot.user_id, WeeklySnapshot.week_end, unique=True)
 
 
-class BrokerAccount(PortfolioBase):
+class BrokerAccount(Base):
     __tablename__ = "broker_accounts"
-    __table_args__ = {"schema": _schema("portfolio")}
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     name       = Column(String, nullable=False)
     color      = Column(String, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
@@ -235,20 +191,19 @@ class BrokerAccount(PortfolioBase):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
-class AccountBalance(PortfolioBase):
+class AccountBalance(Base):
     __tablename__ = "account_balances"
     __table_args__ = (
         Index("ux_account_balances_acct_week", "account_id", "week_date", unique=True),
-        {"schema": _schema("portfolio")},
     )
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
-    account_id = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
     week_date  = Column(Date, nullable=False, index=True)
     balance    = Column(Float, nullable=False)
 
 
-class CashDeposit(PortfolioBase):
+class CashDeposit(Base):
     """
     Records cash added to or withdrawn from the account on a specific Friday.
 
@@ -259,9 +214,8 @@ class CashDeposit(PortfolioBase):
     amount  < 0 = withdrawal (cash removed)
     """
     __tablename__ = "cash_deposits"
-    __table_args__ = {"schema": _schema("portfolio")}
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     week_date  = Column(Date, nullable=False, index=True)   # The Friday this deposit hit
     amount     = Column(Float, nullable=False)               # +ve deposit, -ve withdrawal
     note       = Column(String, nullable=True)               # e.g. "Wire transfer", "Withdrawal"
@@ -270,7 +224,7 @@ class CashDeposit(PortfolioBase):
 Index("ux_cash_deposits_user_week", CashDeposit.user_id, CashDeposit.week_date)
 
 
-class WatchlistSymbol(PortfolioBase):
+class WatchlistSymbol(Base):
     """
     Per-user watchlist of stock symbols.
 
@@ -280,9 +234,8 @@ class WatchlistSymbol(PortfolioBase):
     remove it.  is_active=False means soft-deleted by the user.
     """
     __tablename__ = "watchlist_symbols"
-    __table_args__ = {"schema": _schema("portfolio")}
     id           = Column(Integer, primary_key=True)
-    user_id      = Column(Integer, nullable=False, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     symbol       = Column(String, nullable=False, index=True)
     company_name = Column(String, nullable=True)
     source       = Column(String, nullable=False, default="manual")   # manual | position | holding
@@ -294,13 +247,12 @@ class WatchlistSymbol(PortfolioBase):
 Index("ux_watchlist_user_symbol", WatchlistSymbol.user_id, WatchlistSymbol.symbol, unique=True)
 
 
-class OptionPosition(PortfolioBase):
+class OptionPosition(Base):
     __tablename__ = "option_positions"
-    __table_args__ = {"schema": _schema("portfolio")}
     id              = Column(Integer, primary_key=True)
-    user_id         = Column(Integer, nullable=False, index=True)
-    week_id         = Column(Integer, nullable=False, index=True)
-    holding_id      = Column(Integer, nullable=True, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    week_id         = Column(Integer, ForeignKey("weekly_snapshots.id", ondelete="RESTRICT"), nullable=False, index=True)
+    holding_id      = Column(Integer, ForeignKey("stock_holdings.id", ondelete="SET NULL"), nullable=True, index=True)
     symbol          = Column(String, nullable=False, index=True)
     contracts       = Column(Integer, nullable=False, default=1)
     strike          = Column(Float, nullable=False)
@@ -313,22 +265,21 @@ class OptionPosition(PortfolioBase):
     spot_price      = Column(Float, nullable=True)
     is_roll         = Column(Boolean, nullable=False, default=False)
     status          = Column(Enum(OptionPositionStatus), nullable=False, default=OptionPositionStatus.ACTIVE, index=True)
-    rolled_to_id    = Column(Integer, nullable=True)
-    carried_from_id = Column(Integer, nullable=True)
+    rolled_to_id    = Column(Integer, ForeignKey("option_positions.id", ondelete="SET NULL"), nullable=True)
+    carried_from_id = Column(Integer, ForeignKey("option_positions.id", ondelete="SET NULL"), nullable=True)
     margin          = Column(Float, nullable=True)
     notes           = Column(Text, nullable=True)
     created_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class PremiumLedger(PortfolioBase):
+class PremiumLedger(Base):
     __tablename__ = "premium_ledger"
-    __table_args__ = {"schema": _schema("portfolio")}
     id                 = Column(Integer, primary_key=True)
-    user_id            = Column(Integer, nullable=False, index=True)
-    holding_id         = Column(Integer, nullable=False, index=True)
-    position_id        = Column(Integer, nullable=False, index=True)
+    user_id            = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    holding_id         = Column(Integer, ForeignKey("stock_holdings.id", ondelete="CASCADE"), nullable=False, index=True)
+    position_id        = Column(Integer, ForeignKey("option_positions.id", ondelete="CASCADE"), nullable=False, index=True)
     symbol             = Column(String, nullable=False, index=True)
-    week_id            = Column(Integer, nullable=True, index=True)
+    week_id            = Column(Integer, ForeignKey("weekly_snapshots.id", ondelete="SET NULL"), nullable=True, index=True)
     option_type        = Column(String, nullable=False)
     strike             = Column(Float, nullable=False)
     contracts          = Column(Integer, nullable=False, default=1)
@@ -343,12 +294,11 @@ class PremiumLedger(PortfolioBase):
 
 Index("ux_premium_ledger_holding_position", PremiumLedger.holding_id, PremiumLedger.position_id, unique=True)
 
-class StockAssignment(PortfolioBase):
+class StockAssignment(Base):
     __tablename__ = "stock_assignments"
-    __table_args__ = {"schema": _schema("portfolio")}
     id                 = Column(Integer, primary_key=True)
-    user_id            = Column(Integer, nullable=False, index=True)
-    position_id        = Column(Integer, nullable=False, index=True)
+    user_id            = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    position_id        = Column(Integer, ForeignKey("option_positions.id", ondelete="CASCADE"), nullable=False, index=True)
     symbol             = Column(String, nullable=False, index=True)
     shares_acquired    = Column(Integer, nullable=False)
     acquisition_price  = Column(Float, nullable=False)
@@ -359,12 +309,11 @@ class StockAssignment(PortfolioBase):
     created_at         = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at         = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class PortfolioValueHistory(PortfolioBase):
+class PortfolioValueHistory(Base):
     """Daily net-worth snapshot — new table, ensures we never lose portfolio history again."""
     __tablename__ = "portfolio_value_history"
-    __table_args__ = {"schema": _schema("portfolio")}
     id             = Column(Integer, primary_key=True)
-    user_id        = Column(Integer, nullable=False, index=True)
+    user_id        = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     snapshot_date  = Column(DateTime, nullable=False, index=True)
     total_value    = Column(Float, nullable=True)
     cash           = Column(Float, nullable=True)
@@ -381,11 +330,10 @@ Index("ux_portfolio_value_history_user_date", PortfolioValueHistory.user_id, Por
 # BUDGET DATABASE  (budget.db)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class Budget(BudgetBase):
+class Budget(Base):
     __tablename__ = "budget"
-    __table_args__ = {"schema": _schema("budget")}
     id           = Column(Integer, primary_key=True)
-    user_id      = Column(Integer, nullable=False, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     category     = Column(String, nullable=True)
     type         = Column(Enum(BudgetType), nullable=True)
     entry_type   = Column(String, nullable=True)
@@ -398,12 +346,11 @@ class Budget(BudgetBase):
     created_at   = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at   = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class BudgetOverride(BudgetBase):
+class BudgetOverride(Base):
     __tablename__ = "budget_overrides"
-    __table_args__ = {"schema": _schema("budget")}
     id          = Column(Integer, primary_key=True)
-    user_id     = Column(Integer, nullable=False, index=True)
-    budget_id   = Column(Integer, nullable=False, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    budget_id   = Column(Integer, ForeignKey("budget.id", ondelete="CASCADE"), nullable=False, index=True)
     month_key   = Column(String, nullable=False)
     amount      = Column(Float, nullable=False)
     description = Column(String, nullable=True)
@@ -412,11 +359,10 @@ class BudgetOverride(BudgetBase):
 
 Index("ux_budget_overrides_user_budget_month", BudgetOverride.user_id, BudgetOverride.budget_id, BudgetOverride.month_key, unique=True)
 
-class CreditCardWeek(BudgetBase):
+class CreditCardWeek(Base):
     __tablename__ = "credit_card_weeks"
-    __table_args__ = {"schema": _schema("budget")}
     id          = Column(Integer, primary_key=True)
-    user_id     = Column(Integer, nullable=False, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     week_start  = Column(DateTime, nullable=False)
     card_name   = Column(String, nullable=True)
     balance     = Column(Float, nullable=False, default=0.0)
@@ -426,21 +372,19 @@ class CreditCardWeek(BudgetBase):
     created_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at  = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class CashFlow(BudgetBase):
+class CashFlow(Base):
     __tablename__ = "cash_flow"
-    __table_args__ = {"schema": _schema("budget")}
     id      = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     action  = Column(Enum(CashAction), nullable=False)
     amount  = Column(Float, nullable=False)
     date    = Column(DateTime, nullable=False)
     notes   = Column(String, nullable=True)
 
-class LedgerAccount(BudgetBase):
+class LedgerAccount(Base):
     __tablename__ = "ledger_accounts"
-    __table_args__ = {"schema": _schema("budget")}
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     name       = Column(String, nullable=False)
     type       = Column(Enum(LedgerAccountType), nullable=False, index=True)
     currency   = Column(String, nullable=False, default="USD")
@@ -448,11 +392,10 @@ class LedgerAccount(BudgetBase):
 
 Index("ux_ledger_accounts_user_name_currency", LedgerAccount.user_id, LedgerAccount.name, LedgerAccount.currency, unique=True)
 
-class LedgerEntry(BudgetBase):
+class LedgerEntry(Base):
     __tablename__ = "ledger_entries"
-    __table_args__ = {"schema": _schema("budget")}
     id              = Column(Integer, primary_key=True)
-    user_id         = Column(Integer, nullable=False, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     entry_type      = Column(Enum(LedgerEntryType), nullable=False, index=True)
     created_at      = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     effective_at    = Column(DateTime, nullable=True, index=True)
@@ -463,12 +406,11 @@ class LedgerEntry(BudgetBase):
 
 Index("ux_ledger_entries_user_idempotency_key", LedgerEntry.user_id, LedgerEntry.idempotency_key, unique=True)
 
-class LedgerLine(BudgetBase):
+class LedgerLine(Base):
     __tablename__ = "ledger_lines"
-    __table_args__ = {"schema": _schema("budget")}
     id         = Column(Integer, primary_key=True)
-    entry_id   = Column(Integer, nullable=False, index=True)
-    account_id = Column(Integer, nullable=False, index=True)
+    entry_id   = Column(Integer, ForeignKey("ledger_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("ledger_accounts.id", ondelete="RESTRICT"), nullable=False, index=True)
     amount     = Column(Float, nullable=False)
     memo       = Column(String, nullable=True)
 
@@ -476,9 +418,8 @@ class LedgerLine(BudgetBase):
 # MARKETS DATABASE  (markets.db)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class NetFlowSnapshot(MarketsBase):
+class NetFlowSnapshot(Base):
     __tablename__ = "net_flow_snapshots"
-    __table_args__ = {"schema": _schema("markets")}
     id         = Column(Integer, primary_key=True)
     symbol     = Column(String, nullable=False, index=True)
     ts         = Column(String, nullable=False, index=True)
@@ -489,9 +430,8 @@ class NetFlowSnapshot(MarketsBase):
     total_prem = Column(Float, nullable=True)
     volume     = Column(Integer, nullable=True)
 
-class PriceSnapshot(MarketsBase):
+class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"
-    __table_args__ = {"schema": _schema("markets")}
     id         = Column(Integer, primary_key=True)
     symbol     = Column(String, nullable=False, index=True)
     date       = Column(DateTime, nullable=False, index=True)

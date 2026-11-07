@@ -11,7 +11,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from optionflow.core.db import get_users_session
+from optionflow.core.db import get_session
 from optionflow.core.settings import get_settings
 
 _logger = logging.getLogger("optionflow.auth")
@@ -25,9 +25,6 @@ except Exception as e:
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-def _users_session():
-    """Session for users.db (auth, tokens, events)."""
-    return get_users_session()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -105,7 +102,7 @@ def _validate_password_policy(password: str) -> None:
 # ── Users ─────────────────────────────────────────────────────────────────────
 
 def create_user(username, password, role="user"):
-    session = _users_session()
+    session = get_session()
     try:
         username = str(username).strip().lower()
         if not username:
@@ -131,7 +128,7 @@ def create_user(username, password, role="user"):
 
 
 def authenticate_user(username, password):
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         uname = str(username).strip().lower()
@@ -150,7 +147,7 @@ def authenticate_user(username, password):
 
 
 def get_user(user_id: int):
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         return session.query(User).filter(User.id == int(user_id)).first()
@@ -159,7 +156,7 @@ def get_user(user_id: int):
 
 
 def get_user_by_username(username: str):
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         uname = str(username).strip().lower()
@@ -169,7 +166,7 @@ def get_user_by_username(username: str):
 
 
 def list_all_users():
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         return session.query(User).order_by(User.created_at.asc()).all()
@@ -178,7 +175,7 @@ def list_all_users():
 
 
 def patch_user_admin(user_id: int, *, role: str | None = None, is_active: bool | None = None):
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -198,7 +195,7 @@ def patch_user_admin(user_id: int, *, role: str | None = None, is_active: bool |
 
 
 def delete_user_admin(user_id: int) -> None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -215,7 +212,7 @@ def delete_user_admin(user_id: int) -> None:
 
 def admin_set_password(user_id: int, new_password: str) -> None:
     """Admin-only: forcibly set a user's password without knowing the old one."""
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -238,7 +235,7 @@ def admin_set_password(user_id: int, new_password: str) -> None:
 
 def update_username_admin(user_id: int, new_username: str) -> None:
     """Admin-only: change a user's username."""
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         uname = str(new_username).strip().lower()
@@ -258,7 +255,7 @@ def update_username_admin(user_id: int, new_username: str) -> None:
 
 
 def set_auth_valid_after_epoch(*, user_id: int, epoch_seconds: int) -> None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -295,7 +292,7 @@ def change_password(
     new_password: str,
     invalidate_tokens_before_epoch: int | None = None,
 ) -> None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import User
         u = session.query(User).filter(User.id == int(user_id)).first()
@@ -324,7 +321,7 @@ def change_password(
 # ── Revoked tokens (JWT blocklist) ────────────────────────────────────────────
 
 def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RevokedToken
         jti = str(jti).strip()
@@ -349,7 +346,7 @@ def revoke_token(*, user_id: int, jti: str, expires_at: datetime) -> None:
 
 
 def is_token_revoked(*, jti: str) -> bool:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RevokedToken
         jti = str(jti).strip()
@@ -364,7 +361,7 @@ def is_token_revoked(*, jti: str) -> bool:
 # ── Refresh tokens ────────────────────────────────────────────────────────────
 
 def create_refresh_token(*, user_id: int, ip: str | None = None, user_agent: str | None = None) -> str:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         raw = f"rt_{secrets.token_urlsafe(32)}"
@@ -397,7 +394,7 @@ def create_refresh_token(*, user_id: int, ip: str | None = None, user_agent: str
 
 
 def validate_refresh_token(*, refresh_token: str) -> int | None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         th = _hash_refresh_token(refresh_token)
@@ -420,7 +417,7 @@ def rotate_refresh_token(
     ip: str | None = None,
     user_agent: str | None = None,
 ) -> tuple[int, str] | None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         th = _hash_refresh_token(refresh_token)
@@ -468,7 +465,7 @@ def rotate_refresh_token(
 
 
 def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> None:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         th = _hash_refresh_token(refresh_token)
@@ -492,7 +489,7 @@ def revoke_refresh_token(*, user_id: int | None = None, refresh_token: str) -> N
 
 
 def revoke_all_refresh_tokens(*, user_id: int) -> int:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -518,7 +515,7 @@ def revoke_all_refresh_tokens(*, user_id: int) -> int:
 
 
 def list_refresh_sessions(*, user_id: int, limit: int = 25) -> list[dict]:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -549,7 +546,7 @@ def list_refresh_sessions(*, user_id: int, limit: int = 25) -> list[dict]:
 
 
 def revoke_refresh_session_by_id(*, user_id: int, session_id: int, reason: str = "revoked") -> bool:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import RefreshToken
         rt = (
@@ -587,7 +584,7 @@ def log_auth_event(
     detail: str | None = None,
 ) -> None:
     """Append an auth audit event (best-effort)."""
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import AuthEvent
         ev = AuthEvent(
@@ -610,7 +607,7 @@ def log_auth_event(
 
 
 def list_auth_events(*, user_id: int, limit: int = 25) -> list[dict]:
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import AuthEvent
         rows = (
@@ -643,7 +640,7 @@ def is_login_rate_limited(*, username: str, ip: str | None = None) -> bool:
         return False
     since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
     since_naive = since.replace(tzinfo=None)
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import AuthEvent
         q = (
@@ -667,7 +664,7 @@ def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
         return False
     since = datetime.now(timezone.utc) - timedelta(seconds=int(window_s))
     since_naive = since.replace(tzinfo=None)
-    session = _users_session()
+    session = get_session()
     try:
         from database.models import AuthEvent
         q = (
@@ -858,7 +855,11 @@ def admin_update_user(user_id: int, *, username: str | None = None, password: st
 
 
 def admin_delete_user(user_id: int) -> None:
+    """Delete a user who owns no data. Users with data are deactivated instead (409)."""
+    from sqlalchemy.exc import IntegrityError
     try:
         delete_user_admin(user_id=user_id)
     except ValueError:
         raise _err.NotFound("User not found")
+    except IntegrityError:
+        raise _err.Conflict("This user has data (portfolio, budget or watchlist); deactivate them instead")

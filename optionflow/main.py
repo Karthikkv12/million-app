@@ -21,7 +21,7 @@ from sqlalchemy import text
 
 from optionflow.core.db import get_session, init_db
 from optionflow.core.errors import V1_PREFIX, install_error_handlers
-from optionflow.core.settings import DB_DOMAINS, Settings, get_settings
+from optionflow.core.settings import Settings, get_settings
 from optionflow.modules.registry import MODULES
 
 logging.basicConfig(
@@ -41,18 +41,17 @@ def enabled_modules(settings: Settings) -> List[str]:
 
 
 def health() -> Dict[str, Any] | JSONResponse:
-    """Liveness + readiness: SELECT 1 on every database. 503 if any is unreachable."""
+    """Liveness + readiness: SELECT 1 on the database. 503 if it is unreachable."""
     status: Dict[str, str] = {}
-    for domain in DB_DOMAINS:
-        session = get_session(domain)
-        try:
-            session.execute(text("SELECT 1"))
-            status[domain] = "ok"
-        except Exception as exc:
-            logger.error("Health check failed for %s db: %s", domain, exc)
-            status[domain] = "unreachable"
-        finally:
-            session.close()
+    session = get_session()
+    try:
+        session.execute(text("SELECT 1"))
+        status["optionflow"] = "ok"
+    except Exception as exc:
+        logger.error("Health check failed: %s", exc)
+        status["optionflow"] = "unreachable"
+    finally:
+        session.close()
     down = any(v != "ok" for v in status.values())
     payload = {"status": "unhealthy" if down else "healthy", "databases": status}
     return JSONResponse(status_code=503, content=payload) if down else payload
