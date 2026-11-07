@@ -327,14 +327,14 @@ def create_holding(*, user_id: int, data: dict) -> dict:
             session.refresh(prior)
             result = _holding_to_dict(prior, session)
 
-        # Auto-register in watchlist
-        try:
-            from optionflow.modules.watchlist.service import upsert_symbol as _wl_upsert
-            _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
-        except Exception:
-            pass
+            # Auto-register in watchlist
+            try:
+                from optionflow.modules.watchlist.service import upsert_symbol as _wl_upsert
+                _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
+            except Exception:
+                pass
 
-        return result
+            return result
 
         # ── No prior CLOSED lot — create fresh ───────────────────────────────
         h = StockHolding(
