@@ -87,6 +87,34 @@ tests/<module>/
 - **Component layers:** tokens → `components/ui` → `components/trading` →
   `features/*` → `app/*`.
 
+### Screen status
+
+| Screen | Status | Where |
+|---|---|---|
+| Flow (options-flow) | **Redesigned** | `feat/flow-heatmaps` (local session) |
+| Shell: top bar, tokens, fonts | **Redesigned** | `feat/flow-heatmaps` |
+| Settings | **Redesigned**: Profile, Appearance, Password (rules match the backend policy), Devices, Sign-in activity | `feat/settings-redesign` |
+| Landing (`/`) | **Redesigned**: sample board, "How to read it", modules, disclaimer footer | `feat/settings-redesign` |
+| Login | **Redesigned**: split layout, plain-language errors | `feat/settings-redesign` |
+| Users (admin) | **To do**: restyle to match Settings (list rows, role pills, in-page confirm for delete) | step 6 |
+| Markets | **To do**: review against tokens, 11px floor and phone width | step 6 |
+| Dashboard | **To do**: review; drop leftover gradient "from-purple-500" quick links | step 6 |
+| Ledger | Hidden; rebuilt with Money in step 7 | step 7 |
+| Portfolio, Budget | Removed; rebuilt in step 7 | step 7 |
+
+`feat/settings-redesign` also contains:
+- **Theme fix** in `lib/theme.tsx`. `ThemeProvider` wrote its initial "dark" to
+  storage before reading the saved value, so a saved light theme was lost.
+- `cellColor` exported from `GexHeatmap.tsx`.
+- `components/marketing/SampleBoard.tsx`.
+- A `logoutAll` helper in `lib/api.ts`.
+
+Backend gaps the new screens exposed (fold into step 4, auth module):
+- `/auth/sessions` doesn't flag the current session, so Settings guesses
+  "This browser" from the user agent. Return `is_current`.
+- Auth events don't store the device or IP. Record both, so sign-in activity can show
+  where each sign-in came from.
+
 ## 4. Carry-over
 
 Tag `develop` as **`pre-new-build`** before deleting anything.
@@ -165,7 +193,8 @@ dark. Never push to `main`. Keep optflw.com running; develop on port 3002.
 
 1. **Land the heatmap work.** Tag `pre-new-build`, merge `feat/flow-heatmaps` into
    `develop` (it's based on old `main`, so expect conflicts on files `develop`
-   changed), delete the Drop list, and fix the second accent color.
+   changed), then merge `feat/settings-redesign` on top (Settings, landing, login,
+   theme fix). Delete the Drop list, and fix the second accent color.
    Protect `main`/`develop` with required CI and turn on CodeQL.
 2. **Core.** `core/settings.py`, `core/db.py`, `core/deps.py`. Replace every
    `logic.services` import with a direct one, delete the facade, and make the tests
@@ -176,13 +205,15 @@ dark. Never push to `main`. Keep optflw.com running; develop on port 3002.
 4. **Modules under `/api/v1`.** auth → market → watchlist → portfolio → budget, with
    typed responses and `ENABLED_MODULES`. Old paths stay as aliases. Every route
    requires auth or a rate limit, there's an isolation test per module, and
-   `/restore-db` is removed.
+   `/restore-db` is removed. The auth module returns `is_current` on sessions and
+   records the device and IP on auth events.
 5. **One database.** A script that copies the five files into one, with real foreign
    keys and a fresh baseline migration. Back up first with `scripts/backup_dbs.py`.
    Host it encrypted with scheduled, tested backups.
 6. **Website on the new API.** Generate the TS client, move the AI chat to the
    backend, add the flow SSE stream, and finish the shell, type floor and wide layout.
-   httpOnly cookie auth, two-factor login, Sentry and new-device alerts.
+   Restyle the remaining screens: Users (admin), Markets and Dashboard (see Screen
+   status). httpOnly cookie auth, two-factor login, Sentry and new-device alerts.
 7. **Bring back Portfolio and Budget** in the new style (`/portfolio/[tab]`,
    `/money/[tab]`). Short pen test before outside users.
 8. **Phone app** on the same `/api/v1` and generated client. Keychain or Keystore
