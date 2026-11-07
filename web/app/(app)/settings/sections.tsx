@@ -64,9 +64,9 @@ const EVENT_META: Record<string, { label: string; icon: typeof LogIn; tone: "neu
 
 const TONE = {
   neutral: "text-foreground/55 bg-foreground/[0.05]",
-  good:    "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
+  good:    "text-gain bg-gain/10",
   warn:    "text-amber-600 dark:text-amber-400 bg-amber-500/10",
-  bad:     "text-red-600 dark:text-red-400 bg-red-500/10",
+  bad:     "text-loss bg-loss/10",
 };
 
 // ── Layout pieces ─────────────────────────────────────────────────────────────
@@ -230,9 +230,9 @@ export function PasswordSection() {
           <PasswordField id="pw-current" label="Current password" value={current} onChange={setCurrent} autoComplete="current-password" />
           <PasswordField id="pw-new" label="New password" value={next} onChange={setNext} autoComplete="new-password" />
           <PasswordField id="pw-confirm" label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
-          {mismatch && <p className="text-[13px] text-red-600 dark:text-red-400">The new passwords don't match.</p>}
-          {mut.isError && <p className="text-[13px] text-red-600 dark:text-red-400">{(mut.error as Error).message || "Couldn't change the password. Check your current password and try again."}</p>}
-          {mut.isSuccess && <p className="flex items-center gap-1.5 text-[13px] text-emerald-600 dark:text-emerald-400"><Check size={14} /> Password changed.</p>}
+          {mismatch && <p className="text-[13px] text-loss">The new passwords don't match.</p>}
+          {mut.isError && <p className="text-[13px] text-loss">{(mut.error as Error).message || "Couldn't change the password. Check your current password and try again."}</p>}
+          {mut.isSuccess && <p className="flex items-center gap-1.5 text-[13px] text-gain"><Check size={14} /> Password changed.</p>}
           <div>
             <button type="submit" className="btn-primary" disabled={!ready || mut.isPending}>
               {mut.isPending ? "Changing…" : "Change password"}
@@ -245,7 +245,7 @@ export function PasswordSection() {
             {RULES.map((_, i) => (
               <div key={i} className={clsx(
                 "h-1 rounded-full transition-colors",
-                i < passed ? (requiredOk ? "bg-emerald-500" : "bg-amber-500") : "bg-foreground/10",
+                i < passed ? (requiredOk ? "bg-gain" : "bg-amber-500") : "bg-foreground/10",
               )} />
             ))}
           </div>
@@ -255,7 +255,7 @@ export function PasswordSection() {
               return (
                 <li key={r.label} className={clsx("flex items-center gap-2 text-[13px]", ok ? "text-foreground" : "text-foreground/50")}>
                   <span className={clsx("flex h-4 w-4 items-center justify-center rounded-full border",
-                    ok ? "border-emerald-500 bg-emerald-500 text-white" : "border-[var(--border-strong)]")}>
+                    ok ? "border-gain bg-gain text-white" : "border-[var(--border-strong)]")}>
                     {ok && <Check size={10} strokeWidth={3} />}
                   </span>
                   {r.label}

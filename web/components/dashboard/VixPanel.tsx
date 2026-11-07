@@ -10,10 +10,11 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis, XAxis,
+  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis, XAxis, CartesianGrid,
 } from "recharts";
 import { api } from "@/lib/api";
 import { Panel, Pill, Change, Segmented, useChartColors } from "@/components/ui";
+import { ChartTooltip } from "@/components/chart/kit";
 
 interface Bar { date: string; close: number; }
 
@@ -176,6 +177,7 @@ export default function VixPanel({
       {!loading && bars.length > 1 && (
         <ResponsiveContainer width="100%" height={150}>
           <AreaChart data={bars} margin={{ top: 6, right: 4, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke={chart.grid} vertical={false} />
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={chart.accent} stopOpacity={0.22} />
@@ -197,7 +199,15 @@ export default function VixPanel({
             <YAxis domain={["auto", "auto"]} tickLine={false} axisLine={false} tick={tick} tickFormatter={(v: number) => v.toFixed(0)} width={32} />
             <ReferenceLine y={20} stroke="rgba(245,158,11,0.55)" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="rgba(220,38,38,0.55)" strokeDasharray="3 3" />
-            <Tooltip content={<CustomTooltip intraday={cfg.intraday} />} />
+            <Tooltip
+              cursor={{ stroke: chart.border, strokeDasharray: "3 3" }}
+              content={
+                <ChartTooltip
+                  title={(l) => { try { return cfg.intraday ? new Date(String(l)).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : new Date(String(l)).toLocaleDateString([], { month: "short", day: "numeric" }); } catch { return String(l); } }}
+                  format={(p) => [{ label: title, value: Number(p[0].value).toFixed(2), color: chart.accent }]}
+                />
+              }
+            />
             <Area type="monotone" dataKey="close" stroke={chart.accent} strokeWidth={1.75} fill={`url(#${gradId})`} dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
@@ -212,7 +222,7 @@ export default function VixPanel({
         />
         <div className="flex items-center gap-3 font-mono text-[11px] text-foreground/50">
           <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-amber-500" />20 elevated</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-red-500" />30 high</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-loss" />30 high</span>
         </div>
       </div>
     </Panel>

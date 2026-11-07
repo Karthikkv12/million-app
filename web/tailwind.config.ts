@@ -14,6 +14,8 @@ const config: Config = {
         foreground: "rgb(var(--foreground-rgb) / <alpha-value>)",
         accent: "rgb(var(--accent-rgb) / <alpha-value>)",
         warm: "rgb(var(--warm-rgb) / <alpha-value>)",
+        gain: "rgb(var(--gain-rgb) / <alpha-value>)",
+        loss: "rgb(var(--loss-rgb) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],

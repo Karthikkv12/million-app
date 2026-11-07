@@ -41,7 +41,7 @@ export function TopFlowStrikes({ data }: Props) {
               </div>
               <span
                 className={`shrink-0 font-black text-[11px] flex items-center gap-0.5 ${
-                  isCall ? "text-emerald-400" : "text-red-400"
+                  isCall ? "text-gain" : "text-loss"
                 }`}
               >
                 {isCall ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}

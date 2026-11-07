@@ -66,9 +66,9 @@ export function RegimeCard({ className }: { className?: string }) {
   const lo = 576, hi = 594;
   const pos = (v: number) => `${((hi - v) / (hi - lo)) * 100}%`;
   const marks = [
-    { v: 590, label: "Call wall", cls: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+    { v: 590, label: "Call wall", cls: "bg-gain", text: "text-gain" },
     { v: 586.4, label: "Flip", cls: "bg-accent", text: "text-accent" },
-    { v: 580, label: "Put wall", cls: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+    { v: 580, label: "Put wall", cls: "bg-loss", text: "text-loss" },
   ];
   return (
     <WindowFrame title="OptionFlow / Levels / SPY" className={className}>

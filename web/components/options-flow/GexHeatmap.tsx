@@ -213,7 +213,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                 <div className="whitespace-nowrap text-[10px] font-medium text-white/80">{exp}</div>
                 <div className="flex justify-end gap-1.5 text-[9px]">
                   <span className="text-white/40">{dte(exp)}</span>
-                  <span className={colTotals[ci] >= 0 ? "text-emerald-300/80" : "text-violet-300/80"}>{fmtMoney(colTotals[ci])}</span>
+                  <span className={colTotals[ci] >= 0 ? "text-gain/80" : "text-violet-300/80"}>{fmtMoney(colTotals[ci])}</span>
                 </div>
               </th>
             ))}
@@ -238,7 +238,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                         ★ King
                       </span>
                     )}
-                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-emerald-300/90">CW</span>}
+                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
                     {strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
                     {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
                   </div>

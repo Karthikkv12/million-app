@@ -20,11 +20,11 @@ import { searchTickers, TickerSuggestion } from "@/lib/api";
 
 const TYPE_COLOR: Record<string, string> = {
   Equity:  "text-foreground/70",
-  ETF:     "text-emerald-400",
+  ETF:     "text-gain",
   Index:   "text-foreground/50",
   Fund:    "text-orange-400",
   Crypto:  "text-yellow-400",
-  Future:  "text-red-400",
+  Future:  "text-loss",
   Forex:   "text-cyan-400",
 };
 

@@ -81,7 +81,7 @@ function PasswordInput({ value, onChange, id }: { value: string; onChange: (v: s
         {RULES.map((r) => {
           const ok = r.test(value);
           return (
-            <li key={r.label} className={clsx("flex items-center gap-1.5 text-[12px]", ok ? "text-emerald-600 dark:text-emerald-400" : "text-foreground/50")}>
+            <li key={r.label} className={clsx("flex items-center gap-1.5 text-[12px]", ok ? "text-gain" : "text-foreground/50")}>
               <Check size={12} className={ok ? "" : "opacity-30"} />{r.label}
             </li>
           );
@@ -137,7 +137,7 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
             ))}
           </div>
         </fieldset>
-        {error && <p role="alert" className="text-[13px] text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-[13px] text-loss">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-ghost h-10">Cancel</button>
           <button type="submit" disabled={!ok || busy} className="btn-primary h-10">{busy ? "Creating…" : "Create user"}</button>
@@ -165,7 +165,7 @@ function ResetPasswordDialog({ user, onClose }: { user: AdminUser; onClose: () =
     <Dialog title={`Reset password for ${user.username}`} onClose={onClose}>
       {done ? (
         <div className="grid gap-4">
-          <p className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><Check size={16} /> Password updated.</p>
+          <p className="flex items-center gap-2 text-sm text-gain"><Check size={16} /> Password updated.</p>
           <p className="text-[13px] text-foreground/65">Send them this temporary password privately and ask them to change it in Settings:</p>
           <code className="block select-all rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm text-foreground">{password}</code>
           <div className="flex justify-end"><button onClick={onClose} className="btn-primary h-10">Done</button></div>
@@ -173,7 +173,7 @@ function ResetPasswordDialog({ user, onClose }: { user: AdminUser; onClose: () =
       ) : (
         <div className="grid gap-4">
           <PasswordInput id="rp-pass" value={password} onChange={setPassword} />
-          {error && <p role="alert" className="text-[13px] text-red-600 dark:text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-[13px] text-loss">{error}</p>}
           <div className="flex justify-end gap-2">
             <button onClick={onClose} className="btn-ghost h-10">Cancel</button>
             <button onClick={submit} disabled={!ok || busy} className="btn-primary h-10">{busy ? "Saving…" : "Set password"}</button>
@@ -257,7 +257,7 @@ function RowMenu({ u, isSelf, onRole, onActive, onReset, onDelete }: {
                 <KeyRound size={15} />Reset password
               </button>
               <div className="my-1 h-px bg-[var(--border)]" />
-              <button className={clsx(item, "text-red-600 hover:text-red-700 dark:text-red-400")} disabled={isSelf} onClick={() => setConfirm(true)}>
+              <button className={clsx(item, "text-red-600 hover:text-loss")} disabled={isSelf} onClick={() => setConfirm(true)}>
                 <Trash2 size={15} />Delete user
               </button>
               {isSelf && <p className="px-2.5 pb-1 pt-1.5 text-[12px] text-foreground/45">You can't change or delete your own account here.</p>}

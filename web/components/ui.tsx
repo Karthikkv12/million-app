@@ -107,8 +107,8 @@ export function StatCard({
       </div>
       <p className={clsx(
         "text-xl sm:text-2xl font-semibold tracking-tight tabular-nums leading-tight",
-        trend === "up"   ? "text-emerald-500" :
-        trend === "down" ? "text-red-500"      :
+        trend === "up"   ? "text-gain" :
+        trend === "down" ? "text-loss"      :
         "text-foreground",
       )}>{value}</p>
       {sub && <p className="text-xs text-foreground/70 mt-1.5">{sub}</p>}
@@ -191,7 +191,7 @@ export function RefreshButton({ onRefresh, isRefreshing = false }: {
 // ── Error banner ──────────────────────────────────────────────────────────────
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="p-4 bg-red-500/[0.06] border border-red-500/20 rounded-2xl text-sm text-red-600 dark:text-red-400 leading-relaxed">
+    <div className="p-4 bg-loss/[0.06] border border-loss/20 rounded-2xl text-sm text-loss leading-relaxed">
       {message}
     </div>
   );
@@ -235,8 +235,8 @@ export function Badge({ children, variant = "default", className }: {
 }) {
   const styles = {
     default: "bg-foreground/[0.06] text-foreground/80",
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    danger:  "bg-red-500/10 text-red-600 dark:text-red-400",
+    success: "bg-gain/10 text-gain",
+    danger:  "bg-loss/10 text-loss",
     warning: "bg-warm/10 text-warm",
     info:    "bg-accent/10 text-accent",
   };
@@ -326,7 +326,7 @@ export function Panel({
 /** Gain/loss text: ▲ +1.23 (+0.45%). Neutral grey at exactly zero. */
 export function Change({ value, pct, className, digits = 2 }: { value?: number | null; pct?: number | null; className?: string; digits?: number }) {
   const v = pct ?? value ?? 0;
-  const tone = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "text-foreground/55";
+  const tone = v > 0 ? "text-gain" : v < 0 ? "text-loss" : "text-foreground/55";
   const arrow = v > 0 ? "▲" : v < 0 ? "▼" : "■";
   const fmt = (n: number) => (n > 0 ? "+" : "") + n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   return (
@@ -340,8 +340,8 @@ export function Change({ value, pct, className, digits = 2 }: { value?: number |
 
 const PILL_TONE = {
   neutral: "border-[var(--border-strong)] text-foreground/70",
-  good:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  bad:     "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+  good:    "border-gain/30 bg-gain/10 text-gain",
+  bad:     "border-loss/30 bg-loss/10 text-loss",
   warn:    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   accent:  "border-accent/30 bg-accent/10 text-accent",
 };
@@ -391,8 +391,8 @@ export function heatColor(pct: number | null | undefined, cap = 3): { bg: string
   if (Math.abs(pct) < 0.05) return { bg: "rgb(var(--foreground-rgb) / 0.08)", fg: "rgb(var(--foreground-rgb) / 0.8)" };
   const strong = a > 0.55;
   return pct > 0
-    ? { bg: `rgba(22,163,74,${0.14 + a * 0.7})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" }
-    : { bg: `rgba(220,38,38,${0.14 + a * 0.7})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" };
+    ? { bg: `rgb(var(--gain-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" }
+    : { bg: `rgb(var(--loss-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" };
 }
 
 /**
@@ -403,11 +403,15 @@ export function useChartColors() {
   const { theme } = useTheme();
   const dark = theme === "dark";
   return {
-    accent: dark ? "#90bff9" : "#2f5bea",
-    ink:    dark ? "#eeeef0" : "#0e0f12",
-    muted:  dark ? "rgba(238,238,240,0.45)" : "rgba(14,15,18,0.45)",
-    grid:   dark ? "rgba(255,255,255,0.08)" : "rgba(14,15,18,0.08)",
-    gain:   dark ? "#4ade80" : "#16a34a",
-    loss:   dark ? "#f87171" : "#dc2626",
+    accent: dark ? "#7aa2ff" : "#2f5bea",
+    ink:    dark ? "#e6e9ef" : "#0e0f12",
+    muted:  dark ? "rgba(203,213,225,0.5)" : "rgba(14,15,18,0.45)",
+    grid:   dark ? "rgba(148,163,184,0.10)" : "rgba(14,15,18,0.07)",
+    gain:   dark ? "#3fb37f" : "#15803d",
+    loss:   dark ? "#e55d5d" : "#dc2626",
+    gainSoft: dark ? "rgba(63,179,127,0.35)" : "rgba(21,128,61,0.28)",
+    lossSoft: dark ? "rgba(229,93,93,0.35)" : "rgba(220,38,38,0.25)",
+    surface: dark ? "#141a22" : "#ffffff",
+    border:  dark ? "rgba(148,163,184,0.18)" : "rgba(14,15,18,0.12)",
   };
 }

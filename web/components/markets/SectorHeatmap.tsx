@@ -305,7 +305,7 @@ export default function SectorHeatmaps() {
           <button onClick={load} className="btn-ghost h-8 px-3 text-[13px]">Refresh</button>
         </div>
       </div>
-      {error && <p className="text-xs text-red-400 mb-2">Could not load quote data — will retry automatically.</p>}
+      {error && <p className="text-xs text-loss mb-2">Could not load quote data — will retry automatically.</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         {(Object.keys(SECTORS) as SectorKey[]).map((key) => (
           <SectorCard key={key} sector={key} quotes={quotes} loading={loading && Object.keys(quotes).length === 0} />

@@ -74,7 +74,7 @@ const INDIA: Instrument[] = [
   { symbol: "^NSEI",    label: "Nifty 50",    sublabel: "NSE India",    accent: "bg-blue-50 dark:bg-blue-900/30",     iconColor: "text-blue-500"    },
   { symbol: "^BSESN",   label: "Sensex",      sublabel: "BSE India",    accent: "bg-orange-50 dark:bg-orange-900/30", iconColor: "text-orange-500"  },
   { symbol: "^NSEBANK", label: "Bank Nifty",  sublabel: "NSE Banking",  accent: "bg-slate-50 dark:bg-slate-800/40", iconColor: "text-slate-400"  },
-  { symbol: "INR=X",    label: "INR / USD",   sublabel: "Spot Rate",    accent: "bg-emerald-50 dark:bg-emerald-900/30",iconColor: "text-emerald-500" },
+  { symbol: "INR=X",    label: "INR / USD",   sublabel: "Spot Rate",    accent: "bg-emerald-50 dark:bg-emerald-900/30",iconColor: "text-gain" },
 ];
 
 // ── Quote fetching ─────────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ function QuoteCard({ inst, quote }: { inst: Instrument; quote: Quote | undefined
         {pct != null && (
           <span className="mt-1 flex h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-foreground/[0.07]" aria-hidden>
             <span
-              className={pct >= 0 ? "bg-emerald-500" : "bg-red-500"}
+              className={pct >= 0 ? "bg-gain" : "bg-loss"}
               style={{ width: `${Math.min(Math.abs(pct) / 3, 1) * 100}%`, marginLeft: pct >= 0 ? 0 : "auto" }}
             />
           </span>
@@ -210,7 +210,7 @@ export default function MarketCards() {
   return (
     <div className="mb-10 grid gap-8">
       {error && (
-        <p className="rounded-xl border border-red-500/25 bg-red-500/[0.06] px-4 py-3 text-[13px] text-red-700 dark:text-red-300">
+        <p className="rounded-xl border border-loss/25 bg-loss/[0.06] px-4 py-3 text-[13px] text-loss">
           Couldn't load market data. Retrying every 30 seconds.
         </p>
       )}

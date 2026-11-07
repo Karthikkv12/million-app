@@ -102,13 +102,13 @@ function fmtAxis(n: number): string {
   return `${n}`;
 }
 
-const CALL_COLOR  = "#34d399";
-const PUT_COLOR   = "#f87171";
+const CALL_COLOR  = "#3fb37f"; // muted gain
+const PUT_COLOR   = "#e55d5d"; // muted loss
 const PRICE_COLOR = "#5b8def"; // accent blue, readable on light and dark
-const NET_CALL    = "#22c55e";
-const NET_PUT     = "#ef4444";
-const VOL_CALL    = "#22c55e99";
-const VOL_PUT     = "#ef444499";
+const NET_CALL    = "#3fb37f";
+const NET_PUT     = "#e55d5d";
+const VOL_CALL    = "#3fb37f66";
+const VOL_PUT     = "#e55d5d66";
 
 // ── Custom tick components (Recharts 3.x requires React elements, not style objects) ──
 function PriceTick({ x, y, payload }: any) {
@@ -118,7 +118,7 @@ function PriceTick({ x, y, payload }: any) {
     </text>
   );
 }
-function AxisTick({ x, y, payload, color = "#9ca3af", size = 9 }: any) {
+function AxisTick({ x, y, payload, color = "#8b93a1", size = 11 }: any) {
   return (
     <text x={x} y={y} dy={4} textAnchor="middle" fill={color} fontSize={size} fontWeight={600}>
       {payload.value}
@@ -339,8 +339,8 @@ export default function NetFlowPanel({ data }: Props) {
         <div className="flex items-center gap-2 z-10">
           <span className={`text-[11px] font-black px-3 py-1.5 rounded-full tracking-wider shadow-sm ${
             isCallBias
-              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/10"
-              : "bg-red-500/15 text-red-400 border border-red-500/30 shadow-red-500/10"
+              ? "bg-gain/15 text-gain border border-gain/30 shadow-emerald-500/10"
+              : "bg-loss/15 text-loss border border-loss/30 shadow-red-500/10"
           }`}>
             {isCallBias ? "▲ CALLS" : "▼ PUTS"}
           </span>
@@ -354,19 +354,19 @@ export default function NetFlowPanel({ data }: Props) {
           {/* Call Premium */}
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/55 mb-1.5">Call prem</p>
-            <p className="font-mono text-[17px] font-medium text-emerald-600 dark:text-emerald-400 tabular-nums leading-none">{fmt(call_premium)}</p>
+            <p className="font-mono text-[17px] font-medium text-gain tabular-nums leading-none">{fmt(call_premium)}</p>
             <p className="text-[12px] text-foreground/55 mt-1">{callPct.toFixed(1)}% of total</p>
           </div>
           {/* Net Flow */}
           <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-3">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/55 mb-1.5">Net flow</p>
-            <p className={`font-mono text-[17px] font-medium tabular-nums leading-none ${isCallBias ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{fmt(net_flow)}</p>
+            <p className={`font-mono text-[17px] font-medium tabular-nums leading-none ${isCallBias ? "text-gain" : "text-loss"}`}>{fmt(net_flow)}</p>
             <p className="text-[12px] text-foreground/55 mt-1">{isCallBias ? "Calls dominate" : "Puts dominate"}</p>
           </div>
           {/* Put Premium */}
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/55 mb-1.5">Put prem</p>
-            <p className="font-mono text-[17px] font-medium text-red-600 dark:text-red-400 tabular-nums leading-none">{fmt(put_premium)}</p>
+            <p className="font-mono text-[17px] font-medium text-loss tabular-nums leading-none">{fmt(put_premium)}</p>
             <p className="text-[12px] text-foreground/55 mt-1">{putPct.toFixed(1)}% of total</p>
           </div>
         </div>
@@ -374,19 +374,19 @@ export default function NetFlowPanel({ data }: Props) {
         {/* ══ CALL / PUT SPLIT BAR ═════════════════════════════════════════ */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
           <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest mb-2">
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            <span className="flex items-center gap-1.5 text-gain">
+              <span className="w-2 h-2 rounded-full bg-gain inline-block" />
               Calls {callPct.toFixed(1)}%
             </span>
             <span className="text-foreground text-[11px] font-semibold tabular-nums">Total {fmt(call_premium + put_premium)}</span>
-            <span className="flex items-center gap-1.5 text-red-400">
+            <span className="flex items-center gap-1.5 text-loss">
               Puts {putPct.toFixed(1)}%
-              <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              <span className="w-2 h-2 rounded-full bg-loss inline-block" />
             </span>
           </div>
           <div className="h-2 rounded-full overflow-hidden flex bg-[var(--border)] gap-px">
-            <div className="bg-emerald-500 rounded-l-full transition-all duration-700" style={{ width: `${callPct}%` }} />
-            <div className="bg-red-500 rounded-r-full transition-all duration-700" style={{ width: `${putPct}%` }} />
+            <div className="bg-gain rounded-l-full transition-all duration-700" style={{ width: `${callPct}%` }} />
+            <div className="bg-loss rounded-r-full transition-all duration-700" style={{ width: `${putPct}%` }} />
           </div>
         </div>
 
@@ -405,7 +405,7 @@ export default function NetFlowPanel({ data }: Props) {
               <span className="text-foreground/70">
                 Prem <span className="text-foreground font-mono font-medium tabular-nums">{fmt(stats.total_prem ?? 0)}</span>
               </span>
-              <span className={`font-black tabular-nums ${(stats.net_flow ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              <span className={`font-black tabular-nums ${(stats.net_flow ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>
                 {(stats.net_flow ?? 0) >= 0 ? "▲" : "▼"} {fmt(Math.abs(stats.net_flow ?? 0))}
               </span>
             </div>
@@ -487,11 +487,11 @@ export default function NetFlowPanel({ data }: Props) {
               {/* ── BOTTOM PANEL: Call + Put premium + volume bars ──────── */}
               <div className="px-1 pb-2">
                 <div className="flex items-center gap-4 px-2 py-1">
-                  <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/80 uppercase tracking-wide font-bold">
-                    <span className="w-3 h-[2px] bg-emerald-400 rounded-full inline-block" />Call
+                  <span className="flex items-center gap-1.5 text-[11px] text-gain/80 uppercase tracking-wide font-bold">
+                    <span className="w-3 h-[2px] bg-gain rounded-full inline-block" />Call
                   </span>
-                  <span className="flex items-center gap-1.5 text-[11px] text-red-400/80 uppercase tracking-wide font-bold">
-                    <span className="w-3 h-[2px] bg-red-400 rounded-full inline-block" />Put
+                  <span className="flex items-center gap-1.5 text-[11px] text-loss/80 uppercase tracking-wide font-bold">
+                    <span className="w-3 h-[2px] bg-loss rounded-full inline-block" />Put
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] text-foreground/60 uppercase tracking-wide font-semibold">
                     <span className="w-2.5 h-2 bg-gray-600/50 rounded-sm inline-block" />Vol
@@ -563,11 +563,11 @@ export default function NetFlowPanel({ data }: Props) {
                   </BarChart>
                 </ResponsiveContainer>
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[var(--border)]">
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-300 uppercase tracking-wide font-semibold">
-                    <span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Calls
+                  <span className="flex items-center gap-1 text-[11px] text-gain uppercase tracking-wide font-semibold">
+                    <span className="w-2 h-2 rounded-sm bg-gain inline-block" />Calls
                   </span>
-                  <span className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-300 uppercase tracking-wide font-semibold">
-                    <span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Puts
+                  <span className="flex items-center gap-1 text-[11px] text-loss uppercase tracking-wide font-semibold">
+                    <span className="w-2 h-2 rounded-sm bg-loss inline-block" />Puts
                   </span>
                 </div>
               </div>
@@ -611,8 +611,8 @@ export default function NetFlowPanel({ data }: Props) {
                 <thead>
                   <tr className="border-b border-[var(--border)]">
                     <th className="text-left px-4 py-2 font-bold tracking-wide text-[11px] uppercase text-foreground">Strike</th>
-                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-emerald-600 dark:text-emerald-300">Call $</th>
-                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-red-600 dark:text-red-300">Put $</th>
+                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-gain">Call $</th>
+                    <th className="text-right px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-loss">Put $</th>
                     <th className="text-right px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-foreground">Net</th>
                     <th className="text-center px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-foreground">Split</th>
                     <th className="text-center px-3 py-2 font-bold tracking-wide text-[11px] uppercase text-foreground">Bias</th>
@@ -625,9 +625,9 @@ export default function NetFlowPanel({ data }: Props) {
                     return (
                     <tr key={s.strike} className={`border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors ${i % 2 === 0 ? "" : "bg-foreground/[0.02]"}`}>
                       <td className="px-4 py-2 font-mono font-medium text-foreground tabular-nums">${s.strike.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-300 tabular-nums font-semibold">{fmt(s.call_prem)}</td>
-                      <td className="px-3 py-2 text-right text-red-600 dark:text-red-300 tabular-nums font-semibold">{fmt(s.put_prem)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-black ${s.net >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-red-600 dark:text-red-300"}`}>{fmt(s.net)}</td>
+                      <td className="px-3 py-2 text-right text-gain tabular-nums font-semibold">{fmt(s.call_prem)}</td>
+                      <td className="px-3 py-2 text-right text-loss tabular-nums font-semibold">{fmt(s.put_prem)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-black ${s.net >= 0 ? "text-gain" : "text-loss"}`}>{fmt(s.net)}</td>
                       <td className="px-3 py-2">
                         <div className="w-full h-1.5 rounded-full overflow-hidden flex bg-[var(--border)] min-w-[48px]">
                           <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-l-full" style={{ width: `${cPct}%` }} />
@@ -637,8 +637,8 @@ export default function NetFlowPanel({ data }: Props) {
                       <td className="px-3 py-2 text-center">
                         <span className={`inline-block text-[11px] font-black px-2 py-0.5 rounded-full tracking-wider ${
                           s.bias === "call"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
-                            : "bg-red-500/15 text-red-400 border border-red-500/25"
+                            ? "bg-gain/15 text-gain border border-gain/25"
+                            : "bg-loss/15 text-loss border border-loss/25"
                         }`}>{s.bias === "call" ? "▲ CALL" : "▼ PUT"}</span>
                       </td>
                     </tr>

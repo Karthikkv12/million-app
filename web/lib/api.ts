@@ -162,9 +162,10 @@ export interface GexResult {
   spot: number;
   expiries: string[];
   strikes: number[];
-  gex_by_strike: Record<string, number>;
-  call_gex_by_strike: Record<string, number>;
-  put_gex_by_strike: Record<string, number>;
+  /** Aligned with `strikes` (same index), in $ per 1% move. */
+  gex_by_strike: number[];
+  call_gex_by_strike: number[];
+  put_gex_by_strike: number[];
   heatmap_expiries: string[];
   heatmap_strikes: number[];
   heatmap_values: number[][];

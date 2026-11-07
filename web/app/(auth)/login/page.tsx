@@ -60,7 +60,7 @@ function BrandPanel() {
         </h2>
         <ul className="mt-8 grid gap-3 text-[15px] text-white/75">
           {["Every strike × expiry on one board", "King node, flip and walls marked for you", "Sector heatmaps and volatility next door"].map((t) => (
-            <li key={t} className="flex items-center gap-2.5"><Check size={16} className="text-emerald-400" />{t}</li>
+            <li key={t} className="flex items-center gap-2.5"><Check size={16} className="text-gain" />{t}</li>
           ))}
         </ul>
         <div className="mt-10 max-w-xl [&>div]:shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)]">
@@ -72,7 +72,7 @@ function BrandPanel() {
         <span className="flex items-center gap-2">
           <span className={clsx(
             "h-2 w-2 rounded-full",
-            status === "up" ? "bg-emerald-400" : status === "down" ? "bg-red-400" : "animate-pulse bg-white/40",
+            status === "up" ? "bg-gain" : status === "down" ? "bg-loss" : "animate-pulse bg-white/40",
           )} />
           {status === "up" ? "All systems normal" : status === "down" ? "Service is having trouble" : "Checking status…"}
         </span>
@@ -190,7 +190,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <p role="alert" className="rounded-xl border border-red-500/25 bg-red-500/[0.07] px-3.5 py-3 text-[13px] leading-relaxed text-red-700 dark:text-red-300">
+                <p role="alert" className="rounded-xl border border-loss/25 bg-loss/[0.07] px-3.5 py-3 text-[13px] leading-relaxed text-loss">
                   {error}
                 </p>
               )}

@@ -45,8 +45,8 @@ export function LevelsStrip({ data }: { data: GexResult }) {
       </div>
       <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
         <Stat label="Flip" value={money(zero_gamma)} sub={pct(zero_gamma, spot)} tone="text-accent" />
-        <Stat label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-emerald-600 dark:text-emerald-400" />
-        <Stat label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-red-600 dark:text-red-400" />
+        <Stat label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-gain" />
+        <Stat label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-loss" />
       </div>
     </div>
   );

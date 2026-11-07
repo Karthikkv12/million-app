@@ -30,10 +30,10 @@ export function PremiumFlow({ data }: Props) {
         {/* Call premium bar */}
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-[11px] text-emerald-400 font-black uppercase tracking-wide">
+            <span className="text-[11px] text-gain font-black uppercase tracking-wide">
               Calls
             </span>
-            <span className="text-[11px] font-black text-emerald-400 tabular-nums">
+            <span className="text-[11px] font-black text-gain tabular-nums">
               ${(callPrem / 1e6).toFixed(1)}M
             </span>
           </div>
@@ -52,7 +52,7 @@ export function PremiumFlow({ data }: Props) {
           </span>
           <span
             className={`text-[15px] font-black tabular-nums leading-none mt-0.5 ${
-              pcRatio > 1 ? "text-red-400" : "text-emerald-400"
+              pcRatio > 1 ? "text-loss" : "text-gain"
             }`}
           >
             {pcRatio.toFixed(2)}
@@ -62,10 +62,10 @@ export function PremiumFlow({ data }: Props) {
         {/* Put premium bar */}
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-[11px] text-red-400 font-black uppercase tracking-wide">
+            <span className="text-[11px] text-loss font-black uppercase tracking-wide">
               Puts
             </span>
-            <span className="text-[11px] font-black text-red-400 tabular-nums">
+            <span className="text-[11px] font-black text-loss tabular-nums">
               ${(putPrem / 1e6).toFixed(1)}M
             </span>
           </div>

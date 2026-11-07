@@ -20,11 +20,11 @@ export function DealerNarrative({ data }: Props) {
   } = data;
 
   const regime    = (net_gex ?? 0) >= 0 ? "long gamma" : "short gamma";
-  const regimeCol = (net_gex ?? 0) >= 0 ? "text-emerald-400" : "text-red-400";
+  const regimeCol = (net_gex ?? 0) >= 0 ? "text-gain" : "text-loss";
   const netGexFmt = fmtGex(net_gex);
   const pcRatio   = call_premium > 0 ? (put_premium / call_premium).toFixed(2) : "N/A";
   const flowBias  = net_flow >= 0 ? "bullish (call-heavy)" : "bearish (put-heavy)";
-  const flowCol   = net_flow >= 0 ? "text-emerald-400" : "text-red-400";
+  const flowCol   = net_flow >= 0 ? "text-gain" : "text-loss";
   const aboveZeroG   = zero_gamma != null && spot != null && spot > zero_gamma;
   const nearCallWall = max_call_wall != null && spot != null && (max_call_wall - spot) / spot < 0.02;
   const nearPutWall  = max_put_wall  != null && spot != null && (spot - max_put_wall)  / spot < 0.02;

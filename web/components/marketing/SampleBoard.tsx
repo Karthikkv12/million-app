@@ -59,12 +59,12 @@ export function SampleBoard({ compact = false, bare = false, className }: { comp
         </div>
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Call wall</p>
-          <p className="font-mono text-sm tabular-nums text-emerald-600 dark:text-emerald-400">$590</p>
+          <p className="font-mono text-sm tabular-nums text-gain">$590</p>
         </div>
         {!compact && (
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Put wall</p>
-            <p className="font-mono text-sm tabular-nums text-red-600 dark:text-red-400">$580</p>
+            <p className="font-mono text-sm tabular-nums text-loss">$580</p>
           </div>
         )}
       </div>

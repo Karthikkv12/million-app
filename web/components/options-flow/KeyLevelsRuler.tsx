@@ -11,10 +11,10 @@ export function KeyLevelsRuler({ data }: Props) {
 
   type Level = { label: string; value: number; color: string };
   const levels: Level[] = [];
-  if (max_put_wall  != null) levels.push({ label: "Put Wall",  value: max_put_wall,  color: "#ef4444" });
+  if (max_put_wall  != null) levels.push({ label: "Put Wall",  value: max_put_wall,  color: "#e55d5d" });
   if (zero_gamma    != null) levels.push({ label: "Zero γ",    value: zero_gamma,    color: "#f59e0b" });
   if (spot          != null) levels.push({ label: "Spot",      value: spot,          color: "#f9fafb" });
-  if (max_call_wall != null) levels.push({ label: "Call Wall", value: max_call_wall, color: "#22c55e" });
+  if (max_call_wall != null) levels.push({ label: "Call Wall", value: max_call_wall, color: "#3fb37f" });
 
   levels.sort((a, b) => a.value - b.value);
   if (levels.length < 2) return null;

@@ -42,7 +42,7 @@ export function FlowByExpiry({ data }: Props) {
               </span>
               <span
                 className={`text-[11px] font-black tabular-nums shrink-0 ${
-                  isPos ? "text-emerald-400" : "text-red-400"
+                  isPos ? "text-gain" : "text-loss"
                 }`}
               >
                 {isPos ? "+" : ""}

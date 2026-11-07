@@ -110,7 +110,7 @@ function Hero() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_50%_0%,rgb(var(--accent-rgb)/0.10),transparent_70%)]" />
       <Container className="relative pb-6 pt-16 text-center sm:pt-24">
         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[13px] text-foreground/70">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="h-1.5 w-1.5 rounded-full bg-gain" />
           New flow board: every strike × expiry on one screen
         </span>
         <h1 className="mx-auto mt-7 max-w-4xl text-balance text-[44px] font-semibold leading-[1.02] tracking-[-0.045em] text-foreground sm:text-7xl">
@@ -126,7 +126,7 @@ function Hero() {
         </div>
         <ul className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-x-6 gap-y-2 text-[13px] text-foreground/60">
           {["Any optionable ticker", "Yahoo Finance data, ~15 min delayed", "Light and dark, desktop and phone"].map((t) => (
-            <li key={t} className="flex items-center gap-1.5"><Check size={14} className="text-emerald-500" />{t}</li>
+            <li key={t} className="flex items-center gap-1.5"><Check size={14} className="text-gain" />{t}</li>
           ))}
         </ul>
       </Container>
@@ -186,7 +186,7 @@ function Feature({ eyebrow, title, body, points, visual, flip = false, id }: {
         <ul className="mt-6 grid gap-2.5">
           {points.map((p) => (
             <li key={p} className="flex items-start gap-2.5 text-[15px] text-foreground/80">
-              <Check size={16} className="mt-0.5 shrink-0 text-emerald-500" />{p}
+              <Check size={16} className="mt-0.5 shrink-0 text-gain" />{p}
             </li>
           ))}
         </ul>

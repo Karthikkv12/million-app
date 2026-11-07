@@ -53,7 +53,7 @@ function Breadth({ quotes }: { quotes: QuoteMap }) {
       {vals.length === 0 ? <div className="skeleton h-20" /> : (
         <>
           <div className="grid grid-cols-3 gap-2">
-            {[["Up", adv, "text-emerald-600 dark:text-emerald-400"], ["Flat", unc, "text-foreground/70"], ["Down", dec, "text-red-600 dark:text-red-400"]].map(([l, v, c]) => (
+            {[["Up", adv, "text-gain"], ["Flat", unc, "text-foreground/70"], ["Down", dec, "text-loss"]].map(([l, v, c]) => (
               <div key={l as string}>
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">{l}</p>
                 <p className={`font-mono text-2xl font-medium tabular-nums ${c}`}>{v}</p>
@@ -61,9 +61,9 @@ function Breadth({ quotes }: { quotes: QuoteMap }) {
             ))}
           </div>
           <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-foreground/[0.06]" aria-hidden>
-            <div style={{ width: `${(adv / total) * 100}%` }} className="bg-emerald-500 transition-all duration-700" />
+            <div style={{ width: `${(adv / total) * 100}%` }} className="bg-gain transition-all duration-700" />
             <div style={{ width: `${(unc / total) * 100}%` }} className="bg-foreground/20 transition-all duration-700" />
-            <div style={{ width: `${(dec / total) * 100}%` }} className="bg-red-500 transition-all duration-700" />
+            <div style={{ width: `${(dec / total) * 100}%` }} className="bg-loss transition-all duration-700" />
           </div>
           <p className="mt-2 text-[13px] text-foreground/60">{Math.round((adv / total) * 100)}% advancing</p>
         </>
@@ -91,9 +91,9 @@ function Sentiment({ quotes }: { quotes: QuoteMap }) {
           <svg viewBox="0 0 100 56" className="h-16 w-28 shrink-0 text-foreground" aria-hidden>
             <defs>
               <linearGradient id="sentGrad" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0%" stopColor="#dc2626" />
+                <stop offset="0%" stopColor="#e55d5d" />
                 <stop offset="50%" stopColor="#a3a3a3" />
-                <stop offset="100%" stopColor="#16a34a" />
+                <stop offset="100%" stopColor="#3fb37f" />
               </linearGradient>
             </defs>
             <path d="M 8 50 A 42 42 0 0 1 92 50" fill="none" stroke="url(#sentGrad)" strokeWidth="7" strokeLinecap="round" opacity="0.85" />
@@ -145,7 +145,7 @@ function SectorETFs({ quotes }: { quotes: QuoteMap }) {
                 <span className="absolute inset-y-0 left-1/2 w-px bg-[var(--border-strong)]" />
                 {r.pct != null && (
                   <span
-                    className={`absolute inset-y-0 rounded-full ${r.pct >= 0 ? "bg-emerald-500" : "bg-red-500"}`}
+                    className={`absolute inset-y-0 rounded-full ${r.pct >= 0 ? "bg-gain" : "bg-loss"}`}
                     style={r.pct >= 0 ? { left: "50%", width: `${w}%` } : { right: "50%", width: `${w}%` }}
                   />
                 )}
@@ -242,7 +242,7 @@ export default function MarketsPage() {
       />
 
       {error && (
-        <p className="mb-6 rounded-xl border border-red-500/25 bg-red-500/[0.06] px-4 py-3 text-[13px] text-red-700 dark:text-red-300">
+        <p className="mb-6 rounded-xl border border-loss/25 bg-loss/[0.06] px-4 py-3 text-[13px] text-loss">
           Couldn't load quotes. Retrying every minute.
         </p>
       )}
