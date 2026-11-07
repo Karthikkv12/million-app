@@ -136,7 +136,28 @@ Tag `develop` as **`pre-new-build`** before deleting anything.
 - The admin password in `AGENT_CONTEXT.md`. Remove it from the file and change it.
 - `/restore-db` endpoint, once the one-time Railway data upload is done.
 
-## 5. Order of work
+## 5. Security
+
+| Layer | Today | Target | Step |
+|---|---|---|---|
+| Secrets | **Leaked:** `.env` (Tradier and OpenAI keys), all `*.db` files and the admin password are in the public repo history | Repo private; new keys and password; secrets only in host variables and `core/settings.py`; GitHub secret scanning with push protection | 0 · 2 |
+| Login | Refresh rotation, PBKDF2, login rate limit, auth events and session revoke are built. Tokens are in `localStorage` | Two-factor login (TOTP or passkeys); httpOnly cookies on the web; Keychain or Keystore in the app | 6 · 8 |
+| Permissions | Every query is filtered by `user_id`; `test_auth_and_isolation.py` | An isolation test in every module; admin checks on the server only | 4 |
+| Front door | Backend hidden behind Next.js; CORS defaults to `*`; `/market/quotes` has no auth; `/restore-db` exists | CORS = optflw.com only; every route requires auth or a rate limit; CSP and HSTS headers; remove `/restore-db` | 2 · 4 |
+| Data | SQLite files on a laptop | Managed database, encrypted at rest, scheduled and tested backups; brokerages linked only via OAuth (SnapTrade or Plaid), never stored passwords | 5 |
+| Phone app | Third-party keys already stay on the server | No keys in the app; tokens in Keychain or Keystore; App Attest or Play Integrity | 8 |
+| Code | Dependabot on; no branch protection | CodeQL on `develop`; protected `main`/`develop` with required CI; Pydantic on every input | 1 |
+| Watching | Auth events recorded; no alerts | Sentry, uptime checks, new-device login alerts, a one-page leak plan | 6 |
+| Accounts | Unknown | Two-factor login on GitHub, Cloudflare, Railway and the registrar; separate dev and prod data; pen test before outside users | 0 · 7 |
+
+**Step 0 is for the owner, not the agent:** make the repo private; replace the Tradier
+and OpenAI keys, the admin password and the Cloudflare tunnel token; turn on secret
+scanning with push protection; enable two-factor login on GitHub, Cloudflare and Railway.
+
+Agent rules from here on: never commit `.env`, `*.db` or tokens; never print secrets
+in logs or chat; ask before changing anything in GitHub, Cloudflare or Railway settings.
+
+## 6. Order of work
 
 Each step is its own branch off `develop` and its own PR into `develop`. Before each
 push: `pytest`, `npm run build`, and screenshots at 1280px and 390px in light and
