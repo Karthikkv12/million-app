@@ -1,4 +1,4 @@
-"""backend_api/schemas/auth.py — Auth, session, and admin Pydantic models."""
+"""optionflow/modules/auth/schemas.py — auth, session and admin request/response models."""
 from datetime import datetime
 from typing import Optional
 
@@ -85,3 +85,7 @@ class AdminPatchUserRequest(BaseModel):
     password: Optional[str] = Field(default=None, min_length=6)
     role: Optional[str] = Field(default=None, pattern="^(admin|user)$")
     is_active: Optional[bool] = None
+
+
+class StatusOut(BaseModel):
+    status: str = "ok"

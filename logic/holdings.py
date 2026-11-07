@@ -329,7 +329,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
 
         # Auto-register in watchlist
         try:
-            from logic.watchlist import upsert_symbol as _wl_upsert
+            from optionflow.modules.watchlist.service import upsert_symbol as _wl_upsert
             _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
         except Exception:
             pass
@@ -357,7 +357,7 @@ def create_holding(*, user_id: int, data: dict) -> dict:
 
         # Auto-register in watchlist
         try:
-            from logic.watchlist import upsert_symbol as _wl_upsert
+            from optionflow.modules.watchlist.service import upsert_symbol as _wl_upsert
             _wl_upsert(user_id=user_id, symbol=symbol, source="holding")
         except Exception:
             pass

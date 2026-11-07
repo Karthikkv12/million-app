@@ -26,9 +26,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend_api.main import app
-from backend_api.security import create_access_token
+from optionflow.core.security import create_access_token
 from database import models as dbmodels
-from logic import auth_services
+from optionflow.modules.auth import service as auth_services
 from optionflow.core import db as core_db
 from conftest import make_memory_engine
 from optionflow.modules.flow import service as flow_service

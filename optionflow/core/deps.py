@@ -7,8 +7,8 @@ from typing import Any, Dict
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from backend_api.security import decode_token
-from logic import auth_services
+from optionflow.core.security import decode_token
+from optionflow.modules.auth import service as auth_services
 
 logger = logging.getLogger("optionflow.deps")
 

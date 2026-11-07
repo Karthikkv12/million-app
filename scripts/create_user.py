@@ -23,7 +23,7 @@ def main():
     # Import app code paths
     from optionflow.core.db import init_db
     init_db()
-    from logic.auth_services import create_user
+    from optionflow.modules.auth.service import create_user
 
     try:
         uid = create_user(args.user, args.password)

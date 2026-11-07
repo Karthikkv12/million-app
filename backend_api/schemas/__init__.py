@@ -8,20 +8,6 @@ continue to work unchanged. New code should import directly from the
 domain module (e.g. `from backend_api.schemas.trades import TradeOut`).
 """
 
-from backend_api.schemas.auth import (  # noqa: F401
-    AdminCreateUserRequest,
-    AdminPatchUserRequest,
-    AdminUserOut,
-    AuthChangePasswordRequest,
-    AuthEventOut,
-    AuthLoginRequest,
-    AuthLogoutRequest,
-    AuthMeResponse,
-    AuthRefreshRequest,
-    AuthResponse,
-    AuthSessionOut,
-    AuthSignupRequest,
-)
 
 from backend_api.schemas.trades import (  # noqa: F401
     AccountCreateRequest,

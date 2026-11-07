@@ -1,4 +1,8 @@
-"""logic/auth_services.py — Authentication, users, tokens, and rate-limiting."""
+"""optionflow/modules/auth/service.py — users, passwords, tokens, sessions, rate limits.
+
+The lower half ("Flows") holds what the HTTP routes do: plain functions that
+raise optionflow.core.errors instead of HTTP exceptions.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -676,3 +680,185 @@ def is_refresh_rate_limited(*, ip: str | None = None) -> bool:
         return int(q.count()) >= int(max_attempts)
     finally:
         session.close()
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Flows used by the API (moved from the auth/admin routers)
+# ══════════════════════════════════════════════════════════════════════════════
+from optionflow.core import errors as _err  # noqa: E402
+from optionflow.core.security import create_access_token as _create_access_token  # noqa: E402
+
+
+def _token_bundle(user_id: int, username: str, role: str, refresh_token: str | None,
+                  issued_at: datetime | None = None) -> dict:
+    extra = {"username": username, "role": role}
+    return {
+        "access_token": _create_access_token(subject=str(user_id), extra=extra, issued_at=issued_at),
+        "refresh_token": refresh_token,
+        "user_id": int(user_id),
+        "username": username,
+        "role": role,
+    }
+
+
+def _limited(check, **kwargs) -> bool:
+    """Run a rate-limit check; if the check itself fails, log it and allow the request."""
+    try:
+        return bool(check(**kwargs))
+    except Exception as exc:
+        _logger.warning("Rate-limit check failed (%s): %s", check.__name__, exc)
+        return False
+
+
+def login(username: str, password: str, *, ip: str | None = None, user_agent: str | None = None) -> dict:
+    """Check credentials and issue an access + refresh token. Logs every attempt."""
+    username = str(username).strip().lower()
+    if _limited(is_login_rate_limited, username=username, ip=ip):
+        log_auth_event(event_type="login_throttled", success=False, username=username, ip=ip, user_agent=user_agent)
+        raise _err.RateLimited("Too many login attempts. Please try again later.")
+    auth = authenticate_user(username, password)
+    if not auth:
+        log_auth_event(event_type="login", success=False, username=username, ip=ip,
+                       user_agent=user_agent, detail="invalid credentials")
+        raise _err.Unauthorized("Invalid username or password")
+    user_id = int(auth["user_id"])
+    role = auth.get("role", "user")
+    refresh = create_refresh_token(user_id=user_id, ip=ip, user_agent=user_agent)
+    log_auth_event(event_type="login", success=True, username=username, user_id=user_id, ip=ip, user_agent=user_agent)
+    return _token_bundle(user_id, username, role, refresh)
+
+
+def refresh_session(refresh_token: str, *, ip: str | None = None, user_agent: str | None = None) -> dict:
+    """Rotate a refresh token and issue a new access token."""
+    if _limited(is_refresh_rate_limited, ip=ip):
+        log_auth_event(event_type="refresh_throttled", success=False, ip=ip, user_agent=user_agent)
+        raise _err.RateLimited("Too many refresh attempts. Please try again later.")
+    rotated = rotate_refresh_token(refresh_token=refresh_token, ip=ip, user_agent=user_agent)
+    if not rotated:
+        log_auth_event(event_type="refresh", success=False, ip=ip, user_agent=user_agent, detail="invalid refresh token")
+        raise _err.Unauthorized("Invalid refresh token")
+    user_id, new_refresh = rotated
+    u = get_user(int(user_id))
+    username = str(getattr(u, "username", "") or "") if u is not None else ""
+    role = str(getattr(u, "role", None) or "user") if u is not None else "user"
+    log_auth_event(event_type="refresh", success=True, username=username, user_id=int(user_id), ip=ip, user_agent=user_agent)
+    return _token_bundle(int(user_id), username, role, new_refresh)
+
+
+def profile(claims: dict) -> dict:
+    """The signed-in user's id, name and role (database values win over token claims)."""
+    user_id = int(claims["sub"])
+    username = str(claims.get("username") or "")
+    role = str(claims.get("role") or "user")
+    u = get_user(user_id)
+    if u is not None:
+        username = str(getattr(u, "username", username) or username)
+        role = str(getattr(u, "role", None) or role)
+    return {"user_id": user_id, "username": username, "role": role}
+
+
+def _revoke_access_token(claims: dict) -> None:
+    jti = str(claims.get("jti") or "").strip()
+    if not jti:
+        return
+    try:
+        exp = datetime.fromtimestamp(int(claims.get("exp")), tz=timezone.utc)
+    except Exception:
+        exp = datetime.now(timezone.utc)
+    revoke_token(user_id=int(claims["sub"]), jti=jti, expires_at=exp)
+
+
+def logout(claims: dict, refresh_token: str | None = None) -> None:
+    """Revoke this access token and, if given, its refresh token."""
+    user_id = int(claims["sub"])
+    _revoke_access_token(claims)
+    if refresh_token:
+        try:
+            revoke_refresh_token(user_id=user_id, refresh_token=str(refresh_token))
+        except Exception as exc:
+            _logger.warning("Failed to revoke refresh token on logout for user %s: %s", user_id, exc)
+    log_auth_event(event_type="logout", success=True, username=str(claims.get("username") or ""), user_id=user_id)
+
+
+def logout_everywhere(claims: dict) -> None:
+    """Invalidate every token issued before now, on every device."""
+    user_id = int(claims["sub"])
+    set_auth_valid_after_epoch(user_id=user_id, epoch_seconds=int(claims.get("iat") or 0) + 1)
+    try:
+        revoke_all_refresh_tokens(user_id=user_id)
+    except Exception as exc:
+        _logger.warning("revoke_all_refresh_tokens failed on logout_all for user %s: %s", user_id, exc)
+    _revoke_access_token(claims)
+    log_auth_event(event_type="logout_all", success=True, username=str(claims.get("username") or ""), user_id=user_id)
+
+
+def change_own_password(claims: dict, current_password: str, new_password: str) -> dict:
+    """Change the signed-in user's password, end other sessions, and issue fresh tokens."""
+    user_id = int(claims["sub"])
+    username = str(claims.get("username") or "")
+    cutoff = int(claims.get("iat") or 0) + 1
+    try:
+        change_password(user_id=user_id, old_password=current_password, new_password=new_password,
+                        invalidate_tokens_before_epoch=cutoff)
+    except ValueError as e:
+        raise _err.BadRequest(str(e))
+    try:
+        revoke_all_refresh_tokens(user_id=user_id)
+    except Exception as exc:
+        _logger.warning("revoke_all_refresh_tokens failed on change_password for user %s: %s", user_id, exc)
+    log_auth_event(event_type="change_password", success=True, username=username, user_id=user_id)
+    u = get_user(user_id)
+    role = str(getattr(u, "role", None) or claims.get("role") or "user")   # keep admin rights in the new token
+    return _token_bundle(user_id, username, role, create_refresh_token(user_id=user_id),
+                         issued_at=datetime.fromtimestamp(cutoff, tz=timezone.utc))
+
+
+def revoke_own_session(claims: dict, session_id: int) -> None:
+    user_id = int(claims["sub"])
+    if not revoke_refresh_session_by_id(user_id=user_id, session_id=int(session_id), reason="revoked"):
+        raise _err.NotFound("Session not found")
+    log_auth_event(event_type="revoke_session", success=True, username=str(claims.get("username") or ""), user_id=user_id)
+
+
+# ── Admin flows ───────────────────────────────────────────────────────────────
+def admin_create_user(username: str, password: str, role: str = "user"):
+    if get_user_by_username(username):
+        raise _err.Conflict("Username already exists")
+    user = get_user(create_user(username=username, password=password, role=role or "user"))
+    if not user:
+        raise _err.ServerError("User created but could not be retrieved")
+    return user
+
+
+def admin_update_user(user_id: int, *, username: str | None = None, password: str | None = None,
+                      role: str | None = None, is_active: bool | None = None):
+    """Apply only the provided fields, in order: username, password, role/active."""
+    if not any([username, password, role is not None, is_active is not None]):
+        raise _err.Unprocessable("No fields to update")
+    if username is not None:
+        try:
+            update_username_admin(user_id, username)
+        except ValueError as e:
+            raise (_err.NotFound if "not found" in str(e) else _err.Conflict)(str(e))
+    if password is not None:
+        try:
+            admin_set_password(user_id, password)
+        except ValueError as e:
+            raise _err.BadRequest(str(e))
+    if role is not None or is_active is not None:
+        try:
+            patch_user_admin(user_id, role=role, is_active=is_active)
+        except ValueError as e:
+            raise _err.NotFound(str(e))
+    user = get_user(user_id)
+    if not user:
+        raise _err.NotFound("User not found")
+    return user
+
+
+def admin_delete_user(user_id: int) -> None:
+    try:
+        delete_user_admin(user_id=user_id)
+    except ValueError:
+        raise _err.NotFound("User not found")

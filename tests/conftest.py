@@ -108,15 +108,18 @@ class FakeMarketData:
 
 @pytest.fixture
 def fake_market_data():
-    """Route all market data to a FakeMarketData and start with an empty GEX cache."""
+    """Route all market data to a FakeMarketData, with empty GEX and market caches."""
     from optionflow.modules.flow import service as flow_service
+    from optionflow.modules.market import service as market_service
     from optionflow.providers.market_data import use_market_data
 
     fake = FakeMarketData()
     use_market_data(fake)
     flow_service.clear_cache()
+    market_service.clear_caches()
     try:
         yield fake
     finally:
         use_market_data(None)
         flow_service.clear_cache()
+        market_service.clear_caches()

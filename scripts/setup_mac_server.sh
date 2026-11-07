@@ -79,7 +79,7 @@ say "Installing launchd agents"
 # Free the ports in case old manual servers are running
 kill -9 $(lsof -ti :8000 :3000) 2>/dev/null || true
 write_agent com.optflw.fastapi "$REPO" \
-  "exec uvicorn backend_api.main:app --host 127.0.0.1 --port 8000"
+  "exec uvicorn optionflow.main:app --host 127.0.0.1 --port 8000"
 write_agent com.optflw.nextjs "$REPO/web" \
   "exec node node_modules/.bin/next dev --port 3000"
 

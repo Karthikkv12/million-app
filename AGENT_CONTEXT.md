@@ -100,6 +100,13 @@ optionflow/core/
 ```
 Never call `os.getenv` in app code — add a field to `Settings` instead.
 
+**API layout (plan step 4):** `optionflow/main.py` (`create_app()`) mounts each module in `ENABLED_MODULES`
+(default `auth,market,flow,watchlist`; also `portfolio`, `budget`) at **`/api/v1/...`** and at the legacy path.
+Modules live in `optionflow/modules/<name>/` (`router.py` HTTP only → `service.py` plain functions → typed `schemas.py`).
+Services raise `optionflow.core.errors` (`NotFound`, `Conflict`, …). Errors on `/api/v1` are `{"error": {"code", "message"}}`;
+legacy paths keep `{"detail": …}`. Market data only via `optionflow.providers.get_market_data()`.
+`backend_api/main.py` is a one-line entry-point alias for existing launchd configs.
+
 ```
 backend_api/
   main.py          # thin app factory — CORS, middleware, lifespan, /health (all 5 DBs)

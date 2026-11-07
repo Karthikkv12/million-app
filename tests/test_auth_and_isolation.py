@@ -1,4 +1,5 @@
-from logic import auth_services, trade_services
+from logic import trade_services
+from optionflow.modules.auth import service as auth_services
 
 
 def test_create_and_auth(db_engine_and_session):

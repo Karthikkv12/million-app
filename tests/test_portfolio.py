@@ -3,7 +3,7 @@ Tests for logic/portfolio.py — weekly options portfolio service layer.
 """
 import datetime
 import pytest
-from logic import auth_services
+from optionflow.modules.auth import service as auth_services
 import logic.portfolio as port
 
 

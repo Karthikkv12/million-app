@@ -618,7 +618,7 @@ def create_position(*, user_id: int, week_id: int, data: dict) -> dict:
 
     # Auto-register in watchlist (fire-and-forget — never block position creation)
     try:
-        from logic.watchlist import upsert_symbol as _wl_upsert
+        from optionflow.modules.watchlist.service import upsert_symbol as _wl_upsert
         _wl_upsert(user_id=user_id, symbol=result["symbol"], source="position")
     except Exception:
         pass

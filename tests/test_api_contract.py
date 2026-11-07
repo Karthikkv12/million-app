@@ -15,7 +15,7 @@ from optionflow.core import db as core_db
 from optionflow.modules.flow import service as flow_service
 from optionflow.modules.flow.gamma import GEXResult
 
-PREFIXES = [""]
+PREFIXES = ["", "/api/v1"]
 
 PASSWORD = "GoodPassword12"
 
@@ -39,7 +39,7 @@ def api(prefix, fake_market_data):
 
 
 def _user(username="alice", role="user"):
-    from logic import auth_services
+    from optionflow.modules.auth import service as auth_services
     return auth_services.create_user(username, PASSWORD, role=role)
 
 
@@ -220,7 +220,7 @@ def test_market_routes(api, fake_market_data):
     assert q.status_code == 200 and [x["symbol"] for x in q.json()] == ["SPY", "QQQ"]
     assert client.get(url("/market/quotes"), params={"symbols": ""}).status_code == 400
     lq = client.get(url("/quote/aapl"), headers=h)
-    assert lq.json() == {"symbol": "AAPL", "price": 123.4568, "from_cache": False}
+    assert {k: lq.json()[k] for k in ("symbol", "price", "from_cache")} == {"symbol": "AAPL", "price": 123.4568, "from_cache": False}
     info = client.get(url("/stocks/aapl/info"), headers=h)
     assert info.status_code == 200 and info.json()["name"] == "Apple"
     hist = client.get(url("/stocks/aapl/history"), headers=h, params={"period": "5d", "interval": "1d"})
@@ -261,3 +261,62 @@ def test_watchlist_routes(api):
     assert client.get(url("/watchlist"), headers=h).json() == []
     sync = client.post(url("/watchlist/sync"), headers=h)
     assert sync.status_code == 200 and sync.json() == {"positions_synced": 0, "holdings_synced": 0, "total_added": 0}
+
+
+# ── Step 4: /api/v1 behaviour ─────────────────────────────────────────────────
+def test_admin_keeps_admin_rights_after_password_change(api):
+    """The token issued by change-password used to drop the role claim."""
+    client, url = api
+    tok = _admin_token(client, url)
+    time.sleep(1.1)
+    new = client.post(url("/auth/change-password"), headers=_bearer(tok),
+                      json={"current_password": PASSWORD, "new_password": "NewPassword123"}).json()
+    assert new["role"] == "admin"
+    assert client.get(url("/admin/users"), headers=_bearer(new["access_token"])).status_code == 200
+
+
+def test_error_shapes_v1_vs_legacy(fake_market_data):
+    engine = make_memory_engine()
+    core_db.use_engine(engine)
+    try:
+        client = TestClient(app)
+        v1 = client.get("/api/v1/auth/me")
+        assert v1.status_code == 401 and v1.json() == {"error": {"code": "unauthorized", "message": "Missing bearer token"}}
+        assert client.get("/auth/me").json() == {"detail": "Missing bearer token"}
+        bad = client.post("/api/v1/auth/login", json={"username": "x"})
+        assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_request"
+        assert "password" in bad.json()["error"]["message"]
+        assert isinstance(client.post("/auth/login", json={"username": "x"}).json()["detail"], list)
+        missing = client.get("/api/v1/no-such-route")
+        assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found"
+        signup = client.post("/api/v1/auth/signup", json={"username": "a", "password": "b"})
+        assert signup.json() == {"error": {"code": "forbidden", "message": "Registration is not open at this time."}}
+        assert client.get("/api/v1/health").json()["status"] == "healthy"
+    finally:
+        core_db.use_engine(None)
+        engine.dispose()
+
+
+def test_enabled_modules_switch_routes_on_and_off(caplog):
+    from optionflow.core.settings import Settings
+    from optionflow.main import create_app
+
+    only_auth = TestClient(create_app(Settings(_env_file=None, enabled_modules="auth,nonsense")))
+    assert only_auth.get("/api/v1/watchlist").status_code == 404          # module off: route absent
+    assert only_auth.get("/api/v1/options/gamma-exposure/SPY").status_code == 404
+    assert only_auth.get("/api/v1/auth/me").status_code == 401             # module on
+    assert "unknown module 'nonsense'" in caplog.text
+
+    default = create_app(Settings(_env_file=None))
+    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist"]
+    assert TestClient(default).get("/api/v1/portfolio/weeks").status_code == 404   # off by default
+
+    with_portfolio = TestClient(create_app(Settings(_env_file=None, enabled_modules="auth,portfolio,budget")))
+    for path in ("/api/v1/portfolio/weeks", "/portfolio/weeks", "/api/v1/accounts", "/api/v1/budget"):
+        assert with_portfolio.get(path).status_code == 401, path            # mounted, needs a token
+
+
+def test_openapi_lists_only_v1_paths():
+    paths = TestClient(app).get("/openapi.json").json()["paths"]
+    assert paths and all(p.startswith("/api/v1/") for p in paths), [p for p in paths if not p.startswith("/api/v1/")]
+    assert "/api/v1/options/gamma-exposure/{symbol}" in paths and "/api/v1/auth/login" in paths

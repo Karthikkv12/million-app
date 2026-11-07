@@ -1,17 +1,7 @@
-"""
-logic/watchlist.py — Watchlist service layer.
+"""optionflow/modules/watchlist/service.py — the user's watchlist.
 
-Clean, single-responsibility module that manages the watchlist_symbols table.
-
-Public API
-----------
-list_watchlist(user_id)             → list of symbol dicts, active only
-upsert_symbol(user_id, symbol, ...) → insert or reactivate + update metadata
-remove_symbol(user_id, symbol)      → soft-delete (is_active=False)
-bulk_register(user_id, symbols, source)
-    → register a batch of symbols from positions/holdings (no-ops if already present)
-sync_from_positions(user_id)        → scan all OptionPositions, register any missing symbols
-sync_from_holdings(user_id)         → scan all StockHoldings, register any missing symbols
+NOTE: sync_from_positions / sync_from_holdings read portfolio tables directly;
+plan step 4b switches them to the portfolio module's service.
 """
 from __future__ import annotations
 
@@ -235,3 +225,10 @@ def sync_from_holdings(*, user_id: int) -> int:
     bulk_register(user_id=user_id, symbols=symbols, source="holding")
     after  = {r["symbol"] for r in list_watchlist(user_id=user_id)}
     return len(after - before)
+
+
+def sync_all(*, user_id: int) -> dict:
+    """Register symbols from positions and holdings; returns the counts added."""
+    positions = sync_from_positions(user_id=user_id)
+    holdings = sync_from_holdings(user_id=user_id)
+    return {"positions_synced": positions, "holdings_synced": holdings, "total_added": positions + holdings}
