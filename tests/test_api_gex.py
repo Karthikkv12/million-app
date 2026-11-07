@@ -31,7 +31,7 @@ from database import models as dbmodels
 from logic import auth_services
 from optionflow.core import db as core_db
 from conftest import make_memory_engine
-import logic.gamma as gmod
+from optionflow.modules.flow import service as flow_service
 
 
 # ---------------------------------------------------------------------------
@@ -69,11 +69,8 @@ def client(db):
 
 @pytest.fixture(autouse=True)
 def mock_gex(monkeypatch):
-    """Patch the GEX engine so no yfinance calls are made during API tests.
-    compute_gamma_exposure is imported inside the endpoint function, so we
-    patch it at the source module (logic.gamma) rather than backend_api.main.
-    """
-    from logic.gamma import GEXResult
+    """Replace the GEX computation so API tests make no market-data calls."""
+    from optionflow.modules.flow.gamma import GEXResult
 
     def _fake_compute(symbol: str) -> GEXResult:
         spot = 500.0
@@ -108,13 +105,10 @@ def mock_gex(monkeypatch):
             error=None,
         )
 
-    # compute_gamma_exposure is imported inside the endpoint via
-    # `from logic.gamma import compute_gamma_exposure`, so patch at the source.
-    monkeypatch.setattr(gmod, "compute_gamma_exposure", _fake_compute)
-    # The GEX cache lives in backend_api.state and is imported by reference into
-    # the markets router, so clear the shared dict rather than rebinding it.
-    from backend_api import state
-    state._gex_cache.clear()
+    # The flow service calls compute_gamma_exposure; replace it and start each
+    # test with an empty cache.
+    monkeypatch.setattr(flow_service, "compute_gamma_exposure", _fake_compute)
+    flow_service.clear_cache()
 
 
 # ---------------------------------------------------------------------------

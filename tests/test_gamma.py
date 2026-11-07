@@ -1,5 +1,5 @@
 """
-Tests for logic/gamma.py
+Tests for optionflow/modules/flow/gamma.py and the Yahoo chain parser
 
 Covers:
   - bs_gamma edge cases (zero/tiny sigma, zero T, etc.)
@@ -13,7 +13,9 @@ import types
 import pytest
 import pandas as pd
 
-from logic.gamma import bs_gamma, _compute_gex, _find_zero_gamma, _parse_chain_rows
+from optionflow.modules.flow.gamma import bs_gamma, _compute_gex, _fill_gamma, _find_zero_gamma
+from optionflow.providers.market_data import OptionChain
+from optionflow.providers.yahoo import parse_chain_rows as _parse_chain_rows
 
 
 # ---------------------------------------------------------------------------
@@ -80,13 +82,16 @@ class TestParseChainRows:
 
     def test_normal_row_included(self):
         chain = _make_chain([self._base_row()], [])
-        rows = _parse_chain_rows("2026-03-20", chain, spot=610.0, T=21 / 252)
+        rows = _parse_chain_rows("2026-03-20", chain, T=21 / 252)
         assert len(rows) == 1
-        assert rows[0]["gamma"] > 0
+        # The feed has no gamma column, so the parser leaves it empty and
+        # the flow math fills it from IV with Black-Scholes.
+        filled = _fill_gamma(pd.DataFrame(rows), spot=610.0)
+        assert filled["gamma"].iloc[0] > 0
 
     def test_zero_oi_excluded(self):
         chain = _make_chain([self._base_row(openInterest=0)], [])
-        rows = _parse_chain_rows("2026-03-20", chain, spot=610.0, T=21 / 252)
+        rows = _parse_chain_rows("2026-03-20", chain, T=21 / 252)
         assert len(rows) == 0
 
     def test_floor_iv_zero_mid_excluded(self):
@@ -98,7 +103,7 @@ class TestParseChainRows:
         chain = _make_chain(
             [self._base_row(impliedVolatility=1e-5, bid=0.0, ask=0.0)], []
         )
-        rows = _parse_chain_rows("2026-03-20", chain, spot=610.0, T=7 / 252)
+        rows = _parse_chain_rows("2026-03-20", chain, T=7 / 252)
         assert len(rows) == 0, "Phantom row with floor IV and zero mid must be excluded"
 
     def test_floor_iv_with_real_bid_included(self):
@@ -109,12 +114,12 @@ class TestParseChainRows:
         chain = _make_chain(
             [self._base_row(impliedVolatility=1e-5, bid=0.5, ask=0.6)], []
         )
-        rows = _parse_chain_rows("2026-03-20", chain, spot=610.0, T=7 / 252)
+        rows = _parse_chain_rows("2026-03-20", chain, T=7 / 252)
         assert len(rows) == 1
 
     def test_call_and_put_otype(self):
         chain = _make_chain([self._base_row()], [self._base_row(strike=600.0)])
-        rows = _parse_chain_rows("2026-03-20", chain, spot=610.0, T=21 / 252)
+        rows = _parse_chain_rows("2026-03-20", chain, T=21 / 252)
         otypes = {r["otype"] for r in rows}
         assert otypes == {"call", "put"}
 
@@ -192,13 +197,13 @@ class TestFindZeroGamma:
 # ---------------------------------------------------------------------------
 
 class TestComputeGammaExposureMocked:
-    def test_no_phantom_gex_from_floor_iv(self, monkeypatch):
+    def test_no_phantom_gex_from_floor_iv(self, fake_market_data):
         """
         Regression test for the QQQ -$160B bug.
         Inject a chain that contains one real row and one phantom floor-IV row.
         Net GEX must be driven only by the real row.
         """
-        import logic.gamma as gmod
+        import optionflow.modules.flow.gamma as gmod
 
         real_row = {
             "strike": 610.0, "expiry": "2026-03-20", "otype": "call",
@@ -211,11 +216,8 @@ class TestComputeGammaExposureMocked:
             "iv": 1e-5, "mid": 0.0, "volume": 0, "T": 7 / 252,
         }
 
-        def _fake_fetch(symbol):
-            df = pd.DataFrame([real_row])          # phantom already excluded by _parse_chain_rows
-            return 609.24, df
-
-        monkeypatch.setattr(gmod, "_fetch_chain_yfinance", _fake_fetch)
+        # The provider already drops the phantom row (see TestParseChainRows)
+        fake_market_data.chain_fn = lambda symbol: OptionChain(609.24, pd.DataFrame([real_row]))
 
         result = gmod.compute_gamma_exposure("QQQ")
         assert result.error is None

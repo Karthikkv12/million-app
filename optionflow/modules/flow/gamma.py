@@ -1,5 +1,8 @@
 """
-Gamma Exposure (GEX) calculations.
+optionflow/modules/flow/gamma.py — Gamma Exposure (GEX) calculations.
+
+Option chains come from the market-data provider (optionflow.providers);
+this module only does the math.
 
 Dealer GEX model:
   - For calls:  dealer is SHORT gamma  → GEX contribution = -Gamma × OI × lot_size × Spot
@@ -9,7 +12,7 @@ Dealer GEX model:
   Formula: GEX = gamma × OI × contract_size × spot² × 0.01  ($ per 1% spot move, canonical standard)
 
 Data source:
-  yfinance (Yahoo Finance) — free, ~15-min delayed, no API key needed
+  get_market_data() — Yahoo Finance today (free, ~15-min delayed)
 
 Lot sizes:
   US options:            100 contracts per lot (standard)
@@ -22,9 +25,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from typing import List, Optional
-import warnings
 
 import pandas as pd
+
+from optionflow.providers.market_data import get_market_data
 
 # ---------------------------------------------------------------------------
 # Indian contract lot sizes (NSE F&O)
@@ -209,134 +213,26 @@ class GEXResult:
 # Fetch + compute
 # ---------------------------------------------------------------------------
 
-def _parse_chain_rows(exp: str, chain: "object", spot: float, T: float) -> list[dict]:
-    """Convert one expiry's option_chain into a list of row dicts."""
-    rows: list[dict] = []
-    for otype, df in [("call", chain.calls), ("put", chain.puts)]:
-        if df is None or df.empty:
-            continue
-        for _, opt in df.iterrows():
-            try:
-                strike_raw = opt.get("strike", 0)
-                strike = float(strike_raw) if strike_raw is not None and not (isinstance(strike_raw, float) and math.isnan(strike_raw)) else 0.0
-                if strike <= 0:
-                    continue
+def _fill_gamma(df: pd.DataFrame, spot: float, r: float = 0.045) -> pd.DataFrame:
+    """Use the feed's gamma where it has one (> 0); otherwise Black-Scholes from IV.
 
-                oi_raw = opt.get("openInterest", 0)
-                if oi_raw is None or (isinstance(oi_raw, float) and math.isnan(oi_raw)):
-                    oi = 0
-                else:
-                    oi = int(float(oi_raw))
-                if oi <= 0:
-                    continue
-
-                iv_raw = opt.get("impliedVolatility", 0)
-                iv = float(iv_raw) if iv_raw is not None and not (isinstance(iv_raw, float) and math.isnan(iv_raw)) else 0.0
-
-                bid_raw = opt.get("bid", 0)
-                bid = float(bid_raw) if bid_raw is not None and not (isinstance(bid_raw, float) and math.isnan(bid_raw)) else 0.0
-                ask_raw = opt.get("ask", 0)
-                ask = float(ask_raw) if ask_raw is not None and not (isinstance(ask_raw, float) and math.isnan(ask_raw)) else 0.0
-                mid = (bid + ask) / 2.0
-
-                # Skip illiquid/phantom rows: yfinance sets IV=1e-5 as a floor
-                # for options with no real market (zero bid & ask). These rows
-                # have real OI but no price signal; feeding them to bs_gamma with
-                # near-zero sigma causes gamma to explode (~50 vs ~0.025 for ATM).
-                # Threshold: IV < 0.5% (0.005) with zero mid → discard the row.
-                if iv < 0.005 and mid == 0.0:
-                    continue
-
-                chain_gamma = opt.get("gamma", None)
-                if chain_gamma is not None and not (isinstance(chain_gamma, float) and math.isnan(chain_gamma)) and float(chain_gamma) > 0:
-                    gamma = float(chain_gamma)
-                elif iv > 0 and spot > 0:
-                    gamma = bs_gamma(S=spot, K=strike, T=T, r=0.045, sigma=iv)
-                else:
-                    gamma = 0.0
-
-                vol_raw = opt.get("volume", 0)
-                vol = int(float(vol_raw)) if vol_raw is not None and not (isinstance(vol_raw, float) and math.isnan(vol_raw)) else 0
-
-                rows.append({
-                    "strike": strike,
-                    "expiry": exp,
-                    "otype":  otype,
-                    "oi":     oi,
-                    "volume": vol,
-                    "iv":     iv,
-                    "mid":    mid,
-                    "gamma":  gamma,
-                    "T":      T,
-                })
-            except Exception:
-                continue
-    return rows
-
-
-def _fetch_chain_yfinance(symbol: str) -> tuple[float, pd.DataFrame]:
-    """Fetch options chain using yfinance. Returns (spot_price, options_df).
-    All expiries are fetched concurrently via ThreadPoolExecutor.
+    Rows without IV (or without a spot price) get gamma 0.
     """
-    import yfinance as yf
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    if df.empty:
+        return df
+    df = df.copy()
+    feed = pd.to_numeric(df["gamma"], errors="coerce") if "gamma" in df.columns else pd.Series(float("nan"), index=df.index)
 
-    ticker = yf.Ticker(symbol.upper())
+    def _row_gamma(row) -> float:
+        g = feed.loc[row.name]
+        if pd.notna(g) and g > 0:
+            return float(g)
+        if row["iv"] > 0 and spot > 0:
+            return bs_gamma(S=spot, K=row["strike"], T=row["T"], r=r, sigma=row["iv"])
+        return 0.0
 
-    # Current price
-    info = ticker.fast_info
-    spot = float(getattr(info, "last_price", None) or getattr(info, "regularMarketPrice", None) or 0.0)
-    if spot <= 0:
-        hist = ticker.history(period="1d", progress=False)
-        if not hist.empty:
-            spot = float(hist["Close"].iloc[-1])
-
-    expiries = ticker.options
-    if not expiries:
-        return spot, pd.DataFrame()
-
-    # Use US/Eastern date — options expire in ET; servers running UTC would
-    # otherwise roll "today" over at 7pm ET and drop the 0-DTE expiry.
-    try:
-        import zoneinfo
-        _ET = zoneinfo.ZoneInfo("America/New_York")
-    except Exception:
-        import pytz  # type: ignore[import]
-        _ET = pytz.timezone("America/New_York")
-    from datetime import datetime as _dt
-    today = pd.Timestamp(_dt.now(_ET).date())
-
-    # Build list of (exp, T) pairs — skip expired (include today = 0-DTE)
-    valid: list[tuple[str, float]] = []
-    for exp in expiries:
-        T_days = (pd.to_datetime(exp) - today).days
-        if T_days >= 0:
-            # 0-DTE: use 1 trading day / 252 (canonical standard for intraday gamma)
-            T = max(T_days, 1) / 252.0
-            valid.append((exp, T))
-
-    if not valid:
-        return spot, pd.DataFrame()
-
-    def _fetch_one(exp: str, T: float) -> list[dict]:
-        try:
-            chain = ticker.option_chain(exp)
-            return _parse_chain_rows(exp, chain, spot, T)
-        except Exception:
-            return []
-
-    # Fetch all expiries in parallel — cap workers at min(len, 16) to avoid
-    # overwhelming yfinance's rate limit while still getting big speedups.
-    all_rows: list[dict] = []
-    max_workers = min(len(valid), 16)
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_fetch_one, exp, T): exp for exp, T in valid}
-        for fut in as_completed(futures):
-            all_rows.extend(fut.result())
-
-    if not all_rows:
-        return spot, pd.DataFrame()
-    return spot, pd.DataFrame(all_rows)
+    df["gamma"] = df.apply(_row_gamma, axis=1)
+    return df
 
 
 def _compute_gex(df: pd.DataFrame, spot: float, lot_size: int = 100) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -424,13 +320,12 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
     result = GEXResult(symbol=display_sym, spot=0.0, expiries=[])
 
     try:
-        # ── Yahoo Finance (yfinance) — the only data source ──────────────────
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            spot, df = _fetch_chain_yfinance(sym)
+        provider = get_market_data()
+        spot, df = provider.option_chain(sym)
+        df = _fill_gamma(df, spot)
 
         result.spot = round(spot, 2)
-        result.data_source = "yfinance"
+        result.data_source = provider.name
 
         if df.empty:
             result.error = f"No options data found for {sym}."

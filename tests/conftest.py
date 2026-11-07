@@ -70,3 +70,53 @@ def db_engine_and_session():
     finally:
         core_db.use_engine(None)
         engine.dispose()
+
+
+# ── Market data ──────────────────────────────────────────────────────────────
+class FakeMarketData:
+    """In-memory market-data provider. Set `chain_fn(symbol) -> OptionChain`."""
+
+    name = "fake"
+
+    def __init__(self):
+        from optionflow.providers.market_data import CHAIN_COLUMNS, OptionChain
+        import pandas as pd
+        self.chain_fn = lambda symbol: OptionChain(0.0, pd.DataFrame(columns=CHAIN_COLUMNS))
+
+    def option_chain(self, symbol):
+        return self.chain_fn(symbol)
+
+    def search(self, query, limit):
+        return []
+
+    def quote(self, symbol):
+        return {"symbol": symbol, "price": None, "prev_close": None, "change": None, "change_pct": None}
+
+    def last_price(self, symbol):
+        return None
+
+    def watchlist_row(self, symbol):
+        return {"symbol": symbol, "error": "fake provider"}
+
+    def stock_info(self, symbol):
+        return {"symbol": symbol, "error": "fake provider"}
+
+    def price_history(self, symbol, period, interval):
+        import pandas as pd
+        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+
+
+@pytest.fixture
+def fake_market_data():
+    """Route all market data to a FakeMarketData and start with an empty GEX cache."""
+    from optionflow.modules.flow import service as flow_service
+    from optionflow.providers.market_data import use_market_data
+
+    fake = FakeMarketData()
+    use_market_data(fake)
+    flow_service.clear_cache()
+    try:
+        yield fake
+    finally:
+        use_market_data(None)
+        flow_service.clear_cache()

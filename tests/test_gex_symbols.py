@@ -34,8 +34,9 @@ from typing import Any
 import pandas as pd
 import pytest
 
-import logic.gamma as gmod
-from logic.gamma import compute_gamma_exposure
+from optionflow.modules.flow.gamma import compute_gamma_exposure
+from optionflow.providers.market_data import OptionChain
+from optionflow.providers.yahoo import parse_chain_rows
 
 
 # ---------------------------------------------------------------------------
@@ -123,10 +124,10 @@ _SPOT: dict[str, float] = {
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def mock_yfinance(monkeypatch):
-    """Replace network fetch with a synthetic chain. No internet required."""
+def mock_yfinance(fake_market_data):
+    """Serve a synthetic chain through the fake provider. No internet required."""
 
-    def _fake_fetch(symbol: str):
+    def _fake_chain(symbol: str):
         # Resolve alias (SPX → ^SPX etc.) to find our spot dict entry
         raw = symbol.lstrip("^").upper()
         spot = _SPOT.get(raw, 100.0)
@@ -138,19 +139,15 @@ def mock_yfinance(monkeypatch):
         today = pd.Timestamp(_dt.now(_ET).date())
 
         # Simulate 6 weekly expiries
-        from logic.gamma import _parse_chain_rows
         all_rows = []
         for weeks in range(6):
             exp = (today + pd.Timedelta(days=7 * (weeks + 1))).strftime("%Y-%m-%d")
             T = max(7 * (weeks + 1), 1) / 252.0
-            rows = _parse_chain_rows(exp, chain, spot, T)
-            all_rows.extend(rows)
+            all_rows.extend(parse_chain_rows(exp, chain, T))
 
-        return spot, pd.DataFrame(all_rows)
+        return OptionChain(spot, pd.DataFrame(all_rows))
 
-    monkeypatch.setattr(gmod, "_fetch_chain_yfinance", _fake_fetch)
-    # Clear any cached results between tests
-    gmod._gex_cache.clear() if hasattr(gmod, "_gex_cache") else None
+    fake_market_data.chain_fn = _fake_chain
 
 
 # ---------------------------------------------------------------------------

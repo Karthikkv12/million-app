@@ -1,7 +1,7 @@
 """backend_api/main.py — Thin application factory.
 
 All route logic lives in backend_api/routers/*.py.
-Shared state (caches, poller, flow-DB helpers) lives in backend_api/state.py.
+GEX cache and flow history live in optionflow/modules/flow; the poller in optionflow/workers.
 This module only:
   1. Reads settings (optionflow.core.settings, which loads .env)
   2. Creates the FastAPI app and registers middleware, routers and exception handlers
@@ -10,7 +10,6 @@ This module only:
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Coroutine, Dict
@@ -42,11 +41,10 @@ logger = logging.getLogger("optionflow.main")
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Run startup tasks before yield; shutdown tasks after."""
-    from .state import init_flow_db, background_poller
+    from optionflow.workers import gex_poller
 
-    init_db()
-    init_flow_db()
-    threading.Thread(target=background_poller, daemon=True, name="gex-poller").start()
+    init_db()  # creates any missing tables, including net_flow_snapshots
+    gex_poller.start()
     logger.info("OptionFlow API v2.2.0 started — GEX poller running")
     yield
     # (shutdown: nothing to clean up — poller is a daemon thread)
