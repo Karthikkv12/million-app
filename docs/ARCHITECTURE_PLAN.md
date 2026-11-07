@@ -91,14 +91,14 @@ tests/<module>/
 
 | Screen | Status | Where |
 |---|---|---|
-| Flow (options-flow) | **Redesigned** | `feat/flow-heatmaps` (local session) |
+| Flow (options-flow) | **Redesigned** (board by local session; one-accent levels strip, drawer cards, 11px floor in `feat/settings-redesign`) | both branches |
 | Shell: top bar, tokens, fonts | **Redesigned** | `feat/flow-heatmaps` |
 | Settings | **Redesigned**: Profile, Appearance, Password (rules match the backend policy), Devices, Sign-in activity | `feat/settings-redesign` |
 | Landing (`/`) | **Redesigned**: sample board, "How to read it", modules, disclaimer footer | `feat/settings-redesign` |
 | Login | **Redesigned**: split layout, plain-language errors | `feat/settings-redesign` |
-| Users (admin) | **To do**: restyle to match Settings (list rows, role pills, in-page confirm for delete) | step 6 |
-| Markets | **To do**: review against tokens, 11px floor and phone width | step 6 |
-| Dashboard | **To do**: review; drop leftover gradient "from-purple-500" quick links | step 6 |
+| Users (admin) | **Redesigned**: summary, search, actions menu, reset password, real password policy | `feat/settings-redesign` |
+| Markets | **Redesigned**: breadth, sentiment, VIX, ranked sector ETFs, movers, graded heatmaps | `feat/settings-redesign` |
+| Dashboard | **Redesigned**: quote cards, volatility, calendar (now follows theme), Jump to | `feat/settings-redesign` |
 | Ledger | Hidden; rebuilt with Money in step 7 | step 7 |
 | Portfolio, Budget | Removed; rebuilt in step 7 | step 7 |
 
@@ -108,6 +108,10 @@ tests/<module>/
 - `cellColor` exported from `GexHeatmap.tsx`.
 - `components/marketing/SampleBoard.tsx`.
 - A `logoutAll` helper in `lib/api.ts`.
+- **Shared card system** in `components/ui.tsx`: `Panel`, `SectionHeader`, `Change`,
+  `Pill`, `Segmented`, `heatColor`, `useChartColors`. New cards should use these.
+- Light-mode fixes: the TradingView calendar was always dark; several white-on-white
+  labels and buttons; pale `*-300` text on light backgrounds.
 
 Backend gaps the new screens exposed (fold into step 4, auth module):
 - `/auth/sessions` doesn't flag the current session, so Settings guesses
@@ -212,8 +216,7 @@ dark. Never push to `main`. Keep optflw.com running; develop on port 3002.
    Host it encrypted with scheduled, tested backups.
 6. **Website on the new API.** Generate the TS client, move the AI chat to the
    backend, add the flow SSE stream, and finish the shell, type floor and wide layout.
-   Restyle the remaining screens: Users (admin), Markets and Dashboard (see Screen
-   status). httpOnly cookie auth, two-factor login, Sentry and new-device alerts.
+   All current screens are restyled (see Screen status). httpOnly cookie auth, two-factor login, Sentry and new-device alerts.
 7. **Bring back Portfolio and Budget** in the new style (`/portfolio/[tab]`,
    `/money/[tab]`). Short pen test before outside users.
 8. **Phone app** on the same `/api/v1` and generated client. Keychain or Keystore
