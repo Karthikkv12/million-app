@@ -2,22 +2,15 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { SidebarProvider, useSidebar } from "@/lib/sidebar";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import AiChat from "@/components/AiChat";
 
 function AppShell({ children }: { children: React.ReactNode }) {
-  const { collapsed } = useSidebar();
   return (
-    <div className="min-h-screen w-full overflow-x-hidden">
+    <div className="min-h-screen w-full overflow-x-hidden dot-grid">
       <Navbar />
-      <main
-        className={[
-          "min-w-0 w-full overflow-x-hidden pb-nav md:pb-0 animate-fade-up transition-[padding-left] duration-200 ease-in-out",
-          collapsed ? "md:pl-[64px]" : "md:pl-[240px]",
-        ].join(" ")}
-      >
+      <main className="mx-auto w-full max-w-[1680px] min-w-0 overflow-x-hidden pb-nav md:pb-10 animate-fade-up">
         {children}
       </main>
       <BottomNav />
@@ -48,9 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <SidebarProvider>
-      <AppShell>{children}</AppShell>
-    </SidebarProvider>
+    <AppShell>{children}</AppShell>
   );
 }
 

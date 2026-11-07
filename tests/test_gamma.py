@@ -216,7 +216,6 @@ class TestComputeGammaExposureMocked:
             return 609.24, df
 
         monkeypatch.setattr(gmod, "_fetch_chain_yfinance", _fake_fetch)
-        monkeypatch.setattr(gmod, "_tradier_token", lambda: None)
 
         result = gmod.compute_gamma_exposure("QQQ")
         assert result.error is None

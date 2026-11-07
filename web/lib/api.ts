@@ -180,7 +180,7 @@ export interface GexResult {
   total_volume: number;
   flow_by_expiry: FlowByExpiry[];
   top_flow_strikes: TopFlowStrike[];
-  data_source: "tradier" | "yfinance";
+  data_source: "yfinance";
   error: string | null;
 }
 

@@ -239,7 +239,7 @@ class TestGexResponseSchema:
 
     def test_data_source_field_valid(self, client, auth_token):
         data = self._get(client, auth_token)
-        assert data["data_source"] in ("yfinance", "tradier")
+        assert data["data_source"] == "yfinance"
 
 
 # ---------------------------------------------------------------------------

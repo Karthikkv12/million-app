@@ -2,37 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Warm paper light theme / near-black dark theme, hairline borders.
+   *-rgb channel variants let Tailwind apply opacity (text-foreground/60). */
 :root {
-  --background: #f7f7f8;
-  --foreground: #111111;
-  --surface:    #ffffff;
-  --surface-2:  #f2f2f4;
-  --border:     #e2e2e6;
-  --brand:      #111111;
-  --brand-2:    #444444;
-  --sidebar-w:  240px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0d0d;
-    --foreground: #ededed;
-    --surface:    #141414;
-    --surface-2:  #1a1a1a;
-    --border:     #2a2a2a;
-    --brand:      #ededed;
-    --brand-2:    #888888;
-  }
+  --background:     #f6f6f3;
+  --background-rgb: 246 246 243;
+  --foreground:     #0e0f12;
+  --foreground-rgb: 14 15 18;
+  --surface:        #ffffff;
+  --surface-2:      #f0f0ec;
+  --border:         rgba(14, 15, 18, 0.09);
+  --border-strong:  rgba(14, 15, 18, 0.16);
+  --accent:         #2f5bea;
+  --accent-rgb:     47 91 234;
+  --warm:           #f2711c;
+  --warm-rgb:       242 113 28;
+  --dot:            rgba(14, 15, 18, 0.075);
+  --shadow-float:   0 30px 80px -40px rgba(14, 15, 18, 0.35);
+  --brand:          #0e0f12;
+  --brand-2:        #5b5d63;
+  --sidebar-w:      0px;
+  color-scheme: light;
 }
 
 .dark {
-  --background: #0d0d0d;
-  --foreground: #ededed;
-  --surface:    #141414;
-  --surface-2:  #1a1a1a;
-  --border:     #2a2a2a;
-  --brand:      #ededed;
-  --brand-2:    #888888;
+  --background:     #0a0a0a;
+  --background-rgb: 10 10 10;
+  --foreground:     #eeeef0;
+  --foreground-rgb: 238 238 240;
+  --surface:        #0f1013;
+  --surface-2:      #16171b;
+  --border:         rgba(255, 255, 255, 0.08);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+  --accent:         #90bff9;
+  --accent-rgb:     144 191 249;
+  --warm:           #ff8a3d;
+  --warm-rgb:       255 138 61;
+  --dot:            rgba(255, 255, 255, 0.06);
+  --shadow-float:   0 50px 120px -40px rgba(0, 0, 0, 0.9);
+  --brand:          #eeeef0;
+  --brand-2:        #9a9ca3;
+  color-scheme: dark;
 }
 
 html {
@@ -44,7 +55,8 @@ html {
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* No overflow set here — let the browser handle scroll naturally on all engines */
@@ -65,11 +77,8 @@ body {
 /* Default (Windows / non-Mac): wide enough to click with a mouse */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 99px; }
-::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid var(--surface-2); }
-::-webkit-scrollbar-thumb:hover { background: #64748b; }
-.dark ::-webkit-scrollbar-track { background: #1a1a1a; }
-.dark ::-webkit-scrollbar-thumb { background: #3f4466; border-color: #1a1a1a; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #5a5f8a; }
+::-webkit-scrollbar-thumb { background: rgb(var(--foreground-rgb) / 0.22); border-radius: 99px; border: 2px solid var(--surface-2); }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--foreground-rgb) / 0.35); }
 
 /* Mac / Apple trackpad: keep the thin overlay style */
 @media (pointer: coarse), (-webkit-device-pixel-ratio: 2) and (pointer: fine) and (hover: hover) and (max-device-width: 1920px) {
@@ -79,10 +88,7 @@ body {
 /* Standard Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #94a3b8 transparent;
-}
-.dark * {
-  scrollbar-color: #3f4466 transparent;
+  scrollbar-color: rgb(var(--foreground-rgb) / 0.22) transparent;
 }
 
 /* ── Autofill fix ──────────────────────────────────────────────────────────── */
@@ -128,12 +134,41 @@ input[type="number"] { -moz-appearance: textfield; }
 
   /* Card hover */
   .card-hover {
-    @apply transition-all duration-200 hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5;
+    @apply transition-all duration-200 hover:border-[var(--border-strong)];
   }
 
-  /* Gradient text */
+  /* Gradient headline text */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-violet-500;
+    background-image: linear-gradient(92deg, #2f5bea 0%, #5b4ff0 45%, #8a46c9 75%, #a24a8c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .dark .gradient-text {
+    background-image: linear-gradient(92deg, #cfe2ff 0%, #90bff9 38%, #a9b6ff 62%, #ffd2a8 100%);
+  }
+
+  /* Faint dotted grid backdrop */
+  .dot-grid {
+    background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+  }
+
+  /* Small mono uppercase label */
+  .eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgb(var(--foreground-rgb) / 0.55);
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 h-10 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50;
+  }
+  .btn-primary { @apply btn bg-foreground text-background hover:bg-foreground/85; }
+  .btn-ghost { @apply btn border border-[var(--border-strong)] bg-[var(--surface)] text-foreground hover:bg-[var(--surface-2)]; }
+
+  /* Hairline card */
+  .card {
+    @apply rounded-2xl border border-[var(--border)] bg-[var(--surface)];
   }
 
   /* Skeleton */
@@ -146,7 +181,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
   /* Glass surface */
   .glass {
-    @apply backdrop-blur-xl bg-white/80 dark:bg-gray-950/80 border border-white/60 dark:border-white/5;
+    @apply backdrop-blur-xl bg-background/75 border-[var(--border)];
   }
 
   /* Fade-up page entry */
@@ -156,8 +191,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
   /* Sidebar nav item active glow */
   .nav-active {
-    background: linear-gradient(135deg, rgba(79,110,247,0.15) 0%, rgba(124,58,237,0.1) 100%);
-    @apply text-blue-600 dark:text-blue-400;
+    @apply bg-foreground/[0.06] text-foreground;
   }
 }
 

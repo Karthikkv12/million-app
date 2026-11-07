@@ -1,33 +1,25 @@
 "use client";
 /**
- * TickerPanel — assembles all GEX sub-sections for a single ticker.
- * TickerPanelWithQuery — wraps TickerPanel with its own react-query data fetch.
+ * TickerPanel — one compact column: search header, key levels, GEX heatmap,
+ * and a Details button that opens every secondary section in a drawer.
+ * TickerPanelWithQuery — wraps TickerPanel with its own react-query fetch.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { PanelRight } from "lucide-react";
 import { fetchGex, GexResult } from "@/lib/api";
-import { BarChart2, Zap, TrendingUp } from "lucide-react";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
-import GexStrikeTable from "@/components/gex/GexStrikeTable";
-import NetFlowPanel from "@/components/gex/NetFlowPanel";
-
 import { PanelHeader } from "./PanelHeader";
-import { GexKeyLevels } from "./GexKeyLevels";
-import { InsightBar } from "./InsightBar";
-import { ExpiryFilter } from "./ExpiryFilter";
-import { PremiumFlow } from "./PremiumFlow";
-import { TopFlowStrikes } from "./TopFlowStrikes";
-import { FlowByExpiry } from "./FlowByExpiry";
-import { KeyLevelsRuler } from "./KeyLevelsRuler";
-import { GexProfileChart } from "./GexProfileChart";
-import { GammaConcentration } from "./GammaConcentration";
-import { DealerNarrative } from "./DealerNarrative";
-import { FlowMomentumChart } from "./FlowMomentumChart";
+import { LevelsStrip } from "./LevelsStrip";
+import { GexHeatmap } from "./GexHeatmap";
+import type { HeatOpts, BoardHandle } from "./GexHeatmap";
+import { DetailsDrawer } from "./DetailsDrawer";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
 export interface Slot {
   ticker: string;
   input: string;
+  /** Kept for compatibility with saved layouts; no longer used by the UI. */
   expiryFilter: string[] | null;
 }
 
@@ -35,61 +27,19 @@ export function makeSlot(ticker: string): Slot {
   return { ticker, input: ticker, expiryFilter: null };
 }
 
-// ── Available strike-depth options ───────────────────────────────────────────
-export const STRIKE_OPTIONS = [10, 20, 30, 40, 50] as const;
+/** Strike-window sizes (backend sends at most 40 strikes around spot). */
+export const STRIKE_OPTIONS = [10, 20, 30, 40] as const;
 
-// ── Panel tabs ────────────────────────────────────────────────────────────────
-type PanelTab = "gex" | "flow";
-const TABS: { id: PanelTab; label: string; icon: typeof Zap }[] = [
-  { id: "gex",  label: "GEX",      icon: Zap       },
-  { id: "flow", label: "Net Flow", icon: TrendingUp },
-];
-
-// ── Strikes depth selector (reusable inside panel header area) ────────────────
-function StrikesSelector({
-  nStrikes,
-  accentColor,
-  onSetNStrikes,
-}: {
-  nStrikes: number;
-  accentColor: string;
-  onSetNStrikes: (n: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[9px] text-foreground uppercase tracking-widest font-semibold hidden sm:block">
-        Strikes
-      </span>
-      <div className="flex items-center bg-[var(--surface)] rounded-lg p-0.5 gap-0.5 border border-[var(--border)]">
-        {STRIKE_OPTIONS.map((n) => (
-          <button
-            key={n}
-            onClick={() => onSetNStrikes(n)}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
-              nStrikes === n
-                ? "text-white"
-                : "text-foreground/60 hover:text-foreground"
-            }`}
-            style={nStrikes === n ? { background: accentColor } : undefined}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── TickerPanel: pure presentational (no data fetching) ──────────────────────
+// ── TickerPanel: presentational ──────────────────────────────────────────────
 export interface TickerPanelProps {
   slot: Slot;
   accentColor: string;
   nStrikes: number;
-  onSetNStrikes: (n: number) => void;
+  heatOpts: HeatOpts;
+  canRemove: boolean;
+  onRemove: () => void;
   onInputChange: (v: string) => void;
   onSelect: (symbol: string) => void;
-  onToggleExpiry: (d: string) => void;
-  onClearExpiry: () => void;
   data: GexResult | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -99,236 +49,84 @@ export interface TickerPanelProps {
 }
 
 export function TickerPanel({
-  slot,
-  accentColor,
-  nStrikes,
-  onSetNStrikes,
-  onInputChange,
-  onSelect,
-  onToggleExpiry,
-  onClearExpiry,
-  data,
-  isLoading,
-  isError,
-  isFetching,
-  onRefresh,
-  dataUpdatedAt,
+  slot, accentColor, nStrikes, heatOpts, canRemove, onRemove, onInputChange, onSelect,
+  data, isLoading, isError, isFetching, onRefresh, dataUpdatedAt,
 }: TickerPanelProps) {
-  const expiryDates: string[] = data
-    ? Array.from(new Set(data.heatmap_expiries ?? [])).sort()
-    : [];
-
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const board = useRef<BoardHandle>(null);
   const lastUpdated = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
-
-  // Derive single selected expiry from the slot's filter array
-  const selectedExpiry = slot.expiryFilter?.[0] ?? null;
-
-  const [activeTab, setActiveTab] = useState<PanelTab>("gex");
+  const apiError = data?.error;
 
   return (
-    <div
-      className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl"
-      style={{
-        boxShadow: `0 0 0 1px ${accentColor}30, 0 8px 32px rgba(0,0,0,0.18)`,
-      }}
+    <section
+      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm"
+      style={{ borderTop: `2px solid ${accentColor}` }}
     >
-      {/* Thick accent gradient bar */}
-      <div
-        className="h-[3px] w-full rounded-t-2xl overflow-hidden"
-        style={{
-          background: `linear-gradient(90deg, ${accentColor}, ${accentColor}55, transparent)`,
-        }}
-      />
-
-      {/* ── Tab selector ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 px-4 pt-2.5 pb-0 border-b border-[var(--border)] bg-[var(--surface-2)]">
-        {TABS.map(({ id, label, icon: Icon }) => {
-          const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold tracking-wide rounded-t-lg border-b-2 transition-all ${
-                active
-                  ? "border-b-[var(--border)] text-foreground bg-[var(--surface)]"
-                  : "border-transparent text-foreground/50 hover:text-foreground/80 hover:bg-[var(--surface)]/50"
-              }`}
-              style={active ? { borderBottomColor: accentColor, color: accentColor } : undefined}
-            >
-              <Icon size={11} strokeWidth={active ? 2.5 : 1.8} />
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search header */}
       <PanelHeader
         inputValue={slot.input}
         accentColor={accentColor}
-        dataSource={data?.data_source}
         isFetching={isFetching}
         lastUpdated={lastUpdated}
+        canRemove={canRemove}
+        onRemove={onRemove}
         onInputChange={onInputChange}
         onSelect={onSelect}
         onRefresh={onRefresh}
       />
 
-      {isLoading && (
-        <div className="p-4">
-          <SkeletonStatGrid count={6} />
-        </div>
-      )}
-      {isError && (
-        <div className="p-4">
-          <ErrorBanner message={`Failed to load GEX for ${slot.ticker}.`} />
-        </div>
+      {isLoading && <div className="p-4"><SkeletonStatGrid count={3} /></div>}
+      {(isError || apiError) && (
+        <div className="p-4"><ErrorBanner message={apiError || `Failed to load GEX for ${slot.ticker}.`} /></div>
       )}
 
-      {data && (
+      {data && !apiError && (
         <>
-          {/* ── GEX Tab ─────────────────────────────────────────────── */}
-          {activeTab === "gex" && (
-            <>
-              {/* Key level cards */}
-              <GexKeyLevels data={data} ticker={slot.ticker} />
-
-              {/* Dealer insight text */}
-              <InsightBar data={data} />
-
-              {/* ★ GEX Strike Heatmap — main money component, first */}
-              {/* GEX Strike Table */}
-              <div className="border-b border-[var(--border)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[var(--surface-2)]">
-                  <div className="flex items-center gap-2">
-                    <BarChart2 size={11} className="text-foreground/60" />
-                    <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
-                      GEX by Strike
-                    </span>
-                    <span
-                      className="text-[9px] font-black px-2 py-0.5 rounded-md ml-1"
-                      style={{
-                        background: `${accentColor}18`,
-                        color: accentColor,
-                        border: `1px solid ${accentColor}30`,
-                      }}
-                    >
-                      {slot.ticker}
-                    </span>
-                  </div>
-                  <StrikesSelector
-                    nStrikes={nStrikes}
-                    accentColor={accentColor}
-                    onSetNStrikes={onSetNStrikes}
-                  />
-                </div>
-                <div className="overflow-x-auto">
-                  <GexStrikeTable
-                    data={data}
-                    nStrikes={nStrikes}
-                    expiryFilter={slot.expiryFilter}
-                    accentColor={accentColor}
-                  />
-                </div>
-              </div>
-
-              {/* Expiry picker */}
-              <ExpiryFilter
-                expiryDates={expiryDates}
-                selectedExpiry={selectedExpiry}
-                accentColor={accentColor}
-                onSelect={(d) => onToggleExpiry(d)}
-                onClear={onClearExpiry}
-              />
-
-              {/* Key levels ruler */}
-              <KeyLevelsRuler data={data} />
-
-              {/* GEX profile chart */}
-              <GexProfileChart data={data} accentColor={accentColor} />
-
-              {/* Gamma concentration */}
-              <GammaConcentration data={data} />
-
-              {/* Premium flow P/C */}
-              <PremiumFlow data={data} />
-
-              {/* Top flow strikes */}
-              <TopFlowStrikes data={data} />
-
-              {/* Flow by expiry */}
-              <FlowByExpiry data={data} />
-
-              {/* Dealer narrative */}
-              <DealerNarrative data={data} />
-            </>
-          )}
-
-          {/* ── Net Flow Tab ─────────────────────────────────────────── */}
-          {activeTab === "flow" && (
-            <>
-              <div className="p-4">
-                <NetFlowPanel data={data} accentColor={accentColor} />
-              </div>
-              <FlowMomentumChart symbol={slot.ticker} accentColor={accentColor} />
-            </>
-          )}
+          <LevelsStrip data={data} />
+          <div className="flex items-center gap-1 border-b border-[var(--border)] px-3 py-1.5 text-[11px]">
+            <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
+            <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+          </div>
+          <GexHeatmap ref={board} data={data} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
+          <button
+            onClick={() => setDetailsOpen(true)}
+            className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-3 py-2.5 text-[11px] font-bold text-foreground/70 transition hover:bg-[var(--surface-2)] hover:text-foreground"
+          >
+            <PanelRight size={13} /> Details: levels, premium &amp; net flow
+          </button>
+          <DetailsDrawer
+            open={detailsOpen}
+            onClose={() => setDetailsOpen(false)}
+            data={data}
+            ticker={slot.ticker}
+            accentColor={accentColor}
+          />
         </>
       )}
-    </div>
+    </section>
   );
 }
 
 // ── TickerPanelWithQuery: owns its own react-query fetch ──────────────────────
-export interface TickerPanelWithQueryProps {
-  slot: Slot;
-  accentColor: string;
-  nStrikes: number;
-  onSetNStrikes: (n: number) => void;
-  enabled: boolean;
-  onInputChange: (v: string) => void;
-  onSelect: (symbol: string) => void;
-  onToggleExpiry: (d: string) => void;
-  onClearExpiry: () => void;
-}
+export type TickerPanelWithQueryProps = Omit<
+  TickerPanelProps,
+  "data" | "isLoading" | "isError" | "isFetching" | "onRefresh" | "dataUpdatedAt"
+>;
 
-export function TickerPanelWithQuery({
-  slot,
-  accentColor,
-  nStrikes,
-  onSetNStrikes,
-  enabled,
-  onInputChange,
-  onSelect,
-  onToggleExpiry,
-  onClearExpiry,
-}: TickerPanelWithQueryProps) {
-  const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } =
-    useQuery<GexResult>({
-      queryKey: ["gex", slot.ticker],
-      queryFn: () => fetchGex(slot.ticker),
-      staleTime: 10_000,
-      refetchInterval: 10_000,
-      refetchIntervalInBackground: false,
-      enabled,
-    });
+export function TickerPanelWithQuery(props: TickerPanelWithQueryProps) {
+  const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useQuery<GexResult>({
+    queryKey: ["gex", props.slot.ticker],
+    queryFn: () => fetchGex(props.slot.ticker),
+    staleTime: 30_000,
+    // Yahoo data is ~15 min delayed, so polling every 10s only burns rate limit
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
 
   return (
     <TickerPanel
-      slot={slot}
-      accentColor={accentColor}
-      nStrikes={nStrikes}
-      onSetNStrikes={onSetNStrikes}
-      onInputChange={onInputChange}
-      onSelect={onSelect}
-      onToggleExpiry={onToggleExpiry}
-      onClearExpiry={onClearExpiry}
+      {...props}
       data={data}
       isLoading={isLoading}
       isError={isError}

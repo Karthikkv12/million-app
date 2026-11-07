@@ -138,15 +138,6 @@ const FEATURES = [
     tag: "Market Overview",
     tagColor: "bg-blue-500/15 text-blue-400",
   },
-  {
-    icon: "💳",
-    title: "Budget & Spending",
-    desc: "Income vs expenses separated. CC charges, recurring bills, category cards, and savings rate.",
-    color: "from-orange-500/20 to-orange-600/5",
-    border: "border-orange-500/30",
-    tag: "Finance",
-    tagColor: "bg-orange-500/15 text-orange-400",
-  },
 ];
 
 const STATS = [
@@ -234,8 +225,8 @@ function Hero() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}>
-          OptionFlow is a full-stack trading analytics platform — options flow, weekly covered call portfolio,
-          sector heatmaps, trade journaling, budget tracking, and AI-powered portfolio analysis in one place.
+          OptionFlow is a full-stack trading analytics platform — options flow, GEX and dealer positioning,
+          sector heatmaps, live market breadth, and an AI assistant in one place.
         </motion.p>
 
         {/* CTAs */}
@@ -526,193 +517,6 @@ function HeatmapHighlight() {
   );
 }
 
-function WeeklyPortfolioHighlight() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-  return (
-    <section className="py-24 px-5 bg-white/[0.015] border-y border-white/5" ref={ref}>
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        {/* Left: text */}
-        <motion.div
-          initial={{ opacity: 0, x: -40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3">📈 Weekly Options Portfolio</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-5">
-            Know your real yield,<br />not just the premium
-          </h2>
-          <p className="text-white/60 text-base leading-relaxed mb-8">
-            Most traders only see the premium collected this week. OptionFlow shows you
-            the <span className="text-white/90 font-semibold">effective premium</span> — your true economic
-            gain per share if called away, accounting for every dollar collected since you bought the stock.
-          </p>
-          <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-5 py-4 mb-6 font-mono text-sm">
-            <p className="text-white/50 text-xs uppercase tracking-widest mb-2">Formula</p>
-            <p className="text-violet-300 font-bold">Eff Prem = (strike − avg cost) + pre-collected</p>
-            <p className="text-white/40 text-xs mt-1">× contracts × 100 shares</p>
-          </div>
-          <ul className="space-y-3">
-            {[
-              "Weekly position tracker with roll & carry-forward support",
-              "Moneyness: ITM / ATM / OTM from live spot price",
-              "Intrinsic & extrinsic value computed per position",
-              "Premium ledger tracks every dollar collected per holding",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-white/80">
-                <span className="mt-0.5 text-violet-400 shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-
-        {/* Right: mock portfolio card */}
-        <motion.div
-          className="relative rounded-2xl border border-violet-500/20 bg-[#0f1018] p-5 shadow-2xl"
-          initial={{ opacity: 0, x: 40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}>
-          {/* Window chrome */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-              </div>
-              <span className="text-[10px] text-white/50 ml-1 font-mono">optionflow · weekly portfolio · Week 9</span>
-            </div>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 font-bold tracking-wide">Mar 2026</span>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {[
-              { label: "Eff Prem",    value: "$2,340",  color: "text-violet-400", bg: "bg-violet-500/10" },
-              { label: "Premium In",  value: "$1,180",  color: "text-emerald-400", bg: "bg-emerald-500/10" },
-              { label: "Positions",   value: "4 active", color: "text-white/80",  bg: "bg-white/5" },
-            ].map(({ label, value, color, bg }) => (
-              <div key={label} className={`${bg} rounded-lg p-2 text-center`}>
-                <p className="text-[8px] text-white/50 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className={`text-xs font-black ${color}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Position rows */}
-          <div className="space-y-1.5 mb-3">
-            <div className="grid text-[8px] text-white/40 uppercase tracking-widest px-1 mb-1" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr" }}>
-              <span>Symbol</span><span className="text-center">Strike</span><span className="text-center">Prem</span><span className="text-center">Eff Prem</span><span className="text-center">Status</span>
-            </div>
-            {[
-              { sym: "AAPL", strike: "$210", prem: "$2.40", eff: "$18.20", status: "OTM",  sc: "text-green-400",  sb: "bg-green-500/10" },
-              { sym: "MSFT", strike: "$420", prem: "$3.10", eff: "$31.50", status: "OTM",  sc: "text-green-400",  sb: "bg-green-500/10" },
-              { sym: "NVDA", strike: "$135", prem: "$4.80", eff: "$12.80", status: "ATM",  sc: "text-amber-400",  sb: "bg-amber-500/10" },
-              { sym: "TSLA", strike: "$280", prem: "$6.20", eff: "$8.40",  status: "ITM",  sc: "text-red-400",    sb: "bg-red-500/10"   },
-            ].map((p) => (
-              <div key={p.sym} className="grid items-center bg-white/[0.03] rounded-lg px-3 py-2" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr" }}>
-                <span className="text-[10px] font-bold text-white">{p.sym}</span>
-                <span className="text-[10px] text-white/70 text-center">{p.strike}</span>
-                <span className="text-[10px] text-emerald-400 text-center">{p.prem}</span>
-                <span className="text-[10px] text-violet-400 font-bold text-center">{p.eff}</span>
-                <span className={`text-[8px] font-bold text-center px-1.5 py-0.5 rounded-full ${p.sb} ${p.sc}`}>{p.status}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-[8px] text-white/30 text-right">Eff Prem = (strike − avg cost) + pre-collected / share</p>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function BudgetHighlight() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-  return (
-    <section className="py-24 px-5" ref={ref}>
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        {/* Left: mock budget card */}
-        <motion.div
-          className="rounded-2xl border border-orange-500/20 bg-[#0f1018] p-5 shadow-2xl order-2 lg:order-1"
-          initial={{ opacity: 0, x: -40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-mono text-white/50">Budget · March 2026</span>
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 font-bold">v1.8</span>
-          </div>
-          {/* Stat cards */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {[
-              { label: "Income",   value: "$8,400",  color: "text-emerald-400", bg: "bg-emerald-500/10" },
-              { label: "Expenses", value: "$3,210",  color: "text-red-400",     bg: "bg-red-500/10"     },
-              { label: "Savings",  value: "61.8%",   color: "text-amber-400",   bg: "bg-amber-500/10"   },
-            ].map(({ label, value, color, bg }) => (
-              <div key={label} className={`${bg} rounded-lg p-2 text-center`}>
-                <p className="text-[8px] text-white/50 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className={`text-xs font-black ${color}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-          {/* Category bars */}
-          <div className="space-y-2">
-            {[
-              { cat: "Rent",       spent: 1500, budget: 1500, color: "#f59e0b" },
-              { cat: "Groceries",  spent: 420,  budget: 500,  color: "#22c55e" },
-              { cat: "Dining",     spent: 310,  budget: 300,  color: "#ef4444" },
-              { cat: "Transport",  spent: 180,  budget: 250,  color: "#22c55e" },
-              { cat: "CC Charges", spent: 640,  budget: 700,  color: "#a78bfa" },
-            ].map(({ cat, spent, budget, color }) => (
-              <div key={cat}>
-                <div className="flex justify-between text-[9px] text-white/60 mb-1">
-                  <span>{cat}</span>
-                  <span style={{ color }}>${spent} <span className="text-white/30">/ ${budget}</span></span>
-                </div>
-                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${Math.min((spent/budget)*100, 100)}%`, background: color + "cc" }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Right: text */}
-        <motion.div
-          className="order-1 lg:order-2"
-          initial={{ opacity: 0, x: 40 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3">💳 Budget & Spending</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-5">
-            Your full financial<br />picture, not just trades
-          </h2>
-          <p className="text-white/60 text-base leading-relaxed mb-8">
-            Income and expenses are tracked separately. Credit card charges, Robinhood Gold,
-            recurring bills — everything flows into a clean monthly dashboard with savings rate
-            and category-level annual breakdowns.
-          </p>
-          <ul className="space-y-3">
-            {[
-              "Income separated from expenses — no bleed-through",
-              "Credit card charges tracked as a dedicated expense bucket",
-              "Recurring entries with end-date dropdowns (no invisible Safari inputs)",
-              "Category annual cards with monthly bar charts",
-              "Savings rate widget — income minus all real costs",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-white/80">
-                <span className="mt-0.5 text-orange-400 shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
 function CTA() {
   return (
     <section className="py-24 px-5">
@@ -729,7 +533,7 @@ function CTA() {
               Ready to trade with edge?
             </h2>
             <p className="text-white/60 mb-8 text-base">
-              Sign up free. No credit card required. Start tracking your trades and options flow in minutes.
+              Sign up free. No credit card required. Start reading options flow in minutes.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/login"
@@ -754,7 +558,7 @@ function Footer() {
           <span className="font-black text-white text-sm">Option<span className="text-amber-400">Flow</span></span>
           <span className="text-white/50 text-xs ml-2">© 2026</span>
         </div>
-        <p className="text-xs text-white/50">Options Flow · Weekly Portfolio · Trade Journal · Budget · AI Assistant · Market Intelligence</p>
+        <p className="text-xs text-white/50">Options Flow · GEX · AI Assistant · Market Intelligence</p>
       </div>
     </footer>
   );
@@ -772,8 +576,6 @@ export default function LandingPage() {
         <Features />
         <Highlight />
         <HeatmapHighlight />
-        <WeeklyPortfolioHighlight />
-        <BudgetHighlight />
         <CTA />
       </main>
       <Footer />

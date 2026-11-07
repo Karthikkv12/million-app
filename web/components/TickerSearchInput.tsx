@@ -56,8 +56,9 @@ export default function TickerSearchInput({
   const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef   = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
-  // Set to true the moment user picks something; cleared when they type a new char
-  const closedRef      = useRef(false);
+  // Set to true the moment user picks something; cleared when they type a new char.
+  // Starts true so a pre-filled value (e.g. a saved ticker) doesn't pop the dropdown on load.
+  const closedRef      = useRef(true);
 
   const closeDropdown = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
