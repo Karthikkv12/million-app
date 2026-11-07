@@ -58,7 +58,7 @@ if _active_db not in _DOMAIN_MAP:
 _pg_schema, target_metadata = _DOMAIN_MAP[_active_db]
 
 # ── SQLite fallback URLs (used when DATABASE_URL is not set) ──────────────────
-_DB_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_DB_ROOT = os.getenv("DB_DIR") or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _SQLITE_URLS = {
     "users":     f"sqlite:///{_DB_ROOT}/users.db",
     "trades":    f"sqlite:///{_DB_ROOT}/trades.db",

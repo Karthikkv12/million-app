@@ -5,6 +5,8 @@ back through main.py.
 """
 from __future__ import annotations
 
+import os
+
 import logging
 import re
 import sqlite3 as _sqlite3
@@ -35,7 +37,8 @@ _backfilled: set[tuple[str, int]] = set()
 _backfill_lock = threading.Lock()
 
 # ── Flow snapshot DB ──────────────────────────────────────────────────────────
-_FLOW_DB = _Path(__file__).parent.parent / "markets.db"
+# Respect DB_DIR (e.g. a mounted volume in production) like database.models does.
+_FLOW_DB = _Path(os.getenv("DB_DIR") or _Path(__file__).parent.parent) / "markets.db"
 _flow_db_initialised = False
 _flow_db_init_lock = threading.Lock()
 
