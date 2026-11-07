@@ -22,7 +22,7 @@ const ROWS: { strike: number; vals: number[] }[] = [
   { strike: 575, vals: [ -88, -205,  -95,  -58,  -27] },
 ];
 
-export function SampleBoard({ compact = false, className }: { compact?: boolean; className?: string }) {
+export function SampleBoard({ compact = false, bare = false, className }: { compact?: boolean; bare?: boolean; className?: string }) {
   const vmax = Math.max(...ROWS.flatMap((r) => r.vals.map(Math.abs)));
   // Phones always get 3 expiries; wider screens get all 5 unless compact.
   const cols = compact ? 3 : EXPIRIES.length;
@@ -31,8 +31,9 @@ export function SampleBoard({ compact = false, className }: { compact?: boolean;
     : "grid [grid-template-columns:60px_repeat(3,minmax(0,1fr))] sm:[grid-template-columns:64px_repeat(5,minmax(0,1fr))]";
   const colCls = (i: number) => (i >= 3 ? "hidden sm:block" : "");
   return (
-    <div className={clsx("overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)]", className)}>
+    <div className={clsx("overflow-hidden bg-[var(--surface)]", !bare && "rounded-2xl border border-[var(--border)] shadow-[var(--shadow-float)]", className)}>
       {/* window chrome */}
+      <div className={clsx(bare && "hidden")}>
       <div className="grid grid-cols-[52px_minmax(0,1fr)_52px] items-center border-b border-[var(--border)] px-4 py-2.5">
         <div className="flex gap-1.5" aria-hidden>
           <span className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
@@ -43,6 +44,7 @@ export function SampleBoard({ compact = false, className }: { compact?: boolean;
           OptionFlow / Flow / SPY
         </span>
         <span />
+      </div>
       </div>
 
       {/* levels strip */}
