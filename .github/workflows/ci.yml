@@ -25,7 +25,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run full test suite
-        working-directory: OptionFlow_V1
         run: |
           python -m pytest tests/ -v --tb=short \
             --ignore=tests/test_gex_live.py
@@ -36,7 +35,6 @@ jobs:
           JWT_ISSUER: "optionflow-api"
 
       - name: Coverage report
-        working-directory: OptionFlow_V1
         run: |
           pip install pytest-cov -q
           python -m pytest tests/ -q --tb=no \
@@ -70,7 +68,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: GEX symbol sweep (all UI symbols, mocked)
-        working-directory: OptionFlow_V1
         run: |
           python -m pytest tests/test_gex_symbols.py tests/test_api_gex.py \
             -v --tb=short
@@ -81,7 +78,6 @@ jobs:
           JWT_ISSUER: "optionflow-api"
 
       - name: Verify no test is skipped or xfailed
-        working-directory: OptionFlow_V1
         run: |
           python -m pytest tests/ -q --tb=line \
             --ignore=tests/test_gex_live.py \

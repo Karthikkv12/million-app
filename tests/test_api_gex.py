@@ -132,7 +132,10 @@ def mock_gex(monkeypatch):
     # compute_gamma_exposure is imported inside the endpoint via
     # `from logic.gamma import compute_gamma_exposure`, so patch at the source.
     monkeypatch.setattr(gmod, "compute_gamma_exposure", _fake_compute)
-    monkeypatch.setattr("backend_api.main._gex_cache", {})
+    # The GEX cache lives in backend_api.state and is imported by reference into
+    # the markets router, so clear the shared dict rather than rebinding it.
+    from backend_api import state
+    state._gex_cache.clear()
 
 
 # ---------------------------------------------------------------------------
