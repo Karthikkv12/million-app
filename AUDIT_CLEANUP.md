@@ -68,6 +68,29 @@ This file tracks all remnant references to the old project names (`million-app`,
 
 ---
 
+## ☁️ TODO — Move optflw.com to Railway (Shelved 2026-11-07)
+> Code is ready in PR #4 (`claude/wonderful-turing-dd9y4e` → `develop`, CI green).
+> Nothing is deployed yet. Until then optflw.com runs on the MacBook via the Cloudflare tunnel.
+
+**Done (in PR #4):** Dockerfile + `railway.json` (backend, SQLite on a `/data` volume),
+`web/railway.json` (frontend), `/restore-db` upload endpoint + `scripts/upload_dbs.sh`,
+`docs/RAILWAY.md` guide, `scripts/setup_mac_server.sh`, CI fix.
+
+**To resume:**
+- [ ] Merge PR #4 into `develop`
+- [ ] Create Railway account (Hobby, ~$5/mo) and follow `docs/RAILWAY.md` steps 1–3
+- [ ] Upload DBs from the Mac with `scripts/upload_dbs.sh`, then delete `RESTORE_TOKEN`
+- [ ] Point optflw.com DNS at Railway, delete the Cloudflare tunnel, retire the Mac
+- [ ] Remove or disable `.github/workflows/deploy-backend.yml` (AWS; fails on push to `main`)
+
+**Security — do regardless of hosting:**
+- [ ] Make the GitHub repo private (`main` history has `.env`, all `*.db` files, admin password)
+- [ ] Rotate Tradier token and OpenAI key (committed in `.env` on `main`)
+- [ ] Refresh the Cloudflare tunnel token (pasted in chat)
+- [ ] Change the app admin password; remove it from `AGENT_CONTEXT.md`
+
+---
+
 ## 🚀 SaaS Migration Roadmap (Shelved — budget pending)
 > Brainstorm list. No action until explicitly decided.
 
