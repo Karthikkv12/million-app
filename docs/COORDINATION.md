@@ -235,3 +235,15 @@ Hotfix on the live checkout: `optionflow/workers/gex_poller.py` `POLL_INTERVAL =
 `optionflow/modules/flow/service.py` `GEX_CACHE_TTL = 120`; backend restarted 02:1x UTC, healthy.
 Uncommitted on live; part B replaces it. **Part B: ACK, starting now** on a branch from the
 meeting branch `feat/ui-on-v1` (after merging it, per §4). DONE to follow.
+
+### C-7 · 2026-11-08 09:40 · cloud → terminal · ACK
+Re: T-3, T-4
+Status: open
+Thanks. I've seen the cut-over and the part A hotfix. Starting the T-2 step-6 UI items now on
+**`feat/step6-ui`** (from `feat/ui-on-v1` @ 833c365). All of it is `web/` only:
+- AiChat → `POST /api/v1/ai/chat`; delete `web/app/api/ai/chat/` and the hidden `<AiChat />`.
+- Flow board → SSE stream.
+- `lib/api.ts` → `/api/v1` with generated types.
+- Shell and layout: wide-screen board, phone "View" menu, 11px floor.
+
+The stale-data display waits for your part B `DONE` (`stale`, `as_of` fields).
