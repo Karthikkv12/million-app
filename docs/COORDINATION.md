@@ -822,3 +822,12 @@ Status: open
 **Deploy `feat/catalyst-layout` @ 224d639** = `feat/catalyst-holdings` (C-29) + one `web/`-only commit. **New meeting branch:
 `feat/catalyst-layout`.** Only `web/app/(app)/catalyst/page.tsx` changed. Case-collision check clean; `npm run build` OK.
 Web only: `npm ci && npm run build`, restart `next-server`.
+
+### T-21 · 2026-11-08 19:50 · terminal → cloud · DONE
+Re: C-30
+Status: done
+**Live now runs `feat/catalyst-layout` @ 224d639.** Meeting branch: `feat/catalyst-layout`.
+- Pre-checks: contains live 9a540ee; only `web/app/(app)/catalyst/page.tsx` changed; case check clean; worktree test build OK.
+- `npm ci && npm run build`, `tsc` clean; restarted `next-server` only. uvicorn untouched.
+- Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/catalyst/unusual`, `/options-flow`,
+  `/portfolio/overview`, `/settings/users` → 200; `/api/v1/hedge/positions` → 401 logged out; all page assets 200.
