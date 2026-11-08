@@ -6,7 +6,7 @@
  *  - A readout bar follows the cursor; click the chart to pin a moment and the readout shows
  *    the change from the pin to the cursor. Drag the brush under the chart to zoom.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -36,6 +36,7 @@ const when = (ts: string, days: number) => {
 
 export function FlowMomentumChart({ symbol }: Props) {
   const [days, setDays] = useState<Day>(1);
+  const [picked, setPicked] = useState(false);          // the user chose a range: don't auto-widen
   const [mode, setMode] = useState<Mode>("since");
   const [on, setOn] = useState<Record<Key, boolean>>({ call: true, put: true, net: true, price: true });
   const [hover, setHover] = useState<number | null>(null);
@@ -48,6 +49,14 @@ export function FlowMomentumChart({ symbol }: Props) {
     staleTime: 30_000,
     refetchInterval: 30_000,
   });
+
+  // No snapshots in the window (weekend, before the open)? Widen to the last session automatically.
+  useEffect(() => {
+    if (picked || isLoading || snaps.length >= 2) return;
+    const next = DAYS.find((d) => d > days);
+    if (next) setDays(next);
+  }, [picked, isLoading, snaps.length, days]);
+  const widened = !picked && days > 1 && snaps.length >= 2;
 
   const rows = useMemo(() => {
     if (!snaps.length) return [];
@@ -85,16 +94,19 @@ export function FlowMomentumChart({ symbol }: Props) {
         <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">Through the day</h3>
         <div className="flex items-center gap-4">
           <div className="flex">{seg<Mode>("since", mode, setMode, "Since start")}{seg<Mode>("total", mode, setMode, "Totals")}</div>
-          <div className="flex">{DAYS.map((d) => seg<Day>(d, days, (x) => { setDays(x); setPin(null); setHover(null); }, `${d}D`))}</div>
+          <div className="flex">{DAYS.map((d) => seg<Day>(d, days, (x) => { setPicked(true); setDays(x); setPin(null); setHover(null); }, `${d}D`))}</div>
         </div>
       </div>
 
-      {isLoading ? (
+      {widened && (
+        <p className="mb-2 font-mono text-[11px] text-amber-700 dark:text-amber-300">No flow yet today (market closed); showing the last {days} days.</p>
+      )}
+      {isLoading || (!picked && snaps.length < 2 && days < 14) ? (
         <div className="skeleton h-48" />
       ) : rows.length < 2 ? (
         <div className="flex h-48 flex-col items-center justify-center gap-2 text-foreground/50">
           <Clock size={20} className="opacity-40" />
-          <p className="text-[13px]">Flow history builds up while the market is open.</p>
+          <p className="text-[13px]">No flow history for this ticker in the last {days} days. It builds up while the market is open.</p>
         </div>
       ) : (
         <>

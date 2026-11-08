@@ -214,7 +214,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
       <table className="w-full border-separate border-spacing-0 font-mono text-[11px] tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-[var(--border-strong)] bg-[var(--background)] py-2 pl-3 pr-2 text-left text-[10px] font-medium text-foreground/45">
+            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-[var(--border-strong)] bg-[var(--background)] py-2 pl-3 pr-2 shadow-[1px_0_0_var(--border-strong)] text-left text-[10px] font-medium text-foreground/45">
               Strike
             </th>
             <th className="sticky top-0 z-20 min-w-[84px] border-b border-l border-[var(--background)] bg-[var(--background)] px-2 py-1.5 text-right">
@@ -240,7 +240,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
             const spotLine = isSpot ? "inset 0 -2px 0 rgb(var(--foreground-rgb) / 0.9)" : undefined;
             return (
               <tr key={strike} data-strike={strike}>
-                <td className={`sticky left-0 z-10 border-b border-[var(--border)] py-[5px] pl-3 pr-2 ${isSpot ? "bg-foreground/[0.06]" : "bg-[var(--background)]"}`}>
+                <td className={`sticky left-0 z-10 border-b border-[var(--border)] py-[5px] pl-3 pr-2 shadow-[1px_0_0_var(--border-strong)] ${isSpot ? "bg-[color-mix(in_srgb,rgb(var(--foreground-rgb))_8%,var(--background))]" : "bg-[var(--background)]"}`}>
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className={isSpot ? "font-medium text-foreground" : "text-foreground/65"}>{fmtStrike(strike)}</span>
                     {isSpot && (

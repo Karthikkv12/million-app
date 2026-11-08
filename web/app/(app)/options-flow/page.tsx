@@ -157,8 +157,8 @@ export default function OptionsFlowPage() {
       </div>
 
       {/* ── Ticker columns ──────────────────────────────────────────────── */}
-      <div className="pb-10 sm:px-4">
-        <div className={`grid divide-y divide-[var(--border-strong)] lg:divide-x lg:divide-y-0 ${gridClass}`}>
+      <div className="pb-10 pt-2 sm:px-4">
+        <div className={`grid gap-y-8 lg:gap-x-0 ${gridClass} [&>*]:min-w-0 max-lg:[&>*+*]:border-t-2 max-lg:[&>*+*]:border-[var(--border-strong)] max-lg:[&>*+*]:pt-2 lg:[&>*+*]:border-l-2 lg:[&>*+*]:border-[var(--border-strong)] lg:[&>*]:px-3`}>
           {slots.map((slot, i) => (
             <TickerPanelWithQuery
               key={slot.ticker + i}

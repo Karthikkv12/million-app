@@ -12,9 +12,9 @@ function pct(level: number | null | undefined, spot: number): string {
 }
 const money = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(v % 1 === 0 ? 0 : 2));
 
-function Fig({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+function Fig({ label, value, sub, tone, className }: { label: string; value: string; sub?: string; tone?: string; className?: string }) {
   return (
-    <div className="min-w-0 py-0.5 pr-3 [&:not(:first-child)]:pl-3">
+    <div className={clsx("min-w-0 px-3 py-0.5 first:pl-0", className)}>
       <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-foreground/45">{label}</p>
       <p className={clsx("truncate font-mono text-[15px] font-medium tabular-nums leading-tight", tone ?? "text-foreground")}>{value}</p>
       {sub && <p className="font-mono text-[10.5px] tabular-nums text-foreground/45">{sub}</p>}
@@ -39,12 +39,10 @@ export function LevelsStrip({ data, metric = "gex" }: { data: GexResult; metric?
         <Fig label="Flip" value={money(zero_gamma)} sub={pct(zero_gamma, spot)} tone="text-accent" />
         <Fig label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-gain" />
         <Fig label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-loss" />
-        <div className="hidden sm:block"><Fig label="★ King" value={money(max_gex_strike)} sub={pct(max_gex_strike, spot)} tone="text-[#b45309] dark:text-[#fde725]" /></div>
-        <div className="hidden sm:block">
-          {metric === "vex"
-            ? <Fig label="Net VEX" value={fmtGex(data.net_vex)} sub="per 1 vol pt" tone={(data.net_vex ?? 0) >= 0 ? "text-gain" : "text-loss"} />
-            : <Fig label="Net GEX" value={fmtGex(net_gex)} sub="per 1% move" tone={longGamma ? "text-gain" : "text-loss"} />}
-        </div>
+        <Fig className="hidden sm:block" label="★ King" value={money(max_gex_strike)} sub={pct(max_gex_strike, spot)} tone="text-[#b45309] dark:text-[#fde725]" />
+        {metric === "vex"
+          ? <Fig className="hidden sm:block" label="Net VEX" value={fmtGex(data.net_vex)} sub="per 1 vol pt" tone={(data.net_vex ?? 0) >= 0 ? "text-gain" : "text-loss"} />
+          : <Fig className="hidden sm:block" label="Net GEX" value={fmtGex(net_gex)} sub="per 1% move" tone={longGamma ? "text-gain" : "text-loss"} />}
       </div>
     </div>
   );
