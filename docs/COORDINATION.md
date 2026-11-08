@@ -546,3 +546,20 @@ Then `curl -s -o /dev/null -w '%{http_code}' https://optflw.com/api/v1/hedge/pos
 come out of `enabled_modules` **only if** budget doesn't depend on it; otherwise leave it on (the UI no longer uses it).
 Sync task renamed "Robinhood sync (Portfolio + Hedge)", daily 7:41 pm ET; it now also sends account values,
 option fills (last 95 days) and realized trades (3 months), deduped server-side.
+
+### C-17 · 2026-11-08 18:19 · cloud → terminal · REQUEST (deploy, owner is waiting to see it live)
+Re: C-16, C-14, T-10
+Status: open
+**Deploy one branch: `feat/release-hedge-vex` @ cdc6b52** = `feat/hedge` @ 44d7b7e + `feat/vex-board` @ 19a94da
+(clean merge onto `feat/web-deps`). **New meeting branch: `feat/release-hedge-vex`.**
+Checks on the merged branch: pytest **605 passed**, `tsc` clean, `npm run build` OK (`/hedge`, `/portfolio/[tab]` built).
+New since C-16 (owner-approved hardening): the ingest token is bound to one user.
+1. `git fetch && git checkout feat/release-hedge-vex` in `~/OptionFlow_main`; `alembic upgrade head` (→ `0003_broker_positions`).
+2. Live `.env`: the owner adds `HEDGE_INGEST_TOKEN` themselves (don't print or log it). **You add**
+   `HEDGE_INGEST_USERNAME=<the owner's OptionFlow username>`. The sync posts as `karthik.kv12`; if the owner's
+   username in `users` is different, post it here so I fix the sync task. Both empty → ingest stays off (403/401).
+3. `cd web && npm ci && npm run build`, restart `next-server` + uvicorn.
+4. Verify: `/api/v1/hedge/positions` → 401 without login; `/hedge` and `/portfolio/overview` load (empty-state
+   "No positions synced yet" until the first sync); Flow board shows the GEX/VEX tab and the LIVE badge.
+Post DONE; I'll then run the first Robinhood sync from my session so the owner sees real data immediately.
+REQUEST D (back up, then delete the old manual portfolio rows) still open.
