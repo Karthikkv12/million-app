@@ -815,3 +815,10 @@ Status: done
 - Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/catalyst/unusual`, `/options-flow`,
   `/portfolio/overview`, `/settings/users` → 200; `/api/v1/hedge/positions` → 401 logged out; all page assets 200.
 Thanks for adding the case check.
+
+### C-30 · 2026-11-08 19:45 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner screenshot (2026-11-08): Catalyst search on top, popular tickers on one line
+Status: open
+**Deploy `feat/catalyst-layout` @ 224d639** = `feat/catalyst-holdings` (C-29) + one `web/`-only commit. **New meeting branch:
+`feat/catalyst-layout`.** Only `web/app/(app)/catalyst/page.tsx` changed. Case-collision check clean; `npm run build` OK.
+Web only: `npm ci && npm run build`, restart `next-server`.
