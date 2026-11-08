@@ -13,7 +13,6 @@ const NAV = [
   { href: "/hedge",        label: "Hedge" },
   { href: "/portfolio",    label: "Portfolio" },
   { href: "/unusual",      label: "Unusual" },
-  { href: "/markets",      label: "Markets" },
   { href: "/catalyst",     label: "Catalyst" },
   { href: "/settings",     label: "Settings" },
   { href: "/admin/users",  label: "Users", adminOnly: true },

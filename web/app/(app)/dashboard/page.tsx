@@ -2,7 +2,7 @@
 /**
  * Dashboard — the morning desk (owner, 2026-11-08: no cards, more usable, US only).
  * Tape · your book · what to do (hedge signals, expiring options) · SPY dealer map ·
- * movers in your holdings · US market pulse. The economic calendar lives on /catalyst.
+ * movers in your holdings · US market pulse · sectors (the old Markets page). The economic calendar lives on /catalyst.
  */
 import { useState } from "react";
 import Link from "next/link";
@@ -16,6 +16,7 @@ import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchHedgeBooks, Bro
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Tag } from "@/components/desk";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { Quote, useQuotes } from "@/components/dashboard/quotes";
+import { Sectors } from "@/components/dashboard/Sectors";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const signed = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${usd(v, d)}`);
@@ -56,7 +57,7 @@ function Tape({ quotes }: { quotes?: Record<string, Quote> }) {
         {TAPE.map((s) => {
           const q = quotes?.[s];
           return (
-            <Link key={s} href={s.startsWith("^") || s.includes("=") || s.includes("-") || s.includes(".") ? "/markets" : `/stocks/${s}`}
+            <Link key={s} href={`/stocks/${encodeURIComponent(s)}`}
               className="flex items-baseline gap-2 px-4 py-2.5 font-mono text-[12.5px] tabular-nums first:pl-0 hover:bg-foreground/[0.03]">
               <span className="text-foreground/50">{LABEL[s]?.label ?? s}</span>
               <span className="text-foreground">{q?.price != null ? fmtPx(s, q.price) : "—"}</span>
@@ -214,7 +215,7 @@ export default function DashboardPage() {
           </DeskSection>
 
           {/* ── Market pulse (US) ───────────────────────────────────── */}
-          <DeskSection label="Market pulse" className="lg:grid-cols-1" meta={<Link href="/markets" className="text-accent">Markets →</Link>}>
+          <DeskSection label="Market pulse" className="lg:grid-cols-1" meta="US · live">
             <div className="grid gap-5">
               {PULSE.map((grp) => (
                 <div key={grp.group}>
@@ -236,8 +237,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <DeskSection id="sectors" label="Sectors" meta={<>Ranked by today&apos;s move.<br />Tap a sector for its stocks, sized by market cap.</>}>
+        <Sectors />
+      </DeskSection>
+
       <nav className="mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-strong)] pt-5 font-mono text-[12px] uppercase tracking-[0.14em]">
-        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst · calendar"], ["/unusual", "Unusual"], ["/markets", "Markets"]].map(([href, l]) => (
+        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst · calendar"], ["/unusual", "Unusual"]].map(([href, l]) => (
           <Link key={href} href={href} className="inline-flex items-center gap-1 text-foreground/60 hover:text-foreground">{l}<ArrowUpRight size={12} /></Link>
         ))}
       </nav>

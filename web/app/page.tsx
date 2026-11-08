@@ -216,10 +216,10 @@ function Product() {
           visual={<RegimeCard />}
         />
         <Feature
-          eyebrow="Markets"
+          eyebrow="Dashboard"
           title="Then zoom out to the whole tape."
-          body="Sector heatmaps sized by market cap show where money is moving, next to volatility and the economic calendar."
-          points={["Tiles sized by market cap", "VIX and sector ETFs on the same page", "The day's economic events on the dashboard"]}
+          body="Sectors ranked by today's move open into heatmaps sized by market cap, next to VIX, rates, the dollar and your own book."
+          points={["Sector ETFs ranked, each with its stocks", "Indexes, futures, VIX, 10Y and dollar on one screen", "US economic calendar on the Catalyst page"]}
           visual={<SectorTiles />}
         />
       </Container>

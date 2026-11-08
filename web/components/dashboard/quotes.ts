@@ -5,11 +5,15 @@ export interface Quote { symbol: string; price: number | null; prev_close: numbe
 
 async function fetchQuotes(symbols: string[]): Promise<Record<string, Quote>> {
   const out: Record<string, Quote> = {};
-  for (let i = 0; i < symbols.length; i += 20) {
-    const res = await fetch(`/api/v1/market/quotes?symbols=${encodeURIComponent(symbols.slice(i, i + 20).join(","))}`, { cache: "no-store" });
+  const batches: string[][] = [];
+  for (let i = 0; i < symbols.length; i += 20) batches.push(symbols.slice(i, i + 20));
+  const results = await Promise.allSettled(batches.map(async (b) => {
+    const res = await fetch(`/api/v1/market/quotes?symbols=${encodeURIComponent(b.join(","))}`, { cache: "no-store" });
     if (!res.ok) throw new Error("Quote fetch failed");
-    for (const r of (await res.json()) as Quote[]) out[r.symbol] = r;
-  }
+    return (await res.json()) as Quote[];
+  }));
+  for (const r of results) if (r.status === "fulfilled") for (const q of r.value) out[q.symbol] = q;
+  if (!Object.keys(out).length) throw new Error("Quote fetch failed");
   return out;
 }
 
