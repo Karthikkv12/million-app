@@ -443,3 +443,20 @@ class PriceSnapshot(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 Index("ux_price_snapshots_symbol_date", PriceSnapshot.symbol, PriceSnapshot.date, unique=True)
+
+
+class GexSnapshot(Base):
+    """GEX replay: at most one snapshot per symbol every 5 minutes (flow.history)."""
+    __tablename__ = "gex_snapshots"
+    id         = Column(Integer, primary_key=True)
+    symbol     = Column(String, nullable=False)
+    ts         = Column(String, nullable=False)            # ISO UTC, "…Z"
+    spot       = Column(Float, nullable=False)
+    net_gex    = Column(Float, nullable=True)
+    zero_gamma = Column(Float, nullable=True)
+    call_wall  = Column(Float, nullable=True)
+    put_wall   = Column(Float, nullable=True)
+    king       = Column(Float, nullable=True)
+    profile    = Column(Text, nullable=False, default="[]")  # JSON [[strike, net_gex], …] near spot
+
+Index("idx_gex_snap_sym_ts", GexSnapshot.symbol, GexSnapshot.ts)

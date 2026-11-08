@@ -13,7 +13,7 @@ What it does
      depends on them), saving every removed row to <target>.dropped.json.
   5. Verifies: integrity check, no foreign-key violations, and for every table
      the target equals the source row for row, except the dropped rows.
-  6. Stamps the Alembic baseline revision.
+  6. Stamps the Alembic head revision (the schema it created).
 On any failure the half-written target is deleted.
 """
 from __future__ import annotations
@@ -30,14 +30,14 @@ sys.path.insert(0, str(ROOT))
 SOURCES = ["users", "trades", "portfolio", "budget", "markets"]
 
 
-def baseline_revision() -> str:
-    """Revision id of the single baseline migration in alembic/versions."""
-    import re
-    files = sorted((ROOT / "alembic" / "versions").glob("*.py"))
-    revs = [m.group(1) for f in files if (m := re.search(r'^revision(?::\s*str)?\s*=\s*["\']([^"\']+)', f.read_text(), re.M))]
-    if len(revs) != 1:
-        raise SystemExit(f"expected exactly one Alembic baseline revision, found {revs}")
-    return revs[0]
+def head_revision() -> str:
+    """The Alembic head: the new database is created at the current schema."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    heads = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_heads()
+    if len(heads) != 1:
+        raise SystemExit(f"expected one Alembic head, found {heads}")
+    return heads[0]
 
 
 def _cols(con: sqlite3.Connection, schema: str, table: str) -> list[str]:
@@ -68,7 +68,7 @@ def merge(source_dir: Path, target: Path, drop_orphans: bool) -> dict:
 def _merge(source_dir: Path, target: Path, drop_orphans: bool) -> dict:
     from sqlalchemy import create_engine
     from database.models import Base
-    BASELINE_REVISION = baseline_revision()
+    BASELINE_REVISION = head_revision()
 
     missing = [s for s in SOURCES if not (source_dir / f"{s}.db").exists()]
     if missing:

@@ -30,13 +30,16 @@ Read this before starting a step, and keep to your own lane.
 | `logic/unusual.py` | `modules/flow/unusual_service.py`, or a `modules/unusual/` module; Yahoo calls through the market-data provider | Same thresholds, 5-minute cache, `scan()` signature |
 | `backend_api/routers/unusual.py` | Router of that module | `GET /unusual?symbols=&min_premium=&type=`, also under `/api/v1` |
 | `tests/test_unusual.py` | `tests/unusual/` | All 3 tests |
+| `logic/gex_history.py` | `modules/flow/` (replay repo + service); table `gex_snapshots` into the one-database schema in step 5 | 5-minute throttle, `record()` never raises |
+| `backend_api/routers/gex_history.py` | Router of the flow module | `GET /gex-history/{symbol}?on=YYYY-MM-DD` |
+| `tests/test_gex_history.py` | `tests/flow/` | All 4 tests |
 | `web/lib/api.ts`: `gex_by_strike`, `call_gex_by_strike`, `put_gex_by_strike` are now `number[]` | Typed response schema for gamma-exposure | They are arrays aligned with `strikes`, not dicts |
 
 ## Coming next from the cloud session (in this order)
 1. ~~Catalyst page~~ (done)
 2. ~~Unusual activity scanner~~ (done)
-3. **Price chart with GEX levels:** UI only, on the stock page.
-4. **GEX replay:** reads the existing snapshots. Adds one read-only route.
+3. ~~Price chart with GEX levels~~ (done; `/stocks/[symbol]` page restored)
+4. ~~GEX replay~~ (done)
 5. **Watchlist alerts:** needs a new table. **Waits until the terminal finishes step 5
    (one database)**, so the table goes into the new schema and not into five files.
 
@@ -69,6 +72,17 @@ first, under "Requests":
   tests in `tests/unusual/`.
 - **Step 7 backend ready (branch `chore/step7-backend`):** `portfolio` and `budget` are
   **on by default** now (`ENABLED_MODULES`), so their screens can be built.
+
+- **Step 5 (one database) is DONE** — PR #10 (`chore/one-database`). **Watchlist
+  alerts can go ahead.** One schema in `database/models.py`, Alembic head
+  `0002_gex_snapshots`. New tables: add the model + `alembic revision --autogenerate`
+  (terminal lane; ask under Requests and the terminal adds it, or add it on your branch
+  and note it here). The live site still runs on the five old files until the cut-over
+  (`scripts/merge_databases.py`), which waits on the owner.
+- **GEX replay hand-off done:** `logic/gex_history.py` → `optionflow/modules/flow/history.py`
+  (same function names, 5-minute throttle, `record()` never raises), table
+  `gex_snapshots` in the one-database schema (migration `0002`), router
+  `GET /gex-history/{symbol}?on=YYYY-MM-DD` (+ `/api/v1`), all 4 tests in `tests/flow/`.
 
 ## Step 7 hand-off: Portfolio and Money screens (cloud builds the UI)
 Every route is under `/api/v1/…` (legacy paths too), bearer auth, and typed in
@@ -116,3 +130,10 @@ Symbols, Watchlist) and `web/components/budget/*`.
   4. Plan step 6 UI items: the shell, the 11px type floor, the wide-screen layout.
   5. `web/components/gex/NetFlowPanel.stable.tsx` was deleted (plan Drop list;
      nothing imports it). Don't re-add it.
+- **Cloud → terminal (already applied, please keep):** one line in
+  `backend_api/state.py` `background_poller()`, right after the gex cache is updated:
+  `gex_history.record(result)`. When the poller moves to `workers/gex_poller.py` in
+  step 3, keep that call there.
+  - **Done (terminal, 2026-11-08):** `optionflow/workers/gex_poller.py` → `poll_once()`
+    calls `history.record(result)` right after each refresh; a test
+    (`tests/flow/test_gex_history.py::test_poller_records_replay_snapshot`) keeps it there.

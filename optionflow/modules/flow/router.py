@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List
+from datetime import date
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
+from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
-from optionflow.modules.flow import service
-from optionflow.modules.flow.schemas import GexOut, NetFlowPoint, WatchRequest
+from optionflow.modules.flow import history, service
+from optionflow.modules.flow.schemas import GexDayOut, GexOut, NetFlowPoint, WatchRequest
 from optionflow.workers import backfill
 
 router = APIRouter(prefix="/options", tags=["flow"])
 stream_router = APIRouter(prefix="/flow", tags=["flow"])
+history_router = APIRouter(prefix="/gex-history", tags=["flow"])
 
 
 @router.get("/gamma-exposure/{symbol}", response_model=GexOut)
@@ -70,3 +73,14 @@ async def gex_stream(
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@history_router.get("/{symbol}", response_model=GexDayOut)
+def gex_day(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
+            _user=Depends(get_current_user)) -> GexDayOut:
+    """GEX replay: one day of 5-minute snapshots."""
+    try:
+        d = date.fromisoformat(on) if on else None
+    except ValueError:
+        raise errors.BadRequest("Use YYYY-MM-DD for 'on'")
+    return history.day(symbol, d)
