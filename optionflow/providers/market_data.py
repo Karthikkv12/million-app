@@ -1,9 +1,11 @@
 """optionflow/providers/market_data.py — the market-data interface.
 
 Every quote, search result, price bar and option chain the app uses comes
-through `get_market_data()`. Yahoo Finance serves everything by default. With
-PUBLIC_API_SECRET set, option chains (GEX) come from Public.com first and fall
-back to Yahoo (`ChainFallbackMarketData`); everything else stays on Yahoo.
+through `get_market_data()`. With PUBLIC_API_SECRET set (the normal setup),
+Public.com is the default for option chains (GEX/VEX heatmaps) and prices
+(quote, last_price, last_prices, quotes_batch), falling back to Yahoo per call
+or per symbol (`PublicFirstMarketData`). Search, company data, price history
+and catalysts are Yahoo's. Without the secret, Yahoo serves everything.
 
 Tests install a fake with `use_market_data(fake)`.
 """
@@ -65,28 +67,81 @@ def get_market_data() -> MarketDataProvider:
         from optionflow.core.settings import get_settings
         s = get_settings()
         if s.public_api_secret:
-            from optionflow.providers.public import PublicClient, PublicOptionChains
+            from optionflow.providers.public import PublicClient, PublicOptionChains, PublicQuotes
             client = PublicClient(s.public_api_secret, s.public_account_id)
-            _default = ChainFallbackMarketData(PublicOptionChains(client), _default)
+            _default = PublicFirstMarketData(PublicOptionChains(client), _default, PublicQuotes(client))
     return _default
 
 
-class ChainFallbackMarketData:
-    """Option chains from `chains` (Public.com), falling back to `fallback` (Yahoo).
+class PublicFirstMarketData:
+    """Public.com first, Yahoo (`fallback`) when Public fails or can't serve a symbol.
 
-    Every other method, and `gate` (the Yahoo back-off that catalysts and the
-    scanner check), is the fallback's.
+    - `option_chain` from `chains` (PublicOptionChains).
+    - `quote`, `last_price`, `last_prices`, `quotes_batch` from `quotes` (PublicQuotes), when given.
+    Every other method (search, stock_info, watchlist_row fundamentals, price_history,
+    raw_ticker, …) and `gate` (the Yahoo back-off that catalysts and the scanner check)
+    are the fallback's.
     """
 
-    def __init__(self, chains: Any, fallback: Any):
+    def __init__(self, chains: Any, fallback: Any, quotes: Any = None):
         self.chains = chains
         self.fallback = fallback
+        self.quotes = quotes
         self.name = f"{chains.name}+{fallback.name}"
         self.gate = getattr(fallback, "gate", None)
         self._warned = False
+        self._quotes_warned = False
 
-    def __getattr__(self, attr: str) -> Any:     # search, quote, price_history, raw_ticker, …
+    def __getattr__(self, attr: str) -> Any:     # search, stock_info, price_history, raw_ticker, …
         return getattr(self.fallback, attr)
+
+    # ── prices: Public first ──────────────────────────────────────────────────
+    def _public_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        if self.quotes is None or not symbols:
+            return {}
+        try:
+            got = self.quotes.quotes(symbols)
+        except Exception as exc:                  # auth, 429, outage: Yahoo for this call
+            if not self._quotes_warned:
+                _log.warning("%s quotes failed (%s); using %s", self.quotes.name, exc, self.fallback.name)
+                self._quotes_warned = True
+            return {}
+        if self._quotes_warned:
+            _log.info("%s quotes working again", self.quotes.name)
+            self._quotes_warned = False
+        return got
+
+    def quotes_batch(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """{SYMBOL: {symbol, price, prev_close, change, change_pct, volume}} for the symbols Public
+        priced, in one request. Missing symbols are left out: the caller decides on a fallback."""
+        return self._public_quotes(symbols)
+
+    def quote(self, symbol: str) -> Dict[str, Any]:
+        q = self._public_quotes([symbol]).get(symbol.strip().upper())
+        if q is not None:
+            return {k: q[k] for k in ("price", "prev_close", "change", "change_pct")} | {"symbol": symbol}
+        return self.fallback.quote(symbol)
+
+    def last_price(self, symbol: str) -> Optional[float]:
+        q = self._public_quotes([symbol]).get(symbol.strip().upper())
+        return q["price"] if q is not None else self.fallback.last_price(symbol)
+
+    def last_prices(self, symbols: List[str]) -> Dict[str, float]:
+        """{symbol: price}: one Public request for all of them; Yahoo for any Public missed."""
+        got = self._public_quotes(symbols)
+        out: Dict[str, float] = {}
+        for sym in symbols:
+            q = got.get(sym.strip().upper())
+            if q is not None:
+                out[sym] = q["price"]
+                continue
+            try:
+                p = self.fallback.last_price(sym)
+            except Exception:
+                p = None
+            if p:
+                out[sym] = p
+        return out
 
     def chains_blocked(self) -> bool:
         """True only when neither source can serve a chain right now."""
@@ -121,6 +176,9 @@ class ChainFallbackMarketData:
                 f"try again in about {minutes} min",
             ) from exc
         return chain if chain.source else chain._replace(source=self.fallback.name)
+
+
+ChainFallbackMarketData = PublicFirstMarketData     # old name (tests, imports)
 
 
 def use_market_data(provider: Optional[MarketDataProvider]) -> None:

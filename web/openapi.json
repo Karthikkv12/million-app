@@ -3754,6 +3754,17 @@
       "title": "Heatmap Values",
       "type": "array"
      },
+     "heatmap_vex_values": {
+      "default": [],
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Heatmap Vex Values",
+      "type": "array"
+     },
      "max_call_wall": {
       "anyOf": [
        {
@@ -3795,6 +3806,11 @@
      "net_gex": {
       "default": 0.0,
       "title": "Net Gex",
+      "type": "number"
+     },
+     "net_vex": {
+      "default": 0.0,
+      "title": "Net Vex",
       "type": "number"
      },
      "put_gex_by_strike": {

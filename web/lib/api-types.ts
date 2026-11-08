@@ -2674,6 +2674,11 @@ export interface components {
              * @default []
              */
             heatmap_values: number[][];
+            /**
+             * Heatmap Vex Values
+             * @default []
+             */
+            heatmap_vex_values: number[][];
             /** Max Call Wall */
             max_call_wall?: number | null;
             /** Max Gex Strike */
@@ -2690,6 +2695,11 @@ export interface components {
              * @default 0
              */
             net_gex: number;
+            /**
+             * Net Vex
+             * @default 0
+             */
+            net_vex: number;
             /**
              * Put Gex By Strike
              * @default []
