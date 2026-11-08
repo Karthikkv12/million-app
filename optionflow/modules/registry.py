@@ -50,6 +50,11 @@ def _unusual() -> List[APIRouter]:
     return [router]
 
 
+def _hedge() -> List[APIRouter]:
+    from optionflow.modules.hedge.router import router, stream_router
+    return [router, stream_router]
+
+
 def _ai() -> List[APIRouter]:
     from optionflow.modules.ai.router import router
     return [router]
@@ -65,4 +70,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "ai": _ai,                 # off by default; the chat UI is hidden for now
     "portfolio": _portfolio,
     "budget": _budget,
+    "hedge": _hedge,
 }

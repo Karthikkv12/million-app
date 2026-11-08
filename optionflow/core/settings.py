@@ -72,7 +72,9 @@ class Settings(BaseSettings):
     public_account_id: Optional[str] = None     # default: first options-enabled BROKERAGE account
 
     # ── Feature modules (used from plan step 4) ─────────────────────────────
-    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget"
+    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget,hedge"
+    # Shared secret for POST /hedge/ingest (broker sync). Empty = ingest disabled.
+    hedge_ingest_token: str = ""
 
     # ── Derived values ───────────────────────────────────────────────────────
     @property

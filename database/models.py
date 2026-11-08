@@ -460,3 +460,28 @@ class GexSnapshot(Base):
     profile    = Column(Text, nullable=False, default="[]")  # JSON [[strike, net_gex], …] near spot
 
 Index("idx_gex_snap_sym_ts", GexSnapshot.symbol, GexSnapshot.ts)
+
+
+class BrokerPosition(Base):
+    """Positions synced from a broker (Robinhood) for the hedge module.
+
+    Replaced wholesale per (user, source) on each sync; never edited by hand.
+    quantity is signed: long > 0, short < 0 (shares for stock, contracts for options).
+    avg_price is per share (option premium per share, always >= 0).
+    """
+    __tablename__ = "broker_positions"
+    id          = Column(Integer, primary_key=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source      = Column(String, nullable=False, default="robinhood")
+    account     = Column(String, nullable=True)                 # masked label, e.g. "Trading ••8453"
+    symbol      = Column(String, nullable=False, index=True)
+    kind        = Column(String, nullable=False)                # "stock" | "option"
+    quantity    = Column(Float, nullable=False)
+    avg_price   = Column(Float, nullable=True)
+    option_type = Column(String, nullable=True)                 # "call" | "put"
+    strike      = Column(Float, nullable=True)
+    expiry      = Column(String, nullable=True)                 # YYYY-MM-DD
+    multiplier  = Column(Float, nullable=False, default=100.0)
+    opened_at   = Column(String, nullable=True)                 # ISO UTC
+    synced_at   = Column(String, nullable=False)                # ISO UTC
+

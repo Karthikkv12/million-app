@@ -1,0 +1,72 @@
+"""optionflow/modules/hedge/router.py — /hedge: synced positions, live books, 1-second stream, ingest."""
+from __future__ import annotations
+
+import asyncio
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
+
+from optionflow.core.deps import get_current_user, get_current_user_for_stream
+from optionflow.modules.auth import service as auth_service
+from optionflow.modules.hedge import service
+from optionflow.modules.hedge.schemas import BooksOut, BrokerPositionOut, IngestOut, IngestRequest
+
+router = APIRouter(prefix="/hedge", tags=["hedge"])
+stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
+
+
+@router.post("/ingest", response_model=IngestOut)
+def ingest(body: IngestRequest, x_hedge_ingest_token: Optional[str] = Header(None)) -> IngestOut:
+    """Replace a user's broker positions (daily broker sync). Auth: X-Hedge-Ingest-Token."""
+    if not service.check_ingest_token(x_hedge_ingest_token):
+        raise HTTPException(status_code=401, detail="Bad or missing ingest token")
+    user = auth_service.get_user_by_username(body.username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Unknown user")
+    for p in body.positions:
+        if p.kind == "option" and (p.option_type is None or p.strike is None or p.expiry is None):
+            raise HTTPException(status_code=422, detail=f"{p.symbol}: options need option_type, strike and expiry")
+    rows = [p.model_dump() for p in body.positions]
+    for r in rows:
+        r["symbol"] = r["symbol"].strip().upper()
+    count, synced = service.replace_positions(int(user.id), body.source, rows)
+    return IngestOut(count=count, synced_at=synced)
+
+
+@router.get("/positions", response_model=List[BrokerPositionOut])
+def positions(user=Depends(get_current_user)) -> List[BrokerPositionOut]:
+    """Positions from the last broker sync."""
+    return [BrokerPositionOut(**p) for p in service.list_positions(int(user["sub"]))]
+
+
+@router.get("/books", response_model=BooksOut)
+def books(user=Depends(get_current_user)) -> BooksOut:
+    """Net delta / gamma, IV vs HV and the delta-neutral suggestion for every holding."""
+    return BooksOut(**service.books_for(int(user["sub"])))
+
+
+@stream_router.get("/stream", response_class=StreamingResponse)
+async def stream(
+    request: Request,
+    interval: float = Query(default=1.0, ge=1.0, le=60.0, description="Seconds between updates"),
+    limit: int = Query(default=0, ge=0, description="Stop after this many events (0 = until the client leaves)"),
+    user=Depends(get_current_user_for_stream),
+) -> StreamingResponse:
+    """Server-Sent Events: a `books` event (same body as GET /hedge/books) every `interval` seconds."""
+    uid = int(user["sub"])
+
+    async def events():
+        yield "retry: 3000\n\n"
+        sent = 0
+        while not await request.is_disconnected():
+            data = await run_in_threadpool(service.books_for, uid)
+            yield f"event: books\ndata: {BooksOut(**data).model_dump_json()}\n\n"
+            sent += 1
+            if limit and sent >= limit:
+                return
+            await asyncio.sleep(interval)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

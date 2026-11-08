@@ -546,6 +546,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Books
+         * @description Net delta / gamma, IV vs HV and the delta-neutral suggestion for every holding.
+         */
+        get: operations["books_api_v1_hedge_books_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest
+         * @description Replace a user's broker positions (daily broker sync). Auth: X-Hedge-Ingest-Token.
+         */
+        post: operations["ingest_api_v1_hedge_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Positions
+         * @description Positions from the last broker sync.
+         */
+        get: operations["positions_api_v1_hedge_positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream
+         * @description Server-Sent Events: a `books` event (same body as GET /hedge/books) every `interval` seconds.
+         */
+        get: operations["stream_api_v1_hedge_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/holdings/{holding_id}": {
         parameters: {
             query?: never;
@@ -1678,6 +1758,67 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** BookOut */
+        BookOut: {
+            /**
+             * Accounts
+             * @default []
+             */
+            accounts: string[];
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Chain Source */
+            chain_source?: string | null;
+            /** Day Change */
+            day_change?: number | null;
+            /** Day High */
+            day_high?: number | null;
+            /** Dollar Gamma 1Pct */
+            dollar_gamma_1pct?: number | null;
+            /** Error */
+            error?: string | null;
+            /** Gap */
+            gap?: number | null;
+            iv?: components["schemas"]["IvOut"] | null;
+            /** Iv Hv */
+            iv_hv?: number | null;
+            /**
+             * Legs
+             * @default []
+             */
+            legs: components["schemas"]["LegOut"][];
+            levels?: components["schemas"]["LevelsOut"] | null;
+            /** Lots */
+            lots?: number | null;
+            /** Net Delta */
+            net_delta?: number | null;
+            /** Net Gamma */
+            net_gamma?: number | null;
+            /** Prev Close */
+            prev_close?: number | null;
+            /** Regime */
+            regime?: ("bull" | "high-vol") | null;
+            /** Shares */
+            shares?: number | null;
+            /** Spot */
+            spot?: number | null;
+            suggestion?: components["schemas"]["SuggestionOut"] | null;
+            /** Symbol */
+            symbol: string;
+            /** Target Delta */
+            target_delta?: number | null;
+            /** Weekly Expiry */
+            weekly_expiry?: string | null;
+        };
+        /** BooksOut */
+        BooksOut: {
+            /** As Of */
+            as_of: string;
+            /** Books */
+            books: components["schemas"]["BookOut"][];
+            /** Synced At */
+            synced_at?: string | null;
+        };
         /** BrokerAccountCreateRequest */
         BrokerAccountCreateRequest: {
             /** Color */
@@ -1715,6 +1856,50 @@ export interface components {
             name?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /** BrokerPositionOut */
+        BrokerPositionOut: {
+            /**
+             * Account
+             * @description Masked label, e.g. "Trading ••8453". Never a full account number.
+             */
+            account?: string | null;
+            /**
+             * Avg Price
+             * @description Per share; option premium per share
+             */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "option";
+            /**
+             * Multiplier
+             * @default 100
+             */
+            multiplier: number;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /**
+             * Quantity
+             * @description Signed: long > 0, short < 0 (shares or contracts)
+             */
+            quantity: number;
+            /** Source */
+            source: string;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Synced At */
+            synced_at: string;
         };
         /** BudgetCreateRequest */
         BudgetCreateRequest: {
@@ -2302,6 +2487,93 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** IngestOut */
+        IngestOut: {
+            /** Count */
+            count: number;
+            /** Synced At */
+            synced_at: string;
+        };
+        /** IngestPosition */
+        IngestPosition: {
+            /**
+             * Account
+             * @description Masked label, e.g. "Trading ••8453". Never a full account number.
+             */
+            account?: string | null;
+            /**
+             * Avg Price
+             * @description Per share; option premium per share
+             */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "option";
+            /**
+             * Multiplier
+             * @default 100
+             */
+            multiplier: number;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /**
+             * Quantity
+             * @description Signed: long > 0, short < 0 (shares or contracts)
+             */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** IngestRequest */
+        IngestRequest: {
+            /** Positions */
+            positions: components["schemas"]["IngestPosition"][];
+            /**
+             * Source
+             * @default robinhood
+             * @constant
+             */
+            source: "robinhood";
+            /** Username */
+            username: string;
+        };
+        /** IvOut */
+        IvOut: {
+            /** Atm Iv */
+            atm_iv?: number | null;
+            /**
+             * Cooling
+             * @default false
+             */
+            cooling: boolean;
+            /** Hv10 */
+            hv10?: number | null;
+            /** Hv20 */
+            hv20?: number | null;
+            /** Hv60 */
+            hv60?: number | null;
+            /** Iv High */
+            iv_high?: number | null;
+            /** Iv Open */
+            iv_open?: number | null;
+            /** Iv Roc 15M */
+            iv_roc_15m?: number | null;
+            /** Iv Roc Day */
+            iv_roc_day?: number | null;
+            /**
+             * Spike
+             * @default false
+             */
+            spike: boolean;
+        };
         /** LedgerEntryOut */
         LedgerEntryOut: {
             /** Created At */
@@ -2340,6 +2612,46 @@ export interface components {
             currency?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** LegOut */
+        LegOut: {
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Delta */
+            delta: number;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Gamma */
+            gamma: number;
+            /** Iv */
+            iv?: number | null;
+            /** Kind */
+            kind: string;
+            /** Otype */
+            otype?: string | null;
+            /** Position Delta */
+            position_delta: number;
+            /** Position Gamma */
+            position_gamma: number;
+            /** Quantity */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+        };
+        /** LevelsOut */
+        LevelsOut: {
+            /** Call Wall */
+            call_wall?: number | null;
+            /** King */
+            king?: number | null;
+            /** Net Gex */
+            net_gex?: number | null;
+            /** Put Wall */
+            put_wall?: number | null;
+            /** Zero Gamma */
+            zero_gamma?: number | null;
         };
         /** LiveQuoteOut */
         LiveQuoteOut: {
@@ -3016,6 +3328,47 @@ export interface components {
             week_52_high?: number | null;
             /** Week 52 Low */
             week_52_low?: number | null;
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "SELL_CALL" | "SELL_PUT" | "BUY_PUT" | "HOLD" | "WAIT" | "TRACK";
+            /**
+             * Contracts
+             * @default 0
+             */
+            contracts: number;
+            /** Credit */
+            credit?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Headline */
+            headline: string;
+            /** Locked Gain */
+            locked_gain?: number | null;
+            /** Net Delta After */
+            net_delta_after?: number | null;
+            /** Option Delta */
+            option_delta?: number | null;
+            /** Otype */
+            otype?: string | null;
+            /** Premium */
+            premium?: number | null;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Strike */
+            strike?: number | null;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
@@ -4612,6 +4965,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    books_api_v1_hedge_books_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BooksOut"];
+                };
+            };
+        };
+    };
+    ingest_api_v1_hedge_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hedge-ingest-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    positions_api_v1_hedge_positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerPositionOut"][];
+                };
+            };
+        };
+    };
+    stream_api_v1_hedge_stream_get: {
+        parameters: {
+            query?: {
+                /** @description Seconds between updates */
+                interval?: number;
+                /** @description Stop after this many events (0 = until the client leaves) */
+                limit?: number;
+                /** @description For EventSource, which can't send headers */
+                access_token?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
