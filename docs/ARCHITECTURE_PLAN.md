@@ -26,7 +26,7 @@ This is a snapshot.
 
 | Step | State | Branch / PR |
 |---|---|---|
-| 0. Owner: secrets, private repo, 2FA | **Not confirmed.** Nothing in the log says the keys or the admin password were replaced | owner |
+| 0. Owner: secrets, private repo, 2FA | **In progress.** Leaked Tradier and OpenAI keys are dead (owner, 2026-11-08). Still open: repo private (it is public), admin password, Cloudflare tunnel token, secret scanning, two-factor login | owner |
 | 1. Land heatmaps, drop list, one accent | Done, not merged | [PR #5](https://github.com/Karthikkv12/million-app/pull/5) |
 | 2. Core | Done, not merged | [PR #6](https://github.com/Karthikkv12/million-app/pull/6) |
 | 3. Providers and flow | Done, not merged | [PR #7](https://github.com/Karthikkv12/million-app/pull/7) |
@@ -214,7 +214,7 @@ Tag `develop` as **`pre-new-build`** before deleting anything.
 
 | Layer | Today | Target | Step |
 |---|---|---|---|
-| Secrets | **Leaked:** `.env` (Tradier and OpenAI keys), all `*.db` files and the admin password are in the public repo history | Repo private; new keys and password; secrets only in host variables and `core/settings.py`; GitHub secret scanning with push protection | 0 · 2 |
+| Secrets | **Leaked:** `.env` (Tradier and OpenAI keys — both now dead), all `*.db` files and the admin password are in the public repo history | Repo private; new password; secrets only in host variables and `core/settings.py`; GitHub secret scanning with push protection | 0 · 2 |
 | Login | Refresh rotation, PBKDF2, login rate limit, auth events and session revoke are built. Tokens are in `localStorage` | Two-factor login (TOTP or passkeys); httpOnly cookies on the web; Keychain or Keystore in the app | 6 · 8 |
 | Permissions | Every query is filtered by `user_id`; `test_auth_and_isolation.py` | An isolation test in every module; admin checks on the server only | 4 |
 | Front door | Backend hidden behind Next.js; CORS defaults to `*`; `/market/quotes` has no auth; `/restore-db` exists | CORS = optflw.com only; every route requires auth or a rate limit; CSP and HSTS headers; remove `/restore-db` | 2 · 4 |
@@ -224,9 +224,10 @@ Tag `develop` as **`pre-new-build`** before deleting anything.
 | Watching | Auth events recorded; no alerts | Sentry, uptime checks, new-device login alerts, a one-page leak plan | 6 |
 | Accounts | Unknown | Two-factor login on GitHub, Cloudflare, Railway and the registrar; separate dev and prod data; pen test before outside users | 0 · 7 |
 
-**Step 0 is for the owner, not the agent:** make the repo private; replace the Tradier
-and OpenAI keys, the admin password and the Cloudflare tunnel token; turn on secret
+**Step 0 is for the owner, not the agent:** make the repo private; replace the admin
+password and the Cloudflare tunnel token; turn on secret
 scanning with push protection; enable two-factor login on GitHub, Cloudflare and Railway.
+(The leaked Tradier and OpenAI keys are already dead — confirmed by the owner on 2026-11-08.)
 
 Agent rules from here on: never commit `.env`, `*.db` or tokens; never print secrets
 in logs or chat; ask before changing anything in GitHub, Cloudflare or Railway settings.
