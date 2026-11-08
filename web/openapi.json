@@ -8587,6 +8587,72 @@
     ]
    }
   },
+  "/api/v1/flow/{symbol}/replay": {
+   "get": {
+    "description": "A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted).",
+    "operationId": "gex_replay_api_v1_flow__symbol__replay_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "on",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "On"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Gex Replay Api V1 Flow  Symbol  Replay Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Gex Replay",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
   "/api/v1/flow/{symbol}/stream": {
    "get": {
     "description": "Server-Sent Events: a `gex` event (same body as gamma-exposure) whenever GEX changes.\n\nKeeps the symbol watched while connected, so the poller keeps it fresh.\nBetween changes it sends `: keepalive` comments.",
@@ -11038,6 +11104,92 @@
     "summary": "Stock Info",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/unusual": {
+   "get": {
+    "description": "Contracts trading far above open interest with large premium (delayed chain snapshots).",
+    "operationId": "unusual_api_v1_unusual_get",
+    "parameters": [
+     {
+      "description": "Comma-separated tickers; default universe if empty",
+      "in": "query",
+      "name": "symbols",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated tickers; default universe if empty",
+       "title": "Symbols"
+      }
+     },
+     {
+      "in": "query",
+      "name": "min_premium",
+      "required": false,
+      "schema": {
+       "default": 100000,
+       "maximum": 50000000,
+       "minimum": 10000,
+       "title": "Min Premium",
+       "type": "number"
+      }
+     },
+     {
+      "in": "query",
+      "name": "type",
+      "required": false,
+      "schema": {
+       "default": "all",
+       "enum": [
+        "all",
+        "call",
+        "put"
+       ],
+       "title": "Type",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Unusual Api V1 Unusual Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unusual",
+    "tags": [
+     "unusual"
     ]
    }
   },

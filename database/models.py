@@ -430,6 +430,20 @@ class NetFlowSnapshot(Base):
     total_prem = Column(Float, nullable=True)
     volume     = Column(Integer, nullable=True)
 
+class GexSnapshot(Base):
+    """GEX levels through the session, for replay (one row per symbol every ~5 min)."""
+    __tablename__ = "gex_snapshots"
+    id         = Column(Integer, primary_key=True)
+    symbol     = Column(String, nullable=False, index=True)
+    ts         = Column(String, nullable=False, index=True)   # UTC, "YYYY-MM-DDTHH:MM:SSZ"
+    spot       = Column(Float, nullable=False)
+    net_gex    = Column(Float, nullable=True)
+    zero_gamma = Column(Float, nullable=True)
+    call_wall  = Column(Float, nullable=True)
+    put_wall   = Column(Float, nullable=True)
+    king       = Column(Float, nullable=True)
+    profile    = Column(Text, nullable=False, default="[]")   # JSON [[strike, net_gex], ...]
+
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"
     id         = Column(Integer, primary_key=True)

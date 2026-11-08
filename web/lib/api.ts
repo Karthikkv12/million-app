@@ -900,3 +900,20 @@ export interface Catalysts {
   as_of: string; source: string;
 }
 export const fetchCatalysts = (symbol: string) => api.get<Catalysts>(`/catalyst/${encodeURIComponent(symbol)}`);
+
+// ── Unusual options activity ─────────────────────────────────────────────────
+export interface UnusualRow {
+  symbol: string; type: "call" | "put"; strike: number; expiry: string; dte: number;
+  spot: number | null; otm_pct: number | null; last: number | null; bid: number | null; ask: number | null;
+  side: "ask" | "bid" | "mid" | "unknown"; volume: number; open_interest: number; vol_oi: number | null;
+  iv_pct: number | null; premium: number; score: number;
+}
+export interface UnusualScan { rows: UnusualRow[]; count: number; symbols: string[]; call_premium: number; put_premium: number; as_of: string; source: string }
+export const fetchUnusual = (opts: { symbols?: string[]; minPremium?: number; type?: "all" | "call" | "put" } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.symbols?.length) q.set("symbols", opts.symbols.join(","));
+  if (opts.minPremium) q.set("min_premium", String(opts.minPremium));
+  if (opts.type && opts.type !== "all") q.set("type", opts.type);
+  const qs = q.toString();
+  return api.get<UnusualScan>(`/unusual${qs ? `?${qs}` : ""}`);
+};

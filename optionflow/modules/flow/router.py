@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
+from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.flow import service
 from optionflow.modules.flow.schemas import GexOut, NetFlowPoint, WatchRequest
@@ -70,3 +71,15 @@ async def gex_stream(
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@stream_router.get("/{symbol}/replay")
+def gex_replay(symbol: str, on: Optional[str] = None, _user=Depends(get_current_user)) -> Dict[str, Any]:
+    """A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted)."""
+    from datetime import date as _date
+    from optionflow.modules.flow import replay
+    try:
+        d = _date.fromisoformat(on) if on else None
+    except ValueError:
+        raise errors.BadRequest("Use YYYY-MM-DD for 'on'")
+    return replay.day(symbol, d)

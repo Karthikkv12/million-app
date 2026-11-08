@@ -12,6 +12,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from optionflow.modules.flow import replay
 from optionflow.modules.flow import repo
 from optionflow.modules.flow.gamma import GEXResult, compute_gamma_exposure
 
@@ -43,6 +44,7 @@ def refresh_gex(symbol: str) -> GEXResult:
     """Compute GEX now, cache it, and record a flow snapshot."""
     result = compute_and_cache(symbol)
     record_snapshot(result)
+    replay.record(result)   # GEX replay snapshots (throttled, never raises)
     return result
 
 

@@ -31,13 +31,24 @@ SOURCES = ["users", "trades", "portfolio", "budget", "markets"]
 
 
 def baseline_revision() -> str:
-    """Revision id of the single baseline migration in alembic/versions."""
+    """Revision id to stamp: the single head of alembic/versions.
+
+    The new database is built with Base.metadata.create_all (every current
+    model), so it already matches the newest migration, not just the baseline.
+    """
     import re
     files = sorted((ROOT / "alembic" / "versions").glob("*.py"))
-    revs = [m.group(1) for f in files if (m := re.search(r'^revision(?::\s*str)?\s*=\s*["\']([^"\']+)', f.read_text(), re.M))]
-    if len(revs) != 1:
-        raise SystemExit(f"expected exactly one Alembic baseline revision, found {revs}")
-    return revs[0]
+    revs, downs = [], set()
+    for f in files:
+        text = f.read_text()
+        if (m := re.search(r'^revision(?::\s*str)?\s*=\s*["\']([^"\']+)', text, re.M)):
+            revs.append(m.group(1))
+        if (d := re.search(r'^down_revision(?:[^=]*)=\s*["\']([^"\']+)', text, re.M)):
+            downs.add(d.group(1))
+    heads = [r for r in revs if r not in downs]
+    if len(heads) != 1:
+        raise SystemExit(f"expected exactly one Alembic head revision, found {heads}")
+    return heads[0]
 
 
 def _cols(con: sqlite3.Connection, schema: str, table: str) -> list[str]:

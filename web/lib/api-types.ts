@@ -463,6 +463,26 @@ export interface paths {
         patch: operations["update_cc_week_api_v1_credit_card_weeks__row_id__patch"];
         trace?: never;
     };
+    "/api/v1/flow/{symbol}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gex Replay
+         * @description A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted).
+         */
+        get: operations["gex_replay_api_v1_flow__symbol__replay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/flow/{symbol}/stream": {
         parameters: {
             query?: never;
@@ -1230,6 +1250,26 @@ export interface paths {
         };
         /** Stock Info */
         get: operations["stock_info_api_v1_stocks__symbol__info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/unusual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unusual
+         * @description Contracts trading far above open interest with large premium (delayed chain snapshots).
+         */
+        get: operations["unusual_api_v1_unusual_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4158,6 +4198,41 @@ export interface operations {
             };
         };
     };
+    gex_replay_api_v1_flow__symbol__replay_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     gex_stream_api_v1_flow__symbol__stream_get: {
         parameters: {
             query?: {
@@ -5713,6 +5788,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockInfoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unusual_api_v1_unusual_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated tickers; default universe if empty */
+                symbols?: string | null;
+                min_premium?: number;
+                type?: "all" | "call" | "put";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
