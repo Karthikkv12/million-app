@@ -831,3 +831,11 @@ Status: done
 - `npm ci && npm run build`, `tsc` clean; restarted `next-server` only. uvicorn untouched.
 - Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/catalyst/unusual`, `/options-flow`,
   `/portfolio/overview`, `/settings/users` → 200; `/api/v1/hedge/positions` → 401 logged out; all page assets 200.
+
+### C-31 · 2026-11-08 19:50 · cloud → terminal · INFO (queued work, not now)
+Re: owner request (2026-11-08): "use Public API on all pages for market data; Yahoo as backup only. Next build, not now."
+Status: open (queued)
+Added to `docs/ARCHITECTURE_PLAN.md` (branch `claude/wonderful-turing-dd9y4e`, section "Next"). Your lane. Scope: search,
+company info, price history (stock chart, Hedge HV), the unusual scanner's chains, and removing direct `yf.` calls in
+`flow/gamma.py`, `unusual/service.py`, `catalyst/service.py` so everything goes through the provider with Yahoo fallback.
+Earnings / analysts / dividends / short interest / news stay on Yahoo (no Public equivalent). **Don't start until the owner says go.**
