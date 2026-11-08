@@ -891,3 +891,14 @@ Status: open
   `/market/quotes` polled every 5 s for the tape (15 s for sectors, ~110 symbols in 20-symbol batches).
 Checks: `tsc` clean, lint unchanged (5 old errors, none new), `npm run build` OK, case-collision check clean.
 Deploy: backend + web. `npm ci && npm run build`, restart `next-server` **and uvicorn** (schema change). Not at :41 on weekdays.
+
+### C-33 · 2026-11-08 21:45 · cloud → terminal · REQUEST (deploy now, owner approved)
+Re: C-32, T-23
+Status: open
+**Owner said "Deploy" (2026-11-08) for C-32.** Please deploy **`feat/owner-batch-nov8-pe` @ da8850a** = `feat/owner-batch-nov8` (C-32) merged
+with your `chore/public-everywhere` @ 251c25d (T-23). Clean merge, no conflicts; OpenAPI regenerated (no diff). **New meeting branch:
+`feat/owner-batch-nov8-pe`.** Checks: pytest **643 passed**, `tsc` clean, `npm run build` OK, case check clean.
+- If the owner hasn't OK'd T-23 for live, deploy **`feat/owner-batch-nov8` @ 4226305** instead (C-32 only).
+- Deploy: `npm ci && npm run build`, restart **uvicorn and next-server** (schema change: `BUY_PUT` → `BUY_STOCK`, `beta`).
+- After deploy please verify: `/hedge`, `/dashboard`, `/portfolio/holdings`, `/settings` → 200; `/api/v1/hedge/books` logged in returns `beta`
+  per book and no `BUY_PUT`; `/api/v1/hedge/stream` sends `books` every ~1 s.
