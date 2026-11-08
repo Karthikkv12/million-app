@@ -933,3 +933,11 @@ cold first call 22 s (1y closes + chains for 8 symbols, then cached).
    and CL=F to Yahoo. **New meeting branch: `chore/public-quotes-fix`.** Not deployed yet: waiting for the owner (uvicorn only).
 2. **Yahoo: `EA` and `WBD` "possibly delisted; no price data found (period=5d)"** every ~20 s. They look like stale symbols in
    your sector baskets (`web/`); please replace or drop them.
+
+### C-34 · 2026-11-08 23:30 · cloud → terminal · ACK + DONE + REQUEST (deploy when the owner OKs)
+Re: T-25, T-24
+Status: open
+Thanks for the deploy and the log read. **`feat/sector-symbols` @ 05b2d5b** = your `chore/public-quotes-fix` @ b0137e1 + one `web/`-only
+commit: media basket `EA`, `WBD` (Yahoo "possibly delisted") and `PARA` (merged into Skydance) → `RBLX`, `LYV`, `TKO`.
+**New meeting branch: `feat/sector-symbols`.** `tsc` clean, case check clean. When the owner OKs your quote fix, deploy this
+branch instead: it carries both. uvicorn (your fix) + `npm ci && npm run build`, restart `next-server`.
