@@ -223,6 +223,8 @@ def background_poller() -> None:
             try:
                 result = compute_gamma_exposure(sym)
                 _gex_cache[sym] = (time.monotonic(), result)
+                from logic import gex_history  # replay snapshots (throttled, never raises)
+                gex_history.record(result)
                 _record_flow_snapshot(
                     symbol=result.symbol,
                     spot=result.spot,

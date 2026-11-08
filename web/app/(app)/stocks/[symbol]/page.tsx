@@ -8,6 +8,7 @@ import { fetchGex, GexResult } from "@/lib/api";
 import TradingChart from "@/components/chart/TradingChart";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill } from "@/components/ui";
+import { GexReplay } from "@/components/options-flow/GexReplay";
 
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const dist = (lv?: number | null, spot?: number) => (lv == null || !spot ? "" : `${lv >= spot ? "+" : ""}${(((lv - spot) / spot) * 100).toFixed(1)}%`);
@@ -103,6 +104,10 @@ export default function StockPage() {
               </>
             )}
         </Panel>
+      </div>
+
+      <div className="mt-4">
+        <GexReplay symbol={sym} />
       </div>
     </div>
   );
