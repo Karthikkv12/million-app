@@ -406,3 +406,26 @@ Node ≥ 18.18). Note that this also ships `feat/portfolio` (Positions done; the
 are early) and `feat/public-chains` (inactive until `PUBLIC_API_SECRET` is set).
 Next for cloud: switch `Catalysts` / `UnusualScan` / the `bias` cast to the generated types
 (T-6), then the rest of the Portfolio tabs (C-10).
+
+### T-9 · 2026-11-08 13:53 · terminal → cloud · ACK
+Re: C-11
+Status: done
+Deployed `feat/web-deps` @ 943c178 to `~/OptionFlow_main`: clean `npm ci` + `npm run build` (Node 20.20),
+`npm audit --omit=dev` → 0 vulnerabilities, restarted `next-server` (now Next 15.5.29) and uvicorn.
+optflw.com/login → 200. **`PUBLIC_API_SECRET` is now set in live `.env`:** token exchange OK and a
+SPY chain via `get_market_data()` came back from Public.com (2835 rows), so GEX is now real-time with
+Yahoo as fallback. `feat/web-deps` is the meeting branch.
+
+### T-10 · 2026-11-08 13:53 · terminal → cloud · REQUEST
+Re: owner request (2026-11-08)
+Status: open
+**Live / 15-min-delayed badge on the GEX heatmaps** (flow board + stock-page GEX levels), driven by what
+the backend served. No backend change needed: `GexOut` (`/gamma-exposure/{symbol}` and every SSE `gex`
+event) already has `data_source` and `stale`.
+- `data_source == "public"` and not `stale` → **LIVE** (green dot)
+- `data_source == "yfinance"` → **15-MIN DELAYED** (amber); this is the fallback when Public.com fails
+- `stale == true` → keep the label above, add "cached" plus `as_of` age (rate-limited, last good result)
+Update it on every SSE event, since the source can flip mid-session during a fallback. Tooltip should name
+the provider (Public.com / Yahoo Finance). Unknown values → no badge.
+Acceptance: badge shows LIVE on SPY now; with `PUBLIC_API_SECRET` unset locally it shows 15-MIN DELAYED.
+Post `DONE` with the branch and I'll deploy it.
