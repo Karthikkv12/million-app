@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
-import AiChat from "@/components/AiChat";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -14,8 +13,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomNav />
-      {/* AI Chat — hidden for now, do not delete */}
-      <div className="hidden"><AiChat /></div>
     </div>
   );
 }

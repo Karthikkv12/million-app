@@ -90,7 +90,7 @@ type QuoteMap = Record<string, Quote>;
 
 async function fetchQuotes(symbols: string[]): Promise<QuoteMap> {
   const joined = symbols.join(",");
-  const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(joined)}`, { cache: "no-store" });
+  const res = await fetch(`/api/v1/market/quotes?symbols=${encodeURIComponent(joined)}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Quote fetch failed");
   const rows: { symbol: string; price: number | null; prev_close: number | null; change: number | null; change_pct: number | null }[] = await res.json();
   const results: QuoteMap = {};

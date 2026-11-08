@@ -308,7 +308,8 @@ export default function NetFlowPanel({ data }: Props) {
   [top_flow_strikes]);
 
   const tableStrikes: TopFlowStrike[] = useMemo(() =>
-    [...top_flow_strikes].sort((a, b) => b.call_prem + b.put_prem - (a.call_prem + a.put_prem)),
+    // `bias` is a plain string in the generated schema; the backend only sends "call" | "put" (C-8).
+    ([...top_flow_strikes] as TopFlowStrike[]).sort((a, b) => b.call_prem + b.put_prem - (a.call_prem + a.put_prem)),
   [top_flow_strikes]);
 
   const hasEnoughData = chartData.length >= 5;

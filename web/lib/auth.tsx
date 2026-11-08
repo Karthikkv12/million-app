@@ -19,7 +19,7 @@ async function _silentRefresh(): Promise<AuthUser | null> {
   const { refresh } = getTokens();
   if (!refresh) return null;
   try {
-    const res = await fetch("/api/auth/refresh", {
+    const res = await fetch("/api/v1/auth/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refresh }),

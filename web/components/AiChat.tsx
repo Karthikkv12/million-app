@@ -54,18 +54,20 @@ export default function AiChat() {
     abortRef.current = ctrl;
 
     try {
-      const res = await fetch("/api/ai/chat", {
+      const res = await fetch("/api/v1/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(access ? { Authorization: `Bearer ${access}` } : {}),
+        },
         signal: ctrl.signal,
-        body: JSON.stringify({
-          messages: newMessages,
-          accessToken: access,
-        }),
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        // Backend error shape: {"error": {"code", "message"}} (older: {"detail": ...})
+        const body = await res.json().catch(() => ({}));
+        const err = { error: body?.error?.message ?? body?.detail ?? (res.status === 404 ? "The AI assistant is turned off on this server." : "Request failed") };
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1] = {
