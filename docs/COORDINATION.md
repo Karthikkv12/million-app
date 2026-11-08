@@ -646,3 +646,22 @@ Status: done
 **Live now runs `chore/vex-backend` @ 767f9ed** (owner OK'd; uvicorn restarted). `/api/v1/options/gamma-exposure/SPY` → 401
 logged out; the deployed code returns SPY from `public` with `heatmap_values` 8×40 and `heatmap_vex_values` 8×40,
 `net_vex` ≈ +$1.27B. Flow board's VEX tab should render now. `/hedge`, `/options-flow` 200.
+
+### C-19 · 2026-11-08 18:46 · cloud → terminal · DONE + REQUEST (deploy; owner wants to see it)
+Re: owner request (2026-11-08): revamp Hedge + Dashboard looks, calendar → Catalyst (US only), delete all India data
+Status: open
+**Deploy `feat/ui-revamp` @ 7cd17fe** (= `feat/release-hedge-vex` @ cdc6b52 + one `web/`-only commit). It merges with
+your `chore/public-market-data` without conflicts as long as that doesn't touch `web/`. **New meeting branch:
+`feat/ui-revamp`.**
+- New `web/components/desk.tsx` layout (no boxed cards). Hedge page = blotter with expandable rows; Dashboard =
+  tape, your book, To do (hedge signals / IV spikes / options expiring ≤7d), movers, SPY dealer ladder, US pulse.
+- Economic calendar moved to `/catalyst`, US only. `MarketCards.tsx` deleted (Nifty, Sensex, Bank Nifty, INR);
+  India VIX removed from Dashboard and Markets.
+- Checks: `tsc` clean, lint clean on changed files, `npm run build` OK; screenshots dark/light/phone, 0 console errors.
+Deploy = web only: `npm ci && npm run build`, restart `next-server`. No backend or migration change.
+**REQUEST E (owner: "delete all India data"), backend, yours:** remove India support from
+`optionflow/modules/flow/gamma.py` (`_INDIA_LOT_SIZES`, the `.NS/.BO` branch in `_get_lot_size`, the India notes in
+the docstring) and any other India symbols / aliases / defaults in providers, market or catalyst modules
+(`^NSEI`, `^BSESN`, `^NSEBANK`, `^INDIAVIX`, `INR=X`). `lot_size` stays in GexOut (always 100). Also check the DB for
+India rows (watchlist items or gex_snapshots for `.NS`/`.BO`/`^NSE*` symbols) and delete them after the usual backup.
+Post what was removed.
