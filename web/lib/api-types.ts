@@ -472,7 +472,7 @@ export interface paths {
         };
         /**
          * Gex Replay
-         * @description A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted).
+         * @description GEX replay: one day of 5-minute snapshots.
          */
         get: operations["gex_replay_api_v1_flow__symbol__replay_get"];
         put?: never;
@@ -498,6 +498,26 @@ export interface paths {
          *     Between changes it sends `: keepalive` comments.
          */
         get: operations["gex_stream_api_v1_flow__symbol__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gex-history/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gex Day
+         * @description Same as /flow/{symbol}/replay (the path the stock page used before the move).
+         */
+        get: operations["gex_day_api_v1_gex_history__symbol__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1970,8 +1990,27 @@ export interface components {
             /** Put Prem */
             put_prem: number;
         };
+        /** GexDayOut */
+        GexDayOut: {
+            /** Date */
+            date?: string | null;
+            /**
+             * Days
+             * @default []
+             */
+            days: string[];
+            /**
+             * Snapshots
+             * @default []
+             */
+            snapshots: components["schemas"]["GexReplaySnapshot"][];
+            /** Symbol */
+            symbol: string;
+        };
         /** GexOut */
         GexOut: {
+            /** As Of */
+            as_of?: string | null;
             /**
              * Call Gex By Strike
              * @default []
@@ -2045,6 +2084,11 @@ export interface components {
             /** Spot */
             spot: number;
             /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
              * Strikes
              * @default []
              */
@@ -2061,6 +2105,28 @@ export interface components {
              * @default 0
              */
             total_volume: number;
+            /** Zero Gamma */
+            zero_gamma?: number | null;
+        };
+        /** GexReplaySnapshot */
+        GexReplaySnapshot: {
+            /** Call Wall */
+            call_wall?: number | null;
+            /** King */
+            king?: number | null;
+            /** Net Gex */
+            net_gex?: number | null;
+            /**
+             * Profile
+             * @default []
+             */
+            profile: number[][];
+            /** Put Wall */
+            put_wall?: number | null;
+            /** Spot */
+            spot: number;
+            /** Ts */
+            ts: string;
             /** Zero Gamma */
             zero_gamma?: number | null;
         };
@@ -4201,6 +4267,7 @@ export interface operations {
     gex_replay_api_v1_flow__symbol__replay_get: {
         parameters: {
             query?: {
+                /** @description YYYY-MM-DD (UTC); latest day if omitted */
                 on?: string | null;
             };
             header?: never;
@@ -4217,9 +4284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["GexDayOut"];
                 };
             };
             /** @description Validation Error */
@@ -4257,6 +4322,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gex_day_api_v1_gex_history__symbol__get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD (UTC); latest day if omitted */
+                on?: string | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GexDayOut"];
+                };
             };
             /** @description Validation Error */
             422: {

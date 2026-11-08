@@ -4,7 +4,9 @@ The only module that imports yfinance. Free, ~15-minute delayed, no API key.
 """
 from __future__ import annotations
 
+import functools
 import math
+import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -12,8 +14,70 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import yfinance as yf
+from cachetools import TTLCache
 
-from optionflow.providers.market_data import CHAIN_COLUMNS, OptionChain
+from optionflow.providers.market_data import CHAIN_COLUMNS, MarketDataRateLimited, OptionChain, RateLimitGate
+
+try:
+    from yfinance.exceptions import YFRateLimitError
+except Exception:  # older yfinance
+    class YFRateLimitError(Exception):
+        pass
+
+# ── Rate limits ────────────────────────────────────────────────────────────────
+GATE = RateLimitGate(first=120.0, maximum=1800.0)   # one gate for every Yahoo call
+_tl = threading.local()
+
+MAX_CHAIN_DTE = 60          # option chains: expiries within 60 days…
+MAX_CHAIN_EXPIRIES = 12     # …and at most 12 of them (the board shows 8)
+_chain_cache: TTLCache = TTLCache(maxsize=512, ttl=300)   # (symbol, expiry) -> parsed rows, 5 min
+
+
+def _is_rate_limit(exc: BaseException) -> bool:
+    if isinstance(exc, (YFRateLimitError, MarketDataRateLimited)):
+        return True
+    msg = str(exc).lower()
+    return "too many requests" in msg or "rate limit" in msg or "429" in msg
+
+
+def _note(exc: BaseException) -> None:
+    """Remember a rate limit seen inside a method that otherwise handles its own errors."""
+    if _is_rate_limit(exc):
+        _tl.limited = True
+
+
+def _guarded(fn):
+    """Refuse while backing off; trip the gate on any rate limit; reset it on success."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        GATE.check()
+        _tl.limited = False
+        try:
+            out = fn(*args, **kwargs)
+        except Exception as exc:
+            if _is_rate_limit(exc):
+                GATE.trip()
+                raise MarketDataRateLimited(GATE.remaining()) from exc
+            raise
+        if getattr(_tl, "limited", False):
+            GATE.trip()
+            raise MarketDataRateLimited(GATE.remaining())
+        GATE.ok()
+        return out
+    return wrapper
+
+
+class _GuardedTicker:
+    """yfinance Ticker whose attribute reads and method calls all go through the gate."""
+
+    def __init__(self, ticker: Any):
+        self._ticker = ticker
+
+    def __getattr__(self, name: str) -> Any:
+        value = _guarded(lambda: getattr(self._ticker, name))()
+        if callable(value):
+            return _guarded(value)
+        return value
 
 _REC_LABELS = {
     "strong_buy": "Strong Buy", "buy": "Buy", "hold": "Hold",
@@ -60,13 +124,13 @@ def _info_and_fast(sym: str):
     info: Dict[str, Any] = {}
     try:
         info = ticker.info or {}
-    except Exception:
-        pass
+    except Exception as exc:
+        _note(exc)
     fast = None
     try:
         fast = ticker.fast_info
-    except Exception:
-        pass
+    except Exception as exc:
+        _note(exc)
 
     def _fi(attr: str) -> Optional[float]:
         try:
@@ -122,13 +186,16 @@ def parse_chain_rows(exp: str, chain: Any, T: float) -> List[Dict[str, Any]]:
 
 class YahooMarketData:
     name = "yfinance"
+    gate = GATE
 
     # ── Search ────────────────────────────────────────────────────────────────
+    @_guarded
     def search(self, query: str, limit: int) -> List[Dict[str, Any]]:
         try:
             res = yf.Search(query, max_results=min(limit, 20), enable_fuzzy_query=True)
             quotes = res.quotes or []
-        except Exception:
+        except Exception as exc:
+            _note(exc)
             return []
 
         def _rank(r: dict) -> int:
@@ -155,6 +222,7 @@ class YahooMarketData:
         return results
 
     # ── Prices ────────────────────────────────────────────────────────────────
+    @_guarded
     def quote(self, symbol: str) -> Dict[str, Any]:
         try:
             info = yf.Ticker(symbol).fast_info
@@ -164,10 +232,12 @@ class YahooMarketData:
             change_pct = round((change / prev) * 100, 4) if change is not None and prev else None
             return {"symbol": symbol, "price": price, "prev_close": prev,
                     "change": change, "change_pct": change_pct}
-        except Exception:
+        except Exception as exc:
+            _note(exc)
             return {"symbol": symbol, "price": None, "prev_close": None,
                     "change": None, "change_pct": None}
 
+    @_guarded
     def last_price(self, symbol: str) -> Optional[float]:
         ticker = yf.Ticker(symbol)
         fi = ticker.fast_info
@@ -178,6 +248,7 @@ class YahooMarketData:
                 price = float(hist["Close"].iloc[-1])
         return price if price > 0 else None
 
+    @_guarded
     def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
         hist = yf.Ticker(symbol).history(period=period, interval=interval)
         if hist is None or hist.empty:
@@ -188,6 +259,7 @@ class YahooMarketData:
         return hist[[c for c in ["open", "high", "low", "close", "volume"] if c in hist.columns]]
 
     # ── Company data ──────────────────────────────────────────────────────────
+    @_guarded
     def watchlist_row(self, symbol: str) -> Dict[str, Any]:
         sym = symbol
         try:
@@ -231,6 +303,7 @@ class YahooMarketData:
                 "error": None,
             }
         except Exception as exc:
+            _note(exc)
             return {
                 "symbol": sym, "name": sym, "price": None, "prev_close": None,
                 "change": None, "change_pct": None, "volume": None, "avg_volume": None,
@@ -244,6 +317,7 @@ class YahooMarketData:
                 "error": str(exc),
             }
 
+    @_guarded
     def stock_info(self, symbol: str) -> Dict[str, Any]:
         sym = symbol
         try:
@@ -298,16 +372,21 @@ class YahooMarketData:
                 "error": None,
             }
         except Exception as exc:
+            _note(exc)
             return {"symbol": sym, "error": str(exc)}
 
     # ── Raw access (catalyst module) ──────────────────────────────────────────
     def raw_ticker(self, symbol: str):
-        """yfinance Ticker for modules that read Yahoo-specific fields (catalysts)."""
-        return yf.Ticker(symbol)
+        """yfinance Ticker for modules that read Yahoo-specific fields (catalyst, unusual).
+
+        Every attribute read and call goes through the rate-limit gate."""
+        GATE.check()
+        return _GuardedTicker(yf.Ticker(symbol))
 
     # ── Options ───────────────────────────────────────────────────────────────
+    @_guarded
     def option_chain(self, symbol: str) -> OptionChain:
-        """All unexpired expiries, fetched concurrently (max 16 workers)."""
+        """Expiries within MAX_CHAIN_DTE days (at most MAX_CHAIN_EXPIRIES), each chain cached 5 min."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             ticker = yf.Ticker(symbol.upper())
@@ -328,22 +407,31 @@ class YahooMarketData:
             import zoneinfo
             today = pd.Timestamp(datetime.now(zoneinfo.ZoneInfo("America/New_York")).date())
             valid: list[tuple[str, float]] = []
-            for exp in expiries:
+            for exp in sorted(set(expiries)):          # nearest first, no duplicates
                 days = (pd.to_datetime(exp) - today).days
-                if days >= 0:
+                if 0 <= days <= MAX_CHAIN_DTE:
                     # 0-DTE uses 1 trading day / 252 (standard for intraday gamma)
                     valid.append((exp, max(days, 1) / 252.0))
+            valid = valid[:MAX_CHAIN_EXPIRIES]
             if not valid:
                 return empty
+            sym = symbol.upper()
 
             def _one(exp: str, T: float) -> List[Dict[str, Any]]:
+                cached = _chain_cache.get((sym, exp))
+                if cached is not None:
+                    return cached
                 try:
-                    return parse_chain_rows(exp, ticker.option_chain(exp), T)
-                except Exception:
+                    rows = parse_chain_rows(exp, ticker.option_chain(exp), T)
+                except Exception as exc:
+                    if _is_rate_limit(exc):
+                        raise MarketDataRateLimited(0) from exc   # re-raised in the caller's thread
                     return []
+                _chain_cache[(sym, exp)] = rows
+                return rows
 
             rows: List[Dict[str, Any]] = []
-            with ThreadPoolExecutor(max_workers=min(len(valid), 16)) as pool:
+            with ThreadPoolExecutor(max_workers=min(len(valid), 6)) as pool:
                 for fut in as_completed([pool.submit(_one, e, T) for e, T in valid]):
                     rows.extend(fut.result())
         if not rows:

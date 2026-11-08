@@ -2126,8 +2126,59 @@
     "title": "FlowByExpiry",
     "type": "object"
    },
+   "GexDayOut": {
+    "properties": {
+     "date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date"
+     },
+     "days": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "snapshots": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/GexReplaySnapshot"
+      },
+      "title": "Snapshots",
+      "type": "array"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "GexDayOut",
+    "type": "object"
+   },
    "GexOut": {
     "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
      "call_gex_by_strike": {
       "default": [],
       "items": {
@@ -2267,6 +2318,11 @@
       "title": "Spot",
       "type": "number"
      },
+     "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
+     },
      "strikes": {
       "default": [],
       "items": {
@@ -2310,6 +2366,90 @@
      "data_source"
     ],
     "title": "GexOut",
+    "type": "object"
+   },
+   "GexReplaySnapshot": {
+    "properties": {
+     "call_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Wall"
+     },
+     "king": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "King"
+     },
+     "net_gex": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Gex"
+     },
+     "profile": {
+      "default": [],
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Profile",
+      "type": "array"
+     },
+     "put_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Wall"
+     },
+     "spot": {
+      "title": "Spot",
+      "type": "number"
+     },
+     "ts": {
+      "title": "Ts",
+      "type": "string"
+     },
+     "zero_gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zero Gamma"
+     }
+    },
+    "required": [
+     "ts",
+     "spot"
+    ],
+    "title": "GexReplaySnapshot",
     "type": "object"
    },
    "HTTPValidationError": {
@@ -8589,7 +8729,7 @@
   },
   "/api/v1/flow/{symbol}/replay": {
    "get": {
-    "description": "A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted).",
+    "description": "GEX replay: one day of 5-minute snapshots.",
     "operationId": "gex_replay_api_v1_flow__symbol__replay_get",
     "parameters": [
      {
@@ -8602,6 +8742,7 @@
       }
      },
      {
+      "description": "YYYY-MM-DD (UTC); latest day if omitted",
       "in": "query",
       "name": "on",
       "required": false,
@@ -8614,6 +8755,7 @@
          "type": "null"
         }
        ],
+       "description": "YYYY-MM-DD (UTC); latest day if omitted",
        "title": "On"
       }
      }
@@ -8623,9 +8765,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "additionalProperties": true,
-         "title": "Response Gex Replay Api V1 Flow  Symbol  Replay Get",
-         "type": "object"
+         "$ref": "#/components/schemas/GexDayOut"
         }
        }
       },
@@ -8734,6 +8874,72 @@
      }
     ],
     "summary": "Gex Stream",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
+  "/api/v1/gex-history/{symbol}": {
+   "get": {
+    "description": "Same as /flow/{symbol}/replay (the path the stock page used before the move).",
+    "operationId": "gex_day_api_v1_gex_history__symbol__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "description": "YYYY-MM-DD (UTC); latest day if omitted",
+      "in": "query",
+      "name": "on",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "YYYY-MM-DD (UTC); latest day if omitted",
+       "title": "On"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GexDayOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Gex Day",
     "tags": [
      "flow"
     ]

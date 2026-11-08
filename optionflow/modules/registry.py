@@ -21,8 +21,8 @@ def _market() -> List[APIRouter]:
 
 
 def _flow() -> List[APIRouter]:
-    from optionflow.modules.flow.router import router, stream_router
-    return [router, stream_router]
+    from optionflow.modules.flow.router import history_router, router, stream_router
+    return [router, stream_router, history_router]
 
 
 def _watchlist() -> List[APIRouter]:

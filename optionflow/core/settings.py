@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
 
     # ── Feature modules (used from plan step 4) ─────────────────────────────
-    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual"
+    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget"
 
     # ── Derived values ───────────────────────────────────────────────────────
     @property

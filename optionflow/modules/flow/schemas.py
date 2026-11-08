@@ -45,6 +45,8 @@ class GexOut(BaseModel):
     top_flow_strikes: List[TopFlowStrike] = []
     data_source: str
     error: Optional[str] = None
+    as_of: Optional[str] = None      # ISO UTC time the numbers were computed
+    stale: bool = False              # True: data source is rate-limiting; showing the last good result
 
 
 class NetFlowPoint(BaseModel):
@@ -59,3 +61,21 @@ class NetFlowPoint(BaseModel):
 
 class WatchRequest(BaseModel):
     symbols: List[str] = []
+
+
+class GexReplaySnapshot(BaseModel):
+    ts: str
+    spot: float
+    net_gex: Optional[float] = None
+    zero_gamma: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    king: Optional[float] = None
+    profile: List[List[float]] = []      # [[strike, net_gex], …] near spot
+
+
+class GexDayOut(BaseModel):
+    symbol: str
+    date: Optional[str] = None
+    snapshots: List[GexReplaySnapshot] = []
+    days: List[str] = []                 # latest 10 days with data, newest first

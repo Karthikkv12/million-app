@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from datetime import date
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -10,12 +11,13 @@ from fastapi.responses import StreamingResponse
 
 from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
-from optionflow.modules.flow import service
-from optionflow.modules.flow.schemas import GexOut, NetFlowPoint, WatchRequest
+from optionflow.modules.flow import history, service
+from optionflow.modules.flow.schemas import GexDayOut, GexOut, NetFlowPoint, WatchRequest
 from optionflow.workers import backfill
 
 router = APIRouter(prefix="/options", tags=["flow"])
 stream_router = APIRouter(prefix="/flow", tags=["flow"])
+history_router = APIRouter(prefix="/gex-history", tags=["flow"])
 
 
 @router.get("/gamma-exposure/{symbol}", response_model=GexOut)
@@ -57,7 +59,12 @@ async def gex_stream(
         while not await request.is_disconnected():
             for new in service.watch([sym]):
                 backfill.start_backfill(new)
-            result = await run_in_threadpool(service.get_gex, sym)
+            try:
+                result = await run_in_threadpool(service.get_gex, sym)
+            except errors.AppError:       # rate-limited with nothing cached yet: keep the stream open
+                yield ": rate-limited\n\n"
+                await asyncio.sleep(interval)
+                continue
             body = GexOut(**service.gex_payload(result)).model_dump_json()
             if body != last:
                 last = body
@@ -73,13 +80,23 @@ async def gex_stream(
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@stream_router.get("/{symbol}/replay")
-def gex_replay(symbol: str, on: Optional[str] = None, _user=Depends(get_current_user)) -> Dict[str, Any]:
-    """A day of GEX snapshots for replay (`on` = YYYY-MM-DD UTC; latest day if omitted)."""
-    from datetime import date as _date
-    from optionflow.modules.flow import replay
+def _replay_day(symbol: str, on: Optional[str]) -> GexDayOut:
     try:
-        d = _date.fromisoformat(on) if on else None
+        d = date.fromisoformat(on) if on else None
     except ValueError:
         raise errors.BadRequest("Use YYYY-MM-DD for 'on'")
-    return replay.day(symbol, d)
+    return history.day(symbol, d)
+
+
+@stream_router.get("/{symbol}/replay", response_model=GexDayOut)
+def gex_replay(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
+               _user=Depends(get_current_user)) -> GexDayOut:
+    """GEX replay: one day of 5-minute snapshots."""
+    return _replay_day(symbol, on)
+
+
+@history_router.get("/{symbol}", response_model=GexDayOut)
+def gex_day(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
+            _user=Depends(get_current_user)) -> GexDayOut:
+    """Same as /flow/{symbol}/replay (the path the stock page used before the move)."""
+    return _replay_day(symbol, on)

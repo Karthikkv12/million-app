@@ -94,3 +94,80 @@ def bars_from_history(df: pd.DataFrame, intraday: bool) -> List[Dict[str, Any]]:
             "volume": int(vol) if vol is not None and pd.notna(vol) else None,
         })
     return bars
+
+
+# ── Rate-limit back-off (shared by every provider call) ───────────────────────
+import logging as _logging
+import threading as _threading
+import time as _time
+
+_log = _logging.getLogger("optionflow.marketdata")
+
+
+from optionflow.core.errors import Unavailable as _Unavailable
+
+
+class MarketDataRateLimited(_Unavailable):
+    """The data source is rate-limiting us; no call was made (or the call was refused). HTTP 503."""
+
+    def __init__(self, retry_after: float):
+        minutes = max(1, round(retry_after / 60))
+        super().__init__(f"Yahoo Finance is rate-limiting requests; try again in about {minutes} min")
+        self.retry_after = retry_after
+
+
+class RateLimitGate:
+    """Stop *all* calls to a source after a rate limit: 2 min, doubling up to 30 min.
+
+    `check()` before a call raises MarketDataRateLimited while blocked.
+    `trip()` on a rate-limit response; `ok()` after a success resets the delay.
+    Logs once per trip, not per refused call.
+    """
+
+    def __init__(self, first: float = 120.0, maximum: float = 1800.0):
+        self.first, self.maximum = first, maximum
+        self._delay = 0.0
+        self._until = 0.0
+        self._lock = _threading.Lock()
+
+    def remaining(self) -> float:
+        return max(0.0, self._until - _time.monotonic())
+
+    def blocked(self) -> bool:
+        return self.remaining() > 0
+
+    def check(self) -> None:
+        left = self.remaining()
+        if left > 0:
+            raise MarketDataRateLimited(left)
+
+    def trip(self) -> None:
+        with self._lock:
+            if self.blocked():                 # already backing off: don't extend or re-log
+                return
+            self._delay = min(self.maximum, self._delay * 2 if self._delay else self.first)
+            self._until = _time.monotonic() + self._delay
+            _log.warning("Market data rate-limited: pausing all calls for %ds", int(self._delay))
+
+    def ok(self) -> None:
+        if self._delay and not self.blocked():
+            with self._lock:
+                self._delay = 0.0
+                _log.info("Market data calls succeeding again; back-off reset")
+
+    def reset(self) -> None:                   # tests
+        with self._lock:
+            self._delay, self._until = 0.0, 0.0
+
+
+def is_rate_limited() -> bool:
+    """True while the active provider is backing off (callers can skip work or serve stale)."""
+    gate = getattr(get_market_data(), "gate", None)
+    return bool(gate and gate.blocked())
+
+
+def raise_if_rate_limited() -> None:
+    """Raise MarketDataRateLimited (HTTP 503) while the active provider is backing off."""
+    gate = getattr(get_market_data(), "gate", None)
+    if gate is not None:
+        gate.check()

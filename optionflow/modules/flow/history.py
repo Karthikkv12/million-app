@@ -1,9 +1,10 @@
-"""optionflow/modules/flow/replay.py — GEX snapshots through the session, for replay.
+"""optionflow/modules/flow/history.py — GEX snapshots for replay (moved from logic/gex_history.py).
 
-`record(result)` runs after every GEX refresh (see service.refresh_gex) and stores
-at most one snapshot per symbol every SNAPSHOT_EVERY seconds: spot, net GEX, flip,
-walls, king node and the net-GEX profile for the strikes nearest spot.
-`day(symbol, on)` returns a session's snapshots in order.
+The GEX poller calls `record(result)` after each computation. At most one
+snapshot per symbol every SNAPSHOT_EVERY seconds is stored: spot, net GEX,
+flip, call/put walls, king node and the net-GEX profile for the strikes nearest
+spot. `day(symbol, date)` returns them in order. Table: gex_snapshots (one
+database, ORM).
 """
 from __future__ import annotations
 
@@ -19,10 +20,10 @@ from sqlalchemy import func
 from database.models import GexSnapshot
 from optionflow.core.db import get_session
 
-logger = logging.getLogger("optionflow.flow.replay")
+logger = logging.getLogger("optionflow.gex_history")
 
-SNAPSHOT_EVERY = 300   # seconds between stored snapshots per symbol
-PROFILE_STRIKES = 30   # strikes kept around spot
+SNAPSHOT_EVERY = 300          # seconds between stored snapshots per symbol
+PROFILE_STRIKES = 30          # strikes kept around spot
 
 _last: Dict[str, float] = {}
 _lock = threading.Lock()
@@ -58,9 +59,6 @@ def record(result: Any) -> None:
                 net_gex=result.net_gex, zero_gamma=result.zero_gamma, call_wall=result.max_call_wall,
                 put_wall=result.max_put_wall, king=result.max_gex_strike, profile=json.dumps(prof)))
             session.commit()
-        except Exception:
-            session.rollback()
-            raise
         finally:
             session.close()
     except Exception as exc:
@@ -68,20 +66,23 @@ def record(result: Any) -> None:
 
 
 def day(symbol: str, on: Optional[date] = None) -> Dict[str, Any]:
-    """Snapshots for one UTC day (default: the latest day with data) and the days available."""
+    """Snapshots for one UTC day (default: latest day with data)."""
     sym = symbol.strip().upper()
+    day_of = func.substr(GexSnapshot.ts, 1, 10)
     session = get_session()
     try:
-        days = [r[0] for r in session.query(func.substr(GexSnapshot.ts, 1, 10)).filter(GexSnapshot.symbol == sym)
-                .distinct().order_by(func.substr(GexSnapshot.ts, 1, 10).desc()).limit(10).all()]
         if on is None:
-            if not days:
+            latest = session.query(func.max(GexSnapshot.ts)).filter(GexSnapshot.symbol == sym).scalar()
+            if not latest:
                 return {"symbol": sym, "date": None, "snapshots": [], "days": []}
-            on = date.fromisoformat(days[0])
-        rows = (session.query(GexSnapshot).filter(GexSnapshot.symbol == sym, GexSnapshot.ts.like(f"{on.isoformat()}%"))
+            on = date.fromisoformat(latest[:10])
+        rows = (session.query(GexSnapshot).filter(GexSnapshot.symbol == sym, day_of == on.isoformat())
                 .order_by(GexSnapshot.ts).all())
-        snaps = [{"ts": r.ts, "spot": r.spot, "net_gex": r.net_gex, "zero_gamma": r.zero_gamma, "call_wall": r.call_wall,
-                  "put_wall": r.put_wall, "king": r.king, "profile": json.loads(r.profile or "[]")} for r in rows]
+        days = [d for (d,) in session.query(day_of).filter(GexSnapshot.symbol == sym).distinct()
+                .order_by(day_of.desc()).limit(10).all()]
+        snaps = [{"ts": r.ts, "spot": r.spot, "net_gex": r.net_gex, "zero_gamma": r.zero_gamma,
+                  "call_wall": r.call_wall, "put_wall": r.put_wall, "king": r.king,
+                  "profile": json.loads(r.profile or "[]")} for r in rows]
     finally:
         session.close()
     return {"symbol": sym, "date": on.isoformat(), "snapshots": snaps, "days": days}

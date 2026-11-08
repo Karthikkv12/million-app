@@ -13,7 +13,7 @@ What it does
      depends on them), saving every removed row to <target>.dropped.json.
   5. Verifies: integrity check, no foreign-key violations, and for every table
      the target equals the source row for row, except the dropped rows.
-  6. Stamps the Alembic baseline revision.
+  6. Stamps the Alembic head revision (the schema it created).
 On any failure the half-written target is deleted.
 """
 from __future__ import annotations
@@ -30,24 +30,13 @@ sys.path.insert(0, str(ROOT))
 SOURCES = ["users", "trades", "portfolio", "budget", "markets"]
 
 
-def baseline_revision() -> str:
-    """Revision id to stamp: the single head of alembic/versions.
-
-    The new database is built with Base.metadata.create_all (every current
-    model), so it already matches the newest migration, not just the baseline.
-    """
-    import re
-    files = sorted((ROOT / "alembic" / "versions").glob("*.py"))
-    revs, downs = [], set()
-    for f in files:
-        text = f.read_text()
-        if (m := re.search(r'^revision(?::\s*str)?\s*=\s*["\']([^"\']+)', text, re.M)):
-            revs.append(m.group(1))
-        if (d := re.search(r'^down_revision(?:[^=]*)=\s*["\']([^"\']+)', text, re.M)):
-            downs.add(d.group(1))
-    heads = [r for r in revs if r not in downs]
+def head_revision() -> str:
+    """The Alembic head: the new database is created at the current schema."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    heads = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_heads()
     if len(heads) != 1:
-        raise SystemExit(f"expected exactly one Alembic head revision, found {heads}")
+        raise SystemExit(f"expected one Alembic head, found {heads}")
     return heads[0]
 
 
@@ -79,7 +68,7 @@ def merge(source_dir: Path, target: Path, drop_orphans: bool) -> dict:
 def _merge(source_dir: Path, target: Path, drop_orphans: bool) -> dict:
     from sqlalchemy import create_engine
     from database.models import Base
-    BASELINE_REVISION = baseline_revision()
+    BASELINE_REVISION = head_revision()
 
     missing = [s for s in SOURCES if not (source_dir / f"{s}.db").exists()]
     if missing:

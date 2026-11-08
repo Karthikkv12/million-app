@@ -5,6 +5,7 @@ all call them the same way.
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 import time
@@ -12,13 +13,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from optionflow.modules.flow import replay
 from optionflow.modules.flow import repo
 from optionflow.modules.flow.gamma import GEXResult, compute_gamma_exposure
+from optionflow.providers.market_data import MarketDataRateLimited
 
 logger = logging.getLogger("optionflow.flow")
 
-GEX_CACHE_TTL = 10      # seconds a cached GEX result is served to the API
+GEX_CACHE_TTL = 120     # seconds a cached GEX result is served to the API (board refetches every 60s)
 WATCH_TTL = 120         # seconds a symbol stays watched after the last heartbeat
 
 _gex_cache: Dict[str, Tuple[float, GEXResult]] = {}
@@ -44,16 +45,24 @@ def refresh_gex(symbol: str) -> GEXResult:
     """Compute GEX now, cache it, and record a flow snapshot."""
     result = compute_and_cache(symbol)
     record_snapshot(result)
-    replay.record(result)   # GEX replay snapshots (throttled, never raises)
     return result
 
 
 def get_gex(symbol: str, max_age: float = GEX_CACHE_TTL) -> GEXResult:
-    """Cached result if younger than `max_age` seconds, else a fresh one."""
+    """Cached result if younger than `max_age` seconds, else a fresh one.
+
+    While the data source is rate-limiting, serve the last good result marked
+    `stale` (with its `as_of`); 503 only when there is nothing cached.
+    """
     hit = _gex_cache.get(symbol.upper())
     if hit and (time.monotonic() - hit[0]) < max_age:
         return hit[1]
-    return refresh_gex(symbol)
+    try:
+        return refresh_gex(symbol)
+    except MarketDataRateLimited:
+        if hit:
+            return dataclasses.replace(hit[1], stale=True)
+        raise
 
 
 def clear_cache() -> None:
@@ -84,6 +93,8 @@ def gex_payload(result: GEXResult) -> Dict[str, Any]:
         "top_flow_strikes": result.top_flow_strikes,
         "data_source": result.data_source,
         "error": result.error,
+        "as_of": result.as_of,
+        "stale": result.stale,
     }
 
 
