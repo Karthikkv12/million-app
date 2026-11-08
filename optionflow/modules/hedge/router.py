@@ -10,16 +10,21 @@ from fastapi.responses import StreamingResponse
 
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.auth import service as auth_service
+from optionflow.modules.hedge import portfolio as pf
 from optionflow.modules.hedge import service
-from optionflow.modules.hedge.schemas import BooksOut, BrokerPositionOut, IngestOut, IngestRequest
+from optionflow.modules.hedge.schemas import (ActivityOut, BooksOut, BrokerPositionOut, HistoryPoint, IncomeOut,
+                                              IngestOut, IngestRequest, PortfolioOut)
 
 router = APIRouter(prefix="/hedge", tags=["hedge"])
 stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
+broker_router = APIRouter(prefix="/broker", tags=["broker"])
 
 
 @router.post("/ingest", response_model=IngestOut)
 def ingest(body: IngestRequest, x_hedge_ingest_token: Optional[str] = Header(None)) -> IngestOut:
-    """Replace a user's broker positions (daily broker sync). Auth: X-Hedge-Ingest-Token."""
+    """Daily broker sync. Replaces positions; upserts today's account values and the activity history.
+
+    Auth: X-Hedge-Ingest-Token (not a user login)."""
     if not service.check_ingest_token(x_hedge_ingest_token):
         raise HTTPException(status_code=401, detail="Bad or missing ingest token")
     user = auth_service.get_user_by_username(body.username)
@@ -31,8 +36,11 @@ def ingest(body: IngestRequest, x_hedge_ingest_token: Optional[str] = Header(Non
     rows = [p.model_dump() for p in body.positions]
     for r in rows:
         r["symbol"] = r["symbol"].strip().upper()
-    count, synced = service.replace_positions(int(user.id), body.source, rows)
-    return IngestOut(count=count, synced_at=synced)
+    uid = int(user.id)
+    count, synced = service.replace_positions(uid, body.source, rows)
+    n_acct = pf.upsert_accounts(uid, body.source, [a.model_dump() for a in body.accounts], synced)
+    new, total = pf.upsert_activity(uid, body.source, [a.model_dump() for a in body.activity])
+    return IngestOut(count=count, synced_at=synced, accounts=n_acct, activity_new=new, activity_total=total)
 
 
 @router.get("/positions", response_model=List[BrokerPositionOut])
@@ -70,3 +78,31 @@ async def stream(
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ── Portfolio (everything from the broker sync) ──────────────────────────────
+@broker_router.get("/portfolio", response_model=PortfolioOut)
+def broker_portfolio(account: Optional[str] = Query(None, description="Masked account label; all if empty"),
+                     user=Depends(get_current_user)) -> PortfolioOut:
+    """Account values, holdings with live prices and unrealized P&L, open options."""
+    return PortfolioOut(**pf.portfolio(int(user["sub"]), account))
+
+
+@broker_router.get("/history", response_model=List[HistoryPoint])
+def broker_history(account: Optional[str] = None, days: int = Query(365, ge=7, le=3650),
+                   user=Depends(get_current_user)) -> List[HistoryPoint]:
+    """Daily account value (sum of accounts) from each sync."""
+    return [HistoryPoint(**p) for p in pf.history(int(user["sub"]), account, days)]
+
+
+@broker_router.get("/income", response_model=IncomeOut)
+def broker_income(account: Optional[str] = None, user=Depends(get_current_user)) -> IncomeOut:
+    """Option premium (net cash from fills) and realized P&L by week, month and symbol."""
+    return IncomeOut(**pf.income(int(user["sub"]), account))
+
+
+@broker_router.get("/activity", response_model=List[ActivityOut])
+def broker_activity(account: Optional[str] = None, limit: int = Query(200, ge=1, le=2000),
+                    user=Depends(get_current_user)) -> List[ActivityOut]:
+    """Option fills and realized trades, newest first."""
+    return [ActivityOut(**a) for a in pf.activity(int(user["sub"]), account, limit)]

@@ -19,15 +19,49 @@ class IngestPosition(BaseModel):
     opened_at: Optional[str] = None
 
 
+class IngestAccount(BaseModel):
+    account: str = Field(..., description='Masked label, e.g. "Trading ••8453"')
+    day: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="Trading day (US Eastern); default today")
+    total_value: Optional[float] = None
+    equity_value: Optional[float] = None
+    options_value: Optional[float] = None
+    crypto_value: Optional[float] = None
+    cash: Optional[float] = None
+    buying_power: Optional[float] = None
+
+
+class IngestActivity(BaseModel):
+    ext_id: str = Field(..., min_length=1, max_length=200, description="Stable broker id: option leg id, or a derived key")
+    account: Optional[str] = None
+    kind: Literal["option_fill", "realized"]
+    ts: str
+    symbol: str
+    side: Optional[Literal["buy", "sell", ""]] = None
+    position_effect: Optional[Literal["open", "close"]] = None
+    option_type: Optional[Literal["call", "put"]] = None
+    strike: Optional[float] = None
+    expiry: Optional[str] = None
+    quantity: Optional[float] = None
+    price: Optional[float] = None
+    amount: Optional[float] = Field(None, description="Option fills: cash, + credit / − debit")
+    realized_gain: Optional[float] = None
+    strategy: Optional[str] = None
+
+
 class IngestRequest(BaseModel):
     username: str
     source: Literal["robinhood"] = "robinhood"
     positions: List[IngestPosition]
+    accounts: List[IngestAccount] = []
+    activity: List[IngestActivity] = []
 
 
 class IngestOut(BaseModel):
     count: int
     synced_at: str
+    accounts: int = 0
+    activity_new: int = 0
+    activity_total: int = 0
 
 
 class BrokerPositionOut(IngestPosition):
@@ -118,3 +152,101 @@ class BooksOut(BaseModel):
     as_of: str
     synced_at: Optional[str] = None
     books: List[BookOut]
+
+
+# ── Portfolio (broker-synced) ─────────────────────────────────────────────────
+class AccountOut(BaseModel):
+    account: str
+    day: Optional[str] = None
+    total_value: Optional[float] = None
+    equity_value: Optional[float] = None
+    options_value: Optional[float] = None
+    crypto_value: Optional[float] = None
+    cash: Optional[float] = None
+    buying_power: Optional[float] = None
+    prev_total: Optional[float] = None
+    change: Optional[float] = None
+
+
+class HoldingOut(BaseModel):
+    symbol: str
+    accounts: List[str] = []
+    shares: float
+    avg_cost: Optional[float] = None
+    price: Optional[float] = None
+    prev_close: Optional[float] = None
+    market_value: Optional[float] = None
+    cost_basis: Optional[float] = None
+    unrealized: Optional[float] = None
+    unrealized_pct: Optional[float] = None
+    day_change_pct: Optional[float] = None
+    weight: Optional[float] = None
+    short_calls: float = 0
+    covered_pct: float = 0
+
+
+class OptionHoldingOut(BaseModel):
+    symbol: str
+    account: Optional[str] = None
+    option_type: str
+    strike: float
+    expiry: str
+    dte: Optional[int] = None
+    contracts: float
+    avg_price: Optional[float] = None
+    premium: Optional[float] = None
+    spot: Optional[float] = None
+    moneyness: Optional[Literal["ITM", "OTM", "ATM"]] = None
+    distance_pct: Optional[float] = None
+    opened_at: Optional[str] = None
+
+
+class PortfolioOut(BaseModel):
+    as_of: str
+    synced_at: Optional[str] = None
+    account_filter: Optional[str] = None
+    accounts: List[AccountOut]
+    total_value: Optional[float] = None
+    cash: Optional[float] = None
+    buying_power: Optional[float] = None
+    day_change: Optional[float] = None
+    stock_value: Optional[float] = None
+    unrealized: Optional[float] = None
+    holdings: List[HoldingOut]
+    options: List[OptionHoldingOut]
+
+
+class HistoryPoint(BaseModel):
+    day: str
+    total_value: Optional[float] = None
+    cash: Optional[float] = None
+
+
+class IncomeBucket(BaseModel):
+    period: str
+    premium: float = 0.0
+    realized: float = 0.0
+    trades: int = 0
+    wins: int = 0
+
+
+class SymbolIncome(BaseModel):
+    symbol: str
+    premium: float = 0.0
+    realized: float = 0.0
+    trades: int = 0
+
+
+class IncomeOut(BaseModel):
+    weekly: List[IncomeBucket]
+    monthly: List[IncomeBucket]
+    by_symbol: List[SymbolIncome]
+    premium_total: float = 0.0
+    realized_total: float = 0.0
+    trades: int = 0
+    win_rate: Optional[float] = None
+    since: Optional[str] = None
+
+
+class ActivityOut(IngestActivity):
+    id: int

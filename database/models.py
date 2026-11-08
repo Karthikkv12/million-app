@@ -485,3 +485,48 @@ class BrokerPosition(Base):
     opened_at   = Column(String, nullable=True)                 # ISO UTC
     synced_at   = Column(String, nullable=False)                # ISO UTC
 
+
+class BrokerAccountSnapshot(Base):
+    """One row per (user, account, day) from the broker sync: account value history for the Portfolio page."""
+    __tablename__ = "broker_account_snapshots"
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source       = Column(String, nullable=False, default="robinhood")
+    account      = Column(String, nullable=False)                 # masked label
+    day          = Column(String, nullable=False)                 # YYYY-MM-DD (US Eastern trading day)
+    total_value  = Column(Float, nullable=True)
+    equity_value = Column(Float, nullable=True)
+    options_value = Column(Float, nullable=True)
+    crypto_value = Column(Float, nullable=True)
+    cash         = Column(Float, nullable=True)
+    buying_power = Column(Float, nullable=True)
+    synced_at    = Column(String, nullable=False)
+
+Index("ux_broker_snap_user_acct_day", BrokerAccountSnapshot.user_id, BrokerAccountSnapshot.source,
+      BrokerAccountSnapshot.account, BrokerAccountSnapshot.day, unique=True)
+
+
+class BrokerActivity(Base):
+    """Broker history, upserted by (user, source, ext_id): option fills and realized (closing) trades."""
+    __tablename__ = "broker_activity"
+    id              = Column(Integer, primary_key=True)
+    user_id         = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source          = Column(String, nullable=False, default="robinhood")
+    ext_id          = Column(String, nullable=False)              # broker id (order leg id / derived key)
+    account         = Column(String, nullable=True)
+    kind            = Column(String, nullable=False)              # "option_fill" | "realized"
+    ts              = Column(String, nullable=False, index=True)  # ISO UTC
+    symbol          = Column(String, nullable=False, index=True)
+    side            = Column(String, nullable=True)               # buy | sell
+    position_effect = Column(String, nullable=True)               # open | close (option fills)
+    option_type     = Column(String, nullable=True)
+    strike          = Column(Float, nullable=True)
+    expiry          = Column(String, nullable=True)
+    quantity        = Column(Float, nullable=True)
+    price           = Column(Float, nullable=True)                # per share
+    amount          = Column(Float, nullable=True)                # option fills: cash, + credit / − debit
+    realized_gain   = Column(Float, nullable=True)                # realized trades
+    strategy        = Column(String, nullable=True)               # e.g. short_call (opening/closing strategy)
+
+Index("ux_broker_activity_ext", BrokerActivity.user_id, BrokerActivity.source, BrokerActivity.ext_id, unique=True)
+
