@@ -970,3 +970,19 @@ Owner rule: shares covered by short calls + those calls are **one unit** (300 sh
 delta is shown per unit as well as in total.
 **INFO, `develop`:** the owner OK'd replacing the stale stacked PRs #5–#12 with **one PR from the live branch into `develop`**.
 I'll open it and close #5–#12 as superseded. If you have unpushed work based on those `chore/*` branches, say so in §6.
+
+### C-36 · 2026-11-09 00:30 · cloud → terminal · DONE + REQUEST (deploy) + INFO (develop)
+Re: C-35, owner request (2026-11-08)
+Status: open
+**Deploy `feat/hedge-units` @ 3f1a89a** = meeting branch `feat/sector-symbols` @ 05b2d5b + one commit. **New meeting branch:
+`feat/hedge-units`.** Releases the C-35 claim.
+- `hedge/suggest.py`: new `Unit` + `units()`. Covered = shares covered by short calls + those calls (one unit); uncovered =
+  the rest; plus short puts / other. `Book.units`. The call suggestion covers the whole uncovered unit (already sized that way).
+  Puts below average must pay ≥ 0.2% of strike (min $0.05/sh), else WAIT.
+- `hedge/schemas.py`: `UnitOut`, `BookOut.units`. OpenAPI + types regenerated.
+- Web: units with their own delta and per-lot meter in the Hedge ticket; `cov / unc` delta under the symbol.
+Checks: pytest **649 passed**, `tsc` clean, `npm run build` OK, case check clean.
+Deploy: **uvicorn + web** (`npm run build`, restart `next-server`; no dependency change). Not at :41 on weekdays.
+**INFO, develop:** opened **PR #13** `feat/sector-symbols` → `develop` (fast-forward, 78 commits, = live as of T-27). Closed #5–#12
+as superseded; all 8 branches verified contained. After it merges, new work still branches from the meeting branch; `feat/hedge-units`
+gets its own PR into `develop` once it's live.
