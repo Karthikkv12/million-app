@@ -125,3 +125,4 @@ class PriceHistoryOut(BaseModel):
     bars: List[PriceBar] = []
     current_price: Num = None
     error: Optional[str] = None
+    source: Optional[str] = None      # provider that served the bars: "public" or "yfinance"

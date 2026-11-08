@@ -133,4 +133,5 @@ def price_history(symbol: str, period: str = "6mo", interval: str = "1d") -> Dic
     if df.empty:
         return {"symbol": sym, "bars": [], "current_price": None, "error": f"No data for {sym}"}
     bars = bars_from_history(df, intraday=iv not in _DAILY_OR_LONGER)
-    return {"symbol": sym, "bars": bars, "current_price": bars[-1]["close"] if bars else None, "error": None}
+    return {"symbol": sym, "bars": bars, "current_price": bars[-1]["close"] if bars else None, "error": None,
+            "source": df.attrs.get("source")}

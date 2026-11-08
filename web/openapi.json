@@ -6946,6 +6946,17 @@
       ],
       "title": "Error"
      },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
      "symbol": {
       "title": "Symbol",
       "type": "string"

@@ -1,6 +1,8 @@
-"""optionflow/modules/unusual/service.py — unusual options activity from Yahoo option chains.
+"""optionflow/modules/unusual/service.py — unusual options activity from option chain snapshots.
 
-Yahoo gives end-of-snapshot chains (≈15 min delayed), not a trade tape, so
+Chains come through the market-data provider: Public.com (real-time) first, Yahoo
+(≈15 min delayed) per symbol when Public fails. Either way they are snapshots,
+not a trade tape, so
 "unusual" here means a contract whose *day volume* is large relative to its
 *open interest* and whose premium traded is large. That catches fresh
 positioning (new contracts opened today) without claiming to see individual
@@ -20,7 +22,7 @@ import math
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from cachetools import TTLCache
 
@@ -82,7 +84,9 @@ def score(vol_oi: Optional[float], premium: float, otm_pct: float, dte: int) -> 
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 
-def _scan_symbol(sym: str, min_premium: float) -> List[Dict[str, Any]]:
+def _scan_symbol(sym: str, min_premium: float) -> Tuple[List[Dict[str, Any]], str]:
+    """Unusual rows for one symbol and the source that served its chains ("public" / "yfinance").
+    Raises when no source could serve it (nothing is cached then)."""
     from optionflow.providers.market_data import get_market_data
 
     with _lock:
@@ -90,66 +94,52 @@ def _scan_symbol(sym: str, min_premium: float) -> List[Dict[str, Any]]:
     if hit is not None:
         return hit
 
-    t = get_market_data().raw_ticker(sym)
-    try:
-        info = t.fast_info
-        spot = _f(getattr(info, "last_price", None))
-    except Exception:
-        spot = None
+    chain = get_market_data().option_contracts(sym, max_dte=MAX_DTE, max_expiries=MAX_EXPIRIES)
+    spot = _f(chain.spot)
     today = datetime.now(timezone.utc).date()
     rows: List[Dict[str, Any]] = []
-    try:
-        expiries = [e for e in (t.options or []) if 0 <= (date.fromisoformat(e) - today).days <= MAX_DTE][:MAX_EXPIRIES]
-    except Exception as exc:
-        logger.info("unusual %s: no expiries (%s)", sym, exc)
-        expiries = []
-
-    for exp in expiries:
-        try:
-            ch = t.option_chain(exp)
-        except Exception as exc:
-            logger.info("unusual %s %s: chain failed (%s)", sym, exp, exc)
-            continue
+    for exp, contracts in chain.rows.groupby("expiry", sort=True):
         dte = (date.fromisoformat(exp) - today).days
-        for kind, df in (("call", ch.calls), ("put", ch.puts)):
-            for r in df.to_dict("records"):
-                vol, oi = _f(r.get("volume")) or 0.0, _f(r.get("openInterest")) or 0.0
-                bid, ask, last = _f(r.get("bid")), _f(r.get("ask")), _f(r.get("lastPrice"))
-                mid = (bid + ask) / 2 if bid and ask and ask >= bid else last
-                if not mid or vol <= 0:
-                    continue
-                premium = vol * mid * 100
-                if not is_unusual(vol, oi, premium, min_premium=min_premium):
-                    continue
-                strike = float(r["strike"])
-                otm = None
-                if spot:
-                    otm = (strike / spot - 1) * 100 if kind == "call" else (1 - strike / spot) * 100
-                vol_oi = round(vol / oi, 2) if oi > 0 else None
-                rows.append({
-                    "symbol": sym, "type": kind, "strike": strike, "expiry": exp, "dte": dte,
-                    "spot": spot, "otm_pct": round(otm, 2) if otm is not None else None,
-                    "last": last, "bid": bid, "ask": ask, "side": classify_side(last, bid, ask),
-                    "volume": int(vol), "open_interest": int(oi), "vol_oi": vol_oi,
-                    "iv_pct": round((_f(r.get("impliedVolatility")) or 0) * 100, 1) or None,
-                    "premium": round(premium, 0),
-                    "score": score(vol_oi, premium, otm or 0, dte),
-                })
-    from optionflow.providers.market_data import raise_if_rate_limited
-    raise_if_rate_limited()               # partial chains while rate-limited: don't cache
+        for r in contracts.to_dict("records"):
+            kind = r["otype"]
+            vol, oi = _f(r.get("volume")) or 0.0, _f(r.get("oi")) or 0.0
+            bid, ask, last = _f(r.get("bid")), _f(r.get("ask")), _f(r.get("last"))
+            mid = (bid + ask) / 2 if bid and ask and ask >= bid else last
+            if not mid or vol <= 0:
+                continue
+            premium = vol * mid * 100
+            if not is_unusual(vol, oi, premium, min_premium=min_premium):
+                continue
+            strike = float(r["strike"])
+            otm = None
+            if spot:
+                otm = (strike / spot - 1) * 100 if kind == "call" else (1 - strike / spot) * 100
+            vol_oi = round(vol / oi, 2) if oi > 0 else None
+            rows.append({
+                "symbol": sym, "type": kind, "strike": strike, "expiry": exp, "dte": dte,
+                "spot": spot, "otm_pct": round(otm, 2) if otm is not None else None,
+                "last": last, "bid": bid, "ask": ask, "side": classify_side(last, bid, ask),
+                "volume": int(vol), "open_interest": int(oi), "vol_oi": vol_oi,
+                "iv_pct": round((_f(r.get("iv")) or 0) * 100, 1) or None,
+                "premium": round(premium, 0),
+                "score": score(vol_oi, premium, otm or 0, dte),
+            })
     with _lock:
-        _cache[(sym, min_premium)] = rows
-    return rows
+        _cache[(sym, min_premium)] = (rows, chain.source)
+    return rows, chain.source
 
 
 def scan(symbols: Optional[Iterable[str]] = None, *, min_premium: float = 100_000, kind: str = "all", limit: int = 300) -> Dict[str, Any]:
-    from optionflow.providers.market_data import raise_if_rate_limited
+    from optionflow.providers.market_data import chains_rate_limited, raise_if_rate_limited
     syms = [s.strip().upper() for s in (symbols or DEFAULT_UNIVERSE) if s and s.strip()][:40]
-    raise_if_rate_limited()               # honour the shared Yahoo back-off
+    if chains_rate_limited():             # neither Public nor Yahoo can serve chains right now
+        raise_if_rate_limited()
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(lambda s: _safe(s, min_premium), syms))
-    raise_if_rate_limited()               # tripped mid-scan: results are incomplete
-    rows = [r for rs in results for r in rs]
+    if chains_rate_limited():             # both tripped mid-scan: results are incomplete
+        raise_if_rate_limited()
+    rows = [r for rs, _ in results for r in rs]
+    sources = [src for _, src in results if src]
     if kind in ("call", "put"):
         rows = [r for r in rows if r["type"] == kind]
     rows.sort(key=lambda r: (r["score"], r["premium"]), reverse=True)
@@ -162,13 +152,23 @@ def scan(symbols: Optional[Iterable[str]] = None, *, min_premium: float = 100_00
         "call_premium": calls,
         "put_premium": puts,
         "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": "Yahoo Finance option chains (delayed); unusual = day volume ≥1.2× open interest",
+        "source": describe_sources(sources) + "; unusual = day volume ≥1.2× open interest",
     }
 
 
-def _safe(sym: str, min_premium: float) -> List[Dict[str, Any]]:
+def describe_sources(sources: List[str]) -> str:
+    """Human label for the chain sources a scan used."""
+    yahoo = sum(1 for s in sources if s != "public")
+    if sources and not yahoo:
+        return "Public.com option chains (real-time)"
+    if yahoo == len(sources):
+        return "Yahoo Finance option chains (delayed)"
+    return f"Public.com option chains (real-time); Yahoo Finance (delayed) for {yahoo} of {len(sources)} symbols"
+
+
+def _safe(sym: str, min_premium: float) -> Tuple[List[Dict[str, Any]], str]:
     try:
         return _scan_symbol(sym, min_premium)
     except Exception as exc:
         logger.info("unusual %s failed: %s", sym, exc)
-        return []
+        return [], ""
