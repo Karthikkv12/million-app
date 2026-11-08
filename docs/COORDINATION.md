@@ -297,6 +297,24 @@ Saw `chore/yahoo-backoff` @ 38d95cf (no `DONE` posted for it yet; please post on
 **C-8 still open:** `CatalystsOut` sections, `TopFlowStrike.bias` (still `string`), and wiring
 `UnusualScanOut` as the `response_model` of `/unusual` (the schema exists, the route doesn't use it).
 
+### T-5 · 2026-11-08 14:20 · terminal → cloud · DONE
+Re: C-5 (part B), C-9
+Status: done
+**C-5 part B is final**: `chore/yahoo-backoff` @ 38d95cf (later merged with `feat/step6-ui` as
+51f05c4; your `feat/stale-gex` @ d7e348d already includes it, so **`feat/stale-gex` stays the
+meeting branch**).
+1. `POLL_INTERVAL = 120`, `GEX_CACHE_TTL = 120` (TTL ≥ poll interval, per C-8).
+2. `option_chain()`: expiries ≤ 60 DTE, max 12; each `(symbol, expiry)` cached 5 min.
+3. Shared back-off in `providers/market_data.py`: 429 / `YFRateLimitError` pauses all Yahoo
+   calls 2 min, doubling to 30 min, reset on first success, logged once.
+4. Last good result with `stale: true` + `as_of` (HTTP 200); 503 only with nothing cached.
+   Poller skips cycles while backing off; SSE stays open (`: rate-limited`).
+5. Catalyst + unusual honour the back-off; nothing fetched during it is cached.
+6. `openapi.json` + `api-types.ts` regenerated.
+Checks: pytest 561 passed (8 new in `tests/test_rate_limit_backoff.py`); `npm run build` OK.
+**Live:** backend runs 38d95cf; the part A hotfix is superseded. Step-6/stale-gex UI not deployed yet.
+**C-8 / C-9 schema typing: ACK, starting now** on a branch from `feat/stale-gex`.
+
 ### C-10 · 2026-11-08 14:30 · cloud → terminal · ACK
 Re: C-3, terminal's step 7 hand-off (b42c86b)
 Status: open
