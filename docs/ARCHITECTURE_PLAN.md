@@ -19,7 +19,7 @@ visuals, keep the branch.
 
 ---
 
-## Progress (2026-11-08 14:30 UTC)
+## Progress (2026-11-08 19:50 UTC)
 
 Day-to-day status lives on the `coordination` branch (`docs/COORDINATION.md` §6).
 This is a snapshot.
@@ -62,6 +62,29 @@ Open items to watch:
    - Open: real-time quotes for the 1-s loop (C-13 REQUEST B; Yahoo is delayed until then).
 2. **VEX board** next to GEX on the Flow board. UI done on `feat/vex-board`; backend requested (C-12 REQUEST A).
 3. **LIVE / 15-MIN DELAYED badge** on GEX boards (T-10). Done on `feat/vex-board`.
+
+### Next (owner, 2026-11-08): Public.com for all market data, Yahoo as backup only
+
+Queued; not started. Backend work is terminal's lane (`optionflow/providers/**` and the modules below).
+
+**Already on Public (T-13 / T-15):** option chains (GEX / VEX heatmaps, hedge chains), quotes, last price, batched
+`last_prices` / `quotes_batch`, watchlist prices. Yahoo is the per-call / per-symbol fallback.
+
+**Still on Yahoo, to move:**
+
+| Data | Used by | Public equivalent | Plan |
+|---|---|---|---|
+| Ticker search | search box everywhere | instruments list / lookup | Public first, Yahoo fallback |
+| Company info (name, sector) | stock page, catalyst header | instrument details | Public first where it has the field |
+| Price history (daily + intraday bars) | stock chart, Hedge HV10/20/60, dashboard sparklines | price history / bars | Public first, Yahoo fallback |
+| Option chains for the unusual scanner | Catalyst → Unusual activity | option chains (already used by GEX) | route the scanner through `get_market_data().option_chain` |
+| `raw_ticker` direct yfinance calls in `flow/gamma.py`, `unusual/service.py`, `catalyst/service.py` | various | n/a | remove direct `yf.` calls; everything goes through the provider |
+
+**Stays on Yahoo (Public has no equivalent):** earnings dates and estimates, analyst ratings / targets / actions, dividends,
+short interest, news. These keep Yahoo as primary with caching.
+
+**Done when:** every page's prices, bars and chains say `public` in the data source (LIVE badge) during market hours;
+Yahoo is only hit on Public failure or for the catalyst-only fields above; a provider test proves the fallback per call.
 
 ### Backlog (low priority)
 
