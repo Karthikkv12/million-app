@@ -10,7 +10,7 @@ import { ChevronDown } from "lucide-react";
 import { heatColor } from "@/components/ui";
 import { DeskRow } from "@/components/desk";
 import { useQuotes } from "./quotes";
-import { SECTORS, SECTOR_ROWS, StockTile } from "./sectors";
+import { SECTORS, SECTOR_ROWS, StockTile } from "./sector-baskets";
 
 const STOCKS = Array.from(new Set(Object.values(SECTORS).flatMap((s) => s.stocks.map((x) => x.symbol))));
 const ETFS = SECTOR_ROWS.map((r) => r.etf).filter((e): e is string => !!e);
