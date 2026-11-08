@@ -41,6 +41,13 @@ const ACTION: Record<HedgeSuggestion["action"], { tag: "accent" | "gain" | "loss
   TRACK: { tag: "neutral", label: "Track", edge: null },
 };
 
+const UNIT: Record<HedgeBook["units"][number]["kind"], { label: string; cls: string }> = {
+  covered: { label: "covered", cls: "text-accent" },
+  uncovered: { label: "uncovered", cls: "text-gain" },
+  puts: { label: "puts", cls: "text-amber-600 dark:text-amber-400" },
+  other: { label: "other", cls: "text-foreground/50" },
+};
+
 /** Per-lot delta (1.00 = the stock alone). */
 const perLot = (b: HedgeBook) => (b.lots && b.lots >= 1 ? (b.net_delta ?? 0) / Math.floor(b.lots) : null);
 /** Colour for a per-lot delta: near the stock (≥0.85), partly hedged, mostly hedged (<0.40). */
@@ -98,6 +105,22 @@ function Detail({ b }: { b: HedgeBook }) {
       </div>
 
       <div className="min-w-0">
+        {b.units.length > 0 && (
+          <>
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Units</p>
+            <div className="mb-5 mt-2 grid grid-cols-1 gap-3">
+              {b.units.map((u) => (
+                <div key={u.kind}>
+                  <div className="flex items-baseline justify-between gap-3 font-mono text-[12.5px] tabular-nums">
+                    <span className="min-w-0 text-foreground/80"><span className={clsx("mr-2 text-[10px] uppercase tracking-[0.12em]", UNIT[u.kind].cls)}>{UNIT[u.kind].label}</span><span className="sensitive">{u.label}</span></span>
+                    <span className="shrink-0 text-foreground">{sd(u.delta)}{u.per_lot != null && <span className="text-foreground/45"> · {sd(u.per_lot)}/lot</span>}</span>
+                  </div>
+                  {u.per_lot != null && <div className="mt-1"><Meter min={-0.5} max={1.5} value={u.per_lot} target={1} dot={lotTone(u.per_lot)} /></div>}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Legs</p>
         <table className="mt-2 w-full font-mono text-[12.5px] tabular-nums">
           <tbody>
@@ -169,12 +192,13 @@ function Legend() {
           <Item title="Mostly hedged (below 0.40)" sym={<Sym><span className="h-3 w-3 rounded-full bg-amber-500" /></Sym>}>A deep ITM call is taking most of the move.</Item>
           <Item title="+1.00 = the stock alone" sym={<Sym><span className="h-[18px] w-[2px] bg-accent" /></Sym>}>The reference tick. The playbook keeps the book near it; it is not a delta-neutral target.</Item>
           <Item title="After the suggested trade" sym={<Sym><span className="h-2 w-2 rotate-45 border border-accent" /></Sym>}>Where net delta lands if you place the suggested trade.</Item>
+          <Item title="Units" sym={<Sym><span className="font-mono text-[10px] text-accent">cov</span></Sym>}>Shares covered by short calls plus those calls are one unit (300 sh + 3 calls); the rest is another (200 sh). Each shows its own delta; a new call covers the whole uncovered unit at once.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Row edge &amp; signals</p>
           <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Spike: the stock is ≥2% over your average or IV is spiking. Sell the call in the money, at the strike closest to your average from above.</Item>
-          <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average.</Item>
+          <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-amber-500" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
           <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only.</Item>
         </div>
@@ -297,6 +321,13 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
             <span className={clsx("ml-2 font-mono text-[11px] font-normal xl:hidden", betaTone(b.beta))}>{b.beta != null ? `β ${b.beta.toFixed(2)}` : ""}</span>
           </p>
           <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
+          {b.units.some((u) => u.kind === "covered") && b.units.some((u) => u.kind === "uncovered") && (
+            <p className="truncate font-mono text-[10.5px] text-foreground/50">
+              {b.units.filter((u) => u.kind === "covered" || u.kind === "uncovered").map((u) => (
+                <span key={u.kind} className="mr-2"><span className={UNIT[u.kind].cls}>{u.kind === "covered" ? "cov" : "unc"}</span> {sd(u.delta)}</span>
+              ))}
+            </p>
+          )}
         </div>
         <div className="text-right font-mono tabular-nums md:col-start-3 md:row-start-1 xl:col-start-auto xl:row-start-auto">
           <p className="text-[14px] text-foreground"><Tick value={b.spot} className="px-0.5">{usd(b.spot)}</Tick></p>

@@ -154,3 +154,32 @@ def test_options_only_position_is_tracked_not_advised():
 def test_pick_weekly_skips_0_1_dte():
     assert pick_weekly([("a", 0), ("b", 1), ("c", 4), ("d", 11)]) == "c"
     assert pick_weekly([("a", 1), ("d", 11)]) == "d"
+
+
+# ── units (owner): covered shares + their calls are one unit, the rest another ─────────────
+def test_units_split_covered_and_uncovered():
+    ctx = Context("XYZ", 100.0, 95.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    book = evaluate(ctx, [stock(qty=500, avg=95.0), short_call(98.0, n=3)], chain())
+    kinds = {u.kind: u for u in book.units}
+    assert kinds["covered"].shares == 300 and kinds["covered"].contracts == -3
+    assert kinds["uncovered"].shares == 200 and kinds["uncovered"].delta == pytest.approx(2.0)
+    cov = kinds["covered"].delta
+    assert cov == pytest.approx(3.0 + 3 * book.legs[1].position_delta / 3, abs=1e-3)
+    assert cov + kinds["uncovered"].delta == pytest.approx(book.net_delta, abs=1e-3)
+    assert kinds["covered"].per_lot == pytest.approx(cov / 3, abs=1e-3)
+
+
+def test_fully_covered_is_one_unit_and_call_covers_whole_uncovered_unit():
+    ctx = Context("XYZ", 100.0, 95.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    book = evaluate(ctx, [stock(qty=300, avg=95.0), short_call(98.0, n=3)], chain())
+    assert [u.kind for u in book.units] == ["covered"]
+    ctx = Context("XYZ", 103.0, 100.0, 0.03, day_high=103.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    s = evaluate(ctx, [stock(qty=500), short_call(104.0, n=3)], chain()).suggestion
+    assert s.action == "SELL_CALL" and s.contracts == 2                 # the 200-share unit, in one go
+
+
+def test_put_that_pays_too_little_waits():
+    cheap = [Quote(float(k), t, 0.45, 0.01, 0.02, 0.015, 5, EXP) for k in range(94, 109) for t in ("call", "put")]
+    ctx = Context("XYZ", 101.0, 100.0, -0.01, day_high=103.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    s = evaluate(ctx, [stock(), short_call(100.0)], cheap).suggestion
+    assert s.action == "WAIT" and "too little" in s.headline

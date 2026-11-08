@@ -1298,6 +1298,15 @@
       ],
       "title": "Target Delta"
      },
+     "units": {
+      "default": [],
+      "description": "Covered (shares + their short calls), uncovered shares, short puts",
+      "items": {
+       "$ref": "#/components/schemas/UnitOut"
+      },
+      "title": "Units",
+      "type": "array"
+     },
      "weekly_expiry": {
       "anyOf": [
        {
@@ -8569,6 +8578,62 @@
      "bias"
     ],
     "title": "TopFlowStrike",
+    "type": "object"
+   },
+   "UnitOut": {
+    "properties": {
+     "contracts": {
+      "default": 0,
+      "title": "Contracts",
+      "type": "number"
+     },
+     "delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta"
+     },
+     "kind": {
+      "enum": [
+       "covered",
+       "uncovered",
+       "puts",
+       "other"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "per_lot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Per Lot"
+     },
+     "shares": {
+      "default": 0,
+      "title": "Shares",
+      "type": "number"
+     }
+    },
+    "required": [
+     "kind",
+     "label"
+    ],
+    "title": "UnitOut",
     "type": "object"
    },
    "UnusualRow": {
