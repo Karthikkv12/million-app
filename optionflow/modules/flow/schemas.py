@@ -32,11 +32,13 @@ class GexOut(BaseModel):
     heatmap_expiries: List[str] = []
     heatmap_strikes: List[float] = []
     heatmap_values: List[List[float]] = []   # [expiry][strike], $ GEX per 1% move
+    heatmap_vex_values: List[List[float]] = []   # same grid, $ VEX (dealer delta change) per 1 vol-point
     zero_gamma: Optional[float] = None
     max_call_wall: Optional[float] = None
     max_put_wall: Optional[float] = None
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
+    net_vex: float = 0.0
     call_premium: float = 0.0
     put_premium: float = 0.0
     net_flow: float = 0.0

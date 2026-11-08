@@ -4,12 +4,16 @@ optionflow/modules/flow/gamma.py — Gamma Exposure (GEX) calculations.
 Option chains come from the market-data provider (optionflow.providers);
 this module only does the math.
 
-Dealer GEX model:
-  - For calls:  dealer is SHORT gamma  → GEX contribution = -Gamma × OI × lot_size × Spot
-  - For puts:   dealer is LONG gamma   → GEX contribution = +Gamma × OI × lot_size × Spot
-    Net GEX > 0  →  dealers net long gamma  → they sell rallies / buy dips  → mean-reverting / low vol
+Dealer GEX model (SpotGamma convention, as `_compute_gex` implements it):
+  - For calls:  GEX contribution = +Gamma × OI × lot_size × Spot² × 0.01
+  - For puts:   GEX contribution = −Gamma × OI × lot_size × Spot² × 0.01
+  Net GEX > 0  →  dealers net long gamma  → they sell rallies / buy dips  → mean-reverting / low vol
   Net GEX < 0  →  dealers net short gamma → they buy rallies / sell dips  → trending / volatile
   Formula: GEX = gamma × OI × contract_size × spot² × 0.01  ($ per 1% spot move, canonical standard)
+
+Dealer VEX (vanna exposure), same sign convention (calls +, puts −):
+  VEX = vanna × OI × contract_size × spot × 0.01  ($ change in dealer delta per 1 vol-point)
+  Vanna is always Black-Scholes from the row's IV and T (feeds don't send it).
 
 Data source:
   get_market_data() — Public.com option chains (real-time) when PUBLIC_API_SECRET
@@ -164,6 +168,19 @@ def bs_gamma(S: float, K: float, T: float, r: float, sigma: float) -> float:
         return 0.0
 
 
+def bs_vanna(S: float, K: float, T: float, r: float, sigma: float) -> float:
+    """Black-Scholes vanna ∂Δ/∂σ (per 1.00 of vol; same for calls and puts). Same guards as bs_gamma."""
+    if T <= 0 or sigma < 0.005 or S <= 0 or K <= 0:
+        return 0.0
+    try:
+        st = sigma * math.sqrt(T)
+        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / st
+        d2 = d1 - st
+        return -_norm_pdf(d1) * d2 / sigma
+    except Exception:
+        return 0.0
+
+
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
@@ -193,12 +210,14 @@ class GEXResult:
     heatmap_expiries: List[str] = field(default_factory=list)
     heatmap_strikes: List[float] = field(default_factory=list)
     heatmap_values: List[List[float]] = field(default_factory=list)  # shape: [len(expiries)][len(strikes)]
+    heatmap_vex_values: List[List[float]] = field(default_factory=list)  # same grid, $ VEX per 1 vol-point
     # key levels
     zero_gamma: Optional[float] = None
     max_call_wall: Optional[float] = None
     max_put_wall: Optional[float] = None
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
+    net_vex: float = 0.0
     lot_size: int = 100   # contract multiplier used (100 for US, varies for India)
     # ── Net flow fields ──────────────────────────────────────────────────────
     call_premium: float = 0.0       # total call premium (OI × mid × lot_size)
@@ -260,6 +279,13 @@ def _compute_gex(df: pd.DataFrame, spot: float, lot_size: int = 100) -> tuple[pd
     df["gex"] = df.apply(
         lambda r: r["gex_raw"] if r["otype"] == "call" else -r["gex_raw"], axis=1
     )
+    # VEX: Black-Scholes vanna from IV/T, × OI × lot_size × spot × 0.01; calls +, puts −
+    if len(df) and "iv" in df.columns and "T" in df.columns:
+        vanna = df.apply(lambda r: bs_vanna(spot, float(r["strike"]), float(r["T"]), 0.045, float(r["iv"] or 0.0)), axis=1)
+        sign = df["otype"].map(lambda o: 1.0 if o == "call" else -1.0)
+        df["vex"] = vanna * df["oi"] * lot_size * spot * 0.01 * sign
+    else:
+        df["vex"] = 0.0
 
     # per-strike aggregate (all expiries combined)
     by_strike = (
@@ -357,6 +383,7 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
 
         # Net GEX
         result.net_gex = float(by_strike["gex"].sum())
+        result.net_vex = float(df["vex"].sum())
 
         # Key levels
         result.zero_gamma = _find_zero_gamma(by_strike, spot)
@@ -436,15 +463,18 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         heatmap_expiries = expiries[:8]
 
         heatmap_values: list[list[float]] = []
+        heatmap_vex_values: list[list[float]] = []
         for exp in heatmap_expiries:
             sub = df[df["expiry"] == exp]
             sub_gex = sub.groupby("strike")["gex"].sum()
-            row_vals = [float(sub_gex.get(s, 0.0)) for s in heatmap_strikes]
-            heatmap_values.append(row_vals)
+            sub_vex = sub.groupby("strike")["vex"].sum()
+            heatmap_values.append([float(sub_gex.get(s, 0.0)) for s in heatmap_strikes])
+            heatmap_vex_values.append([float(sub_vex.get(s, 0.0)) for s in heatmap_strikes])
 
         result.heatmap_expiries = heatmap_expiries
         result.heatmap_strikes = heatmap_strikes
         result.heatmap_values = heatmap_values
+        result.heatmap_vex_values = heatmap_vex_values
 
     except MarketDataRateLimited:
         raise                       # let the flow service serve the last good result
