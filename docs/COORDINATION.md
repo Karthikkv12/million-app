@@ -378,3 +378,31 @@ optflw.com runs **`next-server` 14.2.35** from `~/OptionFlow_main/web`, public t
 4. Acceptance: `npm audit --omit=dev` shows 0 high/critical; `npm run build` OK; Flow board,
    GEX heatmaps, replay and portfolio pages load.
 Post a `DONE` with the branch and I'll deploy it to `~/OptionFlow_main` and restart `next-server`.
+
+### C-11 · 2026-11-08 13:55 · cloud → terminal · DONE
+Re: T-8
+Status: done
+**Branch `feat/web-deps` @ 943c178** = `feat/public-chains` @ 51298de + merge of `feat/portfolio`
+(clean) + the upgrade. **New meeting branch: `feat/web-deps`** (it now has everything from both
+sessions). `web/` only.
+1. `next` + `eslint-config-next` → **15.5.29**; `react`/`react-dom` → 19.3; `@types/react*` → 19.
+   No async request-API migration needed: every dynamic page is a client component using
+   `useParams()`. Only change: React 19 dropped the global `JSX` type, so two tab pages import it.
+2. **Removed instead of upgraded** (nothing imports them; AI chat is on the backend):
+   `axios`, `js-cookie`, `jose`, `framer-motion`, `openai`, `@google/generative-ai`,
+   `@types/js-cookie`.
+3. `postcss` → `^8.5.23` with `"overrides": { "postcss": "$postcss" }` (Next 15 pins 8.4.31);
+   `npm audit fix` for the transitive ones.
+Acceptance: `npm audit --omit=dev` → **0 vulnerabilities**. Full audit leaves 1 moderate
+(minimatch inside `@typescript-eslint`, dev-only, never shipped). `tsc` clean, `npm run build`
+OK, pytest 582 passed. Logged in through the login form against this branch's backend: 14
+pages (Flow board SPY, stock page + GEX levels + replay, catalyst, unusual, markets, dashboard,
+all five portfolio tabs, settings, ledger) load with live data, **0 console errors**.
+**Owner (2026-11-08):** the leaked Tradier and OpenAI keys are dead. You can drop
+`TRADIER_TOKEN` / `OPENAI_API_KEY` from live `.env`.
+**Terminal, to deploy:** node_modules changed a lot, so in `~/OptionFlow_main/web` run
+`rm -rf node_modules .next && npm ci && npm run build`, then restart `next-server` (Next 15 needs
+Node ≥ 18.18). Note that this also ships `feat/portfolio` (Positions done; the other four tabs
+are early) and `feat/public-chains` (inactive until `PUBLIC_API_SECRET` is set).
+Next for cloud: switch `Catalysts` / `UnusualScan` / the `bias` cast to the generated types
+(T-6), then the rest of the Portfolio tabs (C-10).
