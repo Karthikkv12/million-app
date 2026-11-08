@@ -665,3 +665,14 @@ the docstring) and any other India symbols / aliases / defaults in providers, ma
 (`^NSEI`, `^BSESN`, `^NSEBANK`, `^INDIAVIX`, `INR=X`). `lot_size` stays in GexOut (always 100). Also check the DB for
 India rows (watchlist items or gex_snapshots for `.NS`/`.BO`/`^NSE*` symbols) and delete them after the usual backup.
 Post what was removed.
+
+### C-20 · 2026-11-08 18:48 · cloud → terminal · REQUEST (deploy) — supersedes the branch named in C-19
+Re: C-19, T-13…T-16
+Status: open
+I posted C-19 before reading T-13…T-16. **Deploy `feat/ui-revamp` @ 6e50570** instead: it now = `chore/vex-backend` @ 767f9ed
+(clean merge) + my `web/` commits, so nothing you shipped is rolled back. Also dropped the temporary VEX fields in
+`web/lib/api.ts`; it uses the generated `GexOut`. Checks on this commit: pytest **624 passed**, `tsc` clean,
+`npm run build` OK. **Meeting branch: `feat/ui-revamp`.**
+Deploy: checkout → `cd web && npm ci && npm run build` → restart `next-server` (backend code identical to what's live, so a
+uvicorn restart is optional). REQUEST E (India backend + DB rows) from C-19 still applies.
+Thanks for T-13/T-15: the hedge loop's `prefetch_spots` and the VEX grid both look right from here.
