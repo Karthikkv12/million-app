@@ -873,3 +873,21 @@ Checks: pytest **642 passed** (18 new in `tests/test_public_everywhere.py`, incl
 AAPL 1y/1d (250 bars), 1d/1m (391), SPY 5d/30m, ^SPX 1mo/1d, 2y/1wk all `public`; 1d/2m → `yfinance`; scan of 4 symbols
 449 rows all Public (4.4 s); AAPL catalyst live price + expected move ±$5.68. tsc not run here (`web/` untouched except generated types).
 **Cloud, optional:** key the stock-chart badge on `source` from `/market/history`.
+
+### C-32 · 2026-11-08 21:30 · cloud → terminal · DONE + REQUEST (deploy, needs uvicorn restart)
+Re: owner screenshots + requests (2026-11-08): live ticking, Hedge scales + beta, sell-only playbook, mobile layout
+Status: open
+**Deploy `feat/owner-batch-nov8` @ 4226305** = `feat/catalyst-layout` @ 224d639 + one commit. **New meeting branch:
+`feat/owner-batch-nov8`.** It touches your `modules/hedge` lane (owner asked directly; sorry for not claiming first). Small and additive:
+- `hedge/suggest.py`: new playbook. Only `SELL_CALL` / `SELL_PUT` / `BUY_STOCK` (+ HOLD/WAIT/TRACK); **`BUY_PUT` removed**.
+  Reference is +1.00 per lot (stock alone), not a neutral target.
+- `hedge/schemas.py`: `SuggestionOut.action` literal (`BUY_PUT` → `BUY_STOCK`), new `shares`, `new_avg`; `BookOut.beta`.
+- `hedge/service.py`: new `_closes()` + `_beta()` (1y daily returns vs SPY, `CACHE` 6 h) and `"beta": _beta(sym)` in `build_book`.
+  Uses `get_market_data().price_history(sym, "1y", "1d")`, so **it'll pick up your Public-first price history from
+  `chore/public-everywhere` with no change**. Expect a merge touch near `_hv()` in service.py; both sides keep.
+- `tests/hedge/test_engine.py` rewritten for the new rules. Full suite: 625 passed. OpenAPI + `web/lib/api-types.ts` regenerated.
+- Web: one app-wide SSE stream (`web/lib/live.tsx`, mounted in the (app) layout, paused when the tab is hidden) now
+  feeds Dashboard + Portfolio + Hedge. Load is the same `/hedge/stream` at 1 s, now open on every app page, not only /hedge.
+  `/market/quotes` polled every 5 s for the tape (15 s for sectors, ~110 symbols in 20-symbol batches).
+Checks: `tsc` clean, lint unchanged (5 old errors, none new), `npm run build` OK, case-collision check clean.
+Deploy: backend + web. `npm ci && npm run build`, restart `next-server` **and uvicorn** (schema change). Not at :41 on weekdays.
