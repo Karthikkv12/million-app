@@ -1,8 +1,10 @@
-"""optionflow/providers/public.py — option chains from the Public.com Trading API.
+"""optionflow/providers/public.py — real-time quotes and option chains from the Public.com Trading API.
 
-Used only for GEX (`option_chain`); every other market-data call stays on
-Yahoo. `ChainFallbackMarketData` in market_data.py tries this first and falls
-back to Yahoo on any failure.
+Public.com is the default source for option chains (GEX/VEX heatmaps) and for
+prices: quotes, last prices, batched last prices and the price fields of
+watchlist rows. `PublicFirstMarketData` in market_data.py tries Public first and
+falls back to Yahoo on any failure. Search, company data, price history and
+catalysts stay on Yahoo (Public has no equivalent).
 
 API (https://public.com/api/docs), all JSON, `Authorization: Bearer <token>`:
   POST /userapiauthservice/personal/access-tokens   {secret, validityInMinutes} → {accessToken}
@@ -42,6 +44,8 @@ MAX_CHAIN_DTE = 60            # same window as Yahoo: expiries within 60 days…
 MAX_CHAIN_EXPIRIES = 12       # …at most 12 of them (the board shows 8)
 MIN_REQUEST_GAP = 0.125       # seconds between requests: 8/s, under Public's 10/s
 EXPIRIES_TTL = 3600.0         # expiry lists change at most daily
+QUOTE_TTL = 1.0               # seconds a quote is reused: collapses bursts (hedge loop, pages) into one request
+QUOTE_BATCH = 50              # instruments per quotes request
 
 GATE = RateLimitGate(first=60.0, maximum=900.0, source="Public.com")   # separate from Yahoo's
 
@@ -67,6 +71,31 @@ def instrument_for(symbol: str) -> Optional[Dict[str, str]]:
     if not s or any(c in s for c in ".=/"):
         return None
     return {"symbol": s, "type": "EQUITY"}
+
+
+def quote_price(q: Dict[str, Any]) -> Optional[float]:
+    """Last trade, else the bid/ask midpoint, else None."""
+    last = _f(q.get("last"))
+    if last and last > 0:
+        return last
+    bid, ask = _f(q.get("bid")), _f(q.get("ask"))
+    return (bid + ask) / 2 if bid and ask else None
+
+
+def normalize_quote(symbol: str, q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """A Public quote → {symbol, price, prev_close, change, change_pct, volume} (Yahoo's quote shape
+    plus volume), or None when Public has no price for it."""
+    if q.get("outcome", "SUCCESS") != "SUCCESS":
+        return None
+    price = quote_price(q)
+    if price is None:
+        return None
+    prev = _f(q.get("previousClose"))
+    change = round(price - prev, 4) if prev is not None else None
+    change_pct = round(change / prev * 100, 4) if change is not None and prev else None
+    vol = _f(q.get("volume"))
+    return {"symbol": symbol, "price": price, "prev_close": prev, "change": change,
+            "change_pct": change_pct, "volume": int(vol) if vol else None}
 
 
 def parse_contracts(exp: str, payload: Dict[str, Any], T: float) -> List[Dict[str, Any]]:
@@ -188,13 +217,19 @@ class PublicClient:
         return self._account_id
 
     # ── market data ───────────────────────────────────────────────────────────
+    def quotes(self, instruments: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """Raw quotes, one request per QUOTE_BATCH instruments."""
+        out: List[Dict[str, Any]] = []
+        for i in range(0, len(instruments), QUOTE_BATCH):
+            data = self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/quotes",
+                                json={"instruments": instruments[i:i + QUOTE_BATCH]})
+            out.extend(data.get("quotes") or [])
+        return out
+
     def last_price(self, instrument: Dict[str, str]) -> Optional[float]:
-        data = self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/quotes",
-                            json={"instruments": [instrument]})
-        for q in data.get("quotes") or []:
+        for q in self.quotes([instrument]):
             if q.get("outcome", "SUCCESS") == "SUCCESS":
-                bid, ask = _f(q.get("bid")), _f(q.get("ask"))
-                return _f(q.get("last")) or ((bid + ask) / 2 if bid and ask else None)
+                return quote_price(q)
         return None
 
     def expirations(self, instrument: Dict[str, str]) -> List[str]:
@@ -205,6 +240,56 @@ class PublicClient:
     def chain(self, instrument: Dict[str, str], expiry: str) -> Dict[str, Any]:
         return self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/option-chain",
                             json={"instrument": instrument, "expirationDate": expiry})
+
+
+class PublicQuotes:
+    """Batched real-time quotes with a QUOTE_TTL cache, keyed by the caller's (Yahoo-style) symbol."""
+
+    name = "public"
+    label = "Public.com"
+    gate = GATE
+
+    def __init__(self, client: PublicClient, ttl: float = QUOTE_TTL):
+        self.client = client
+        self.ttl = ttl
+        self._cache: Dict[str, Tuple[float, Optional[Dict[str, Any]]]] = {}
+        self._lock = threading.Lock()
+
+    def quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """{SYMBOL: normalized quote} for every symbol Public could price; others are left out.
+
+        Fresh cache hits cost nothing; the rest go out in one request. Raises PublicError /
+        MarketDataRateLimited when that request fails, so the caller can fall back.
+        """
+        want = list(dict.fromkeys(s.strip().upper() for s in symbols if s and s.strip()))
+        now = time.monotonic()
+        out: Dict[str, Dict[str, Any]] = {}
+        missing: List[Tuple[str, Dict[str, str]]] = []
+        with self._lock:
+            for sym in want:
+                hit = self._cache.get(sym)
+                if hit and now - hit[0] < self.ttl:
+                    if hit[1] is not None:
+                        out[sym] = hit[1]
+                    continue
+                inst = instrument_for(sym)
+                if inst is not None:
+                    missing.append((sym, inst))
+        if not missing:
+            return out
+        by_key = {f"{i['type']}:{i['symbol']}": sym for sym, i in missing}
+        fetched: Dict[str, Optional[Dict[str, Any]]] = {sym: None for sym, _ in missing}
+        for q in self.client.quotes([i for _, i in missing]):
+            inst = q.get("instrument") or {}
+            sym = by_key.get(f"{inst.get('type')}:{str(inst.get('symbol') or '').upper()}")
+            if sym:
+                fetched[sym] = normalize_quote(sym, q)
+        stamp = time.monotonic()
+        with self._lock:
+            for sym, q in fetched.items():
+                self._cache[sym] = (stamp, q)
+        out.update({s: q for s, q in fetched.items() if q is not None})
+        return out
 
 
 class PublicOptionChains:

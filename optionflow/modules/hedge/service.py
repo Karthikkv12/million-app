@@ -129,6 +129,10 @@ class _Cache:
             self._d[key] = (time.time(), val)
         return val
 
+    def put(self, kind: str, sym: str, val: Any) -> None:
+        with self._lock:
+            self._d[(kind, sym)] = (time.time(), val)
+
     def clear(self) -> None:
         with self._lock:
             self._d.clear()
@@ -136,6 +140,21 @@ class _Cache:
 
 CACHE = _Cache()
 _day_high: Dict[str, Tuple[date, float]] = {}
+
+
+def prefetch_spots(syms: List[str]) -> None:
+    """All held symbols' prices in one batched call (one Public request per tick, not one per symbol)."""
+    fn = getattr(get_market_data(), "last_prices", None)
+    if not callable(fn) or not syms:
+        return
+    try:
+        prices = fn(list(syms)) or {}
+    except Exception as e:
+        logger.debug("hedge prefetch failed: %s", e)
+        return
+    for sym, price in prices.items():
+        if price:
+            CACHE.put("spot", sym, price)
 
 
 def _spot(sym: str) -> Optional[float]:
@@ -258,6 +277,7 @@ def _clean(x: Any) -> Any:
 def books_for(user_id: int) -> Dict[str, Any]:
     positions = list_positions(user_id)
     groups = group_legs(positions)
+    prefetch_spots(sorted(groups))
     books = []
     for sym, g in sorted(groups.items()):
         try:
