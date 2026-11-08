@@ -19,6 +19,35 @@ visuals, keep the branch.
 
 ---
 
+## Progress (2026-11-08 14:30 UTC)
+
+Day-to-day status lives on the `coordination` branch (`docs/COORDINATION.md` §6).
+This is a snapshot.
+
+| Step | State | Branch / PR |
+|---|---|---|
+| 0. Owner: secrets, private repo, 2FA | **Not confirmed.** Nothing in the log says the keys or the admin password were replaced | owner |
+| 1. Land heatmaps, drop list, one accent | Done, not merged | [PR #5](https://github.com/Karthikkv12/million-app/pull/5) |
+| 2. Core | Done, not merged | [PR #6](https://github.com/Karthikkv12/million-app/pull/6) |
+| 3. Providers and flow | Done, not merged | [PR #7](https://github.com/Karthikkv12/million-app/pull/7) |
+| 4. Modules under `/api/v1` | Done, not merged | [PR #8](https://github.com/Karthikkv12/million-app/pull/8), [PR #9](https://github.com/Karthikkv12/million-app/pull/9) |
+| 5. One database | Done; **live site switched** to `optionflow.db` (130,053 rows, 9 HIMS orphans dropped) | [PR #10](https://github.com/Karthikkv12/million-app/pull/10) |
+| 6. Website on the new API | Backend done ([PR #11](https://github.com/Karthikkv12/million-app/pull/11)). UI done: `/api/v1` + generated types, AI chat on the backend, SSE flow stream, wide board (`feat/step6-ui`). Yahoo rate-limit fix done both sides (`chore/yahoo-backoff`, `feat/stale-gex`). **Still open:** httpOnly cookies, two-factor login, Sentry, new-device alerts; schema typing request C-8 | see left |
+| 7. Portfolio and Budget | Backend done ([PR #12](https://github.com/Karthikkv12/million-app/pull/12)). Pages **in progress** on `feat/portfolio`: shell + Positions tab done; Holdings, Performance, Accounts, Watchlist are placeholders; `/money/[tab]` not started; pen test not started | see left |
+| 8. Phone app | Not started | — |
+
+**Meeting branch:** `feat/stale-gex` (`feat/portfolio` builds on it).
+**Nothing is merged into `develop` yet.** PRs #5–#12 are stacked and merge in order;
+the live site runs `chore/step7-backend` directly.
+
+Open items to watch:
+- C-8 (terminal): Pydantic models for `CatalystsOut` sections, `TopFlowStrike.bias`
+  literal, `response_model` on `/unusual`.
+- Terminal hasn't posted a `DONE` for `chore/yahoo-backoff` (C-5 part B).
+- C-4: the alerts table (`0003_alerts`) is still unclaimed.
+
+---
+
 ## 1. Backend today (counted on `develop`)
 
 | Problem | Where |
@@ -100,7 +129,8 @@ tests/<module>/
 | Markets | **Redesigned**: breadth, sentiment, VIX, ranked sector ETFs, movers, graded heatmaps | `feat/settings-redesign` |
 | Dashboard | **Redesigned**: quote cards, volatility, calendar (now follows theme), Jump to | `feat/settings-redesign` |
 | Ledger | Hidden; rebuilt with Money in step 7 | step 7 |
-| Portfolio, Budget | Removed; rebuilt in step 7 | step 7 |
+| Portfolio | **In progress**: shell + Positions tab; other tabs placeholders | `feat/portfolio` |
+| Budget (Money) | Not started | step 7 |
 
 `feat/settings-redesign` also contains:
 - **Theme fix** in `lib/theme.tsx`. `ThemeProvider` wrote its initial "dark" to
