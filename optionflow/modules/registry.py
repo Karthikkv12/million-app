@@ -21,8 +21,8 @@ def _market() -> List[APIRouter]:
 
 
 def _flow() -> List[APIRouter]:
-    from optionflow.modules.flow.router import router
-    return [router]
+    from optionflow.modules.flow.router import router, stream_router
+    return [router, stream_router]
 
 
 def _watchlist() -> List[APIRouter]:
@@ -45,12 +45,18 @@ def _catalyst() -> List[APIRouter]:
     return [router]
 
 
+def _ai() -> List[APIRouter]:
+    from optionflow.modules.ai.router import router
+    return [router]
+
+
 MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "auth": _auth,
     "market": _market,
     "flow": _flow,
     "watchlist": _watchlist,
     "catalyst": _catalyst,
+    "ai": _ai,                 # off by default; the chat UI is hidden for now
     "portfolio": _portfolio,
     "budget": _budget,
 }

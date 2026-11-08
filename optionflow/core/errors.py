@@ -57,8 +57,12 @@ class ServerError(AppError):
     status_code, code = 500, "server_error"
 
 
+class Unavailable(AppError):
+    status_code, code = 503, "unavailable"
+
+
 _CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
-          405: "method_not_allowed", 409: "conflict", 422: "unprocessable", 429: "rate_limited"}
+          405: "method_not_allowed", 409: "conflict", 422: "unprocessable", 429: "rate_limited", 503: "unavailable"}
 
 
 def _respond(request: Request, status: int, code: str, message, headers=None) -> JSONResponse:

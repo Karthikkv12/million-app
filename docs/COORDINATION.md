@@ -40,5 +40,37 @@ Read this before starting a step, and keep to your own lane.
 If either session needs to change a file in the other's lane, it writes a line here
 first, under "Requests":
 
+## Terminal session status (2026-11-08)
+- Steps 1–5 done (PRs #5–#10, stacked; merge in order). Step 5 = one database
+  (`optionflow.db`, 37 enforced foreign keys); the live site is **not** switched yet.
+- Step 6 backend done on `chore/web-v1` (stacked on #10), which also merges
+  `feat/settings-redesign` @ 7c39fe1. UI conflicts there took **your** version.
+- Catalyst hand-off done: `optionflow/modules/catalyst/` (same function names,
+  same 10-minute cache), `GET /catalyst/{symbol}` and `/api/v1/catalyst/{symbol}`,
+  5 tests in `tests/catalyst/`. Yahoo access goes through the provider
+  (`get_market_data().raw_ticker()`); please keep `import yfinance` out of modules.
+- New backend for the UI to adopt (see Requests):
+  - `POST /api/v1/ai/chat` — body `{messages: [{role, content}]}`, bearer auth,
+    streams `text/plain`. Module `ai` is **off by default** (`ENABLED_MODULES`).
+  - `GET /api/v1/flow/{symbol}/stream?access_token=…&interval=10` — Server-Sent
+    Events, `event: gex` with the gamma-exposure body when it changes. Next's
+    proxy drops connections after 120s; EventSource reconnects (`retry: 5000`).
+  - `web/lib/api-types.ts` — generated from `web/openapi.json`
+    (`python scripts/export_openapi.py && cd web && npm run gen:api`). A test
+    fails if the API changes without regenerating.
+- New tables (e.g. watchlist alerts) can go ahead: add a model in
+  `database/models.py` + an Alembic revision (`alembic revision --autogenerate`).
+
 ## Requests
-- (none yet)
+- **Terminal → cloud (step 6 UI):**
+  1. Point `components/AiChat.tsx` at `POST /api/v1/ai/chat` (send the bearer
+     header, not `accessToken` in the body), then delete `web/app/api/ai/chat/`
+     and remove the hidden `<AiChat />` from `app/(app)/layout.tsx`.
+  2. Use the flow stream on the flow board instead of 60s polling
+     (`new EventSource(`/api/v1/flow/${sym}/stream?access_token=${token}`)`).
+  3. Move `web/lib/api.ts` calls to `/api/v1/...` and type them with
+     `web/lib/api-types.ts` (`paths["/api/v1/…"]["get"]["responses"]["200"]`).
+     Legacy paths keep working until this is done.
+  4. Plan step 6 UI items: the shell, the 11px type floor, the wide-screen layout.
+  5. `web/components/gex/NetFlowPanel.stable.tsx` was deleted (plan Drop list;
+     nothing imports it). Don't re-add it.

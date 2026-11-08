@@ -105,6 +105,11 @@ Never call `os.getenv` in app code — add a field to `Settings` instead.
 Modules live in `optionflow/modules/<name>/` (`router.py` HTTP only → `service.py` plain functions → typed `schemas.py`).
 Services raise `optionflow.core.errors` (`NotFound`, `Conflict`, …). Errors on `/api/v1` are `{"error": {"code", "message"}}`;
 legacy paths keep `{"detail": …}`. Market data only via `optionflow.providers.get_market_data()`.
+**One database** (step 5): `optionflow.db` (or `DATABASE_URL`), 37 enforced foreign keys, Alembic baseline
+`0001_baseline`. Merge legacy files with `scripts/merge_databases.py`. **Step 6**: AI chat at `/api/v1/ai/chat`
+(module `ai`, off by default), SSE at `/api/v1/flow/{symbol}/stream`, catalyst module, TS types in
+`web/lib/api-types.ts` (regenerate with `scripts/export_openapi.py` + `npm run gen:api`).
+Two sessions share this repo — read `docs/COORDINATION.md` before starting work.
 `backend_api/main.py` is a one-line entry-point alias for existing launchd configs.
 
 ```

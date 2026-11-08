@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from optionflow.core.security import decode_token
@@ -51,3 +51,13 @@ def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str,
     if str(user.get("role") or "user") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+def get_current_user_for_stream(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    access_token: str | None = Query(default=None, description="For EventSource, which can't send headers"),
+) -> Dict[str, Any]:
+    """Like get_current_user, but also accepts ?access_token= (browsers' EventSource can't set headers)."""
+    if creds is None and access_token:
+        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=access_token)
+    return get_current_user(creds)

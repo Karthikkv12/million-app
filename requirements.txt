@@ -11,6 +11,7 @@ PyJWT
 python-multipart
 python-dotenv
 cachetools
+httpx
 # security pins — bump these when new CVEs are published
 cryptography>=46.0.5
 pillow>=12.1.1

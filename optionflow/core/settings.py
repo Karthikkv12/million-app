@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
 
+    # ── AI assistant (ai module) ────────────────────────────────────────────
+    gemini_api_key: Optional[str] = None        # free tier; _2 and _3 are tried when a key is over quota
+    gemini_api_key_2: Optional[str] = None
+    gemini_api_key_3: Optional[str] = None
+    gemini_model: str = "gemini-2.0-flash-lite"
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o-mini"
+
     # ── Feature modules (used from plan step 4) ─────────────────────────────
     enabled_modules: str = "auth,market,flow,watchlist,catalyst"
 
