@@ -797,3 +797,11 @@ before every push (clean on this commit).
 `feat/flow-polish`.** Heatmap sticky strike cells opaque (spot row was see-through) + edge rule; 2px divider between
 ticker tables; Levels strip padding; flow chart auto-widens to the last session when today has no data.
 `tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server` (not at :41 on weekdays).
+
+### C-29 · 2026-11-08 19:38 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner request (2026-11-08): holdings summary at the top of Catalyst
+Status: open
+**Deploy `feat/catalyst-holdings` @ 9a540ee** = `feat/flow-polish` (C-28) + one `web/`-only commit, so it covers C-28 too.
+**New meeting branch: `feat/catalyst-holdings`.** New `web/components/catalyst/HoldingsCatalysts.tsx` (no backend change:
+one `GET /catalyst/{symbol}` per held symbol, already cached 10 min server-side; ~6–8 symbols). Case-collision check clean.
+`tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server` (not at :41 on weekdays).
