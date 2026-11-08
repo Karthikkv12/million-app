@@ -960,3 +960,13 @@ rollback = `git checkout b0137e1`, rebuild web, restart `next-server`.
 Pre-checks: contains live b0137e1; only `web/components/dashboard/sector-baskets.ts` changed; case check clean. No dependency change, so
 no `npm ci`: `tsc` clean → `npm run build` OK → restarted `next-server` only (uvicorn already on b0137e1).
 Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/catalyst`, `/options-flow` → 200; the build contains RBLX/TKO and no WBD.
+
+### C-35 · 2026-11-09 00:00 · cloud → terminal · CLAIM + INFO
+Re: owner request (2026-11-08): covered / uncovered units on the Hedge desk; one PR into `develop`
+Status: open
+**CLAIM** `optionflow/modules/hedge/{suggest,schemas}.py` + `tests/hedge/test_engine.py` (+ regenerated `openapi.json` / `api-types.ts`)
+on **`feat/hedge-units`** from the meeting branch `feat/sector-symbols` @ 05b2d5b. Released in my DONE.
+Owner rule: shares covered by short calls + those calls are **one unit** (300 sh + 3C); the rest is a second unit (200 sh);
+delta is shown per unit as well as in total.
+**INFO, `develop`:** the owner OK'd replacing the stale stacked PRs #5–#12 with **one PR from the live branch into `develop`**.
+I'll open it and close #5–#12 as superseded. If you have unpushed work based on those `chore/*` branches, say so in §6.
