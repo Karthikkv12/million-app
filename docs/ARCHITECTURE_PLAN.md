@@ -19,84 +19,50 @@ visuals, keep the branch.
 
 ---
 
-## Progress (2026-11-08 19:50 UTC)
+## Progress (2026-11-08 23:50 UTC)
 
 Day-to-day status lives on the `coordination` branch (`docs/COORDINATION.md` §6).
 This is a snapshot.
 
-| Step | State | Branch / PR |
-|---|---|---|
-| 0. Owner: secrets, private repo, 2FA | **In progress.** Leaked Tradier and OpenAI keys are dead (owner, 2026-11-08). Still open: repo private (it is public), admin password, Cloudflare tunnel token, secret scanning, two-factor login | owner |
-| 1. Land heatmaps, drop list, one accent | Done, not merged | [PR #5](https://github.com/Karthikkv12/million-app/pull/5) |
-| 2. Core | Done, not merged | [PR #6](https://github.com/Karthikkv12/million-app/pull/6) |
-| 3. Providers and flow | Done, not merged | [PR #7](https://github.com/Karthikkv12/million-app/pull/7) |
-| 4. Modules under `/api/v1` | Done, not merged | [PR #8](https://github.com/Karthikkv12/million-app/pull/8), [PR #9](https://github.com/Karthikkv12/million-app/pull/9) |
-| 5. One database | Done; **live site switched** to `optionflow.db` (130,053 rows, 9 HIMS orphans dropped) | [PR #10](https://github.com/Karthikkv12/million-app/pull/10) |
-| 6. Website on the new API | Backend done ([PR #11](https://github.com/Karthikkv12/million-app/pull/11)). UI done: `/api/v1` + generated types, AI chat on the backend, SSE flow stream, wide board (`feat/step6-ui`). Yahoo rate-limit fix done both sides (`chore/yahoo-backoff`, `feat/stale-gex`). **Still open:** httpOnly cookies, two-factor login, Sentry, new-device alerts; schema typing request C-8 | see left |
-| 7. Portfolio and Budget | Backend done ([PR #12](https://github.com/Karthikkv12/million-app/pull/12)). Pages **in progress** on `feat/portfolio`: shell + Positions tab done; Holdings, Performance, Accounts, Watchlist are placeholders; `/money/[tab]` not started; pen test not started | see left |
-| 8. Phone app | Not started | — |
+**Live on optflw.com:** `feat/sector-symbols` @ 05b2d5b (T-27). That is also the **meeting branch**: every new branch starts there.
+**Nothing is merged into `develop` yet.** PRs #5–#12 are stacked and stale: the live site has moved far past them.
 
-**Meeting branch:** `feat/stale-gex` (`feat/portfolio` builds on it).
-**Nothing is merged into `develop` yet.** PRs #5–#12 are stacked and merge in order;
-the live site runs `chore/step7-backend` directly.
+| Step | State |
+|---|---|
+| 0. Owner: secrets, private repo, 2FA | **In progress.** Leaked Tradier and OpenAI keys are dead. Still open: repo private (it is public), admin password, Cloudflare tunnel token, secret scanning, two-factor login |
+| 1–5. Heatmaps, core, providers, `/api/v1` modules, one database | **Done and live.** PRs #5–#10 open, not merged |
+| 6. Website on the new API | **Done and live**: `/api/v1` + generated types, AI chat on the backend, SSE streams, Next 15 / React 19 (T-8). **Still open:** httpOnly cookies, two-factor login, Sentry, new-device alerts |
+| 7. Portfolio and Budget | **Portfolio done and live**, rebuilt on the Robinhood sync (overview, holdings, options, income, activity). **Budget (`/money`) not started.** Pen test not started |
+| 8. Phone app | Not started |
 
-Open items to watch:
-- C-8 (terminal): Pydantic models for `CatalystsOut` sections, `TopFlowStrike.bias`
-  literal, `response_model` on `/unusual`.
-- Terminal hasn't posted a `DONE` for `chore/yahoo-backoff` (C-5 part B).
-- C-4: the alerts table is still unclaimed; its revision is now `0004_alerts`
-  (`0003_broker_positions` went to the hedge desk).
+### Done and live (owner, 2026-11-08)
 
-### High priority (owner, 2026-11-08)
+1. **Hedge desk** (main indicator). Robinhood sync hourly 9:41–15:41 ET on weekdays + 19:41 ET. Every second, per holding:
+   real net delta (100 sh = +1), gamma, beta vs SPY, ATM IV vs HV, IV spike / cooling. Book-delta-per-lot and portfolio-beta scales.
+   **Playbook (owner):** only sell calls, sell puts or buy stock; never buy options. Spike → ITM call at the strike closest to
+   the average from above; pullback → put at the highest strike below the average; odd lot at/below average → buy stock to
+   round up. Reference is +1 per lot, not delta-neutral.
+2. **Live like a broker:** one app-wide 1 s stream re-prices Dashboard, Portfolio and Hedge; today's P&L live; numbers flash.
+3. **Public.com for market data, Yahoo as backup** (T-23 … T-26): chains, quotes, price history, unusual scanner, catalysts.
+   Search, company info, earnings, analysts, dividends and news stay on Yahoo (no Public equivalent).
+4. VEX board, LIVE / delayed badge, Catalyst page (holdings summary, economic calendar US only, unusual activity),
+   India data removed, hide-values privacy toggle, Dashboard and Flow in the desk style, mobile / iPad layout fixes.
 
-1. **Hedge: delta-neutral desk** (main indicator). Built on `feat/hedge`, waiting for terminal to deploy (C-14).
-   - Holdings and options synced from Robinhood daily (scheduled cloud task, 7:41 pm ET, read-only;
-     `POST /hedge/ingest` with `HEDGE_INGEST_TOKEN`). **Owner:** attach the Robinhood connector to the
-     "Robinhood hedge sync" routine and set the ingest token on the server and the cloud environment.
-   - Every second, per holding: net delta in lots (100 sh = +1) and gamma from Black-Scholes on the live price,
-     ATM IV vs HV10/20/60, IV rate-of-change (day, 15 min), spike / cooling.
-   - Suggestion engine: sell an ITM/ATM weekly call at or above average cost on a rise or IV spike (king node
-     preferred), sized to the delta gap; sell a put only when the book is below target, never into a spike,
-     on a pullback or at the put wall; buy a put when every lot is covered. Target +0.30/lot (bull) or 0
-     (high-vol / −GEX).
-   - Open: real-time quotes for the 1-s loop (C-13 REQUEST B; Yahoo is delayed until then).
-2. **VEX board** next to GEX on the Flow board. UI done on `feat/vex-board`; backend requested (C-12 REQUEST A).
-3. **LIVE / 15-MIN DELAYED badge** on GEX boards (T-10). Done on `feat/vex-board`.
+### Open
 
-### Next (owner, 2026-11-08): Public.com for all market data, Yahoo as backup only
-
-Queued; not started. Backend work is terminal's lane (`optionflow/providers/**` and the modules below).
-
-**Already on Public (T-13 / T-15):** option chains (GEX / VEX heatmaps, hedge chains), quotes, last price, batched
-`last_prices` / `quotes_batch`, watchlist prices. Yahoo is the per-call / per-symbol fallback.
-
-**Still on Yahoo, to move:**
-
-| Data | Used by | Public equivalent | Plan |
-|---|---|---|---|
-| Ticker search | search box everywhere | instruments list / lookup | Public first, Yahoo fallback |
-| Company info (name, sector) | stock page, catalyst header | instrument details | Public first where it has the field |
-| Price history (daily + intraday bars) | stock chart, Hedge HV10/20/60, dashboard sparklines | price history / bars | Public first, Yahoo fallback |
-| Option chains for the unusual scanner | Catalyst → Unusual activity | option chains (already used by GEX) | route the scanner through `get_market_data().option_chain` |
-| `raw_ticker` direct yfinance calls in `flow/gamma.py`, `unusual/service.py`, `catalyst/service.py` | various | n/a | remove direct `yf.` calls; everything goes through the provider |
-
-**Stays on Yahoo (Public has no equivalent):** earnings dates and estimates, analyst ratings / targets / actions, dividends,
-short interest, news. These keep Yahoo as primary with caching.
-
-**Done when:** every page's prices, bars and chains say `public` in the data source (LIVE badge) during market hours;
-Yahoo is only hit on Public failure or for the catalyst-only fields above; a provider test proves the fallback per call.
+- **Owner:** step 0 above (repo private first).
+- **Budget / Money pages** (step 7), then the pen test.
+- **Step 6 security leftovers:** httpOnly cookie auth, two-factor login, Sentry, new-device alerts.
+- **Watchlist alerts** (C-4: table unclaimed, revision `0004_alerts`).
+- **Merge to `develop`:** PRs #5–#12 are stale. Replace them with one PR from the live branch into `develop` (owner decision).
+- **Hedge tuning to confirm with the owner:** the call covers every uncovered lot at once; a put far below a big up-day
+  can pay very little (minimum premium?).
 
 ### Backlog (low priority)
 
 Do these after step 7's pages, or whenever there's a gap. They don't block any step.
 
-- **Move the economic calendar to the Catalyst page, US only** (owner request, 2026-11-08).
-  - Move `web/components/dashboard/EconomicCalendar.tsx` from the Dashboard to
-    `/catalyst` and take it off the Dashboard.
-  - US events only: hard-code `countryFilter = "us"`; delete `COUNTRY_OPTIONS` and the
-    country picker; drop `countries` from the saved filters (ignore old saved values).
-    Keep the importance filter.
-  - `web/` only (cloud lane); no backend change.
+- (Done 2026-11-08: economic calendar moved to Catalyst, US only.)
 
 ---
 
