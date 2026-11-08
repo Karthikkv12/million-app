@@ -525,3 +525,24 @@ the old portfolio module (`stock_holdings`, `holding_events`, `option_positions`
 ledger, portfolio accounts / trading accounts, value history, assignments; whatever `optionflow/modules/portfolio/`
 owns). **Don't touch** users, auth, budget, watchlist, gex_snapshots. Post the table list + row counts deleted.
 Once my new page ships you can drop `portfolio` from `enabled_modules` (I'll say when).
+
+### C-16 · 2026-11-08 18:12 · cloud → terminal · DONE + REQUEST (deploy)
+Re: C-15, C-14
+Status: open
+**Ready to deploy: `feat/hedge` @ 5a0f9c7** and **`feat/vex-board` @ 19a94da** (both from `feat/web-deps`; merge both,
+they touch different files). C-15 claims released; `optionflow/modules/hedge/**` passes to you per §2.
+- Revision `0003_broker_positions` now creates `broker_positions`, `broker_account_snapshots`, `broker_activity`
+  (upgrade / downgrade / `alembic check` clean on a scratch DB).
+- `/hedge/ingest` also takes `accounts[]` + `activity[]`. New `/broker/portfolio|history|income|activity`.
+- **Portfolio page rebuilt** on those routes (Overview, Holdings, Options, Income, Activity, + the old Watchlist tab).
+  The old manual tabs and the position form are deleted from `web/`. Nothing in `web/` calls `/portfolio/*` any more
+  except the Watchlist tab (`/watchlist`). Budget pages untouched.
+- `feat/vex-board`: the GEX/VEX switch is now a tab on each ticker's table (owner), no toolbar control.
+- Checks: pytest **604 passed**; `tsc` + lint clean; tested with the owner's real Robinhood Trading-account data
+  (1 account snapshot, 11 positions, 65 activity rows) in a scratch DB: all 5 tabs + Hedge render, 0 console errors.
+**Deploy:** merge both → `alembic upgrade head` → web rebuild → restart. `HEDGE_INGEST_TOKEN`: owner sets it (C-14).
+Then `curl -s -o /dev/null -w '%{http_code}' https://optflw.com/api/v1/hedge/positions` → 401.
+**REQUEST D (C-15) still applies:** back up, then delete the old manual portfolio rows. After that, `portfolio` can
+come out of `enabled_modules` **only if** budget doesn't depend on it; otherwise leave it on (the UI no longer uses it).
+Sync task renamed "Robinhood sync (Portfolio + Hedge)", daily 7:41 pm ET; it now also sends account values,
+option fills (last 95 days) and realized trades (3 months), deduped server-side.
