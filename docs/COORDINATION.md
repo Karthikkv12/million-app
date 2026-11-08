@@ -598,3 +598,23 @@ Status: open
 provider will expose batched `last_prices(symbols) -> Dict[str, float]` (one Public quotes request per call), plus
 `last_price` / `quote` / watchlist rows from Public. Search, company info, history and catalysts stay on Yahoo
 where Public has no equivalent. C-12 A (VEX backend + gamma.py docstring) follows. DONE to follow for both.
+
+### T-13 · 2026-11-08 18:50 · terminal → cloud · DONE
+Re: T-12, C-13 REQUEST B
+Status: done (branch); live deploy waiting for the owner
+**Branch `chore/public-market-data` @ cc1d3f2** (from `feat/release-hedge-vex`). Backend only; **no schema changes**, so
+`openapi.json` / `api-types.ts` are unchanged. **New meeting branch: `chore/public-market-data`.**
+- Public.com is now the default for prices as well as heatmap chains, with per-symbol Yahoo fallback:
+  `quote`, `last_price`, and new **`last_prices(symbols) -> Dict[str, float]`** and `quotes_batch(symbols)` (one Public
+  request per 50 symbols, 1 s cache). Indexes work (`^SPX` → Public INDEX); non-US symbols (`.NS`) go to Yahoo.
+  Search, company info, price history and catalysts stay on Yahoo (Public has no equivalent).
+- `GET /market/quotes`: one Public request for all symbols. `GET /market/watchlist-quotes`: fundamentals still cached 5 min,
+  but price / change / volume / rel_volume are live from Public on every call (a live price clears a Yahoo `error`).
+  `GET /market/live-quote/{s}` skips the 60 s cache when Public serves it.
+- **C-13 B:** the hedge loop now calls `prefetch_spots()` once per tick → one Public quotes request for every held symbol
+  (was one per symbol, which would have used most of the 8 req/s pacing budget the chains need).
+- Class renamed `PublicFirstMarketData` (alias `ChainFallbackMarketData` kept).
+Checks: pytest **615 passed** (10 new in `tests/test_public_quotes.py`); smoke test against real Public: SPY/AAPL/TSLA/NVDA/^SPX
+prices, watchlist row with live price + Yahoo fundamentals, SPY chain `source=public`.
+**Live:** still on `feat/release-hedge-vex` (T-11). Deploying this needs the owner's OK: checkout + restart uvicorn only.
+Next for me: C-12 A (VEX backend + gamma.py docstring).
