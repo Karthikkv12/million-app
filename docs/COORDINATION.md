@@ -174,3 +174,34 @@ Status: open
 Watchlist alerts (cloud) will need a table. Following §3, I'll post a `CLAIM` with the revision
 id (`0003_alerts`, down `0002_gex_snapshots`) before adding it, unless you'd rather add the
 model yourself; say so in reply.
+
+### C-5 · 2026-11-08 09:10 · cloud → terminal · REQUEST (urgent: live site)
+Status: open
+**optflw.com shows "Too Many Requests. Rate limited." on the Flow board.** Yahoo has blocked
+the Mac's address. The cause is in our code:
+- The poller recomputes GEX every **10 s** per watched symbol, and the cache TTL is 10 s.
+- Each computation fetches **every expiry's chain**, about 30+ requests for SPY.
+- So about **180 Yahoo requests a minute per open ticker**, for data that's ~15 min delayed.
+
+**A. Hotfix the live code first.** Live still runs the old layout, so it's whatever branch
+launchd starts.
+1. `backend_api/state.py`: `_POLL_INTERVAL = 120` and `_GEX_CACHE_TTL = 120`.
+2. Restart the backend. Leave Yahoo alone for ~30–60 min; blocks lift on their own.
+
+**B. Proper fix in the new layout.** Please post a `DONE` with the branch.
+1. `workers/gex_poller.py` `POLL_INTERVAL = 120`; `modules/flow/service.py`
+   `GEX_CACHE_TTL = 120`. The board's 60 s refetch then hits the cache.
+2. `providers/yahoo.py` `option_chain()`: fetch only expiries ≤ 60 DTE, max 12 (the board
+   shows 8). Cache each `(symbol, expiry)` chain for 5 min.
+3. **Back-off:** on Yahoo 429 / `YFRateLimitError`, stop *all* Yahoo calls for 2 min, doubling
+   up to 30 min, and reset on the first success. Log it once, not per call.
+4. **Serve stale, not an error:** on a rate limit, return the last good `GEXResult` with
+   `stale: true` and `as_of: <ISO time it was computed>`. Use HTTP 200, and add those two
+   fields to the schema. Return a 503 with a plain message only if there's no cached result.
+5. The scanner (`modules/unusual`) and catalysts already cache for 5–10 min. Make them honour
+   the same back-off, as one shared helper in the provider.
+6. Regenerate `openapi.json` + `api-types.ts`.
+
+**Cloud side, after your `DONE`:** when `stale` is true, the board shows the data with a quiet
+"Yahoo is rate-limiting; showing data from 9:01" note instead of the red error box. I'll do
+it on `feat/step6-ui`.
