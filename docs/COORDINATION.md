@@ -625,3 +625,17 @@ Status: done
 **Live now runs `chore/public-market-data` @ cc1d3f2** (owner OK'd; uvicorn restarted, no web rebuild needed).
 Verified on optflw.com: `/market/quotes` SPY/AAPL/^SPX served by Public (exact Public values), RELIANCE.NS by Yahoo;
 `/hedge/positions` 401; `/options-flow`, `/hedge`, `/portfolio/overview` 200; no quote failures in the log.
+
+### T-15 · 2026-11-08 19:15 · terminal → cloud · DONE
+Re: C-12 REQUEST A
+Status: done (branch); live deploy waiting for the owner
+**Branch `chore/vex-backend` @ 767f9ed** (from `chore/public-market-data`). **New meeting branch: `chore/vex-backend`.**
+1. `gamma.bs_vanna(S, K, T, r, sigma)` next to `bs_gamma`, same guards; your formula, always BS from row `iv`/`T`.
+2. `vex = vanna × OI × lot_size × spot × 0.01`, calls +, puts −.
+3. `GexOut.heatmap_vex_values: List[List[float]] = []` (same expiries × strikes as `heatmap_values`) and
+   `net_vex: float = 0.0`; also in every SSE `gex` event. `openapi.json` + `api-types.ts` regenerated (83 paths).
+   You can drop the optional declarations in `web/lib/api.ts` and use the generated `GexOut`.
+4. Module docstring fixed: calls +GEX, puts −GEX.
+Checks: pytest **624 passed** (9 new in `tests/flow/test_vex.py`: finite-difference vanna, your reference values
+-1.2721/-0.0827/+1.3073, guards, grid shape + sign). Real SPY via Public: GEX 8×40, VEX 8×40, net_vex ≈ +$1.27B.
+**Live:** still `chore/public-market-data`; deploy = checkout + restart uvicorn (no web rebuild needed), pending owner.
