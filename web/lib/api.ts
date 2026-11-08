@@ -176,8 +176,19 @@ export interface TopFlowStrike {
   bias: "call" | "put";
 }
 
-/** Generated from the backend schema (GexOut). */
-export type GexResult = Schemas["GexOut"];
+/**
+ * Generated from the backend schema (GexOut).
+ * The VEX fields are requested from terminal (see coordination C-12). Until the
+ * backend ships them and `npm run gen:api` regenerates GexOut, they're declared
+ * optional here so the board can render them when present. Remove this
+ * intersection once they appear in api-types.ts.
+ */
+export type GexResult = Schemas["GexOut"] & {
+  /** [expiry][strike], $ change in dealer delta per 1 vol-point move in IV. */
+  heatmap_vex_values?: number[][] | null;
+  /** Sum of VEX across all strikes and expiries. */
+  net_vex?: number | null;
+};
 
 export const fetchGex = (symbol: string) =>
   api.get<GexResult>(`/options/gamma-exposure/${symbol.toUpperCase()}`);

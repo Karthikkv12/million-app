@@ -1,6 +1,6 @@
 "use client";
 /**
- * TickerPanel — one compact column: search header, key levels, GEX heatmap,
+ * TickerPanel — one compact column: search header, key levels, GEX and/or VEX heatmap,
  * and a Details button that opens every secondary section in a drawer.
  * TickerPanelWithQuery — wraps TickerPanel with its own react-query fetch.
  */
@@ -12,8 +12,8 @@ import { useGexStream } from "@/lib/useGexStream";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 import { PanelHeader } from "./PanelHeader";
 import { LevelsStrip } from "./LevelsStrip";
-import { GexHeatmap } from "./GexHeatmap";
-import type { HeatOpts, BoardHandle } from "./GexHeatmap";
+import { GexHeatmap, fmtMoney } from "./GexHeatmap";
+import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
@@ -37,6 +37,8 @@ export interface TickerPanelProps {
   accentColor: string;
   nStrikes: number;
   heatOpts: HeatOpts;
+  /** With both boards on, put them side by side (only one ticker on screen) instead of stacked. */
+  sideBySide?: boolean;
   canRemove: boolean;
   onRemove: () => void;
   onInputChange: (v: string) => void;
@@ -52,11 +54,16 @@ export interface TickerPanelProps {
 }
 
 export function TickerPanel({
-  slot, accentColor, nStrikes, heatOpts, canRemove, onRemove, onInputChange, onSelect,
+  slot, accentColor, nStrikes, heatOpts, sideBySide = false, canRemove, onRemove, onInputChange, onSelect,
   data, isLoading, isError, errorText, isFetching, onRefresh, dataUpdatedAt,
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const board = useRef<BoardHandle>(null);
+  const gexBoard = useRef<BoardHandle>(null);
+  const vexBoard = useRef<BoardHandle>(null);
+  const boardView = heatOpts.board ?? "gex";
+  const metrics: Metric[] = boardView === "both" ? ["gex", "vex"] : [boardView];
+  const both = metrics.length === 2;
+  const boards = () => [gexBoard.current, vexBoard.current];
   // Prefer the time the backend computed the result; fall back to when we received it.
   const asOf = data?.as_of ? new Date(data.as_of).getTime() : dataUpdatedAt;
   const lastUpdated = asOf
@@ -100,10 +107,33 @@ export function TickerPanel({
           )}
           <LevelsStrip data={data} />
           <div className="flex items-center gap-1 border-b border-[var(--border)] px-3 py-1.5 text-[11px]">
-            <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
-            <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+            <button onClick={() => boards().forEach((b) => b?.centerOnSpot())} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
+            <button onClick={() => boards().forEach((b) => b?.centerOnKing())} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+            {metrics.includes("vex") && data.net_vex != null && (
+              <span className="ml-auto font-mono text-foreground/55" title="Net vanna exposure: $ change in dealer delta per 1 vol-point move in IV">
+                Net VEX <span className={data.net_vex >= 0 ? "text-gain" : "text-violet-400"}>{fmtMoney(data.net_vex)}</span>
+              </span>
+            )}
           </div>
-          <GexHeatmap ref={board} data={data} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
+          <div className={both && sideBySide ? "grid grid-cols-1 xl:grid-cols-2 xl:divide-x xl:divide-[var(--border)]" : "flex flex-col"}>
+            {metrics.map((m, i) => (
+              <div key={m} className={both && i > 0 && !sideBySide ? "border-t border-[var(--border)]" : both && i > 0 ? "border-t border-[var(--border)] xl:border-t-0" : ""}>
+                {both && (
+                  <p className="border-b border-[var(--border)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                    {m === "gex" ? "GEX · gamma, $ per 1% move" : "VEX · vanna, $ per 1 vol pt"}
+                  </p>
+                )}
+                <GexHeatmap
+                  ref={m === "gex" ? gexBoard : vexBoard}
+                  data={data}
+                  metric={m}
+                  nStrikes={nStrikes}
+                  opts={heatOpts}
+                  maxHeight={both && !sideBySide ? "44vh" : "68vh"}
+                />
+              </div>
+            ))}
+          </div>
           <button
             onClick={() => setDetailsOpen(true)}
             className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-3 py-2.5 text-[11px] font-bold text-foreground/70 transition hover:bg-[var(--surface-2)] hover:text-foreground"

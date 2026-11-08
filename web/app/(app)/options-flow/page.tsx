@@ -4,7 +4,7 @@ import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { Segmented } from "@/components/ui";
 import { Plus, SlidersHorizontal } from "lucide-react";
-import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
+import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS, BOARD_OPTIONS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
 
 const MAX_TICKERS = 3;
@@ -35,6 +35,7 @@ function loadLayout(): PersistedLayout {
       palette: PALETTES.some((p) => p.id === h?.palette) ? h!.palette : DEFAULT_HEAT_OPTS.palette,
       showPct: typeof h?.showPct === "boolean" ? h.showPct : DEFAULT_HEAT_OPTS.showPct,
       dimSmall: typeof h?.dimSmall === "boolean" ? h.dimSmall : DEFAULT_HEAT_OPTS.dimSmall,
+      board: BOARD_OPTIONS.some((b) => b.value === h?.board) ? h!.board : DEFAULT_HEAT_OPTS.board,
     };
     return { slots, nStrikes, heat };
   } catch {
@@ -103,10 +104,16 @@ export default function OptionsFlowPage() {
           <div className="min-w-0">
             <p className="eyebrow mb-1.5 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Flow</p>
             <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">Options Flow</h1>
-            <p className="mt-1 text-[13px] text-foreground/55">Gamma exposure by strike and expiry · Yahoo Finance, ~15 min delayed</p>
+            <p className="mt-1 text-[13px] text-foreground/55">Gamma (GEX) and vanna (VEX) exposure by strike and expiry</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Segmented
+              label="Exposure board"
+              value={heat.board}
+              onChange={(v) => setHeat((h) => ({ ...h, board: v as HeatOpts["board"] }))}
+              options={BOARD_OPTIONS}
+            />
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Strikes</span>
             <Segmented
               label="Strikes around spot"
@@ -169,6 +176,7 @@ export default function OptionsFlowPage() {
               accentColor={accent}
               nStrikes={nStrikes}
               heatOpts={heat}
+              sideBySide={slots.length === 1}
               canRemove={slots.length > 1}
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}
