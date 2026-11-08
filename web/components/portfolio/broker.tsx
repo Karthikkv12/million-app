@@ -91,7 +91,7 @@ export function NoData({ what = "positions" }: { what?: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-[var(--border-strong)] px-6 py-14 text-center">
       <p className="text-[15px] font-medium text-foreground">No {what} synced yet</p>
-      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-foreground/55">Everything here comes from Robinhood automatically. The sync runs every evening; your accounts, positions and trade history appear after the first run.</p>
+      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-foreground/55">Everything here comes from Robinhood automatically. It syncs every hour while the market is open and again in the evening; your accounts, positions and trade history appear after the first run.</p>
     </div>
   );
 }

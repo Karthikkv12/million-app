@@ -176,6 +176,44 @@ function Legend() {
   );
 }
 
+// ── What this page does ──────────────────────────────────────────────────────
+const INTRO_KEY = "hedge_intro_hidden";
+function HowItWorks() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { try { setHidden(localStorage.getItem(INTRO_KEY) === "1"); } catch { /* storage off */ } }, []);
+  const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(INTRO_KEY, v ? "1" : "0"); } catch { /* storage off */ } };
+  if (hidden) {
+    return (
+      <button onClick={() => set(false)} className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+        What does this page do?
+      </button>
+    );
+  }
+  const steps: [string, string][] = [
+    ["Syncs your book", "Your Robinhood stocks and options load automatically: every hour while the market is open, and once more in the evening."],
+    ["Measures your risk live", "Every second it prices each option with Black-Scholes and adds it up per stock: your net delta (how much you gain or lose per $1 move, in 100-share lots) and gamma (how fast that changes)."],
+    ["Reads the volatility", "It compares at-the-money implied vol to recent realized vol and watches for IV spikes on up-moves, plus the dealer levels (king node, walls) from the Flow board."],
+    ["Suggests the next trade", "It sets a delta target for the regime (+0.30 per lot when calm, 0 when volatile) and tells you which call or put, strike and expiry would bring you back to it: never a call below your average cost, never a put into a spike."],
+  ];
+  return (
+    <DeskSection label="How it works" meta={<button onClick={() => set(true)} className="text-accent hover:underline">Hide</button>}>
+      <p className="mb-5 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
+        The Hedge desk keeps every stock you hold close to a delta target, so you collect option premium without letting the
+        position run away from you. It doesn&apos;t place orders. It tells you what to sell or buy, and why.
+      </p>
+      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map(([t, d], i) => (
+          <li key={t} className="border-t border-[var(--border)] pt-3">
+            <p className="font-mono text-[11px] text-accent">0{i + 1}</p>
+            <p className="mt-1 text-[14px] font-medium text-foreground">{t}</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-foreground/60">{d}</p>
+          </li>
+        ))}
+      </ol>
+    </DeskSection>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function HedgePage() {
   const live = useHedgeStream();
@@ -208,12 +246,14 @@ export default function HedgePage() {
         </div>
       </div>
 
+      <HowItWorks />
+
       {error && !data && <p className="border-t border-[var(--border-strong)] py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't load your positions."}</p>}
       {isLoading && <div className="h-40 animate-pulse border-t border-[var(--border-strong)] bg-foreground/[0.03]" />}
       {data && !books.length && !errored.length && (
         <div className="border-t border-[var(--border-strong)] py-14">
           <p className="text-[17px] font-medium text-foreground">No positions synced yet</p>
-          <p className="mt-1 text-[14px] text-foreground/55">Your Robinhood stocks and options sync nightly at 7:41 pm ET.</p>
+          <p className="mt-1 text-[14px] text-foreground/55">Your Robinhood stocks and options sync every hour while the market is open, and at 7:41 pm ET.</p>
         </div>
       )}
 

@@ -13,7 +13,7 @@ function SyncStatus() {
   return (
     <p className="font-mono text-[11px] text-foreground/50">
       <span className={clsx("mr-1.5 inline-block h-1.5 w-1.5 rounded-full", data?.synced_at ? "bg-gain" : "bg-amber-500")} />
-      Robinhood · synced {ago(data?.synced_at) ?? "never"} · syncs nightly
+      Robinhood · synced {ago(data?.synced_at) ?? "never"} · hourly in market hours
     </p>
   );
 }

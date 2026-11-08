@@ -115,7 +115,7 @@ export default function DashboardPage() {
             <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
           </DeskFigures>
         ) : (
-          <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the nightly sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
+          <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the first Robinhood sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
         )}
       </div>
 
