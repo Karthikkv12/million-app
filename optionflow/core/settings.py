@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     db_pool_timeout: int = 30
 
     # ── Feature modules (used from plan step 4) ─────────────────────────────
-    enabled_modules: str = "auth,market,flow,watchlist"
+    enabled_modules: str = "auth,market,flow,watchlist,catalyst"
 
     # ── Derived values ───────────────────────────────────────────────────────
     @property

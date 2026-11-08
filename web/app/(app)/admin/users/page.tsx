@@ -1,272 +1,420 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { clsx } from "clsx";
 import { useAuth } from "@/lib/auth";
 import { adminListUsers, adminCreateUser, adminPatchUser, adminDeleteUser, AdminUser } from "@/lib/api";
-import { Users, Plus, ShieldCheck, ShieldOff, UserCheck, UserX, X, Trash2 } from "lucide-react";
+import { PageHeader, Panel, Pill } from "@/components/ui";
+import {
+  Plus, Search, MoreHorizontal, ShieldCheck, ShieldOff, UserCheck, UserX, KeyRound, Trash2,
+  X, Copy, Check, RefreshCw,
+} from "lucide-react";
+
+// Mirrors the backend password policy (logic/auth_services.py).
+const RULES = [
+  { label: "12+ characters", test: (p: string) => p.length >= 12 },
+  { label: "Upper and lower case", test: (p: string) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
+  { label: "A number", test: (p: string) => /\d/.test(p) },
+];
+
+function generatePassword(): string {
+  const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%*?"];
+  const all = sets.join("");
+  const pick = (s: string) => s[crypto.getRandomValues(new Uint32Array(1))[0] % s.length];
+  const chars = [...sets.map(pick), ...Array.from({ length: 12 }, () => pick(all))];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+function joined(iso?: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ── Dialog shell ─────────────────────────────────────────────────────────────
+
+function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-modal aria-label={title} onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)]">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-foreground/50 transition hover:bg-[var(--surface-2)] hover:text-foreground"><X size={16} /></button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+const input = "h-10 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm text-foreground outline-none transition focus:border-foreground/40 focus:ring-2 focus:ring-accent/20";
+
+function PasswordInput({ value, onChange, id }: { value: string; onChange: (v: string) => void; id: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+  };
+  return (
+    <div className="grid gap-2">
+      <div className="flex gap-2">
+        <input id={id} value={value} onChange={(e) => onChange(e.target.value)} className={clsx(input, "font-mono")} autoComplete="new-password" spellCheck={false} />
+        <button type="button" onClick={() => onChange(generatePassword())} className="btn-ghost h-10 shrink-0 px-3" title="Generate a strong password">
+          <RefreshCw size={14} /> Generate
+        </button>
+        <button type="button" onClick={copy} disabled={!value} className="btn-ghost h-10 w-10 shrink-0 px-0" aria-label="Copy password">
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+        </button>
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1">
+        {RULES.map((r) => {
+          const ok = r.test(value);
+          return (
+            <li key={r.label} className={clsx("flex items-center gap-1.5 text-[12px]", ok ? "text-gain" : "text-foreground/50")}>
+              <Check size={12} className={ok ? "" : "opacity-30"} />{r.label}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ── Create user ──────────────────────────────────────────────────────────────
+
+function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (u: AdminUser) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState(() => generatePassword());
+  const [role, setRole] = useState<"user" | "admin">("user");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ok = username.trim().length > 0 && RULES.every((r) => r.test(password));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ok) return;
+    setBusy(true); setError("");
+    try {
+      onCreated(await adminCreateUser(username.trim().toLowerCase(), password, role));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create the user.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog title="New user" onClose={onClose}>
+      <form onSubmit={submit} className="grid gap-4">
+        <div className="grid gap-1.5">
+          <label htmlFor="nu-name" className="text-[13px] font-medium text-foreground/80">Username</label>
+          <input id="nu-name" autoFocus value={username} onChange={(e) => setUsername(e.target.value)} className={input} autoCapitalize="none" spellCheck={false} />
+        </div>
+        <div className="grid gap-1.5">
+          <label htmlFor="nu-pass" className="text-[13px] font-medium text-foreground/80">Temporary password</label>
+          <PasswordInput id="nu-pass" value={password} onChange={setPassword} />
+          <p className="text-[12px] text-foreground/50">Share it privately. They can change it in Settings after signing in.</p>
+        </div>
+        <fieldset className="grid gap-1.5">
+          <legend className="mb-1.5 text-[13px] font-medium text-foreground/80">Role</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {([["user", "User", "Uses the app"], ["admin", "Admin", "Also manages users"]] as const).map(([v, l, d]) => (
+              <label key={v} className={clsx("cursor-pointer rounded-xl border p-3 transition", role === v ? "border-foreground" : "border-[var(--border)] hover:border-[var(--border-strong)]")}>
+                <input type="radio" name="role" value={v} checked={role === v} onChange={() => setRole(v)} className="sr-only" />
+                <span className="block text-sm font-medium text-foreground">{l}</span>
+                <span className="block text-[12px] text-foreground/55">{d}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {error && <p role="alert" className="text-[13px] text-loss">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="btn-ghost h-10">Cancel</button>
+          <button type="submit" disabled={!ok || busy} className="btn-primary h-10">{busy ? "Creating…" : "Create user"}</button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ── Reset password ───────────────────────────────────────────────────────────
+
+function ResetPasswordDialog({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  const [password, setPassword] = useState(() => generatePassword());
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const ok = RULES.every((r) => r.test(password));
+  const submit = async () => {
+    setBusy(true); setError("");
+    try { await adminPatchUser(user.user_id, { password }); setDone(true); }
+    catch (err) { setError(err instanceof Error ? err.message : "Couldn't reset the password."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Dialog title={`Reset password for ${user.username}`} onClose={onClose}>
+      {done ? (
+        <div className="grid gap-4">
+          <p className="flex items-center gap-2 text-sm text-gain"><Check size={16} /> Password updated.</p>
+          <p className="text-[13px] text-foreground/65">Send them this temporary password privately and ask them to change it in Settings:</p>
+          <code className="block select-all rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm text-foreground">{password}</code>
+          <div className="flex justify-end"><button onClick={onClose} className="btn-primary h-10">Done</button></div>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          <PasswordInput id="rp-pass" value={password} onChange={setPassword} />
+          {error && <p role="alert" className="text-[13px] text-loss">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button onClick={onClose} className="btn-ghost h-10">Cancel</button>
+            <button onClick={submit} disabled={!ok || busy} className="btn-primary h-10">{busy ? "Saving…" : "Set password"}</button>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+// ── Row actions menu ─────────────────────────────────────────────────────────
+
+function RowMenu({ u, isSelf, onRole, onActive, onReset, onDelete }: {
+  u: AdminUser; isSelf: boolean; onRole: () => void; onActive: () => void; onReset: () => void; onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number; up: boolean } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); setConfirm(false); return; }
+    const r = btnRef.current!.getBoundingClientRect();
+    const up = window.innerHeight - r.bottom < 260;
+    setPos({ top: up ? r.top - 6 : r.bottom + 6, right: window.innerWidth - r.right, up });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!menuRef.current?.contains(t) && !btnRef.current?.contains(t)) { setOpen(false); setConfirm(false); }
+    };
+    const shut = () => { setOpen(false); setConfirm(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") shut(); };
+    document.addEventListener("mousedown", close);
+    window.addEventListener("scroll", shut, true);
+    window.addEventListener("resize", shut);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", shut, true);
+      window.removeEventListener("resize", shut);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-foreground/80 transition hover:bg-[var(--surface-2)] hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
+  return (
+    <div className="relative">
+      <button ref={btnRef} onClick={toggle} aria-label={`Actions for ${u.username}`} aria-expanded={open}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/55 transition hover:bg-[var(--surface-2)] hover:text-foreground">
+        <MoreHorizontal size={16} />
+      </button>
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{ top: pos.top, right: pos.right, transform: pos.up ? "translateY(-100%)" : undefined }}
+          className="fixed z-[160] w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-float)]"
+        >
+          {confirm ? (
+            <div className="grid gap-2 p-2">
+              <p className="text-[13px] text-foreground">Delete <b>{u.username}</b>? This can't be undone.</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirm(false)} className="btn-ghost h-8 flex-1 px-2 text-[13px]">Cancel</button>
+                <button onClick={() => { setOpen(false); onDelete(); }} className="btn h-8 flex-1 bg-red-600 px-2 text-[13px] text-white hover:bg-red-700">Delete</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button className={item} disabled={isSelf} onClick={() => { setOpen(false); onRole(); }}>
+                {u.role === "admin" ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}{u.role === "admin" ? "Remove admin" : "Make admin"}
+              </button>
+              <button className={item} disabled={isSelf} onClick={() => { setOpen(false); onActive(); }}>
+                {u.is_active ? <UserX size={15} /> : <UserCheck size={15} />}{u.is_active ? "Disable sign-in" : "Enable sign-in"}
+              </button>
+              <button className={item} onClick={() => { setOpen(false); onReset(); }}>
+                <KeyRound size={15} />Reset password
+              </button>
+              <div className="my-1 h-px bg-[var(--border)]" />
+              <button className={clsx(item, "text-red-600 hover:text-loss")} disabled={isSelf} onClick={() => setConfirm(true)}>
+                <Trash2 size={15} />Delete user
+              </button>
+              {isSelf && <p className="px-2.5 pb-1 pt-1.5 text-[12px] text-foreground/45">You can't change or delete your own account here.</p>}
+            </>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminUsersPage() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, user: me } = useAuth();
   const router = useRouter();
-
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ username: "", password: "", role: "user" as "admin" | "user" });
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [patchingId, setPatchingId] = useState<number | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [resetFor, setResetFor] = useState<AdminUser | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    if (!loading && !isAdmin) router.replace("/dashboard");
-  }, [loading, isAdmin, router]);
-
+  useEffect(() => { if (!loading && !isAdmin) router.replace("/dashboard"); }, [loading, isAdmin, router]);
   useEffect(() => {
     if (!isAdmin) return;
-    adminListUsers()
-      .then(setUsers)
-      .finally(() => setFetching(false));
+    adminListUsers().then(setUsers).finally(() => setFetching(false));
   }, [isAdmin]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
-    setCreateError("");
-    try {
-      const newUser = await adminCreateUser(createForm.username, createForm.password, createForm.role);
-      setUsers((prev) => [...prev, newUser]);
-      setShowCreate(false);
-      setCreateForm({ username: "", password: "", role: "user" });
-    } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create user");
-    } finally {
-      setCreating(false);
-    }
-  };
+  const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
-  const handleToggleActive = async (u: AdminUser) => {
-    setPatchingId(u.user_id);
+  const patch = async (u: AdminUser, body: { role?: string; is_active?: boolean }, msg: string) => {
+    setBusyId(u.user_id);
     try {
-      const updated = await adminPatchUser(u.user_id, { is_active: !u.is_active });
+      const updated = await adminPatchUser(u.user_id, body);
       setUsers((prev) => prev.map((x) => (x.user_id === u.user_id ? updated : x)));
-    } finally {
-      setPatchingId(null);
-    }
+      flash(msg);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Couldn't update the user.");
+    } finally { setBusyId(null); }
   };
 
-  const handleToggleRole = async (u: AdminUser) => {
-    setPatchingId(u.user_id);
-    try {
-      const updated = await adminPatchUser(u.user_id, { role: u.role === "admin" ? "user" : "admin" });
-      setUsers((prev) => prev.map((x) => (x.user_id === u.user_id ? updated : x)));
-    } finally {
-      setPatchingId(null);
-    }
+  const remove = async (u: AdminUser) => {
+    setUsers((prev) => prev.filter((x) => x.user_id !== u.user_id));
+    try { await adminDeleteUser(u.user_id); flash(`${u.username} deleted.`); }
+    catch { adminListUsers().then(setUsers); flash("Couldn't delete the user."); }
   };
 
-  const handleDelete = async (user_id: number) => {
-    // Optimistically remove immediately so the row disappears without waiting
-    setUsers((prev) => prev.filter((x) => x.user_id !== user_id));
-    setConfirmDeleteId(null);
-    try {
-      await adminDeleteUser(user_id);
-    } catch {
-      // Rollback: re-fetch the list if the delete failed
-      adminListUsers().then(setUsers);
-    } finally {
-      setPatchingId(null);
-    }
-  };
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return [...users]
+      .filter((u) => !q || u.username.toLowerCase().includes(q))
+      .sort((a, b) => (a.role === b.role ? a.username.localeCompare(b.username) : a.role === "admin" ? -1 : 1));
+  }, [users, query]);
+
+  const admins = users.filter((u) => u.role === "admin").length;
+  const disabled = users.filter((u) => !u.is_active).length;
 
   if (loading || fetching) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 rounded-full border-2 border-foreground/20 border-t-foreground animate-spin" />
+      <div className="mx-auto w-full max-w-5xl px-4 pt-8 sm:px-6">
+        <div className="skeleton mb-8 h-10 w-48" />
+        <div className="grid gap-3">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-14" />)}</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto w-full overflow-x-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center">
-            <Users size={16} className="text-foreground/70" />
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-8 sm:px-6">
+      <PageHeader
+        eyebrow="Admin"
+        title="Users"
+        sub="Who can sign in to OptionFlow, and what they can do."
+        action={<button onClick={() => setShowCreate(true)} className="btn-primary h-10"><Plus size={15} /> New user</button>}
+      />
+
+      <div className="mb-6 grid grid-cols-3 gap-3">
+        {[["Accounts", users.length], ["Admins", admins], ["Disabled", disabled]].map(([l, v]) => (
+          <div key={l as string} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/55">{l}</p>
+            <p className="mt-1 font-mono text-2xl font-medium tabular-nums text-foreground">{v}</p>
           </div>
-          <div>
-            <h1 className="text-base font-bold text-foreground">User Management</h1>
-            <p className="text-xs text-foreground/50">{users.length} account{users.length !== 1 ? "s" : ""}</p>
-          </div>
+        ))}
+      </div>
+
+      <Panel
+        title={`All accounts · ${shown.length}`}
+        padded={false}
+                actions={
+          <label className="relative hidden sm:block">
+            <span className="sr-only">Search users</span>
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search"
+              className="h-8 w-48 rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-8 pr-2 text-[13px] text-foreground outline-none focus:border-foreground/30" />
+          </label>
+        }
+      >
+        <div className="border-b border-[var(--border)] p-3 sm:hidden">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search users" aria-label="Search users"
+            className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-[14px] text-foreground outline-none" />
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition"
-        >
-          <Plus size={13} />
-          New User
-        </button>
-      </div>
-
-      {/* Create modal — rendered in a portal so it escapes any layout stacking context */}
-      {showCreate && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-sm mx-4 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-foreground">Create User</h2>
-              <button onClick={() => { setShowCreate(false); setCreateError(""); }} className="p-1 rounded-lg hover:bg-[var(--surface-2)] text-foreground/50 hover:text-foreground transition">
-                <X size={15} />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-foreground/60 block mb-1">Username</label>
-                <input
-                  autoFocus
-                  value={createForm.username}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-sm text-foreground placeholder:text-foreground/30 outline-none focus:ring-1 focus:ring-foreground/30"
-                  placeholder="username"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-foreground/60 block mb-1">Password</label>
-                <input
-                  type="password"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-sm text-foreground placeholder:text-foreground/30 outline-none focus:ring-1 focus:ring-foreground/30"
-                  placeholder="min 6 characters"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-foreground/60 block mb-1">Role</label>
-                <select
-                  value={createForm.role}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "admin" | "user" }))}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-sm text-foreground outline-none focus:ring-1 focus:ring-foreground/30"
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              {createError && <p className="text-xs text-red-500">{createError}</p>}
-              <button
-                type="submit"
-                disabled={creating}
-                className="w-full py-2 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition"
-              >
-                {creating ? "Creating…" : "Create"}
-              </button>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* User table */}
-      <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--surface)]">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-foreground/50 uppercase tracking-wide">User</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-foreground/50 uppercase tracking-wide">Role</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-foreground/50 uppercase tracking-wide">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-foreground/50 uppercase tracking-wide">Joined</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {users.map((u) => (
-              <tr key={u.user_id} className="hover:bg-[var(--surface-2)] transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-black text-foreground uppercase">{u.username[0]}</span>
+        {shown.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-foreground/55">{query ? `No users match “${query}”.` : "No users yet."}</p>
+        ) : (
+          <ul className="divide-y divide-[var(--border)]">
+            {shown.map((u) => {
+              const isSelf = me?.user_id === u.user_id;
+              return (
+                <li key={u.user_id} className={clsx("flex items-center gap-3 px-4 py-3 transition", busyId === u.user_id && "opacity-60", !u.is_active && "bg-foreground/[0.02]")}>
+                  <div className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                    u.role === "admin" ? "bg-foreground text-background" : "border border-[var(--border-strong)] bg-[var(--surface-2)] text-foreground")}>
+                    {u.username.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={clsx("truncate text-sm font-medium", u.is_active ? "text-foreground" : "text-foreground/50 line-through decoration-foreground/30")}>{u.username}</span>
+                      {isSelf && <Pill tone="accent">You</Pill>}
                     </div>
-                    <span className="font-medium text-foreground">{u.username}</span>
+                    <p className="mt-0.5 text-[12px] text-foreground/50">
+                      <span className="sm:hidden">{u.role === "admin" ? "Admin" : "User"} · {u.is_active ? "Active" : "Disabled"} · </span>
+                      Joined {joined(u.created_at)}
+                    </p>
                   </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    u.role === "admin"
-                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                      : "bg-foreground/5 text-foreground/60 border border-foreground/10"
-                  }`}>
-                    {u.role === "admin" ? <ShieldCheck size={10} /> : null}
-                    {u.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    u.is_active
-                      ? "bg-green-500/10 text-green-500 border border-green-500/20"
-                      : "bg-red-500/10 text-red-500 border border-red-500/20"
-                  }`}>
-                    {u.is_active ? "Active" : "Disabled"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-foreground/40 text-xs">
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <button
-                      onClick={() => handleToggleRole(u)}
-                      disabled={patchingId === u.user_id}
-                      title={u.role === "admin" ? "Remove admin" : "Make admin"}
-                      className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-foreground/40 hover:text-amber-500 transition disabled:opacity-40"
-                    >
-                      {u.role === "admin" ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
-                    </button>
-                    <button
-                      onClick={() => handleToggleActive(u)}
-                      disabled={patchingId === u.user_id}
-                      title={u.is_active ? "Disable user" : "Enable user"}
-                      className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-foreground/40 hover:text-foreground transition disabled:opacity-40"
-                    >
-                      {u.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
-                    </button>
-                    {confirmDeleteId === u.user_id ? (
-                      <>
-                        <button
-                          onClick={() => handleDelete(u.user_id)}
-                          disabled={patchingId === u.user_id}
-                          className="px-2 py-1 rounded-lg bg-red-500/10 text-red-500 text-xs font-semibold hover:bg-red-500/20 transition disabled:opacity-40"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-foreground/40 hover:text-foreground transition"
-                        >
-                          <X size={13} />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDeleteId(u.user_id)}
-                        title="Delete user"
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-foreground/20 hover:text-red-500 transition"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                  <div className="hidden items-center gap-2 sm:flex">
+                    <Pill className={u.role === "admin" ? "!border-foreground !text-foreground" : ""}>{u.role}</Pill>
+                    <Pill tone={u.is_active ? "good" : "bad"} dot>{u.is_active ? "Active" : "Disabled"}</Pill>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {users.length === 0 && (
-          <div className="text-center py-12 text-foreground/30 text-sm">No users found</div>
+                  <RowMenu
+                    u={u}
+                    isSelf={isSelf}
+                    onRole={() => patch(u, { role: u.role === "admin" ? "user" : "admin" }, u.role === "admin" ? `${u.username} is no longer an admin.` : `${u.username} is now an admin.`)}
+                    onActive={() => patch(u, { is_active: !u.is_active }, u.is_active ? `${u.username} can no longer sign in.` : `${u.username} can sign in again.`)}
+                    onReset={() => setResetFor(u)}
+                    onDelete={() => remove(u)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
+      </Panel>
+
+      <p className="mt-4 text-[13px] text-foreground/50">
+        Registration is closed, so new people can only get in through an account you create here.
+      </p>
+
+      {notice && (
+        <div role="status" className="fixed bottom-24 left-1/2 z-[150] -translate-x-1/2 rounded-xl bg-foreground px-4 py-2.5 text-[13px] text-background shadow-[var(--shadow-float)] md:bottom-8">
+          {notice}
+        </div>
+      )}
+      {showCreate && (
+        <CreateUserDialog onClose={() => setShowCreate(false)} onCreated={(u) => { setUsers((p) => [...p, u]); setShowCreate(false); flash(`${u.username} created.`); }} />
+      )}
+      {resetFor && <ResetPasswordDialog user={resetFor} onClose={() => setResetFor(null)} />}
     </div>
   );
 }

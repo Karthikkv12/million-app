@@ -11,10 +11,10 @@ export function KeyLevelsRuler({ data }: Props) {
 
   type Level = { label: string; value: number; color: string };
   const levels: Level[] = [];
-  if (max_put_wall  != null) levels.push({ label: "Put Wall",  value: max_put_wall,  color: "rgb(var(--loss-rgb))" });
-  if (zero_gamma    != null) levels.push({ label: "Zero γ",    value: zero_gamma,    color: "rgb(var(--accent-rgb))" });
-  if (spot          != null) levels.push({ label: "Spot",      value: spot,          color: "rgb(var(--foreground-rgb))" });
-  if (max_call_wall != null) levels.push({ label: "Call Wall", value: max_call_wall, color: "rgb(var(--gain-rgb))" });
+  if (max_put_wall  != null) levels.push({ label: "Put Wall",  value: max_put_wall,  color: "#e55d5d" });
+  if (zero_gamma    != null) levels.push({ label: "Zero γ",    value: zero_gamma,    color: "#f59e0b" });
+  if (spot          != null) levels.push({ label: "Spot",      value: spot,          color: "#f9fafb" });
+  if (max_call_wall != null) levels.push({ label: "Call Wall", value: max_call_wall, color: "#3fb37f" });
 
   levels.sort((a, b) => a.value - b.value);
   if (levels.length < 2) return null;
@@ -29,10 +29,10 @@ export function KeyLevelsRuler({ data }: Props) {
       {/* header */}
       <div className="flex items-center gap-2 mb-4">
         <Target size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Key Levels Ruler
         </span>
-        <span className="text-[8px] text-foreground/50 ml-auto">
+        <span className="text-[11px] text-foreground/50 ml-auto">
           Put Wall → Spot → Call Wall
         </span>
       </div>
@@ -67,12 +67,15 @@ export function KeyLevelsRuler({ data }: Props) {
                 borderColor: "var(--surface)",
               }}
             />
-            <div className="text-center mt-1">
-              <p className="text-[8px] font-bold whitespace-nowrap" style={{ color: lv.color }}>
+            <div
+              className={`mt-1 ${pct(lv.value) > 85 ? "text-right" : pct(lv.value) < 15 ? "text-left" : "text-center"}`}
+              style={{ transform: `translateX(${pct(lv.value) > 85 ? "-42%" : pct(lv.value) < 15 ? "42%" : "0"})` }}
+            >
+              <p className="text-[11px] font-bold whitespace-nowrap" style={{ color: lv.color }}>
                 {lv.label}
               </p>
               <p
-                className="text-[9px] font-black tabular-nums"
+                className="text-[11px] font-black tabular-nums"
                 style={{ color: lv.color }}
               >
                 ${lv.value.toFixed(0)}

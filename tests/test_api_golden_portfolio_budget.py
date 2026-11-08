@@ -8,7 +8,6 @@ UPDATE_GOLDEN=1 to re-record (only when a response change is intended).
 import json
 import os
 import re
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -24,25 +23,20 @@ PASSWORD = "GoodPassword12"
 PREFIXES = ["", "/api/v1"]
 
 _TIME_KEYS = re.compile(r"(_at|^ts|^updated|^created|^last_|^as_of)$")
-_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
 
 
 def _normalize(value, key=""):
-    """Hide values that depend on when the test runs."""
+    """Hide timestamps the server sets from the clock (created_at, updated_at, …).
+
+    Every other value, including dates derived from the scenario's fixed
+    dates, is compared exactly, so the test gives the same result on any day.
+    """
     if isinstance(value, dict):
         return {k: _normalize(v, k) for k, v in sorted(value.items())}
     if isinstance(value, list):
         return [_normalize(v, key) for v in value]
-    if isinstance(value, str) and (_TIME_KEYS.search(key) or _ISO.match(value)):
-        if _TIME_KEYS.search(key):
-            return "<time>"
-        try:
-            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-            if abs(dt - datetime.now(timezone.utc)) < timedelta(days=1):
-                return "<now>"
-        except ValueError:
-            pass
+    if isinstance(value, str) and _TIME_KEYS.search(key):
+        return "<time>"
     return value
 
 

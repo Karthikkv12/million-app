@@ -364,11 +364,11 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
           <span className="text-sm font-black text-foreground">{symbol}</span>
           {last && (
             <>
-              <span className={`text-sm font-black tabular-nums ${liveUp ? "text-emerald-500" : "text-red-500"}`}>
+              <span className={`text-sm font-black tabular-nums ${liveUp ? "text-gain" : "text-loss"}`}>
                 {fmt$(last.close)}
               </span>
               {changePct != null && (
-                <span className={`text-[11px] font-bold tabular-nums ${liveUp ? "text-emerald-500" : "text-red-500"}`}>
+                <span className={`text-[11px] font-bold tabular-nums ${liveUp ? "text-gain" : "text-loss"}`}>
                   {liveUp ? "▲" : "▼"} {Math.abs(changePct).toFixed(2)}%
                 </span>
               )}
@@ -434,8 +434,8 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       <div className="flex flex-wrap items-center gap-3 px-4 py-1.5 bg-[var(--surface)] border-b border-[var(--border)]/50 text-[10px] font-mono">
         {legend.time && <span className="text-foreground/50">{legend.time}</span>}
         {legend.open  != null && <span className="text-foreground/70">O <span className="text-foreground font-bold">{fmt$(legend.open)}</span></span>}
-        {legend.high  != null && <span className="text-emerald-400">H <span className="font-bold">{fmt$(legend.high)}</span></span>}
-        {legend.low   != null && <span className="text-red-400">L <span className="font-bold">{fmt$(legend.low)}</span></span>}
+        {legend.high  != null && <span className="text-gain">H <span className="font-bold">{fmt$(legend.high)}</span></span>}
+        {legend.low   != null && <span className="text-loss">L <span className="font-bold">{fmt$(legend.low)}</span></span>}
         {legend.close != null && <span className="text-foreground">C <span className="font-bold">{fmt$(legend.close)}</span></span>}
         {legend.volume != null && <span className="text-foreground/50">Vol <span className="text-foreground font-bold">{fmtVol(legend.volume)}</span></span>}
         {showSMA.s20  && legend.sma20  != null && <span className="text-blue-400">SMA20 <span className="font-bold">{fmt$(legend.sma20)}</span></span>}
@@ -459,8 +459,8 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       {/* ── GEX levels legend ── */}
       {gexLevels && (gexLevels.callWall || gexLevels.putWall || gexLevels.zeroGamma) && (
         <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-t border-[var(--border)] bg-[var(--surface-2)] text-[10px]">
-          {gexLevels.callWall  && <span className="text-emerald-400 font-bold">── Call Wall {fmt$(gexLevels.callWall)}</span>}
-          {gexLevels.putWall   && <span className="text-red-400 font-bold">── Put Wall {fmt$(gexLevels.putWall)}</span>}
+          {gexLevels.callWall  && <span className="text-gain font-bold">── Call Wall {fmt$(gexLevels.callWall)}</span>}
+          {gexLevels.putWall   && <span className="text-loss font-bold">── Put Wall {fmt$(gexLevels.putWall)}</span>}
           {gexLevels.zeroGamma && <span className="text-amber-400 font-bold">── Zero γ {fmt$(gexLevels.zeroGamma)}</span>}
           {earningsDate && (
             <span className="text-amber-400 font-bold">

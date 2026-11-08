@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { LucideIcon, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
+import { useTheme } from "@/lib/theme";
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 export function SkeletonCard({ rows = 3 }: { rows?: number }) {
@@ -99,15 +100,15 @@ export function StatCard({
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <p className="font-mono text-[10px] text-foreground/55 uppercase tracking-[0.16em]">{label}</p>
+        <p className="font-mono text-[11px] text-foreground/55 uppercase tracking-[0.16em]">{label}</p>
         <span className={clsx("p-2 rounded-xl", iconBg)}>
           <Icon size={14} className={iconColor} strokeWidth={2} />
         </span>
       </div>
       <p className={clsx(
         "text-xl sm:text-2xl font-semibold tracking-tight tabular-nums leading-tight",
-        trend === "up"   ? "text-emerald-500" :
-        trend === "down" ? "text-red-500"      :
+        trend === "up"   ? "text-gain" :
+        trend === "down" ? "text-loss"      :
         "text-foreground",
       )}>{value}</p>
       {sub && <p className="text-xs text-foreground/70 mt-1.5">{sub}</p>}
@@ -120,11 +121,15 @@ interface PageHeaderProps {
   title: string;
   sub?: string;
   action?: React.ReactNode;
+  eyebrow?: string;
 }
-export function PageHeader({ title, sub, action }: PageHeaderProps) {
+export function PageHeader({ title, sub, action, eyebrow }: PageHeaderProps) {
   return (
-    <div className="flex items-end justify-between mb-8 gap-4">
-      <div>
+    <div className="flex flex-wrap items-end justify-between mb-8 gap-4">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />{eyebrow}</p>
+        )}
         <h1 className="text-3xl sm:text-[40px] font-semibold text-foreground tracking-[-0.035em] leading-[1.05]">{title}</h1>
         {sub && <p className="text-[15px] text-foreground/60 mt-2 leading-relaxed">{sub}</p>}
       </div>
@@ -186,7 +191,7 @@ export function RefreshButton({ onRefresh, isRefreshing = false }: {
 // ── Error banner ──────────────────────────────────────────────────────────────
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="p-4 bg-red-500/[0.06] border border-red-500/20 rounded-2xl text-sm text-red-600 dark:text-red-400 leading-relaxed">
+    <div className="p-4 bg-loss/[0.06] border border-loss/20 rounded-2xl text-sm text-loss leading-relaxed">
       {message}
     </div>
   );
@@ -230,13 +235,13 @@ export function Badge({ children, variant = "default", className }: {
 }) {
   const styles = {
     default: "bg-foreground/[0.06] text-foreground/80",
-    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    danger:  "bg-red-500/10 text-red-600 dark:text-red-400",
+    success: "bg-gain/10 text-gain",
+    danger:  "bg-loss/10 text-loss",
     warning: "bg-warm/10 text-warm",
     info:    "bg-accent/10 text-accent",
   };
   return (
-    <span className={clsx("inline-flex items-center font-mono text-[10px] px-2 py-0.5 rounded-md uppercase tracking-[0.12em]", styles[variant], className)}>
+    <span className={clsx("inline-flex items-center font-mono text-[11px] px-2 py-0.5 rounded-md uppercase tracking-[0.1em]", styles[variant], className)}>
       {children}
     </span>
   );
@@ -261,4 +266,152 @@ export function Card({ children, className, onClick }: {
       {children}
     </Tag>
   );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Shared card system — every card in the app is a Panel.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Section heading above a group of panels: "— LABEL" with optional right-side meta. */
+export function SectionHeader({ label, meta, className }: { label: string; meta?: React.ReactNode; className?: string }) {
+  return (
+    <div className={clsx("mb-3 flex flex-wrap items-center justify-between gap-2", className)}>
+      <h2 className="eyebrow flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />{label}</h2>
+      {meta && <div className="flex items-center gap-2 text-[12px] text-foreground/55">{meta}</div>}
+    </div>
+  );
+}
+
+/**
+ * Panel — the one card. Hairline border, 16px radius, optional header row with
+ * a mono uppercase title (and window dots when `chrome`), right-side actions.
+ */
+export function Panel({
+  title, sub, actions, chrome = false, padded = true, className, bodyClassName, children,
+}: {
+  title?: React.ReactNode;
+  sub?: React.ReactNode;
+  actions?: React.ReactNode;
+  chrome?: boolean;
+  padded?: boolean;
+  className?: string;
+  bodyClassName?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={clsx("min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]", className)}>
+      {(title || actions) && (
+        <header className="flex min-h-[44px] items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-3">
+            {chrome && (
+              <span className="hidden shrink-0 gap-1.5 sm:flex" aria-hidden>
+                <i className="h-2 w-2 rounded-full bg-foreground/15" />
+                <i className="h-2 w-2 rounded-full bg-foreground/15" />
+                <i className="h-2 w-2 rounded-full bg-foreground/15" />
+              </span>
+            )}
+            <div className="min-w-0">
+              {title && <h3 className="truncate font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">{title}</h3>}
+              {sub && <p className="truncate text-[12px] text-foreground/50">{sub}</p>}
+            </div>
+          </div>
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </header>
+      )}
+      <div className={clsx(padded && "p-4", bodyClassName)}>{children}</div>
+    </section>
+  );
+}
+
+/** Gain/loss text: ▲ +1.23 (+0.45%). Neutral grey at exactly zero. */
+export function Change({ value, pct, className, digits = 2 }: { value?: number | null; pct?: number | null; className?: string; digits?: number }) {
+  const v = pct ?? value ?? 0;
+  const tone = v > 0 ? "text-gain" : v < 0 ? "text-loss" : "text-foreground/55";
+  const arrow = v > 0 ? "▲" : v < 0 ? "▼" : "■";
+  const fmt = (n: number) => (n > 0 ? "+" : "") + n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return (
+    <span className={clsx("inline-flex items-center gap-1 font-mono text-[12px] tabular-nums", tone, className)}>
+      <span className="text-[9px]">{arrow}</span>
+      {value != null && <span>{fmt(value)}</span>}
+      {pct != null && <span>{value != null ? `(${fmt(pct)}%)` : `${fmt(pct)}%`}</span>}
+    </span>
+  );
+}
+
+const PILL_TONE = {
+  neutral: "border-[var(--border-strong)] text-foreground/70",
+  good:    "border-gain/30 bg-gain/10 text-gain",
+  bad:     "border-loss/30 bg-loss/10 text-loss",
+  warn:    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  accent:  "border-accent/30 bg-accent/10 text-accent",
+};
+/** Small rounded label for state: role, status, regime. */
+export function Pill({ tone = "neutral", children, className, dot = false }: {
+  tone?: keyof typeof PILL_TONE; children: React.ReactNode; className?: string; dot?: boolean;
+}) {
+  return (
+    <span className={clsx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em]", PILL_TONE[tone], className)}>
+      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+      {children}
+    </span>
+  );
+}
+
+/** Compact segmented control (e.g. 1D / 5D / 30D). */
+export function Segmented<T extends string>({ options, value, onChange, className, label }: {
+  options: { value: T; label: React.ReactNode }[]; value: T; onChange: (v: T) => void; className?: string; label?: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className={clsx("inline-flex rounded-lg border border-[var(--border)] p-0.5", className)}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={clsx(
+            "rounded-md px-2.5 py-1 font-mono text-[11px] transition",
+            value === o.value ? "bg-foreground text-background" : "text-foreground/55 hover:text-foreground",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Diverging heat colour for % changes (tiles, bars). Intensity grows with |pct|
+ * up to `cap`; near-zero changes stay a quiet neutral.
+ */
+export function heatColor(pct: number | null | undefined, cap = 3): { bg: string; fg: string } {
+  if (pct == null || Number.isNaN(pct)) return { bg: "rgb(var(--foreground-rgb) / 0.06)", fg: "rgb(var(--foreground-rgb) / 0.6)" };
+  const a = Math.min(Math.abs(pct) / cap, 1);
+  if (Math.abs(pct) < 0.05) return { bg: "rgb(var(--foreground-rgb) / 0.08)", fg: "rgb(var(--foreground-rgb) / 0.8)" };
+  const strong = a > 0.55;
+  return pct > 0
+    ? { bg: `rgb(var(--gain-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" }
+    : { bg: `rgb(var(--loss-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" };
+}
+
+/**
+ * Concrete colours for SVG/canvas charts. SVG presentation attributes don't
+ * reliably resolve CSS variables in every browser, so charts take real values.
+ */
+export function useChartColors() {
+  const { theme } = useTheme();
+  const dark = theme === "dark";
+  return {
+    accent: dark ? "#7aa2ff" : "#2f5bea",
+    ink:    dark ? "#e6e9ef" : "#0e0f12",
+    muted:  dark ? "rgba(203,213,225,0.5)" : "rgba(14,15,18,0.45)",
+    grid:   dark ? "rgba(148,163,184,0.10)" : "rgba(14,15,18,0.07)",
+    gain:   dark ? "#3fb37f" : "#15803d",
+    loss:   dark ? "#e55d5d" : "#dc2626",
+    gainSoft: dark ? "rgba(63,179,127,0.35)" : "rgba(21,128,61,0.28)",
+    lossSoft: dark ? "rgba(229,93,93,0.35)" : "rgba(220,38,38,0.25)",
+    surface: dark ? "#141a22" : "#ffffff",
+    border:  dark ? "rgba(148,163,184,0.18)" : "rgba(14,15,18,0.12)",
+  };
 }

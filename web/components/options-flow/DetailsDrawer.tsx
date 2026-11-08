@@ -2,6 +2,7 @@
 /** DetailsDrawer — slide-over with every secondary GEX / flow section for one ticker. */
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { Segmented } from "@/components/ui";
 import type { GexResult } from "@/lib/api";
 import NetFlowPanel from "@/components/gex/NetFlowPanel";
 import { InsightBar } from "./InsightBar";
@@ -44,24 +45,18 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${ticker} details`}>
       <button className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} aria-label="Close details" />
-      <aside className="relative flex h-full w-full max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl">
+      <aside className="relative flex h-full w-full max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)]">
         <header className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: accentColor }} />
-          <h2 className="text-sm font-black text-foreground">{ticker}</h2>
-          <span className="text-xs tabular-nums text-foreground/60">${data.spot.toFixed(2)}</span>
-          <div className="ml-auto flex rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
-            {(["levels", "flow"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`rounded-md px-3 py-1 text-[11px] font-bold capitalize transition ${
-                  tab === t ? "bg-[var(--surface)] text-foreground shadow-sm" : "text-foreground/55 hover:text-foreground"
-                }`}
-              >
-                {t === "levels" ? "Levels" : "Flow"}
-              </button>
-            ))}
-          </div>
+          <h2 className="font-mono text-[13px] font-medium uppercase tracking-[0.14em] text-foreground">{ticker}</h2>
+          <span className="font-mono text-[13px] tabular-nums text-foreground/60">${data.spot.toFixed(2)}</span>
+          <Segmented
+            className="ml-auto"
+            label="Details section"
+            value={tab}
+            onChange={setTab}
+            options={[{ value: "levels", label: "Levels" }, { value: "flow", label: "Flow" }]}
+          />
           <button onClick={onClose} className="rounded-md p-1.5 text-foreground/60 hover:bg-[var(--surface-2)] hover:text-foreground" aria-label="Close">
             <X size={16} />
           </button>

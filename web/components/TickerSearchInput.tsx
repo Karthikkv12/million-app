@@ -7,7 +7,7 @@
  *     value={input}
  *     onChange={setInput}
  *     onSelect={(symbol) => doSearch(symbol)}
- *     accentColor="…"                // ignored: the button always uses ink
+ *     accentColor="#6b82f8"          // optional — colours the button
  *     placeholder="Ticker…"          // optional
  *     actionLabel="LOAD"             // optional button label
  *   />
@@ -20,11 +20,11 @@ import { searchTickers, TickerSuggestion } from "@/lib/api";
 
 const TYPE_COLOR: Record<string, string> = {
   Equity:  "text-foreground/70",
-  ETF:     "text-emerald-400",
+  ETF:     "text-gain",
   Index:   "text-foreground/50",
   Fund:    "text-orange-400",
   Crypto:  "text-yellow-400",
-  Future:  "text-red-400",
+  Future:  "text-loss",
   Forex:   "text-cyan-400",
 };
 
@@ -43,6 +43,7 @@ export default function TickerSearchInput({
   value,
   onChange,
   onSelect,
+  accentColor  = "#6b82f8",
   placeholder  = "Ticker or company…",
   actionLabel  = "LOAD",
   className    = "",
@@ -186,7 +187,8 @@ export default function TickerSearchInput({
     <div ref={containerRef} className={`relative ${className}`}>
       <form
         onSubmit={handleSubmit}
-        className="flex items-stretch rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)] focus-within:border-[var(--border-strong)]"
+        className="flex items-stretch rounded-xl overflow-hidden border border-[var(--border-strong)] bg-[var(--surface)] transition focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-accent/20"
+        data-accent={accentColor}
       >
         <span className="flex items-center pl-3 pr-1.5 text-foreground/70 shrink-0">
           {loading
@@ -202,11 +204,11 @@ export default function TickerSearchInput({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
-          className="flex-1 min-w-0 py-2 text-sm font-bold bg-transparent text-foreground placeholder:text-foreground/40 focus:outline-none"
+          className="flex-1 min-w-0 py-2 text-sm font-medium bg-transparent text-foreground placeholder:text-foreground/40 focus:outline-none"
         />
         <button
           type="submit"
-          className="flex items-center justify-center px-4 text-[11px] font-bold tracking-wider shrink-0 bg-foreground text-background transition-opacity hover:opacity-90"
+          className="m-1 flex items-center justify-center rounded-lg bg-foreground px-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-background shrink-0 transition hover:bg-foreground/85"
         >
           {actionLabel}
         </button>

@@ -162,9 +162,10 @@ export interface GexResult {
   spot: number;
   expiries: string[];
   strikes: number[];
-  gex_by_strike: Record<string, number>;
-  call_gex_by_strike: Record<string, number>;
-  put_gex_by_strike: Record<string, number>;
+  /** Aligned with `strikes` (same index), in $ per 1% move. */
+  gex_by_strike: number[];
+  call_gex_by_strike: number[];
+  put_gex_by_strike: number[];
   heatmap_expiries: string[];
   heatmap_strikes: number[];
   heatmap_values: number[][];
@@ -754,6 +755,7 @@ export const revokeSession = (id: number) => api.post(`/auth/sessions/${id}/revo
 export const fetchAuthEvents = () => api.get<AuthEvent[]>("/auth/events");
 export const changePassword = (currentPassword: string, newPassword: string) =>
   api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+export const logoutAll = () => api.post("/auth/logout-all");
 
 // ── Cash ─────────────────────────────────────────────────────────────────────
 
@@ -775,7 +777,7 @@ export const adminListUsers = () => api.get<AdminUser[]>("/admin/users");
 export const adminCreateUser = (username: string, password: string, role: "admin" | "user") =>
   api.post<AdminUser>("/admin/users", { username, password, role });
 
-export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean }) =>
+export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean; password?: string }) =>
   api.patch<AdminUser>(`/admin/users/${user_id}`, patch);
 
 export const adminDeleteUser = async (user_id: number): Promise<void> => {
@@ -873,3 +875,28 @@ export const syncWatchlist = () =>
   api.post<{ positions_synced: number; holdings_synced: number; total_added: number }>(
     "/watchlist/sync",
   );
+
+// ── Catalyst ──────────────────────────────────────────────────────────────────
+export interface CatalystSignal { label: string; tone: "good" | "bad" | "warn" | "neutral" }
+export interface Catalysts {
+  symbol: string; name: string; price: number | null; change_pct: number | null;
+  earnings: { date: string | null; days_until: number | null; timing: string | null;
+    eps_avg: number | null; eps_low: number | null; eps_high: number | null;
+    revenue_avg: number | null; revenue_low: number | null; revenue_high: number | null };
+  dividend: { ex_date: string | null; ex_days_until: number | null; pay_date: string | null; rate: number | null; yield_pct: number | null };
+  expected_move: { dollars: number; pct: number; low: number; high: number; expiry: string; strike: number; covers_earnings: boolean } | null;
+  earnings_history: { date: string; estimate: number | null; reported: number; surprise_pct: number | null }[];
+  analysts: {
+    rating: string | null;
+    consensus: { strongBuy: number; buy: number; hold: number; sell: number; strongSell: number } | null;
+    targets: { low: number | null; mean: number | null; median: number | null; high: number | null };
+    upside_pct: number | null;
+    actions: { date: string; firm: string; action: string; from: string | null; to: string | null; target: number | null; prior_target: number | null }[];
+  };
+  volume: { today: number | null; average: number | null; relative: number | null; short_pct_float: number | null; short_ratio: number | null; beta: number | null };
+  range: { high: number | null; low: number | null; position_pct: number | null };
+  news: { title: string; publisher: string | null; url: string | null; published: string | number | null }[];
+  signals: CatalystSignal[];
+  as_of: string; source: string;
+}
+export const fetchCatalysts = (symbol: string) => api.get<Catalysts>(`/catalyst/${encodeURIComponent(symbol)}`);

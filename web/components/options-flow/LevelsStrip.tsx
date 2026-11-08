@@ -2,6 +2,7 @@
 /** LevelsStrip — the at-a-glance row: spot, regime, flip, call wall, put wall. */
 import type { GexResult } from "@/lib/api";
 import { fmtGex } from "@/lib/gex";
+import { Pill } from "@/components/ui";
 
 function pct(level: number | null | undefined, spot: number): string {
   if (level == null || !spot) return "";
@@ -12,9 +13,9 @@ function pct(level: number | null | undefined, spot: number): string {
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div className="min-w-0 px-3 py-2">
-      <div className="text-[9px] font-semibold uppercase tracking-wider text-foreground/50">{label}</div>
-      <div className={`text-[13px] font-bold tabular-nums leading-tight truncate ${tone ?? "text-foreground"}`}>{value}</div>
-      {sub && <div className="text-[9px] tabular-nums text-foreground/50">{sub}</div>}
+      <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">{label}</div>
+      <div className={`truncate font-mono text-[15px] font-medium leading-tight tabular-nums ${tone ?? "text-foreground"}`}>{value}</div>
+      {sub && <div className="font-mono text-[11px] tabular-nums text-foreground/50">{sub}</div>}
     </div>
   );
 }
@@ -29,20 +30,17 @@ export function LevelsStrip({ data }: { data: GexResult }) {
     <div className="border-b border-[var(--border)]">
       <div className="flex items-center justify-between gap-3 px-3 pt-2.5">
         <div className="flex items-baseline gap-2 min-w-0">
-          <span className="text-xl font-black tabular-nums text-foreground">${spot.toFixed(2)}</span>
+          <span className="font-mono text-2xl font-medium tracking-tight tabular-nums text-foreground">${spot.toFixed(2)}</span>
           {aboveFlip != null && (
-            <span className="text-[10px] font-semibold text-foreground/55 truncate">
+            <span className="truncate text-[13px] text-foreground/55">
               {aboveFlip ? "above" : "below"} flip
             </span>
           )}
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-            longGamma ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
-          }`}
-          title={longGamma ? "Dealers net long gamma: tends to dampen moves" : "Dealers net short gamma: tends to amplify moves"}
-        >
-          {longGamma ? "+GEX · Pinned" : "−GEX · Volatile"} {fmtGex(net_gex)}
+        <span title={longGamma ? "Dealers net long gamma: tends to dampen moves" : "Dealers net short gamma: tends to amplify moves"}>
+          <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">
+            {longGamma ? "+GEX · Pinned" : "−GEX · Volatile"} {fmtGex(net_gex)}
+          </Pill>
         </span>
       </div>
       <div className="grid grid-cols-3 divide-x divide-[var(--border)]">

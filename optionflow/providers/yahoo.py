@@ -300,6 +300,11 @@ class YahooMarketData:
         except Exception as exc:
             return {"symbol": sym, "error": str(exc)}
 
+    # ── Raw access (catalyst module) ──────────────────────────────────────────
+    def raw_ticker(self, symbol: str):
+        """yfinance Ticker for modules that read Yahoo-specific fields (catalysts)."""
+        return yf.Ticker(symbol)
+
     # ── Options ───────────────────────────────────────────────────────────────
     def option_chain(self, symbol: str) -> OptionChain:
         """All unexpired expiries, fetched concurrently (max 16 workers)."""

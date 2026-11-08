@@ -29,10 +29,10 @@ export function GammaConcentration({ data }: Props) {
       {/* header */}
       <div className="flex items-center gap-2 mb-3">
         <Activity size={10} className="text-foreground/60" />
-        <span className="text-[9px] text-foreground uppercase tracking-widest font-black">
+        <span className="text-[11px] text-foreground uppercase tracking-widest font-black">
           Gamma Concentration
         </span>
-        <span className="text-[8px] text-foreground/50 ml-auto">
+        <span className="text-[11px] text-foreground/50 ml-auto">
           Total |GEX| across all expiries
         </span>
       </div>
@@ -45,7 +45,7 @@ export function GammaConcentration({ data }: Props) {
           return (
             <div key={r.strike} className="flex items-center gap-2.5">
               <span
-                className={`text-[10px] font-bold tabular-nums w-14 text-right shrink-0 ${
+                className={`text-[11px] font-bold tabular-nums w-14 text-right shrink-0 ${
                   isSpot ? "text-amber-400" : "text-foreground/80"
                 }`}
               >
@@ -61,7 +61,7 @@ export function GammaConcentration({ data }: Props) {
                   }}
                 />
               </div>
-              <span className="text-[9px] text-foreground/60 tabular-nums w-14 shrink-0 text-right font-mono">
+              <span className="text-[11px] text-foreground/60 tabular-nums w-14 shrink-0 text-right font-mono">
                 {r.weight.toFixed(2)}B
               </span>
             </div>

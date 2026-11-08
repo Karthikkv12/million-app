@@ -5,6 +5,8 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTheme } from "@/lib/theme";
+import { Panel } from "@/components/ui";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "econ_cal_filters";
@@ -65,6 +67,7 @@ function toggle<T>(arr: T[], val: T): T[] {
 export default function EconomicCalendar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [filters, setFiltersRaw] = useState<Filters>(loadFilters);
+  const { theme } = useTheme();
 
   const setFilters = useCallback((f: Filters) => {
     setFiltersRaw(f);
@@ -83,7 +86,7 @@ export default function EconomicCalendar() {
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
     script.async = true;
     script.innerHTML = JSON.stringify({
-      colorTheme:       "dark",
+      colorTheme:       theme === "dark" ? "dark" : "light",
       isTransparent:    true,
       width:            "100%",
       height:           "400",
@@ -94,65 +97,41 @@ export default function EconomicCalendar() {
 
     containerRef.current.appendChild(script);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(filters)]);
+  }, [JSON.stringify(filters), theme]);
 
-  const pillBase = "px-2.5 py-0.5 rounded-full text-[10px] font-semibold border transition cursor-pointer select-none";
-  const pillOn   = "bg-white/15 border-white/20 text-white";
-  const pillOff  = "bg-transparent border-white/10 text-foreground/70 hover:border-white/20 hover:text-foreground";
+  const pill = (on: boolean) =>
+    `rounded-full border px-2.5 py-1 text-[12px] transition select-none ${
+      on ? "border-foreground bg-foreground text-background" : "border-[var(--border-strong)] text-foreground/60 hover:text-foreground"
+    }`;
 
   return (
-    <div className="mb-6 sm:mb-8">
-      {/* Section title */}
-      <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest mb-3">
-        Economic Calendar
-      </p>
-
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
-        {/* Importance toggles */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[9px] text-foreground/70 uppercase tracking-widest mr-0.5">Importance</span>
-          {IMPORTANCE_OPTIONS.map(({ value, label }) => {
-            const active = filters.importance.includes(value);
-            return (
-              <button
-                key={value}
-                onClick={() => setFilters({ ...filters, importance: toggle(filters.importance, value) })}
-                className={`${pillBase} ${active ? pillOn : pillOff}`}
-              >
-                {label}
-              </button>
-            );
-          })}
+    <Panel
+      title="Economic calendar"
+      sub="TradingView · times in your timezone"
+      padded={false}
+      className="mb-8"
+    >
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--border)] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Importance</span>
+          {IMPORTANCE_OPTIONS.map(({ value, label }) => (
+            <button key={value} aria-pressed={filters.importance.includes(value)}
+              onClick={() => setFilters({ ...filters, importance: toggle(filters.importance, value) })}
+              className={pill(filters.importance.includes(value))}>{label}</button>
+          ))}
         </div>
-
-        {/* Divider */}
-        <span className="w-px h-4 bg-white/10" />
-
-        {/* Country pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] text-foreground/70 uppercase tracking-widest mr-0.5">Countries</span>
-          {COUNTRY_OPTIONS.map(({ value, label }) => {
-            const active = filters.countries.includes(value);
-            return (
-              <button
-                key={value}
-                onClick={() => setFilters({ ...filters, countries: toggle(filters.countries, value) })}
-                className={`${pillBase} ${active ? pillOn : pillOff}`}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Countries</span>
+          {COUNTRY_OPTIONS.map(({ value, label }) => (
+            <button key={value} aria-pressed={filters.countries.includes(value)}
+              onClick={() => setFilters({ ...filters, countries: toggle(filters.countries, value) })}
+              className={pill(filters.countries.includes(value))}>{label}</button>
+          ))}
         </div>
       </div>
-
-      {/* Widget */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
-        <div className="tradingview-widget-container" ref={containerRef}>
-          <div className="tradingview-widget-container__widget" />
-        </div>
+      <div className="tradingview-widget-container min-h-[400px]" ref={containerRef}>
+        <div className="tradingview-widget-container__widget" />
       </div>
-    </div>
+    </Panel>
   );
 }

@@ -32,7 +32,7 @@ export function PanelHeader({
       />
       <div className="flex shrink-0 items-center gap-1 text-foreground/55">
         <span
-          className={`h-1.5 w-1.5 rounded-full ${isFetching ? "bg-amber-400 animate-pulse" : "bg-emerald-500"}`}
+          className={`h-1.5 w-1.5 rounded-full ${isFetching ? "bg-amber-400 animate-pulse" : "bg-gain"}`}
           title="Yahoo Finance · ~15 min delayed"
         />
         {lastUpdated && <span className="hidden font-mono text-[9px] tabular-nums sm:inline">{lastUpdated}</span>}

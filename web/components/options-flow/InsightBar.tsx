@@ -21,14 +21,14 @@ export function InsightBar({ data }: Props) {
   return (
     <div
       className={`px-4 py-2.5 border-b border-[var(--border)] ${
-        isCallBias ? "bg-emerald-500/[0.04]" : "bg-red-500/[0.04]"
+        isCallBias ? "bg-gain/[0.04]" : "bg-loss/[0.04]"
       }`}
     >
-      <div className="flex items-center gap-2 text-[10px] text-foreground/80">
+      <div className="flex items-center gap-2 text-[11px] text-foreground/80">
         {isCallBias ? (
-          <TrendingDown size={11} className="text-emerald-400 shrink-0" />
+          <TrendingDown size={11} className="text-gain shrink-0" />
         ) : (
-          <TrendingUp size={11} className="text-red-400 shrink-0" />
+          <TrendingUp size={11} className="text-loss shrink-0" />
         )}
         <span>
           Price{" "}
@@ -40,12 +40,12 @@ export function InsightBar({ data }: Props) {
             ? "hedge by selling rallies & buying dips"
             : "amplify moves (trending mode)"}
           {data.max_call_wall && data.spot < data.max_call_wall && (
-            <span className="ml-2 text-emerald-400">
+            <span className="ml-2 text-gain">
               · Resistance <strong>${data.max_call_wall.toFixed(0)}</strong>
             </span>
           )}
           {data.max_put_wall && data.spot > data.max_put_wall && (
-            <span className="ml-2 text-red-400">
+            <span className="ml-2 text-loss">
               · Support <strong>${data.max_put_wall.toFixed(0)}</strong>
             </span>
           )}

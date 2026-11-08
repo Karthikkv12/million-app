@@ -61,7 +61,7 @@ const ramp = (stops: RGB[], t: number): RGB => {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 };
 
-function cellColor(v: number, vmax: number, palette: Palette): { bg: string; fg: string } {
+export function cellColor(v: number, vmax: number, palette: Palette): { bg: string; fg: string } {
   const t = vmax ? Math.sqrt(Math.min(Math.abs(v) / vmax, 1)) : 0; // sqrt keeps mid nodes visible
   let c: RGB;
   if (palette in SIGNED) {
@@ -213,7 +213,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                 <div className="whitespace-nowrap text-[10px] font-medium text-white/80">{exp}</div>
                 <div className="flex justify-end gap-1.5 text-[9px]">
                   <span className="text-white/40">{dte(exp)}</span>
-                  <span className={colTotals[ci] >= 0 ? "text-[#4ade80]" : "text-[#f87171]"}>{fmtMoney(colTotals[ci])}</span>
+                  <span className={colTotals[ci] >= 0 ? "text-gain/80" : "text-violet-300/80"}>{fmtMoney(colTotals[ci])}</span>
                 </div>
               </th>
             ))}
@@ -238,9 +238,9 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                         ★ King
                       </span>
                     )}
-                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-[#4ade80]">CW</span>}
-                    {strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-[#f87171]">PW</span>}
-                    {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-[#90bff9]">Flip</span>}
+                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
+                    {strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
+                    {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
                   </div>
                 </td>
                 <td

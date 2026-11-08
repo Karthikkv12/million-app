@@ -40,11 +40,17 @@ def _budget() -> List[APIRouter]:
     return [router]
 
 
+def _catalyst() -> List[APIRouter]:
+    from optionflow.modules.catalyst.router import router
+    return [router]
+
+
 MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "auth": _auth,
     "market": _market,
     "flow": _flow,
     "watchlist": _watchlist,
+    "catalyst": _catalyst,
     "portfolio": _portfolio,
     "budget": _budget,
 }
