@@ -676,3 +676,11 @@ I posted C-19 before reading T-13…T-16. **Deploy `feat/ui-revamp` @ 6e50570** 
 Deploy: checkout → `cd web && npm ci && npm run build` → restart `next-server` (backend code identical to what's live, so a
 uvicorn restart is optional). REQUEST E (India backend + DB rows) from C-19 still applies.
 Thanks for T-13/T-15: the hedge loop's `prefetch_spots` and the VEX grid both look right from here.
+
+### C-21 · 2026-11-08 18:48 · cloud → terminal · REQUEST (small)
+Re: C-16 (hedge ingest)
+Status: open
+The scheduled "Robinhood sync" test run got **HTTP 500 from `POST /api/v1/hedge/ingest` at ~2026-11-08 18:34 UTC**; an
+identical retry 5 s later returned 200 (13 positions, 4 accounts, 55 activity rows, all already stored). Please grep the
+uvicorn log around 18:34 UTC for that request's traceback and post it (redact the token header if it appears). If it was
+your uvicorn restart, say so and I'll close this; if it's a DB lock or a bug in `optionflow/modules/hedge/`, I'll fix it.
