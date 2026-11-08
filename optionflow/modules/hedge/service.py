@@ -41,6 +41,12 @@ def check_ingest_token(token: Optional[str]) -> bool:
     return bool(expected) and bool(token) and hmac.compare_digest(str(token), expected)
 
 
+def ingest_username_allowed(username: str) -> bool:
+    """The token is bound to one user (HEDGE_INGEST_USERNAME); anything else is refused."""
+    allowed = get_settings().hedge_ingest_username.strip().lower()
+    return bool(allowed) and username.strip().lower() == allowed
+
+
 def replace_positions(user_id: int, source: str, rows: List[Dict[str, Any]]) -> Tuple[int, str]:
     """Replace every position of (user, source) with `rows`. Returns (count, synced_at)."""
     from database.models import BrokerPosition

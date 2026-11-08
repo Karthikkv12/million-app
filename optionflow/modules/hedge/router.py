@@ -27,9 +27,9 @@ def ingest(body: IngestRequest, x_hedge_ingest_token: Optional[str] = Header(Non
     Auth: X-Hedge-Ingest-Token (not a user login)."""
     if not service.check_ingest_token(x_hedge_ingest_token):
         raise HTTPException(status_code=401, detail="Bad or missing ingest token")
-    user = auth_service.get_user_by_username(body.username)
-    if user is None:
-        raise HTTPException(status_code=404, detail="Unknown user")
+    user = auth_service.get_user_by_username(body.username) if service.ingest_username_allowed(body.username) else None
+    if user is None:                     # same answer for "not the bound user" and "no such user"
+        raise HTTPException(status_code=403, detail="This token can't write for that user")
     for p in body.positions:
         if p.kind == "option" and (p.option_type is None or p.strike is None or p.expiry is None):
             raise HTTPException(status_code=422, detail=f"{p.symbol}: options need option_type, strike and expiry")

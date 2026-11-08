@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget,hedge"
     # Shared secret for POST /hedge/ingest (broker sync). Empty = ingest disabled.
     hedge_ingest_token: str = ""
+    # The only username the ingest token may write for. Empty = ingest disabled.
+    hedge_ingest_username: str = ""
 
     # ── Derived values ───────────────────────────────────────────────────────
     @property

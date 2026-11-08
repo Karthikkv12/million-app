@@ -4581,6 +4581,7 @@
       "items": {
        "$ref": "#/components/schemas/IngestAccount"
       },
+      "maxItems": 50,
       "title": "Accounts",
       "type": "array"
      },
@@ -4589,6 +4590,7 @@
       "items": {
        "$ref": "#/components/schemas/IngestActivity"
       },
+      "maxItems": 20000,
       "title": "Activity",
       "type": "array"
      },
@@ -4596,6 +4598,7 @@
       "items": {
        "$ref": "#/components/schemas/IngestPosition"
       },
+      "maxItems": 2000,
       "title": "Positions",
       "type": "array"
      },
@@ -4606,6 +4609,7 @@
       "type": "string"
      },
      "username": {
+      "maxLength": 64,
       "title": "Username",
       "type": "string"
      }

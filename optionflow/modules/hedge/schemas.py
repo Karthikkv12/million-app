@@ -49,11 +49,11 @@ class IngestActivity(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    username: str
+    username: str = Field(..., max_length=64)
     source: Literal["robinhood"] = "robinhood"
-    positions: List[IngestPosition]
-    accounts: List[IngestAccount] = []
-    activity: List[IngestActivity] = []
+    positions: List[IngestPosition] = Field(..., max_length=2000)
+    accounts: List[IngestAccount] = Field([], max_length=50)
+    activity: List[IngestActivity] = Field([], max_length=20000)
 
 
 class IngestOut(BaseModel):

@@ -19,7 +19,7 @@ EXP = (date.today() + timedelta(days=5)).isoformat()
 
 @pytest.fixture
 def client(db_engine_and_session, settings_override, fake_market_data):
-    settings_override(hedge_ingest_token=TOKEN)
+    settings_override(hedge_ingest_token=TOKEN, hedge_ingest_username="owner")
     hedge_service.CACHE.clear()
     TRACKER.reset()
     from optionflow.modules.auth import service as auth
@@ -27,7 +27,7 @@ def client(db_engine_and_session, settings_override, fake_market_data):
     auth.create_user("other", PASSWORD)
     app = create_app(Settings(_env_file=None, jwt_secret="test-secret-do-not-use-in-prod",
                               jwt_audience="optionflow-app", jwt_issuer="optionflow-api",
-                              hedge_ingest_token=TOKEN))
+                              hedge_ingest_token=TOKEN, hedge_ingest_username="owner"))
     c = TestClient(app)
     yield c, fake_market_data
     hedge_service.CACHE.clear()
@@ -67,7 +67,18 @@ def test_ingest_replaces_and_is_per_user(client):
     assert c.get("/api/v1/hedge/positions", headers=_login(c, "other")).json() == []
     bad = {"username": "owner", "positions": [{"symbol": "X", "kind": "option", "quantity": -1}]}
     assert c.post("/api/v1/hedge/ingest", json=bad, headers=h).status_code == 422
-    assert c.post("/api/v1/hedge/ingest", json={**BODY, "username": "ghost"}, headers=h).status_code == 404
+    assert c.post("/api/v1/hedge/ingest", json={**BODY, "username": "ghost"}, headers=h).status_code == 403
+    assert c.post("/api/v1/hedge/ingest", json={**BODY, "username": "other"}, headers=h).status_code == 403   # real user, not bound
+    assert c.post("/api/v1/hedge/ingest", json={**BODY, "username": " OWNER "}, headers=h).status_code == 200
+    big = {**BODY, "activity": [{"ext_id": f"x{i}", "kind": "realized", "ts": "2026-01-01T00:00:00Z", "symbol": "X"}
+                                for i in range(20001)]}
+    assert c.post("/api/v1/hedge/ingest", json=big, headers=h).status_code == 422
+
+
+def test_ingest_disabled_without_bound_username(client, settings_override):
+    c, _ = client
+    settings_override(hedge_ingest_username="")
+    assert c.post("/api/v1/hedge/ingest", json=BODY, headers={"X-Hedge-Ingest-Token": TOKEN}).status_code == 403
 
 
 def test_books_compute_live_delta_and_suggestion(client):
