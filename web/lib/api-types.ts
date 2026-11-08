@@ -1238,6 +1238,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/unusual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unusual
+         * @description Contracts trading well above their open interest (5-minute cache per symbol).
+         */
+        get: operations["unusual_api_v1_unusual_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlist": {
         parameters: {
             query?: never;
@@ -2836,6 +2856,42 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /** UnusualScanOut */
+        UnusualScanOut: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Call Premium
+             * @default 0
+             */
+            call_premium: number;
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /**
+             * Put Premium
+             * @default 0
+             */
+            put_premium: number;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Source */
+            source: string;
+            /**
+             * Symbols
+             * @default []
+             */
+            symbols: string[];
+        } & {
+            [key: string]: unknown;
         };
         /** ValidationError */
         ValidationError: {
@@ -5713,6 +5769,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockInfoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unusual_api_v1_unusual_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated tickers; default universe if empty */
+                symbols?: string | null;
+                min_premium?: number;
+                type?: "all" | "call" | "put";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnusualScanOut"];
                 };
             };
             /** @description Validation Error */

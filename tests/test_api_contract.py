@@ -308,8 +308,9 @@ def test_enabled_modules_switch_routes_on_and_off(caplog):
     assert "unknown module 'nonsense'" in caplog.text
 
     default = create_app(Settings(_env_file=None))
-    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst"]
-    assert TestClient(default).get("/api/v1/portfolio/weeks").status_code == 404   # off by default
+    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst", "unusual", "portfolio", "budget"]
+    assert TestClient(default).get("/api/v1/portfolio/weeks").status_code == 401   # on by default (plan step 7)
+    assert "ai" not in default.state.enabled_modules
 
     with_portfolio = TestClient(create_app(Settings(_env_file=None, enabled_modules="auth,portfolio,budget")))
     for path in ("/api/v1/portfolio/weeks", "/portfolio/weeks", "/api/v1/accounts", "/api/v1/budget"):

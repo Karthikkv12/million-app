@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/theme";
 const NAV = [
   { href: "/dashboard",    label: "Dashboard" },
   { href: "/options-flow", label: "Flow" },
+  { href: "/unusual",      label: "Unusual" },
   { href: "/markets",      label: "Markets" },
   { href: "/catalyst",     label: "Catalyst" },
   { href: "/settings",     label: "Settings" },

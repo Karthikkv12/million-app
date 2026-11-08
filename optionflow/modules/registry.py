@@ -45,6 +45,11 @@ def _catalyst() -> List[APIRouter]:
     return [router]
 
 
+def _unusual() -> List[APIRouter]:
+    from optionflow.modules.unusual.router import router
+    return [router]
+
+
 def _ai() -> List[APIRouter]:
     from optionflow.modules.ai.router import router
     return [router]
@@ -56,6 +61,7 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "flow": _flow,
     "watchlist": _watchlist,
     "catalyst": _catalyst,
+    "unusual": _unusual,
     "ai": _ai,                 # off by default; the chat UI is hidden for now
     "portfolio": _portfolio,
     "budget": _budget,

@@ -5931,6 +5931,57 @@
     "title": "TopFlowStrike",
     "type": "object"
    },
+   "UnusualScanOut": {
+    "additionalProperties": true,
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "call_premium": {
+      "default": 0.0,
+      "title": "Call Premium",
+      "type": "number"
+     },
+     "count": {
+      "default": 0,
+      "title": "Count",
+      "type": "integer"
+     },
+     "put_premium": {
+      "default": 0.0,
+      "title": "Put Premium",
+      "type": "number"
+     },
+     "rows": {
+      "default": [],
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "symbols": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "required": [
+     "as_of",
+     "source"
+    ],
+    "title": "UnusualScanOut",
+    "type": "object"
+   },
    "ValidationError": {
     "properties": {
      "ctx": {
@@ -11038,6 +11089,90 @@
     "summary": "Stock Info",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/unusual": {
+   "get": {
+    "description": "Contracts trading well above their open interest (5-minute cache per symbol).",
+    "operationId": "unusual_api_v1_unusual_get",
+    "parameters": [
+     {
+      "description": "Comma-separated tickers; default universe if empty",
+      "in": "query",
+      "name": "symbols",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated tickers; default universe if empty",
+       "title": "Symbols"
+      }
+     },
+     {
+      "in": "query",
+      "name": "min_premium",
+      "required": false,
+      "schema": {
+       "default": 100000,
+       "maximum": 50000000,
+       "minimum": 10000,
+       "title": "Min Premium",
+       "type": "number"
+      }
+     },
+     {
+      "in": "query",
+      "name": "type",
+      "required": false,
+      "schema": {
+       "default": "all",
+       "enum": [
+        "all",
+        "call",
+        "put"
+       ],
+       "title": "Type",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UnusualScanOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unusual",
+    "tags": [
+     "unusual"
     ]
    }
   },
