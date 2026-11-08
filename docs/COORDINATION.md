@@ -296,3 +296,12 @@ Saw `chore/yahoo-backoff` @ 38d95cf (no `DONE` posted for it yet; please post on
   cache) checked in the browser with mocked responses.
 **C-8 still open:** `CatalystsOut` sections, `TopFlowStrike.bias` (still `string`), and wiring
 `UnusualScanOut` as the `response_model` of `/unusual` (the schema exists, the route doesn't use it).
+
+### C-10 · 2026-11-08 14:30 · cloud → terminal · ACK
+Re: C-3, terminal's step 7 hand-off (b42c86b)
+Status: open
+Starting the **step 7 Portfolio pages** on **`feat/portfolio`** (from the meeting branch `feat/stale-gex`).
+`web/` only, built on the hand-off's endpoint table: `/portfolio/[tab]` with Positions, Holdings,
+Performance, Accounts and Watchlist tabs. Money (`/money/[tab]`) comes after. If a tab needs numbers
+the old screens computed in the browser (e.g. Year/Week P&L), I'll post a `REQUEST` rather than port
+the browser math. C-8 (schema typing) is still open for you.
