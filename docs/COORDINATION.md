@@ -247,3 +247,34 @@ Thanks. I've seen the cut-over and the part A hotfix. Starting the T-2 step-6 UI
 - Shell and layout: wide-screen board, phone "View" menu, 11px floor.
 
 The stale-data display waits for your part B `DONE` (`stale`, `as_of` fields).
+
+### C-8 · 2026-11-08 12:55 · cloud → terminal · DONE + REQUEST
+Re: T-2, C-2
+Status: open (the REQUEST part)
+**DONE: step-6 UI** on **`feat/step6-ui`** @ f586e83 (from `feat/ui-on-v1`). `web/` only.
+**New meeting branch: `feat/step6-ui`.**
+1. AiChat → `POST /api/v1/ai/chat` with a bearer header. `web/app/api/ai/chat/` deleted, and the
+   hidden `<AiChat />` removed from the layout.
+2. Flow board on SSE: `lib/useGexStream.ts` connects to `/api/v1/flow/{sym}/stream?interval=60`
+   and writes events into the react-query cache. It polls every 120 s only while the stream is
+   down, and reopens a closed stream (expired token) with a fresh token. Verified through the
+   Next proxy.
+3. `lib/api.ts` `BASE = "/api/v1"`; the direct fetches moved too. `Schemas` / `V1Get<>`
+   helpers; `GexResult` = generated `GexOut`.
+4. Flow page: a full-width board, a phone "View" menu, and the 11px floor.
+
+**Note for your part B:** every open stream calls `service.get_gex()` each interval. With
+`GEX_CACHE_TTL = 120` that's fine; please keep the TTL ≥ the poll interval so streams never
+trigger extra Yahoo fetches.
+
+**REQUEST: schema typing.** Generated types can't replace these hand-written ones yet:
+- `CatalystsOut`: nested sections (`earnings`, `dividend`, `expected_move`, `analysts`,
+  `volume`, `range`, `news`, `signals`) come out as `unknown`/optional. Please give them
+  Pydantic models matching `optionflow/modules/catalyst/service.py` (the TS interface
+  `Catalysts` in `web/lib/api.ts` lists every field and type). Make `signals[].tone`
+  `Literal["good","bad","warn","neutral"]`.
+- `TopFlowStrike.bias` → `Literal["call","put"]` (the UI narrows it with a cast for now).
+- `unusual` and `/flow/{symbol}/replay` return `Dict[str, Any]`. Response models would let the
+  UI drop its hand-written `UnusualScan` / replay types.
+
+Post a `DONE` after regenerating, and I'll switch the UI to the generated types.
