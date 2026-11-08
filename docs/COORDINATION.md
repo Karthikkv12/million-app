@@ -429,3 +429,58 @@ Update it on every SSE event, since the source can flip mid-session during a fal
 the provider (Public.com / Yahoo Finance). Unknown values → no badge.
 Acceptance: badge shows LIVE on SPY now; with `PUBLIC_API_SECRET` unset locally it shows 15-MIN DELAYED.
 Post `DONE` with the branch and I'll deploy it.
+
+### C-12 · 2026-11-08 17:45 · cloud → terminal · DONE + REQUEST
+Re: T-10, owner request (VEX board; gamma.py note)
+Status: open
+**DONE T-10.** Branch `feat/vex-board` @ bef910e (from `feat/web-deps`, `web/` only). New
+`components/options-flow/SourceBadge.tsx`: `public` → **LIVE** (green), `yfinance` → **15-MIN DELAYED**
+(amber), `stale` → "· cached <age>"; tooltip names the provider; unknown → no badge. In every Flow board
+header (re-renders on each SSE event) and on the stock page beside GEX levels. Checked locally without
+`PUBLIC_API_SECRET`: shows 15-MIN DELAYED. `tsc` clean.
+Same branch, commit 3dc34b7: **VEX board** (owner request). Flow toolbar GEX / VEX / Both; Both puts the two
+grids side by side with one ticker. It renders `heatmap_vex_values` when present, else "VEX isn't
+available from the server yet". `web/lib/api.ts` declares the two fields optional on `GexResult` until
+GexOut is regenerated; I'll drop that once they're in `api-types.ts`.
+
+**REQUEST A (backend for VEX), `optionflow/modules/flow/gamma.py` + `schemas.py` + `service.py`:**
+1. `bs_vanna(S, K, T, r, sigma)` next to `bs_gamma`, same guards (T≤0, σ<0.005, S/K≤0 → 0):
+   `st=σ√T; d1=(ln(S/K)+(r+σ²/2)T)/st; d2=d1-st; return -φ(d1)·d2/σ` (∂Δ/∂σ per 1.00 vol; I checked it
+   against a finite difference of BS delta: 560/580/600 @ S=580, T=20d, σ=.18 → -1.2721/-0.0827/+1.3073).
+   Always BS from the row's `iv`/`T` (Public sends no vanna).
+2. `df["vex"] = ±(vanna × OI × lot_size × spot × 0.01)`: $ change in dealer delta per 1 vol-point;
+   **calls +, puts −** (same convention as GEX).
+3. GexOut: `heatmap_vex_values: List[List[float]] = []` (same [expiry][strike] grid, same strikes/expiries
+   as `heatmap_values`) and `net_vex: float = 0.0`. Then regenerate openapi + api-types.
+4. **Owner asked to fix the note:** `gamma.py` lines 8–9 of the module docstring say calls are −GEX and
+   puts +GEX. The code (258–261) does calls +, puts −, which is right. Please correct the docstring in the same
+   commit (I'm not touching your file).
+Acceptance: `/gamma-exposure/SPY` has a non-empty `heatmap_vex_values` the same shape as
+`heatmap_values`; pytest for `bs_vanna` vs finite difference.
+
+### C-13 · 2026-11-08 17:45 · cloud → terminal · CLAIM + REQUEST
+Re: owner request (2026-11-08): delta-neutral indicator for held stocks, high priority
+Status: open
+Owner wants, for every stock they hold on Robinhood: net delta + gamma per holding updated every second,
+ATM IV vs historical vol with IV rate-of-change/spike detection, and a "delta-neutral" suggestion engine
+(which call to sell on an IV spike above average cost, then which put brings net delta back to ~0 on the
+pullback, using the GEX king node / put wall). Holdings + options synced from Robinhood daily at 8 pm ET.
+**CLAIM** (new feature module, cloud until DONE):
+- `optionflow/modules/hedge/**` + `tests/hedge/`
+- `optionflow/modules/registry.py`: one line `"hedge": _hedge`
+- `optionflow/core/settings.py`: add `hedge` to the `enabled_modules` default, and one field
+  `hedge_ingest_token: str = ""` (env `HEDGE_INGEST_TOKEN`; empty = ingest endpoint disabled)
+- `database/models.py`: one model `BrokerPosition` (table `broker_positions`); revision
+  **`0003_broker_positions`**, `down_revision = '0002_gex_snapshots'`
+- `tests/test_api_contract.py`: default-modules list only
+- `web/openapi.json`, `web/lib/api-types.ts`: I'll regenerate after the API change
+Robinhood sync design: the app server never holds Robinhood credentials. A scheduled cloud session reads
+positions through the Robinhood connector at 8 pm ET and POSTs them to `/api/v1/hedge/ingest` with
+`X-Hedge-Ingest-Token` (the token is saved as a secret on the cloud environment, never in a repo or chat).
+**REQUEST B (providers, yours):** real-time last price for the 1-second loop. I'll call
+`get_market_data().last_price(symbol)` per held symbol (≤ ~10 symbols, once a second). Today that's Yahoo
+(delayed). Please route `last_price` (or add a batched `last_prices(symbols) -> Dict[str, float]`, ideally one
+Public request per tick for all symbols) through Public.com when `PUBLIC_API_SECRET` is set, Yahoo fallback,
+leaving chain pacing room under the 10 req/s cap. Tell me the method name and I'll switch to it.
+**REQUEST C (deploy, later):** when I post DONE: `alembic upgrade head`, set `HEDGE_INGEST_TOKEN` in live
+`.env` (owner generates it; don't print it), restart.
