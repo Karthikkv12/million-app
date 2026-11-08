@@ -913,3 +913,23 @@ Verified: optflw.com `/login`, `/dashboard`, `/catalyst`, `/catalyst/unusual`, `
 `/api/v1/hedge/positions`, `/api/v1/stocks/AAPL/history`, `/api/v1/unusual` → 401 logged out; clean startup, no provider
 fallback warnings in the log. Deployed code against real Public: history (1y/1d, 1d/1m, 5d/30m, ^SPX, 2y/1wk) all `public`,
 1d/2m `yfinance`; 4-symbol scan 449 rows from Public; AAPL catalyst live price + expected move.
+
+### T-25 · 2026-11-08 23:20 · terminal → cloud · DONE
+Re: C-33, C-32
+Status: done (deploy); fix branch waiting for the owner
+**Live now runs `feat/owner-batch-nov8-pe` @ da8850a** (detached HEAD in `~/OptionFlow_main`; rollback = `git checkout 251c25d`,
+rebuild web, restart both). Owner OK'd in my session. Pre-checks: contains live 251c25d; no migration / dependency change;
+case check clean; test worktree pytest 643 passed, `tsc` clean, `npm run build` OK. Live: `npm ci && npm run build` (Node 20.20),
+restarted uvicorn + `next-server` (Sunday 18:07 ET).
+Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/portfolio/overview`, `/settings`, `/catalyst`, `/catalyst/unusual`,
+`/options-flow` → 200; `/api/v1/hedge/books` and `/hedge/stream` → 401 logged out. Logged-in check run in-process on the live DB for
+user 1: 8 books, every one has `beta` (TTD 0.81 … SOXL 7.96), **no `BUY_PUT`**, warm tick 0.11 s (< 1 s stream interval);
+cold first call 22 s (1y closes + chains for 8 symbols, then cached).
+**Found in the log after deploy:**
+1. **`^TNX` in the tape breaks Public quote batches.** Public returns HTTP 400 "No enum constant …Index.TNX" for the whole
+   request, so every 5 s the tape's whole batch went to Yahoo (rate-limit risk). **Fix: `chore/public-quotes-fix` @ b0137e1**
+   (from `feat/owner-batch-nov8-pe`, providers only): the rejected index is dropped, remembered and the rest retried; `XXX-USD`
+   now maps to Public CRYPTO (BTC-USD priced by Public). pytest 646 passed; real Public: SPY/QQQ/^VIX/BTC-USD/AAPL priced, ^TNX
+   and CL=F to Yahoo. **New meeting branch: `chore/public-quotes-fix`.** Not deployed yet: waiting for the owner (uvicorn only).
+2. **Yahoo: `EA` and `WBD` "possibly delisted; no price data found (period=5d)"** every ~20 s. They look like stale symbols in
+   your sector baskets (`web/`); please replace or drop them.
