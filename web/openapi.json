@@ -263,6 +263,210 @@
     "title": "AdminUserOut",
     "type": "object"
    },
+   "AnalystAction": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "date": {
+      "title": "Date",
+      "type": "string"
+     },
+     "firm": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firm"
+     },
+     "from": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "From"
+     },
+     "prior_target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prior Target"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
+     },
+     "to": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To"
+     }
+    },
+    "required": [
+     "date",
+     "action"
+    ],
+    "title": "AnalystAction",
+    "type": "object"
+   },
+   "AnalystConsensus": {
+    "properties": {
+     "buy": {
+      "default": 0,
+      "title": "Buy",
+      "type": "integer"
+     },
+     "hold": {
+      "default": 0,
+      "title": "Hold",
+      "type": "integer"
+     },
+     "sell": {
+      "default": 0,
+      "title": "Sell",
+      "type": "integer"
+     },
+     "strongBuy": {
+      "default": 0,
+      "title": "Strongbuy",
+      "type": "integer"
+     },
+     "strongSell": {
+      "default": 0,
+      "title": "Strongsell",
+      "type": "integer"
+     }
+    },
+    "title": "AnalystConsensus",
+    "type": "object"
+   },
+   "AnalystTargets": {
+    "properties": {
+     "high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "High"
+     },
+     "low": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Low"
+     },
+     "mean": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean"
+     },
+     "median": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median"
+     }
+    },
+    "title": "AnalystTargets",
+    "type": "object"
+   },
+   "AnalystsOut": {
+    "properties": {
+     "actions": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/AnalystAction"
+      },
+      "title": "Actions",
+      "type": "array"
+     },
+     "consensus": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AnalystConsensus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "rating": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rating"
+     },
+     "targets": {
+      "$ref": "#/components/schemas/AnalystTargets",
+      "default": {}
+     },
+     "upside_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Upside Pct"
+     }
+    },
+    "title": "AnalystsOut",
+    "type": "object"
+   },
    "AssignmentCreateRequest": {
     "properties": {
      "acquisition_price": {
@@ -1694,6 +1898,12 @@
       "type": "string"
      },
      "tone": {
+      "enum": [
+       "good",
+       "bad",
+       "warn",
+       "neutral"
+      ],
       "title": "Tone",
       "type": "string"
      }
@@ -1706,30 +1916,13 @@
     "type": "object"
    },
    "CatalystsOut": {
-    "additionalProperties": true,
     "properties": {
      "analysts": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Analysts"
+      "$ref": "#/components/schemas/AnalystsOut"
      },
      "as_of": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "As Of"
+      "title": "As Of",
+      "type": "string"
      },
      "change_pct": {
       "anyOf": [
@@ -1743,34 +1936,15 @@
       "title": "Change Pct"
      },
      "dividend": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Dividend"
+      "$ref": "#/components/schemas/DividendOut"
      },
      "earnings": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Earnings"
+      "$ref": "#/components/schemas/EarningsOut"
      },
      "earnings_history": {
       "default": [],
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/EarningsHistoryRow"
       },
       "title": "Earnings History",
       "type": "array"
@@ -1778,31 +1952,21 @@
      "expected_move": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/components/schemas/ExpectedMoveOut"
        },
        {
         "type": "null"
        }
-      ],
-      "title": "Expected Move"
+      ]
      },
      "name": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Name"
+      "title": "Name",
+      "type": "string"
      },
      "news": {
       "default": [],
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/NewsItem"
       },
       "title": "News",
       "type": "array"
@@ -1819,16 +1983,7 @@
       "title": "Price"
      },
      "range": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Range"
+      "$ref": "#/components/schemas/RangeOut"
      },
      "signals": {
       "default": [],
@@ -1839,35 +1994,27 @@
       "type": "array"
      },
      "source": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Source"
+      "title": "Source",
+      "type": "string"
      },
      "symbol": {
       "title": "Symbol",
       "type": "string"
      },
      "volume": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Volume"
+      "$ref": "#/components/schemas/VolumeOut"
      }
     },
     "required": [
-     "symbol"
+     "symbol",
+     "name",
+     "earnings",
+     "dividend",
+     "analysts",
+     "volume",
+     "range",
+     "as_of",
+     "source"
     ],
     "title": "CatalystsOut",
     "type": "object"
@@ -2096,6 +2243,256 @@
      "balance"
     ],
     "title": "CreditCardWeekRequest",
+    "type": "object"
+   },
+   "DividendOut": {
+    "properties": {
+     "ex_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ex Date"
+     },
+     "ex_days_until": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ex Days Until"
+     },
+     "pay_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pay Date"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate"
+     },
+     "yield_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Yield Pct"
+     }
+    },
+    "title": "DividendOut",
+    "type": "object"
+   },
+   "EarningsHistoryRow": {
+    "properties": {
+     "date": {
+      "title": "Date",
+      "type": "string"
+     },
+     "estimate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estimate"
+     },
+     "reported": {
+      "title": "Reported",
+      "type": "number"
+     },
+     "surprise_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Surprise Pct"
+     }
+    },
+    "required": [
+     "date",
+     "reported"
+    ],
+    "title": "EarningsHistoryRow",
+    "type": "object"
+   },
+   "EarningsOut": {
+    "properties": {
+     "date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date"
+     },
+     "days_until": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Days Until"
+     },
+     "eps_avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eps Avg"
+     },
+     "eps_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eps High"
+     },
+     "eps_low": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eps Low"
+     },
+     "revenue_avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revenue Avg"
+     },
+     "revenue_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revenue High"
+     },
+     "revenue_low": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revenue Low"
+     },
+     "timing": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Timing"
+     }
+    },
+    "title": "EarningsOut",
+    "type": "object"
+   },
+   "ExpectedMoveOut": {
+    "description": "ATM straddle on the first expiry covering earnings (else the nearest).",
+    "properties": {
+     "covers_earnings": {
+      "title": "Covers Earnings",
+      "type": "boolean"
+     },
+     "dollars": {
+      "title": "Dollars",
+      "type": "number"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "high": {
+      "title": "High",
+      "type": "number"
+     },
+     "low": {
+      "title": "Low",
+      "type": "number"
+     },
+     "pct": {
+      "title": "Pct",
+      "type": "number"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "dollars",
+     "pct",
+     "low",
+     "high",
+     "expiry",
+     "strike",
+     "covers_earnings"
+    ],
+    "title": "ExpectedMoveOut",
     "type": "object"
    },
    "FlowByExpiry": {
@@ -2954,6 +3351,55 @@
      "ts"
     ],
     "title": "NetFlowPoint",
+    "type": "object"
+   },
+   "NewsItem": {
+    "properties": {
+     "published": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Published"
+     },
+     "publisher": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Publisher"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     }
+    },
+    "required": [
+     "title"
+    ],
+    "title": "NewsItem",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -4721,6 +5167,45 @@
     "title": "QuoteOut",
     "type": "object"
    },
+   "RangeOut": {
+    "properties": {
+     "high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "High"
+     },
+     "low": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Low"
+     },
+     "position_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Pct"
+     }
+    },
+    "title": "RangeOut",
+    "type": "object"
+   },
    "RecalculateHoldingsOut": {
     "additionalProperties": true,
     "properties": {
@@ -6041,6 +6526,10 @@
    "TopFlowStrike": {
     "properties": {
      "bias": {
+      "enum": [
+       "call",
+       "put"
+      ],
       "title": "Bias",
       "type": "string"
      },
@@ -6069,6 +6558,200 @@
      "bias"
     ],
     "title": "TopFlowStrike",
+    "type": "object"
+   },
+   "UnusualRow": {
+    "properties": {
+     "ask": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ask"
+     },
+     "bid": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bid"
+     },
+     "dte": {
+      "title": "Dte",
+      "type": "integer"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "iv_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Pct"
+     },
+     "last": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last"
+     },
+     "open_interest": {
+      "title": "Open Interest",
+      "type": "integer"
+     },
+     "otm_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Otm Pct"
+     },
+     "premium": {
+      "title": "Premium",
+      "type": "number"
+     },
+     "score": {
+      "title": "Score",
+      "type": "number"
+     },
+     "side": {
+      "enum": [
+       "ask",
+       "bid",
+       "mid",
+       "unknown"
+      ],
+      "title": "Side",
+      "type": "string"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "type": {
+      "enum": [
+       "call",
+       "put"
+      ],
+      "title": "Type",
+      "type": "string"
+     },
+     "vol_oi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vol Oi"
+     },
+     "volume": {
+      "title": "Volume",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "symbol",
+     "type",
+     "strike",
+     "expiry",
+     "dte",
+     "side",
+     "volume",
+     "open_interest",
+     "premium",
+     "score"
+    ],
+    "title": "UnusualRow",
+    "type": "object"
+   },
+   "UnusualScanOut": {
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "call_premium": {
+      "default": 0.0,
+      "title": "Call Premium",
+      "type": "number"
+     },
+     "count": {
+      "default": 0,
+      "title": "Count",
+      "type": "integer"
+     },
+     "put_premium": {
+      "default": 0.0,
+      "title": "Put Premium",
+      "type": "number"
+     },
+     "rows": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/UnusualRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "symbols": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "required": [
+     "as_of",
+     "source"
+    ],
+    "title": "UnusualScanOut",
     "type": "object"
    },
    "ValidationError": {
@@ -6109,6 +6792,78 @@
      "type"
     ],
     "title": "ValidationError",
+    "type": "object"
+   },
+   "VolumeOut": {
+    "properties": {
+     "average": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Average"
+     },
+     "beta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Beta"
+     },
+     "relative": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Relative"
+     },
+     "short_pct_float": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Short Pct Float"
+     },
+     "short_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Short Ratio"
+     },
+     "today": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Today"
+     }
+    },
+    "title": "VolumeOut",
     "type": "object"
    },
    "WatchRequest": {
@@ -11369,9 +12124,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "additionalProperties": true,
-         "title": "Response Unusual Api V1 Unusual Get",
-         "type": "object"
+         "$ref": "#/components/schemas/UnusualScanOut"
         }
        }
       },

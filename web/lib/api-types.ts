@@ -1444,6 +1444,77 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** AnalystAction */
+        AnalystAction: {
+            /** Action */
+            action: string;
+            /** Date */
+            date: string;
+            /** Firm */
+            firm?: string | null;
+            /** From */
+            from?: string | null;
+            /** Prior Target */
+            prior_target?: number | null;
+            /** Target */
+            target?: number | null;
+            /** To */
+            to?: string | null;
+        };
+        /** AnalystConsensus */
+        AnalystConsensus: {
+            /**
+             * Buy
+             * @default 0
+             */
+            buy: number;
+            /**
+             * Hold
+             * @default 0
+             */
+            hold: number;
+            /**
+             * Sell
+             * @default 0
+             */
+            sell: number;
+            /**
+             * Strongbuy
+             * @default 0
+             */
+            strongBuy: number;
+            /**
+             * Strongsell
+             * @default 0
+             */
+            strongSell: number;
+        };
+        /** AnalystTargets */
+        AnalystTargets: {
+            /** High */
+            high?: number | null;
+            /** Low */
+            low?: number | null;
+            /** Mean */
+            mean?: number | null;
+            /** Median */
+            median?: number | null;
+        };
+        /** AnalystsOut */
+        AnalystsOut: {
+            /**
+             * Actions
+             * @default []
+             */
+            actions: components["schemas"]["AnalystAction"][];
+            consensus?: components["schemas"]["AnalystConsensus"] | null;
+            /** Rating */
+            rating?: string | null;
+            /** @default {} */
+            targets: components["schemas"]["AnalystTargets"];
+            /** Upside Pct */
+            upside_pct?: number | null;
+        };
         /** AssignmentCreateRequest */
         AssignmentCreateRequest: {
             /** Acquisition Price */
@@ -1847,68 +1918,47 @@ export interface components {
         CatalystSignal: {
             /** Label */
             label: string;
-            /** Tone */
-            tone: string;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "good" | "bad" | "warn" | "neutral";
         };
         /** CatalystsOut */
         CatalystsOut: {
-            /** Analysts */
-            analysts?: {
-                [key: string]: unknown;
-            } | null;
+            analysts: components["schemas"]["AnalystsOut"];
             /** As Of */
-            as_of?: string | null;
+            as_of: string;
             /** Change Pct */
             change_pct?: number | null;
-            /** Dividend */
-            dividend?: {
-                [key: string]: unknown;
-            } | null;
-            /** Earnings */
-            earnings?: {
-                [key: string]: unknown;
-            } | null;
+            dividend: components["schemas"]["DividendOut"];
+            earnings: components["schemas"]["EarningsOut"];
             /**
              * Earnings History
              * @default []
              */
-            earnings_history: {
-                [key: string]: unknown;
-            }[];
-            /** Expected Move */
-            expected_move?: {
-                [key: string]: unknown;
-            } | null;
+            earnings_history: components["schemas"]["EarningsHistoryRow"][];
+            expected_move?: components["schemas"]["ExpectedMoveOut"] | null;
             /** Name */
-            name?: string | null;
+            name: string;
             /**
              * News
              * @default []
              */
-            news: {
-                [key: string]: unknown;
-            }[];
+            news: components["schemas"]["NewsItem"][];
             /** Price */
             price?: number | null;
-            /** Range */
-            range?: {
-                [key: string]: unknown;
-            } | null;
+            range: components["schemas"]["RangeOut"];
             /**
              * Signals
              * @default []
              */
             signals: components["schemas"]["CatalystSignal"][];
             /** Source */
-            source?: string | null;
+            source: string;
             /** Symbol */
             symbol: string;
-            /** Volume */
-            volume?: {
-                [key: string]: unknown;
-            } | null;
-        } & {
-            [key: string]: unknown;
+            volume: components["schemas"]["VolumeOut"];
         };
         /** ChatMessage */
         ChatMessage: {
@@ -1978,6 +2028,71 @@ export interface components {
              * Format: date-time
              */
             week_start: string;
+        };
+        /** DividendOut */
+        DividendOut: {
+            /** Ex Date */
+            ex_date?: string | null;
+            /** Ex Days Until */
+            ex_days_until?: number | null;
+            /** Pay Date */
+            pay_date?: string | null;
+            /** Rate */
+            rate?: number | null;
+            /** Yield Pct */
+            yield_pct?: number | null;
+        };
+        /** EarningsHistoryRow */
+        EarningsHistoryRow: {
+            /** Date */
+            date: string;
+            /** Estimate */
+            estimate?: number | null;
+            /** Reported */
+            reported: number;
+            /** Surprise Pct */
+            surprise_pct?: number | null;
+        };
+        /** EarningsOut */
+        EarningsOut: {
+            /** Date */
+            date?: string | null;
+            /** Days Until */
+            days_until?: number | null;
+            /** Eps Avg */
+            eps_avg?: number | null;
+            /** Eps High */
+            eps_high?: number | null;
+            /** Eps Low */
+            eps_low?: number | null;
+            /** Revenue Avg */
+            revenue_avg?: number | null;
+            /** Revenue High */
+            revenue_high?: number | null;
+            /** Revenue Low */
+            revenue_low?: number | null;
+            /** Timing */
+            timing?: string | null;
+        };
+        /**
+         * ExpectedMoveOut
+         * @description ATM straddle on the first expiry covering earnings (else the nearest).
+         */
+        ExpectedMoveOut: {
+            /** Covers Earnings */
+            covers_earnings: boolean;
+            /** Dollars */
+            dollars: number;
+            /** Expiry */
+            expiry: string;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+            /** Pct */
+            pct: number;
+            /** Strike */
+            strike: number;
         };
         /** FlowByExpiry */
         FlowByExpiry: {
@@ -2253,6 +2368,17 @@ export interface components {
             ts: string;
             /** Volume */
             volume?: number | null;
+        };
+        /** NewsItem */
+        NewsItem: {
+            /** Published */
+            published?: string | number | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Title */
+            title: string;
+            /** Url */
+            url?: string | null;
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -2645,6 +2771,15 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** RangeOut */
+        RangeOut: {
+            /** High */
+            high?: number | null;
+            /** Low */
+            low?: number | null;
+            /** Position Pct */
+            position_pct?: number | null;
+        };
         /** RecalculateHoldingsOut */
         RecalculateHoldingsOut: {
             /**
@@ -2932,8 +3067,11 @@ export interface components {
         };
         /** TopFlowStrike */
         TopFlowStrike: {
-            /** Bias */
-            bias: string;
+            /**
+             * Bias
+             * @enum {string}
+             */
+            bias: "call" | "put";
             /** Call Prem */
             call_prem: number;
             /** Net */
@@ -2942,6 +3080,81 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /** UnusualRow */
+        UnusualRow: {
+            /** Ask */
+            ask?: number | null;
+            /** Bid */
+            bid?: number | null;
+            /** Dte */
+            dte: number;
+            /** Expiry */
+            expiry: string;
+            /** Iv Pct */
+            iv_pct?: number | null;
+            /** Last */
+            last?: number | null;
+            /** Open Interest */
+            open_interest: number;
+            /** Otm Pct */
+            otm_pct?: number | null;
+            /** Premium */
+            premium: number;
+            /** Score */
+            score: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "ask" | "bid" | "mid" | "unknown";
+            /** Spot */
+            spot?: number | null;
+            /** Strike */
+            strike: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "call" | "put";
+            /** Vol Oi */
+            vol_oi?: number | null;
+            /** Volume */
+            volume: number;
+        };
+        /** UnusualScanOut */
+        UnusualScanOut: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Call Premium
+             * @default 0
+             */
+            call_premium: number;
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /**
+             * Put Premium
+             * @default 0
+             */
+            put_premium: number;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["UnusualRow"][];
+            /** Source */
+            source: string;
+            /**
+             * Symbols
+             * @default []
+             */
+            symbols: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -2955,6 +3168,21 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VolumeOut */
+        VolumeOut: {
+            /** Average */
+            average?: number | null;
+            /** Beta */
+            beta?: number | null;
+            /** Relative */
+            relative?: number | null;
+            /** Short Pct Float */
+            short_pct_float?: number | null;
+            /** Short Ratio */
+            short_ratio?: number | null;
+            /** Today */
+            today?: number | null;
         };
         /** WatchRequest */
         WatchRequest: {
@@ -5920,9 +6148,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UnusualScanOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,7 +1,7 @@
 """optionflow/modules/flow/schemas.py — GEX board and net-flow history."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Literal, List, Optional
 
 from pydantic import BaseModel
 
@@ -18,7 +18,7 @@ class TopFlowStrike(BaseModel):
     call_prem: float
     put_prem: float
     net: float
-    bias: str            # "call" | "put"
+    bias: Literal["call", "put"]
 
 
 class GexOut(BaseModel):
