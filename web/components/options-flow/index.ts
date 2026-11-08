@@ -10,6 +10,7 @@ export { LevelsStrip } from "./LevelsStrip";
 export { GexHeatmap, PALETTES, DEFAULT_HEAT_OPTS, BOARD_OPTIONS } from "./GexHeatmap";
 export type { HeatOpts, Palette, Metric, BoardView } from "./GexHeatmap";
 export { DetailsDrawer } from "./DetailsDrawer";
+export { SourceBadge, sourceName } from "./SourceBadge";
 export { KeyLevelsRuler } from "./KeyLevelsRuler";
 export { GexProfileChart } from "./GexProfileChart";
 export { GammaConcentration } from "./GammaConcentration";

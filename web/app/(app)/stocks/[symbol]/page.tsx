@@ -9,6 +9,7 @@ import TradingChart from "@/components/chart/TradingChart";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill } from "@/components/ui";
 import { GexReplay } from "@/components/options-flow/GexReplay";
+import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const dist = (lv?: number | null, spot?: number) => (lv == null || !spot ? "" : `${lv >= spot ? "+" : ""}${(((lv - spot) / spot) * 100).toFixed(1)}%`);
@@ -59,9 +60,9 @@ export default function StockPage() {
         <div>
           <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Stock</p>
           <h1 className="font-mono text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[40px]">{sym}</h1>
-          {gex && !gex.error && <p className="mt-1 font-mono text-[15px] text-foreground/60">{usd(gex.spot)} <span className="text-foreground/40">· {gex.stale
-            ? `Yahoo is rate-limiting; levels from ${gex.as_of ? new Date(gex.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "earlier"}`
-            : "options data delayed ~15 min"}</span></p>}
+          {gex && !gex.error && <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[15px] text-foreground/60">{usd(gex.spot)} <SourceBadge data={gex} />{gex.stale && (
+            <span className="text-[12px] text-foreground/40">{sourceName(gex)} is rate-limiting; levels from {gex.as_of ? new Date(gex.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "earlier"}</span>
+          )}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/options-flow?ticker=${sym}`} className="btn-ghost h-10"><Zap size={15} /> Flow board</Link>
@@ -73,7 +74,7 @@ export default function StockPage() {
         <Panel padded={false} title="Price" actions={
           <label className="flex cursor-pointer items-center gap-2 text-[12px] text-foreground/65">
             <input type="checkbox" checked={showLevels} onChange={(e) => setShowLevels(e.target.checked)} className="accent-[rgb(var(--accent-rgb))]" />
-            GEX levels
+            GEX levels <SourceBadge data={gex} />
           </label>
         }>
           <div className="p-2"><TradingChart symbol={sym} gexLevels={levels} initialPeriod="5D" /></div>

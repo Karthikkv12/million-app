@@ -15,6 +15,7 @@ import { LevelsStrip } from "./LevelsStrip";
 import { GexHeatmap, fmtMoney } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
+import { sourceName } from "./SourceBadge";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
 export interface Slot {
@@ -73,7 +74,7 @@ export function TickerPanel({
   const shownAt = asOf ? new Date(asOf).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   // Keep showing the last good data with a quiet note instead of a red error box.
   const staleNote = !data || apiError ? null
-    : data.stale ? `Yahoo is rate-limiting; showing data from ${shownAt ?? "earlier"}.`
+    : data.stale ? `${sourceName(data)} is rate-limiting; showing data from ${shownAt ?? "earlier"}.`
     : isError ? `Couldn't refresh; showing data from ${shownAt ?? "earlier"}.`
     : null;
 
@@ -91,6 +92,7 @@ export function TickerPanel({
         onInputChange={onInputChange}
         onSelect={onSelect}
         onRefresh={onRefresh}
+        data={data}
       />
 
       {isLoading && <div className="p-4"><SkeletonStatGrid count={3} /></div>}
