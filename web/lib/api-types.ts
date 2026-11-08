@@ -3488,6 +3488,8 @@ export interface components {
             current_price?: number | null;
             /** Error */
             error?: string | null;
+            /** Source */
+            source?: string | null;
             /** Symbol */
             symbol: string;
         };

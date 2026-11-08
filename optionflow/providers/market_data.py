@@ -2,10 +2,12 @@
 
 Every quote, search result, price bar and option chain the app uses comes
 through `get_market_data()`. With PUBLIC_API_SECRET set (the normal setup),
-Public.com is the default for option chains (GEX/VEX heatmaps) and prices
-(quote, last_price, last_prices, quotes_batch), falling back to Yahoo per call
-or per symbol (`PublicFirstMarketData`). Search, company data, price history
-and catalysts are Yahoo's. Without the secret, Yahoo serves everything.
+Public.com is the default for option chains (GEX/VEX heatmaps), option contracts
+(unusual scanner, catalyst expected move), prices (quote, last_price, last_prices,
+quotes_batch) and price history (daily and intraday bars), falling back to Yahoo
+per call or per symbol (`PublicFirstMarketData`). Search, company data and the
+catalyst fields (earnings, analysts, dividends, news) are Yahoo's: Public has no
+equivalent. Without the secret, Yahoo serves everything.
 
 Tests install a fake with `use_market_data(fake)`.
 """
@@ -19,6 +21,17 @@ import pandas as pd
 #   strike, expiry (YYYY-MM-DD), otype ("call"/"put"), oi, volume, iv, mid,
 #   gamma (from the feed; NaN when the feed has none), T (years to expiry)
 CHAIN_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "iv", "mid", "gamma", "T"]
+
+
+# Columns of ContractChain.rows (every quoted contract, open interest or not):
+#   strike, expiry (YYYY-MM-DD), otype ("call"/"put"), oi, volume, bid, ask, last, iv (None when unquoted)
+CONTRACT_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "bid", "ask", "last", "iv"]
+
+
+class ContractChain(NamedTuple):
+    spot: Optional[float]
+    rows: pd.DataFrame
+    source: str = ""
 
 
 class OptionChain(NamedTuple):
@@ -51,6 +64,14 @@ class MarketDataProvider(Protocol):
     def option_chain(self, symbol: str) -> OptionChain:
         """Spot price and every unexpired contract (see CHAIN_COLUMNS)."""
 
+    def option_expiries(self, symbol: str) -> List[str]:
+        """Listed expiries, YYYY-MM-DD, nearest first."""
+
+    def option_contracts(self, symbol: str, expiries: Optional[List[str]] = None,
+                         max_dte: int = 60, max_expiries: int = 4) -> ContractChain:
+        """Spot and every quoted contract (see CONTRACT_COLUMNS) for `expiries`, or the nearest
+        `max_expiries` within `max_dte` days."""
+
 
 _override: Optional[MarketDataProvider] = None
 _default: Optional[MarketDataProvider] = None
@@ -67,33 +88,80 @@ def get_market_data() -> MarketDataProvider:
         from optionflow.core.settings import get_settings
         s = get_settings()
         if s.public_api_secret:
-            from optionflow.providers.public import PublicClient, PublicOptionChains, PublicQuotes
+            from optionflow.providers.public import (
+                PublicClient, PublicHistory, PublicOptionChains, PublicQuotes,
+            )
             client = PublicClient(s.public_api_secret, s.public_account_id)
-            _default = PublicFirstMarketData(PublicOptionChains(client), _default, PublicQuotes(client))
+            _default = PublicFirstMarketData(PublicOptionChains(client), _default, PublicQuotes(client),
+                                             PublicHistory(client))
     return _default
 
 
 class PublicFirstMarketData:
     """Public.com first, Yahoo (`fallback`) when Public fails or can't serve a symbol.
 
-    - `option_chain` from `chains` (PublicOptionChains).
+    - `option_chain`, `option_expiries`, `option_contracts` from `chains` (PublicOptionChains).
     - `quote`, `last_price`, `last_prices`, `quotes_batch` from `quotes` (PublicQuotes), when given.
-    Every other method (search, stock_info, watchlist_row fundamentals, price_history,
-    raw_ticker, …) and `gate` (the Yahoo back-off that catalysts and the scanner check)
-    are the fallback's.
+    - `price_history` from `history` (PublicHistory), when given.
+    Every other method (search, stock_info, watchlist_row fundamentals, raw_ticker for the
+    catalyst-only fields) and `gate` (the Yahoo back-off) are the fallback's.
     """
 
-    def __init__(self, chains: Any, fallback: Any, quotes: Any = None):
+    def __init__(self, chains: Any, fallback: Any, quotes: Any = None, history: Any = None):
         self.chains = chains
         self.fallback = fallback
         self.quotes = quotes
+        self.history = history
         self.name = f"{chains.name}+{fallback.name}"
         self.gate = getattr(fallback, "gate", None)
         self._warned = False
         self._quotes_warned = False
+        self._failing: set = set()               # which Public features are currently falling back
 
-    def __getattr__(self, attr: str) -> Any:     # search, stock_info, price_history, raw_ticker, …
+    def __getattr__(self, attr: str) -> Any:     # search, stock_info, raw_ticker, …
         return getattr(self.fallback, attr)
+
+    def _primary(self, feature: str, source: Any, call, fallback_call, what: str):
+        """Public first, the fallback on any failure; log the switch once each way per feature."""
+        if source is not None:
+            try:
+                out = call()
+                if feature in self._failing:
+                    self._failing.discard(feature)
+                    _log.info("%s %s working again", source.name, feature)
+                return out
+            except Exception as exc:              # auth, unsupported symbol/interval, 429, outage
+                if feature not in self._failing:
+                    self._failing.add(feature)
+                    _log.warning("%s %s failed for %s (%s); using %s",
+                                 source.name, feature, what, exc, self.fallback.name)
+        return fallback_call()
+
+    # ── history and contracts: Public first ──────────────────────────────────
+    def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
+        def _yahoo() -> pd.DataFrame:
+            df = self.fallback.price_history(symbol, period, interval)
+            df.attrs.setdefault("source", self.fallback.name)
+            return df
+        supports = getattr(self.history, "supports", None)
+        if self.history is None or (supports is not None and not supports(symbol, period, interval)):
+            return _yahoo()
+        return self._primary("price history", self.history,
+                             lambda: self.history.price_history(symbol, period, interval),
+                             _yahoo, f"{symbol} {period}/{interval}")
+
+    def option_expiries(self, symbol: str) -> List[str]:
+        return self._primary("expiries", self.chains, lambda: self.chains.option_expiries(symbol),
+                             lambda: self.fallback.option_expiries(symbol), symbol)
+
+    def option_contracts(self, symbol: str, expiries: Optional[List[str]] = None,
+                         max_dte: int = 60, max_expiries: int = 4) -> ContractChain:
+        def _yahoo() -> ContractChain:
+            c = self.fallback.option_contracts(symbol, expiries, max_dte, max_expiries)
+            return c if c.source else c._replace(source=self.fallback.name)
+        return self._primary("option contracts", self.chains,
+                             lambda: self.chains.option_contracts(symbol, expiries, max_dte, max_expiries),
+                             _yahoo, symbol)
 
     # ── prices: Public first ──────────────────────────────────────────────────
     def _public_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
