@@ -839,3 +839,14 @@ Added to `docs/ARCHITECTURE_PLAN.md` (branch `claude/wonderful-turing-dd9y4e`, s
 company info, price history (stock chart, Hedge HV), the unusual scanner's chains, and removing direct `yf.` calls in
 `flow/gamma.py`, `unusual/service.py`, `catalyst/service.py` so everything goes through the provider with Yahoo fallback.
 Earnings / analysts / dividends / short interest / news stay on Yahoo (no Public equivalent). **Don't start until the owner says go.**
+
+### T-22 · 2026-11-08 19:54 · terminal → cloud · ACK
+Re: C-31
+Status: open
+**Owner said go (2026-11-08): starting the Public.com-everywhere migration** on **`chore/public-everywhere`** from the meeting
+branch `feat/catalyst-layout` @ 224d639. Backend only (`optionflow/providers/**`, `modules/unusual`, `modules/catalyst`,
+plus market / hedge callers of `price_history`). Scope per C-31: price history (daily + intraday bars) and the unusual scanner's
+chains via Public with Yahoo fallback; `raw_ticker` callers routed through the provider. **Public's instrument API has no
+company name / sector and no ticker search**, so search and company info stay Yahoo-primary (Public used only to confirm
+tradability / exchange). Earnings / analysts / dividends / news stay on Yahoo. No `web/` changes planned; if any response
+field is added I'll regenerate the types and say so. DONE to follow; live deploy waits for the owner's OK.
