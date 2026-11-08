@@ -51,16 +51,8 @@ export interface HeatOpts {
   showPct: boolean;
   /** Fade nodes smaller than 10% of the King */
   dimSmall: boolean;
-  /** Which boards each ticker shows */
-  board: BoardView;
 }
-export type BoardView = "gex" | "vex" | "both";
-export const BOARD_OPTIONS: { value: BoardView; label: string }[] = [
-  { value: "gex", label: "GEX" },
-  { value: "vex", label: "VEX" },
-  { value: "both", label: "Both" },
-];
-export const DEFAULT_HEAT_OPTS: HeatOpts = { palette: "heat", showPct: false, dimSmall: false, board: "gex" };
+export const DEFAULT_HEAT_OPTS: HeatOpts = { palette: "heat", showPct: false, dimSmall: false };
 
 /** Which exposure a board shows. */
 export type Metric = "gex" | "vex";

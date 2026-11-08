@@ -4,7 +4,7 @@ import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { Segmented } from "@/components/ui";
 import { Plus, SlidersHorizontal } from "lucide-react";
-import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS, BOARD_OPTIONS } from "@/components/options-flow";
+import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
 
 const MAX_TICKERS = 3;
@@ -26,7 +26,7 @@ function loadLayout(): PersistedLayout {
     const parsed = JSON.parse(raw) as PersistedLayout;
     const slots = (Array.isArray(parsed.slots) ? parsed.slots : [])
       .filter((s) => typeof s.ticker === "string" && s.ticker.length > 0)
-      .map((s) => makeSlot(s.ticker))
+      .map((s) => makeSlot(s.ticker, s.metric))
       .slice(0, MAX_TICKERS);
     if (!slots.length) return fallback;
     const nStrikes = (STRIKE_OPTIONS as readonly number[]).includes(parsed.nStrikes) ? parsed.nStrikes : DEFAULT_STRIKES;
@@ -35,7 +35,6 @@ function loadLayout(): PersistedLayout {
       palette: PALETTES.some((p) => p.id === h?.palette) ? h!.palette : DEFAULT_HEAT_OPTS.palette,
       showPct: typeof h?.showPct === "boolean" ? h.showPct : DEFAULT_HEAT_OPTS.showPct,
       dimSmall: typeof h?.dimSmall === "boolean" ? h.dimSmall : DEFAULT_HEAT_OPTS.dimSmall,
-      board: BOARD_OPTIONS.some((b) => b.value === h?.board) ? h!.board : DEFAULT_HEAT_OPTS.board,
     };
     return { slots, nStrikes, heat };
   } catch {
@@ -45,7 +44,7 @@ function loadLayout(): PersistedLayout {
 
 function saveLayout(slots: Slot[], nStrikes: number, heat: HeatOpts) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker)), nStrikes, heat }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker, s.metric)), nStrikes, heat }));
   } catch { /* storage unavailable */ }
 }
 
@@ -108,12 +107,6 @@ export default function OptionsFlowPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Segmented
-              label="Exposure board"
-              value={heat.board}
-              onChange={(v) => setHeat((h) => ({ ...h, board: v as HeatOpts["board"] }))}
-              options={BOARD_OPTIONS}
-            />
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Strikes</span>
             <Segmented
               label="Strikes around spot"
@@ -176,10 +169,10 @@ export default function OptionsFlowPage() {
               accentColor={accent}
               nStrikes={nStrikes}
               heatOpts={heat}
-              sideBySide={slots.length === 1}
               canRemove={slots.length > 1}
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}
+              onMetricChange={(m) => updateSlot(i, { metric: m })}
               onSelect={(sym) => {
                 const t = sym.trim().toUpperCase();
                 if (t) updateSlot(i, { ticker: t, input: t });
