@@ -45,6 +45,8 @@ class GexOut(BaseModel):
     top_flow_strikes: List[TopFlowStrike] = []
     data_source: str
     error: Optional[str] = None
+    as_of: Optional[str] = None      # ISO UTC time the numbers were computed
+    stale: bool = False              # True: data source is rate-limiting; showing the last good result
 
 
 class NetFlowPoint(BaseModel):

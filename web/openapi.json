@@ -2168,6 +2168,17 @@
    },
    "GexOut": {
     "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
      "call_gex_by_strike": {
       "default": [],
       "items": {
@@ -2306,6 +2317,11 @@
      "spot": {
       "title": "Spot",
       "type": "number"
+     },
+     "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
      },
      "strikes": {
       "default": [],

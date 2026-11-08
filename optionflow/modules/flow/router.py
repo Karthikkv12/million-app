@@ -59,7 +59,12 @@ async def gex_stream(
         while not await request.is_disconnected():
             for new in service.watch([sym]):
                 backfill.start_backfill(new)
-            result = await run_in_threadpool(service.get_gex, sym)
+            try:
+                result = await run_in_threadpool(service.get_gex, sym)
+            except errors.AppError:       # rate-limited with nothing cached yet: keep the stream open
+                yield ": rate-limited\n\n"
+                await asyncio.sleep(interval)
+                continue
             body = GexOut(**service.gex_payload(result)).model_dump_json()
             if body != last:
                 last = body

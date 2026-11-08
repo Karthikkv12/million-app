@@ -22,13 +22,15 @@ Lot sizes:
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import math
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 import pandas as pd
 
-from optionflow.providers.market_data import get_market_data
+from optionflow.providers.market_data import MarketDataRateLimited, get_market_data
 
 # ---------------------------------------------------------------------------
 # Indian contract lot sizes (NSE F&O)
@@ -207,6 +209,8 @@ class GEXResult:
     top_flow_strikes: List[dict] = field(default_factory=list)
     data_source: str = "yfinance"
     error: Optional[str] = None
+    as_of: Optional[str] = None    # ISO UTC time this result was computed
+    stale: bool = False            # True when served from cache because the data source is rate-limiting
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +321,8 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
     sym = _SYMBOL_ALIASES.get(raw, raw)
     # Display symbol stays as the user typed (e.g. "SPX") for labels
     display_sym = raw
-    result = GEXResult(symbol=display_sym, spot=0.0, expiries=[])
+    result = GEXResult(symbol=display_sym, spot=0.0, expiries=[],
+                       as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
     try:
         provider = get_market_data()
@@ -438,6 +443,8 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         result.heatmap_strikes = heatmap_strikes
         result.heatmap_values = heatmap_values
 
+    except MarketDataRateLimited:
+        raise                       # let the flow service serve the last good result
     except Exception as e:
         result.error = str(e)
 

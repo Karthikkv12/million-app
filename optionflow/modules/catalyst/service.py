@@ -283,7 +283,10 @@ def get_catalysts(symbol: str) -> Dict[str, Any]:
         hit = _cache.get(sym)
     if hit is not None:
         return hit
+    from optionflow.providers.market_data import raise_if_rate_limited
+    raise_if_rate_limited()               # honour the shared Yahoo back-off
     data = _fetch(sym)
+    raise_if_rate_limited()               # rate-limited mid-fetch: sections are partial, don't cache them
     if data.get("price") is None and not data.get("news"):
         raise LookupError(f"No data for {sym}")
     with _lock:

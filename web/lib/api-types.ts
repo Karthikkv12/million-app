@@ -2009,6 +2009,8 @@ export interface components {
         };
         /** GexOut */
         GexOut: {
+            /** As Of */
+            as_of?: string | null;
             /**
              * Call Gex By Strike
              * @default []
@@ -2081,6 +2083,11 @@ export interface components {
             put_premium: number;
             /** Spot */
             spot: number;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
             /**
              * Strikes
              * @default []

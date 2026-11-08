@@ -135,15 +135,20 @@ def _scan_symbol(sym: str, min_premium: float) -> List[Dict[str, Any]]:
                     "premium": round(premium, 0),
                     "score": score(vol_oi, premium, otm or 0, dte),
                 })
+    from optionflow.providers.market_data import raise_if_rate_limited
+    raise_if_rate_limited()               # partial chains while rate-limited: don't cache
     with _lock:
         _cache[(sym, min_premium)] = rows
     return rows
 
 
 def scan(symbols: Optional[Iterable[str]] = None, *, min_premium: float = 100_000, kind: str = "all", limit: int = 300) -> Dict[str, Any]:
+    from optionflow.providers.market_data import raise_if_rate_limited
     syms = [s.strip().upper() for s in (symbols or DEFAULT_UNIVERSE) if s and s.strip()][:40]
+    raise_if_rate_limited()               # honour the shared Yahoo back-off
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(lambda s: _safe(s, min_premium), syms))
+    raise_if_rate_limited()               # tripped mid-scan: results are incomplete
     rows = [r for rs in results for r in rs]
     if kind in ("call", "put"):
         rows = [r for r in rows if r["type"] == kind]
