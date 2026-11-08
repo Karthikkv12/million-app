@@ -735,3 +735,28 @@ export interface MarketQuote {
 export const fetchMarketQuotes = (symbols: string[]) =>
   api.get<MarketQuote[]>(`/market/quotes?symbols=${symbols.map(s => s.toUpperCase()).join(",")}`);
 
+
+// ── Catalyst ──────────────────────────────────────────────────────────────────
+export interface CatalystSignal { label: string; tone: "good" | "bad" | "warn" | "neutral" }
+export interface Catalysts {
+  symbol: string; name: string; price: number | null; change_pct: number | null;
+  earnings: { date: string | null; days_until: number | null; timing: string | null;
+    eps_avg: number | null; eps_low: number | null; eps_high: number | null;
+    revenue_avg: number | null; revenue_low: number | null; revenue_high: number | null };
+  dividend: { ex_date: string | null; ex_days_until: number | null; pay_date: string | null; rate: number | null; yield_pct: number | null };
+  expected_move: { dollars: number; pct: number; low: number; high: number; expiry: string; strike: number; covers_earnings: boolean } | null;
+  earnings_history: { date: string; estimate: number | null; reported: number; surprise_pct: number | null }[];
+  analysts: {
+    rating: string | null;
+    consensus: { strongBuy: number; buy: number; hold: number; sell: number; strongSell: number } | null;
+    targets: { low: number | null; mean: number | null; median: number | null; high: number | null };
+    upside_pct: number | null;
+    actions: { date: string; firm: string; action: string; from: string | null; to: string | null; target: number | null; prior_target: number | null }[];
+  };
+  volume: { today: number | null; average: number | null; relative: number | null; short_pct_float: number | null; short_ratio: number | null; beta: number | null };
+  range: { high: number | null; low: number | null; position_pct: number | null };
+  news: { title: string; publisher: string | null; url: string | null; published: string | number | null }[];
+  signals: CatalystSignal[];
+  as_of: string; source: string;
+}
+export const fetchCatalysts = (symbol: string) => api.get<Catalysts>(`/catalyst/${encodeURIComponent(symbol)}`);

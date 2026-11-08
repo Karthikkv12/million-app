@@ -11,6 +11,7 @@ const NAV = [
   { href: "/dashboard",    label: "Dashboard" },
   { href: "/options-flow", label: "Flow" },
   { href: "/markets",      label: "Markets" },
+  { href: "/catalyst",     label: "Catalyst" },
   { href: "/settings",     label: "Settings" },
   { href: "/admin/users",  label: "Users", adminOnly: true },
 ];

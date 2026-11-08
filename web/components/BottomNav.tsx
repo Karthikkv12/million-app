@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Zap, Globe, Settings } from "lucide-react";
+import { LayoutDashboard, Zap, Globe, Settings, CalendarClock } from "lucide-react";
 import { clsx } from "clsx";
 
 const TABS = [
   { href: "/dashboard",    label: "Home",    icon: LayoutDashboard },
   { href: "/options-flow", label: "Flow",    icon: Zap             },
   { href: "/markets",      label: "Markets", icon: Globe           },
+  { href: "/catalyst",     label: "Catalyst", icon: CalendarClock  },
   { href: "/settings",     label: "Settings", icon: Settings       },
 ];
 
