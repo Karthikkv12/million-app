@@ -108,11 +108,11 @@ export default function DashboardPage() {
       <div className="py-6">
         {hasBook ? (
           <DeskFigures>
-            <DeskFigure size="lg" label="Account value" value={usd(p!.total_value, 0)}
+            <DeskFigure sensitive size="lg" label="Account value" value={usd(p!.total_value, 0)}
               sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} since last sync</span>} />
-            <DeskFigure size="lg" label="Unrealized" value={signed(p!.unrealized, 0)} tone={tone(p!.unrealized)} sub={`stocks ${usd(p!.stock_value, 0)}`} />
-            <DeskFigure size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
-            <DeskFigure size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Unrealized" value={signed(p!.unrealized, 0)} tone={tone(p!.unrealized)} sub={`stocks ${usd(p!.stock_value, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
           </DeskFigures>
         ) : (
           <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the nightly sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
                         <span className="w-14 font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
                         <Tag tone={b.suggestion!.action === "SELL_PUT" ? "gain" : b.suggestion!.action === "BUY_PUT" ? "loss" : "accent"}>{b.suggestion!.action.replace("_", " ").toLowerCase()}</Tag>
                         <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground/80">{b.suggestion!.headline}</span>
-                        <span className="font-mono text-[13px] tabular-nums text-foreground">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
+                        <span className="sensitive font-mono text-[13px] tabular-nums text-foreground">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
                       </div>
                     </DeskRow>
                   </Link>
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                       <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground/80">
                         {o.contracts < 0 ? "Short" : "Long"} {Math.abs(o.contracts)} {o.strike}{o.option_type === "call" ? "C" : "P"} expires {o.expiry} · spot {usd(o.spot)}
                       </span>
-                      <span className={clsx("font-mono text-[13px] tabular-nums", tone(o.premium))}>{signed(o.premium, 0)}</span>
+                      <span className={clsx("sensitive font-mono text-[13px] tabular-nums", tone(o.premium))}>{signed(o.premium, 0)}</span>
                     </div>
                   </DeskRow>
                 ))}

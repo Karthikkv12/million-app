@@ -210,3 +210,14 @@ input[type="number"] { -moz-appearance: textfield; }
   70%  { box-shadow: 0 0 0 8px rgba(99, 130, 251, 0);    }
   100% { box-shadow: 0 0 0 0   rgba(99, 130, 251, 0);    }
 }
+
+/* ── Privacy mode (hide account values) ─────────────────────────────────────
+   <html class="privacy">: `.sensitive` text is replaced by dots, `.sensitive-blur` is blurred. */
+html.privacy .sensitive { position: relative; color: transparent !important; user-select: none; }
+html.privacy .sensitive * { color: transparent !important; background-color: transparent; }
+html.privacy .sensitive::after {
+  content: "•••••"; position: absolute; inset: 0; padding: inherit; display: flex; align-items: center;
+  justify-content: flex-start; color: rgb(var(--foreground-rgb) / 0.45); letter-spacing: 0.08em; overflow: hidden; white-space: nowrap;
+}
+html.privacy .sensitive.text-right::after { justify-content: flex-end; }
+html.privacy .sensitive-blur { filter: blur(10px); pointer-events: none; user-select: none; }

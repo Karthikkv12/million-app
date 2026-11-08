@@ -12,7 +12,7 @@ import { useGexStream } from "@/lib/useGexStream";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 import { PanelHeader } from "./PanelHeader";
 import { LevelsStrip } from "./LevelsStrip";
-import { GexHeatmap, fmtMoney } from "./GexHeatmap";
+import { GexHeatmap } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
 import { sourceName } from "./SourceBadge";
@@ -76,9 +76,7 @@ export function TickerPanel({
     : null;
 
   return (
-    <section
-      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm"
-    >
+    <section className="flex min-w-0 flex-col">
       <PanelHeader
         inputValue={slot.input}
         accentColor={accentColor}
@@ -100,13 +98,13 @@ export function TickerPanel({
       {data && !apiError && (
         <>
           {staleNote && (
-            <p role="status" className="flex items-center gap-1.5 border-b border-[var(--border)] bg-amber-500/[0.06] px-3 py-1.5 text-[11px] text-foreground/70">
+            <p role="status" className="flex items-center gap-1.5 px-4 py-1 text-[11px] text-amber-700 dark:text-amber-300">
               <Clock size={12} className="shrink-0 text-amber-500" /> {staleNote}
             </p>
           )}
-          <LevelsStrip data={data} />
-          <div className="flex items-center gap-1 border-b border-[var(--border)] px-3 py-1.5 text-[11px]">
-            <div role="tablist" aria-label="Exposure" className="mr-2 inline-flex rounded-md border border-[var(--border)] p-0.5">
+          <LevelsStrip data={data} metric={metric} />
+          <div className="flex items-center gap-1 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
+            <div role="tablist" aria-label="Exposure" className="mr-3 inline-flex gap-3">
               {(["gex", "vex"] as const).map((m) => (
                 <button
                   key={m}
@@ -114,8 +112,8 @@ export function TickerPanel({
                   aria-selected={metric === m}
                   onClick={() => onMetricChange(m)}
                   title={m === "gex" ? "Gamma exposure, $ per 1% move" : "Vanna exposure, $ per 1 vol point"}
-                  className={`rounded px-2.5 py-0.5 font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] transition ${
-                    metric === m ? "bg-foreground text-[var(--background)]" : "text-foreground/60 hover:text-foreground"
+                  className={`-mb-[7px] border-b-2 pb-[5px] pt-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] transition ${
+                    metric === m ? "border-foreground text-foreground" : "border-transparent text-foreground/45 hover:text-foreground"
                   }`}
                 >
                   {m}
@@ -124,19 +122,14 @@ export function TickerPanel({
             </div>
             <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
             <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
-            {metric === "vex" && data.net_vex != null && (
-              <span className="ml-auto font-mono text-foreground/55" title="Net vanna exposure: $ change in dealer delta per 1 vol-point move in IV">
-                Net VEX <span className={data.net_vex >= 0 ? "text-gain" : "text-violet-400"}>{fmtMoney(data.net_vex)}</span>
-              </span>
-            )}
+            <button
+              onClick={() => setDetailsOpen(true)}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground"
+            >
+              <PanelRight size={12} /> Details
+            </button>
           </div>
           <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
-          <button
-            onClick={() => setDetailsOpen(true)}
-            className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-3 py-2.5 text-[11px] font-bold text-foreground/70 transition hover:bg-[var(--surface-2)] hover:text-foreground"
-          >
-            <PanelRight size={13} /> Details: levels, premium &amp; net flow
-          </button>
           <DetailsDrawer
             open={detailsOpen}
             onClose={() => setDetailsOpen(false)}

@@ -62,7 +62,7 @@ function Detail({ b }: { b: HedgeBook }) {
                   ["Contracts", String(s.contracts)],
                   ["Expiry", s.expiry ?? "—"],
                 ].map(([k, v]) => (
-                  <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className="mt-0.5 tabular-nums text-foreground">{v}</dd></div>
+                  <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", ["Credit", "Debit", "If called"].includes(k) && "sensitive")}>{v}</dd></div>
                 ))}
               </dl>
             )}
@@ -86,7 +86,7 @@ function Detail({ b }: { b: HedgeBook }) {
           <tbody>
             {b.legs.map((l, i) => (
               <tr key={i} className="border-b border-[var(--border)] last:border-0">
-                <td className="py-1.5 pr-2 text-foreground/85">
+                <td className="sensitive py-1.5 pr-2 text-foreground/85">
                   {l.kind === "stock" ? `${l.quantity} sh @ ${usd(l.avg_price)}` : `${l.quantity < 0 ? "−" : "+"}${Math.abs(l.quantity)} ${l.strike}${l.otype === "call" ? "C" : "P"} ${l.expiry?.slice(5)}`}
                   {l.kind === "option" && l.dte != null && <span className="ml-1.5 text-foreground/40">{Math.floor(l.dte)}d</span>}
                 </td>
@@ -167,7 +167,7 @@ export default function HedgePage() {
           <div className="border-t border-[var(--border-strong)] py-6">
             <DeskFigures>
               <DeskFigure size="lg" label="Book Δ (lots)" value={sd(netDelta)} sub={`${books.length} underlyings`} />
-              <DeskFigure size="lg" label="$ gamma / 1%" value={big(dollarGamma)} tone={dollarGamma < 0 ? "text-loss" : undefined} sub="short options = short gamma" />
+              <DeskFigure sensitive size="lg" label="$ gamma / 1%" value={big(dollarGamma)} tone={dollarGamma < 0 ? "text-loss" : undefined} sub="short options = short gamma" />
               <DeskFigure size="lg" label="Signals" value={signals.length} tone={signals.length ? "text-accent" : "text-foreground/40"} sub={signals.map((b) => b.symbol).join(" · ") || "none right now"} />
               <DeskFigure size="lg" label="IV spikes" value={spikes.length} tone={spikes.length ? "text-loss" : "text-foreground/40"} sub={spikes.map((b) => b.symbol).join(" · ") || "calm"} />
               <DeskFigure size="lg" label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "—"} />
@@ -192,7 +192,7 @@ export default function HedgePage() {
                         <div className="grid grid-cols-[110px_96px_80px_minmax(180px,1fr)_92px_96px_80px_minmax(200px,1.3fr)_24px] items-center gap-3 px-4 py-3">
                           <div className="min-w-0">
                             <p className="font-mono text-[15px] font-semibold tracking-tight text-foreground">{b.symbol}</p>
-                            <p className="truncate font-mono text-[10.5px] text-foreground/40">{b.shares ? `${b.shares} sh` : "options"} · {b.regime === "high-vol" ? "hi-vol" : "bull"}</p>
+                            <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span> · {b.regime === "high-vol" ? "hi-vol" : "bull"}</p>
                           </div>
                           <div className="text-right font-mono tabular-nums">
                             <p className="text-[14px] text-foreground">{usd(b.spot)}</p>
@@ -203,7 +203,7 @@ export default function HedgePage() {
                             <Meter value={(b.net_delta ?? 0) / lots} target={(b.target_delta ?? 0) / lots} after={s?.net_delta_after != null ? s.net_delta_after / lots : null} />
                             <span className={clsx("w-12 shrink-0 text-right font-mono text-[13px] tabular-nums", offTarget(b) ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>{sd(b.net_delta)}</span>
                           </div>
-                          <p className={clsx("text-right font-mono text-[13px] tabular-nums", (b.dollar_gamma_1pct ?? 0) < 0 ? "text-loss" : "text-foreground/70")}>{big(b.dollar_gamma_1pct)}</p>
+                          <p className={clsx("sensitive text-right font-mono text-[13px] tabular-nums", (b.dollar_gamma_1pct ?? 0) < 0 ? "text-loss" : "text-foreground/70")}>{big(b.dollar_gamma_1pct)}</p>
                           <p className="text-right font-mono text-[13px] tabular-nums text-foreground/80">
                             {vol(b.iv?.atm_iv)}<span className="text-foreground/35"> / {vol(b.iv?.hv20)}</span>
                           </p>
@@ -212,7 +212,7 @@ export default function HedgePage() {
                           </p>
                           <div className="flex min-w-0 items-center gap-2">
                             {a && <Tag tone={a.tag}>{a.label}</Tag>}
-                            <span className="truncate text-[12.5px] text-foreground/70">{s && TRADE.has(s.action) ? `${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)} · ${usd(Math.abs(s.credit ?? 0), 0)}` : s?.headline}</span>
+                            <span className="truncate text-[12.5px] text-foreground/70">{s && TRADE.has(s.action) ? <>{`${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)} · `}<span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}</span>
                           </div>
                           <ChevronDown size={15} className={clsx("text-foreground/40 transition", isOpen && "rotate-180")} />
                         </div>

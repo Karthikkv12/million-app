@@ -26,14 +26,16 @@ export function DeskSection({ label, meta, children, className, id }: {
 }
 
 /** A big inline figure; put several in a DeskFigures row (they divide with vertical rules). */
-export function DeskFigure({ label, value, sub, tone, size = "md" }: {
+export function DeskFigure({ label, value, sub, tone, size = "md", sensitive = false }: {
   label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: string; size?: "lg" | "md";
+  /** Hidden in privacy mode. */
+  sensitive?: boolean;
 }) {
   return (
     <div className="min-w-0 py-1 pr-6">
       <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">{label}</p>
-      <p className={clsx("mt-1 truncate font-mono font-medium tabular-nums tracking-[-0.03em]", size === "lg" ? "text-[34px] leading-none sm:text-[44px]" : "text-[22px] leading-tight", tone ?? "text-foreground")}>{value}</p>
-      {sub && <div className="mt-1 truncate font-mono text-[11.5px] text-foreground/55">{sub}</div>}
+      <p className={clsx("mt-1 truncate font-mono font-medium tabular-nums tracking-[-0.03em]", sensitive && "sensitive", size === "lg" ? "text-[34px] leading-none sm:text-[44px]" : "text-[22px] leading-tight", tone ?? "text-foreground")}>{value}</p>
+      {sub && <div className={clsx("mt-1 truncate font-mono text-[11.5px] text-foreground/55", sensitive && "sensitive")}>{sub}</div>}
     </div>
   );
 }

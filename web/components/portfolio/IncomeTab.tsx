@@ -19,15 +19,15 @@ export function IncomeTab() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Premium collected" value={<span className="text-gain">{signedUsd(inc.collected_total, 0)}</span>} sub={`net ${signedUsd(inc.premium_total, 0)} after ${usd(inc.bought_back_total, 0)} buy-backs`} />
         <Metric label="Realized P&L" value={<span className={tone(inc.realized_total)}>{signedUsd(inc.realized_total, 0)}</span>} sub={`${inc.trades} closing trades · stocks + options`} />
-        <Metric label="Win rate" value={inc.win_rate == null ? "—" : `${(inc.win_rate * 100).toFixed(0)}%`} sub="closing trades in profit" />
-        <Metric label="History since" value={inc.since ? shortDate(inc.since) : "—"} sub="from Robinhood" />
+        <Metric sensitive={false} label="Win rate" value={inc.win_rate == null ? "—" : `${(inc.win_rate * 100).toFixed(0)}%`} sub="closing trades in profit" />
+        <Metric sensitive={false} label="History since" value={inc.since ? shortDate(inc.since) : "—"} sub="from Robinhood" />
       </div>
       <Panel title={series === "collected" ? "Premium collected" : series === "premium" ? "Net premium (after buy-backs)" : "Realized P&L"}>
         <div className="mb-3 flex flex-wrap gap-2">
           <Segmented value={series} onChange={setSeries} options={[{ value: "collected", label: "Collected" }, { value: "premium", label: "Net" }, { value: "realized", label: "Realized" }]} />
           <Segmented value={view} onChange={setView} options={[{ value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }]} />
         </div>
-        <div className="h-[240px]">
+        <div className="sensitive-blur h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} margin={{ top: 6, right: 6, bottom: 0, left: 4 }}>
               <CartesianGrid {...s.grid} />
@@ -52,10 +52,10 @@ export function IncomeTab() {
               {inc.by_symbol.map((r) => (
                 <tr key={r.symbol} className="border-b border-[var(--border)] last:border-0">
                   <td className={`${TD} font-medium text-foreground`}>{r.symbol}</td>
-                  <td className={`${TD} text-right ${r.collected ? "text-gain" : "text-foreground/40"}`}>{signedUsd(r.collected, 0)}</td>
-                  <td className={`${TD} text-right text-foreground/60`}>{r.bought_back ? usd(r.bought_back, 0) : "—"}</td>
-                  <td className={`${TD} text-right ${tone(r.premium)}`}>{signedUsd(r.premium, 0)}</td>
-                  <td className={`${TD} text-right ${tone(r.realized)}`}>{signedUsd(r.realized, 0)}</td>
+                  <td className={`sensitive ${TD} text-right ${r.collected ? "text-gain" : "text-foreground/40"}`}>{signedUsd(r.collected, 0)}</td>
+                  <td className={`sensitive ${TD} text-right text-foreground/60`}>{r.bought_back ? usd(r.bought_back, 0) : "—"}</td>
+                  <td className={`sensitive ${TD} text-right ${tone(r.premium)}`}>{signedUsd(r.premium, 0)}</td>
+                  <td className={`sensitive ${TD} text-right ${tone(r.realized)}`}>{signedUsd(r.realized, 0)}</td>
                   <td className={`${TD} text-right text-foreground/60`}>{r.trades}</td>
                 </tr>
               ))}

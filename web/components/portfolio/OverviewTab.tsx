@@ -25,7 +25,7 @@ export function OverviewTab() {
 
       <Panel title="Account value" sub={hist?.length ? `${hist.length} daily syncs` : undefined}>
         {hist && hist.length > 1 ? (
-          <div className="h-[240px]">
+          <div className="sensitive-blur h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hist} margin={{ top: 6, right: 6, bottom: 0, left: 4 }}>
                 <defs>
@@ -53,9 +53,9 @@ export function OverviewTab() {
               {p.accounts.map((a) => (
                 <tr key={a.account} className="border-b border-[var(--border)] last:border-0">
                   <td className={`${TD} font-sans text-foreground`}>{a.account}<span className="ml-2 font-mono text-[11px] text-foreground/40">{a.day}</span></td>
-                  <td className={`${TD} text-right text-foreground`}>{usd(a.total_value)}</td>
-                  <td className={`${TD} text-right ${tone(a.change)}`}>{signedUsd(a.change)}</td>
-                  <td className={`${TD} hidden text-right text-foreground/70 sm:table-cell`}>{usd(a.cash)}</td>
+                  <td className={`sensitive ${TD} text-right text-foreground`}>{usd(a.total_value)}</td>
+                  <td className={`sensitive ${TD} text-right ${tone(a.change)}`}>{signedUsd(a.change)}</td>
+                  <td className={`sensitive ${TD} hidden text-right text-foreground/70 sm:table-cell`}>{usd(a.cash)}</td>
                 </tr>
               ))}
             </tbody>
@@ -66,8 +66,8 @@ export function OverviewTab() {
             <tbody>
               {[...p.holdings].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0)).slice(0, 6).map((h) => (
                 <tr key={h.symbol} className="border-b border-[var(--border)] last:border-0">
-                  <td className={TD}><Link href={`/stocks/${h.symbol}`} className="font-medium text-foreground hover:text-accent">{h.symbol}</Link><span className="ml-2 text-[11px] text-foreground/45">{h.shares} sh</span></td>
-                  <td className={`${TD} text-right text-foreground`}>{usd(h.market_value, 0)}</td>
+                  <td className={TD}><Link href={`/stocks/${h.symbol}`} className="font-medium text-foreground hover:text-accent">{h.symbol}</Link><span className="sensitive ml-2 text-[11px] text-foreground/45">{h.shares} sh</span></td>
+                  <td className={`sensitive ${TD} text-right text-foreground`}>{usd(h.market_value, 0)}</td>
                   <td className={`${TD} text-right ${tone(h.unrealized)}`}>{pct(h.unrealized_pct, 1)}</td>
                   <td className={`${TD} hidden text-right text-foreground/55 sm:table-cell`}>{h.weight != null ? `${(h.weight * 100).toFixed(0)}%` : "—"}</td>
                 </tr>

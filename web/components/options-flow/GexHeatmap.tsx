@@ -210,22 +210,22 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   const faded = (v: number) => opts.dimSmall && vmax > 0 && Math.abs(v) < 0.1 * vmax;
 
   return (
-    <div ref={boxRef} className="relative overflow-auto bg-[#0b0c10]" style={{ maxHeight }}>
+    <div ref={boxRef} className="relative overflow-auto bg-[var(--background)]" style={{ maxHeight }}>
       <table className="w-full border-separate border-spacing-0 font-mono text-[11px] tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-white/10 bg-[#0b0c10] py-2 pl-3 pr-2 text-left text-[10px] font-medium text-white/50">
+            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-[var(--border-strong)] bg-[var(--background)] py-2 pl-3 pr-2 text-left text-[10px] font-medium text-foreground/45">
               Strike
             </th>
-            <th className="sticky top-0 z-20 min-w-[84px] border-b border-l border-white/10 bg-[#0b0c10] px-2 py-1.5 text-right">
-              <div className="text-[10px] font-medium text-white/80">All</div>
-              <div className="text-[9px] text-white/40">{expiries.length} exp</div>
+            <th className="sticky top-0 z-20 min-w-[84px] border-b border-l border-[var(--background)] bg-[var(--background)] px-2 py-1.5 text-right">
+              <div className="text-[10px] font-medium text-foreground/80">All</div>
+              <div className="text-[9px] text-foreground/40">{expiries.length} exp</div>
             </th>
             {expiries.map((exp, ci) => (
-              <th key={exp} className="sticky top-0 z-20 min-w-[84px] border-b border-l border-white/10 bg-[#0b0c10] px-2 py-1.5 text-right">
-                <div className="whitespace-nowrap text-[10px] font-medium text-white/80">{exp}</div>
+              <th key={exp} className="sticky top-0 z-20 min-w-[84px] border-b border-l border-[var(--background)] bg-[var(--background)] px-2 py-1.5 text-right">
+                <div className="whitespace-nowrap text-[10px] font-medium text-foreground/80">{exp}</div>
                 <div className="flex justify-end gap-1.5 text-[9px]">
-                  <span className="text-white/40">{dte(exp)}</span>
+                  <span className="text-foreground/40">{dte(exp)}</span>
                   <span className={colTotals[ci] >= 0 ? "text-gain/80" : "text-violet-300/80"}>{fmtMoney(colTotals[ci])}</span>
                 </div>
               </th>
@@ -237,17 +237,17 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
             const isSpot = strike === spotStrike;
             const isKingRow = king?.strike === strike;
             const all = cellColor(total, vmaxTotal, opts.palette);
-            const spotLine = isSpot ? "inset 0 -2px 0 rgba(255,255,255,0.9)" : undefined;
+            const spotLine = isSpot ? "inset 0 -2px 0 rgb(var(--foreground-rgb) / 0.9)" : undefined;
             return (
               <tr key={strike} data-strike={strike}>
-                <td className={`sticky left-0 z-10 border-b border-white/[0.06] py-[5px] pl-3 pr-2 ${isSpot ? "bg-[#16181f]" : "bg-[#0b0c10]"}`}>
+                <td className={`sticky left-0 z-10 border-b border-[var(--border)] py-[5px] pl-3 pr-2 ${isSpot ? "bg-foreground/[0.06]" : "bg-[var(--background)]"}`}>
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <span className={isSpot ? "font-medium text-white" : "text-white/70"}>{fmtStrike(strike)}</span>
+                    <span className={isSpot ? "font-medium text-foreground" : "text-foreground/65"}>{fmtStrike(strike)}</span>
                     {isSpot && (
-                      <span className="rounded-[5px] bg-white px-1.5 text-[9.5px] font-medium leading-[16px] text-black">▸ {spot.toFixed(2)}</span>
+                      <span className="rounded-[3px] bg-foreground px-1.5 text-[9.5px] font-medium leading-[16px] text-[var(--background)]">▸ {spot.toFixed(2)}</span>
                     )}
                     {isKingRow && (
-                      <span className="rounded-full border border-amber-300/60 bg-amber-300/15 px-1.5 text-[8.5px] font-medium uppercase leading-[15px] tracking-[0.14em] text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
+                      <span className="rounded-full border border-amber-300/60 bg-amber-300/15 px-1.5 text-[8.5px] font-medium uppercase leading-[15px] tracking-[0.14em] text-amber-700 dark:text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
                         ★ King
                       </span>
                     )}
@@ -257,7 +257,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                   </div>
                 </td>
                 <td
-                  className="border-b border-l border-white/[0.06] px-2 py-[5px] text-right font-medium"
+                  className="border-b border-l border-[var(--background)] px-2 py-[5px] text-right font-medium"
                   style={{ background: all.bg, color: all.fg, boxShadow: spotLine }}
                 >
                   {label(total, vmaxTotal)}
@@ -269,7 +269,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                     <td
                       key={ci}
                       title={`${fmtStrike(strike)} · ${expiries[ci]} · ${metric.toUpperCase()} ${fmtMoney(v)} ${METRIC_UNIT[metric]}`}
-                      className={`border-b border-l border-white/[0.06] px-2 py-[5px] text-right ${isKing ? "relative z-[5] font-medium" : ""}`}
+                      className={`border-b border-l border-[var(--background)] px-2 py-[5px] text-right ${isKing ? "relative z-[5] font-medium" : ""}`}
                       style={{
                         background: c.bg,
                         color: c.fg,

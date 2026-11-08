@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown } from "lucide-react";
+import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { usePrivacy } from "@/lib/privacy";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 
@@ -39,6 +40,20 @@ function ThemeButton() {
       className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
     >
       {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+    </button>
+  );
+}
+
+function PrivacyButton() {
+  const [hidden, toggle] = usePrivacy();
+  return (
+    <button
+      onClick={toggle}
+      aria-pressed={hidden}
+      title={hidden ? "Show account values" : "Hide account values"}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground aria-pressed:text-accent"
+    >
+      {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
     </button>
   );
 }
@@ -84,7 +99,7 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <ThemeButton />
+          <PrivacyButton /><ThemeButton />
 
           <div className="relative hidden md:block" ref={menuRef}>
             <button

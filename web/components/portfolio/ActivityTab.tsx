@@ -38,9 +38,9 @@ export function ActivityTab() {
                 <tr key={a.id} className="border-b border-[var(--border)] last:border-0">
                   <td className={`${TD} whitespace-nowrap text-foreground/60`}>{new Date(a.ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
                   <td className={`${TD} font-sans text-[13px] text-foreground`}>{what}{opt && a.strategy && <span className="ml-2 text-[11px] text-foreground/45">{STRAT[a.strategy] ?? a.strategy}</span>}</td>
-                  <td className={`${TD} text-right text-foreground/70`}>{a.quantity}</td>
+                  <td className={`sensitive ${TD} text-right text-foreground/70`}>{a.quantity}</td>
                   <td className={`${TD} text-right text-foreground/70`}>{usd(a.price)}</td>
-                  <td className={`${TD} text-right ${tone(val)}`}>{signedUsd(val)}</td>
+                  <td className={`sensitive ${TD} text-right ${tone(val)}`}>{signedUsd(val)}</td>
                   <td className={`${TD} font-sans text-[12px] text-foreground/55`}>{a.account}</td>
                 </tr>
               );

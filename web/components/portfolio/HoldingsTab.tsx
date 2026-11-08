@@ -26,12 +26,12 @@ export function HoldingsTab() {
                   <Link href={`/stocks/${h.symbol}`} className="font-medium text-foreground hover:text-accent">{h.symbol}</Link>
                   <p className="font-sans text-[11px] text-foreground/45">{h.accounts.join(" · ")}</p>
                 </td>
-                <td className={`${TD} text-right text-foreground/80`}>{h.shares}</td>
+                <td className={`sensitive ${TD} text-right text-foreground/80`}>{h.shares}</td>
                 <td className={`${TD} text-right text-foreground/80`}>{usd(h.avg_cost)}</td>
                 <td className={`${TD} text-right text-foreground`}>{usd(h.price)}</td>
                 <td className={`${TD} text-right ${tone(h.day_change_pct)}`}>{pct(h.day_change_pct)}</td>
-                <td className={`${TD} text-right text-foreground`}>{usd(h.market_value, 0)}</td>
-                <td className={`${TD} text-right ${tone(h.unrealized)}`}>{signedUsd(h.unrealized, 0)}<p className="text-[11px]">{pct(h.unrealized_pct, 1)}</p></td>
+                <td className={`sensitive ${TD} text-right text-foreground`}>{usd(h.market_value, 0)}</td>
+                <td className={`sensitive ${TD} text-right ${tone(h.unrealized)}`}>{signedUsd(h.unrealized, 0)}<p className="text-[11px]">{pct(h.unrealized_pct, 1)}</p></td>
                 <td className={`${TD} text-right text-foreground/60`}>{h.weight != null ? `${(h.weight * 100).toFixed(1)}%` : "—"}</td>
                 <td className={`${TD} text-right`}>
                   {h.short_calls ? <Link href="/hedge" className="text-accent hover:underline">{(h.covered_pct * 100).toFixed(0)}%</Link> : <span className="text-foreground/40">—</span>}
@@ -42,8 +42,8 @@ export function HoldingsTab() {
           <tfoot>
             <tr className="border-t border-[var(--border-strong)]">
               <td className={`${TD} font-sans text-foreground/60`} colSpan={5}>Total</td>
-              <td className={`${TD} text-right text-foreground`}>{usd(p.stock_value, 0)}</td>
-              <td className={`${TD} text-right ${tone(p.unrealized)}`}>{signedUsd(p.unrealized, 0)}</td>
+              <td className={`sensitive ${TD} text-right text-foreground`}>{usd(p.stock_value, 0)}</td>
+              <td className={`sensitive ${TD} text-right ${tone(p.unrealized)}`}>{signedUsd(p.unrealized, 0)}</td>
               <td colSpan={2} />
             </tr>
           </tfoot>

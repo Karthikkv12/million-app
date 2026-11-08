@@ -77,12 +77,12 @@ export const ago = (iso?: string | null) => {
 };
 export const shortDate = (iso: string) => new Date(iso.length === 10 ? iso + "T12:00:00" : iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-export function Metric({ label, value, sub, className }: { label: string; value: React.ReactNode; sub?: React.ReactNode; className?: string }) {
+export function Metric({ label, value, sub, className, sensitive = true }: { label: string; value: React.ReactNode; sub?: React.ReactNode; className?: string; sensitive?: boolean }) {
   return (
     <div className={clsx("min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4", className)}>
       <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/50">{label}</p>
-      <p className="mt-1.5 truncate font-mono text-[22px] font-medium tabular-nums tracking-tight text-foreground">{value}</p>
-      {sub && <div className="mt-0.5 truncate font-mono text-[12px] text-foreground/55">{sub}</div>}
+      <p className={clsx("mt-1.5 truncate font-mono text-[22px] font-medium tabular-nums tracking-tight text-foreground", sensitive && "sensitive")}>{value}</p>
+      {sub && <div className={clsx("mt-0.5 truncate font-mono text-[12px] text-foreground/55", sensitive && "sensitive")}>{sub}</div>}
     </div>
   );
 }
