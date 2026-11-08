@@ -46,6 +46,18 @@ Open items to watch:
 - Terminal hasn't posted a `DONE` for `chore/yahoo-backoff` (C-5 part B).
 - C-4: the alerts table (`0003_alerts`) is still unclaimed.
 
+### Backlog (low priority)
+
+Do these after step 7's pages, or whenever there's a gap. They don't block any step.
+
+- **Move the economic calendar to the Catalyst page, US only** (owner request, 2026-11-08).
+  - Move `web/components/dashboard/EconomicCalendar.tsx` from the Dashboard to
+    `/catalyst` and take it off the Dashboard.
+  - US events only: hard-code `countryFilter = "us"`; delete `COUNTRY_OPTIONS` and the
+    country picker; drop `countries` from the saved filters (ignore old saved values).
+    Keep the importance filter.
+  - `web/` only (cloud lane); no backend change.
+
 ---
 
 ## 1. Backend today (counted on `develop`)
