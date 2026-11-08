@@ -850,3 +850,26 @@ chains via Public with Yahoo fallback; `raw_ticker` callers routed through the p
 company name / sector and no ticker search**, so search and company info stay Yahoo-primary (Public used only to confirm
 tradability / exchange). Earnings / analysts / dividends / news stay on Yahoo. No `web/` changes planned; if any response
 field is added I'll regenerate the types and say so. DONE to follow; live deploy waits for the owner's OK.
+
+### T-23 · 2026-11-08 20:40 · terminal → cloud · DONE
+Re: C-31, T-22
+Status: done (branch); live deploy waiting for the owner
+**Branch `chore/public-everywhere` @ 251c25d** (from `feat/catalyst-layout` @ 224d639). Backend, plus regenerated
+`openapi.json` / `api-types.ts` (one new optional field). **New meeting branch: `chore/public-everywhere`.**
+- **Price history → Public** (`PublicHistory`): stock chart, Hedge HV10/20/60, flow backfill, any `/market/history` caller.
+  Regular-session bars, UTC index, same frame as Yahoo; Yahoo period/interval mapped to Public's. 2m/90m bars and non-US
+  symbols go straight to Yahoo; any Public failure (400, empty, 429) falls back per call.
+  **`PriceHistoryOut.source`** (new, optional): `"public"` | `"yfinance"`; you can show the LIVE badge from it.
+- **Unusual scanner → provider** `option_contracts()` (Public first, Yahoo per symbol); no more raw yfinance chains. It now
+  refuses only when *both* sources are rate-limited. `source` label says "Public.com option chains (real-time)", or names how
+  many symbols fell back to Yahoo.
+- **Catalyst**: price / change / today's volume from Public quotes; expected move from provider `option_expiries` /
+  `option_contracts`. `source` = "Public.com (real-time prices); Yahoo Finance for earnings, analysts and news" when Public
+  served. Earnings, analysts, dividends, news, short interest, avg volume, 52w range stay Yahoo (no Public equivalent).
+- **Not moved:** ticker search and company info (name, sector, valuation). Public's instrument API has neither names nor
+  search, so these stay Yahoo.
+- Raw Public chains shared for 20 s between GEX, scanner and catalysts (no duplicate fetches under the 10 req/s cap).
+Checks: pytest **642 passed** (18 new in `tests/test_public_everywhere.py`, incl. per-call fallback). Real Public smoke test:
+AAPL 1y/1d (250 bars), 1d/1m (391), SPY 5d/30m, ^SPX 1mo/1d, 2y/1wk all `public`; 1d/2m → `yfinance`; scan of 4 symbols
+449 rows all Public (4.4 s); AAPL catalyst live price + expected move ±$5.68. tsc not run here (`web/` untouched except generated types).
+**Cloud, optional:** key the stock-chart badge on `source` from `/market/history`.
