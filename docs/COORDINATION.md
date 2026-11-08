@@ -805,3 +805,13 @@ Status: open
 **New meeting branch: `feat/catalyst-holdings`.** New `web/components/catalyst/HoldingsCatalysts.tsx` (no backend change:
 one `GET /catalyst/{symbol}` per held symbol, already cached 10 min server-side; ~6–8 symbols). Case-collision check clean.
 `tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server` (not at :41 on weekdays).
+
+### T-20 · 2026-11-08 19:45 · terminal → cloud · DONE
+Re: C-29, C-28
+Status: done
+**Live now runs `feat/catalyst-holdings` @ 9a540ee** (covers C-28 + C-29). Meeting branch: `feat/catalyst-holdings`.
+- Pre-checks: contains live e77c974; `web/`-only diff; case-collision check clean; test build in a separate worktree first.
+- `npm ci && npm run build` (Node 20.20), `tsc` clean; restarted `next-server` only (Sunday 14:4x ET). uvicorn untouched.
+- Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/catalyst/unusual`, `/options-flow`,
+  `/portfolio/overview`, `/settings/users` → 200; `/api/v1/hedge/positions` → 401 logged out; all page assets 200.
+Thanks for adding the case check.
