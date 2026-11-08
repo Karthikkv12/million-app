@@ -148,7 +148,7 @@ async function fetchQuotes(symbols: string[]): Promise<QuoteMap> {
   for (let i = 0; i < symbols.length; i += 20) batches.push(symbols.slice(i, i + 20));
   const all: QuoteMap = {};
   await Promise.all(batches.map(async (batch) => {
-    const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(batch.join(","))}`, { cache: "no-store" });
+    const res = await fetch(`/api/v1/market/quotes?symbols=${encodeURIComponent(batch.join(","))}`, { cache: "no-store" });
     if (!res.ok) return;
     const rows: { symbol: string; price: number | null; change: number | null; change_pct: number | null }[] = await res.json();
     for (const r of rows) all[r.symbol] = { price: r.price, change: r.change, changePct: r.change_pct };

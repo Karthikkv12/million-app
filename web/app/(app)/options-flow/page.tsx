@@ -2,7 +2,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
-import { Plus } from "lucide-react";
+import { Segmented } from "@/components/ui";
+import { Plus, SlidersHorizontal } from "lucide-react";
 import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
 
@@ -52,6 +53,7 @@ export default function OptionsFlowPage() {
   const { theme } = useTheme();
   const accent = ACCENT[theme];
   const [slots, setSlots] = useState<Slot[]>(() => loadLayout().slots);
+  const [viewOpen, setViewOpen] = useState(false);
   const [nStrikes, setNStrikes] = useState<number>(() => loadLayout().nStrikes);
   const [heat, setHeat] = useState<HeatOpts>(() => loadLayout().heat ?? DEFAULT_HEAT_OPTS);
 
@@ -89,67 +91,72 @@ export default function OptionsFlowPage() {
   }, []);
 
   const gridClass =
-    slots.length === 1 ? "grid-cols-1 max-w-5xl" :
+    slots.length === 1 ? "grid-cols-1" :
     slots.length === 2 ? "grid-cols-1 lg:grid-cols-2" :
                          "grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3";
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[var(--background)]">
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-4 sm:px-6">
-        <div className="mr-auto">
-          <h1 className="text-lg font-black tracking-tight text-foreground">Options Flow</h1>
-          <p className="text-[11px] text-foreground/55">Gamma exposure by strike &amp; expiry · Yahoo Finance, ~15 min delayed</p>
-        </div>
+      <div className="px-4 pb-4 pt-6 sm:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <p className="eyebrow mb-1.5 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Flow</p>
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">Options Flow</h1>
+            <p className="mt-1 text-[13px] text-foreground/55">Gamma exposure by strike and expiry · Yahoo Finance, ~15 min delayed</p>
+          </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/50">Strikes</span>
-          <div className="flex rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
-            {STRIKE_OPTIONS.map((n) => (
-              <button
-                key={n}
-                onClick={() => setNStrikes(n)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-bold tabular-nums transition ${
-                  nStrikes === n ? "bg-foreground text-[var(--background)]" : "text-foreground/55 hover:text-foreground"
-                }`}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Strikes</span>
+            <Segmented
+              label="Strikes around spot"
+              value={String(nStrikes)}
+              onChange={(v) => setNStrikes(Number(v) as typeof nStrikes)}
+              options={STRIKE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+            />
+
+            {/* Phones: palette and toggles live behind one "View" button */}
+            <button
+              onClick={() => setViewOpen((o) => !o)}
+              aria-expanded={viewOpen}
+              className="btn-ghost h-8 px-3 text-[12px] md:hidden"
+            >
+              <SlidersHorizontal size={14} /> View
+            </button>
+
+            <div className={`${viewOpen ? "flex" : "hidden"} w-full flex-wrap items-center gap-2 md:flex md:w-auto`}>
+              <select
+                value={heat.palette}
+                onChange={(e) => setHeat((h) => ({ ...h, palette: e.target.value as HeatOpts["palette"] }))}
+                className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[12px] font-medium text-foreground"
+                aria-label="Heatmap colours"
               >
-                {n}
+                {PALETTES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+              {([["showPct", "% of king"], ["dimSmall", "Dim small"]] as const).map(([k, lbl]) => (
+                <button
+                  key={k}
+                  onClick={() => setHeat((h) => ({ ...h, [k]: !h[k] }))}
+                  aria-pressed={heat[k]}
+                  className={`h-8 rounded-lg border px-3 text-[12px] font-medium transition ${
+                    heat[k] ? "border-foreground bg-foreground text-[var(--background)]" : "border-[var(--border)] text-foreground/60 hover:text-foreground"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            {slots.length < MAX_TICKERS && (
+              <button
+                onClick={addSlot}
+                className="flex h-8 items-center gap-1 rounded-lg border border-dashed border-[var(--border-strong)] px-3 text-[12px] font-medium text-foreground/65 transition hover:border-foreground/40 hover:text-foreground"
+              >
+                <Plus size={13} /> Add ticker
               </button>
-            ))}
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <select
-            value={heat.palette}
-            onChange={(e) => setHeat((h) => ({ ...h, palette: e.target.value as HeatOpts["palette"] }))}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-[11px] font-bold text-foreground"
-            aria-label="Heatmap colours"
-          >
-            {PALETTES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-          {([["showPct", "% of king"], ["dimSmall", "Dim small"]] as const).map(([k, lbl]) => (
-            <button
-              key={k}
-              onClick={() => setHeat((h) => ({ ...h, [k]: !h[k] }))}
-              aria-pressed={heat[k]}
-              className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
-                heat[k] ? "border-foreground/40 bg-foreground text-[var(--background)]" : "border-[var(--border)] text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              {lbl}
-            </button>
-          ))}
-        </div>
-
-        {slots.length < MAX_TICKERS && (
-          <button
-            onClick={addSlot}
-            className="flex items-center gap-1 rounded-lg border border-dashed border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-foreground/65 transition hover:border-foreground/40 hover:text-foreground"
-          >
-            <Plus size={12} /> Add ticker
-          </button>
-        )}
       </div>
 
       {/* ── Ticker columns ──────────────────────────────────────────────── */}

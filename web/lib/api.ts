@@ -5,9 +5,17 @@
  * - Auto-refreshes the token on 401 responses
  */
 
-// Use the Next.js /api rewrite proxy so requests stay same-origin (HTTPS on tunnel, HTTP locally).
-// Set NEXT_PUBLIC_API_URL to override (e.g. for production deployment).
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+// Versioned API through the Next.js rewrite (same-origin: HTTPS on the tunnel, HTTP locally).
+// Set NEXT_PUBLIC_API_URL to override (e.g. a phone app or a separate API host).
+export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+
+// ── Generated types (web/lib/api-types.ts, from the backend's OpenAPI) ──────────
+// Regenerate after any API change: `python scripts/export_openapi.py && npm run gen:api`.
+import type { components, paths } from "./api-types";
+export type Schemas = components["schemas"];
+/** JSON body of a 200 GET response, e.g. `V1Get<"/api/v1/catalyst/{symbol}">`. */
+export type V1Get<P extends keyof paths> =
+  paths[P] extends { get: { responses: { 200: { content: { "application/json": infer R } } } } } ? R : never;
 
 // ── token storage (client-side only) ────────────────────────────────────────
 
@@ -157,33 +165,8 @@ export interface TopFlowStrike {
   bias: "call" | "put";
 }
 
-export interface GexResult {
-  symbol: string;
-  spot: number;
-  expiries: string[];
-  strikes: number[];
-  /** Aligned with `strikes` (same index), in $ per 1% move. */
-  gex_by_strike: number[];
-  call_gex_by_strike: number[];
-  put_gex_by_strike: number[];
-  heatmap_expiries: string[];
-  heatmap_strikes: number[];
-  heatmap_values: number[][];
-  zero_gamma: number | null;
-  max_call_wall: number | null;
-  max_put_wall: number | null;
-  max_gex_strike: number | null;
-  net_gex: number | null;
-  // net flow
-  call_premium: number;
-  put_premium: number;
-  net_flow: number;
-  total_volume: number;
-  flow_by_expiry: FlowByExpiry[];
-  top_flow_strikes: TopFlowStrike[];
-  data_source: "yfinance";
-  error: string | null;
-}
+/** Generated from the backend schema (GexOut). */
+export type GexResult = Schemas["GexOut"];
 
 export const fetchGex = (symbol: string) =>
   api.get<GexResult>(`/options/gamma-exposure/${symbol.toUpperCase()}`);
@@ -878,6 +861,7 @@ export const syncWatchlist = () =>
 
 // ── Catalyst ──────────────────────────────────────────────────────────────────
 export interface CatalystSignal { label: string; tone: "good" | "bad" | "warn" | "neutral" }
+// Hand-written until CatalystsOut types its nested sections (coordination C-8).
 export interface Catalysts {
   symbol: string; name: string; price: number | null; change_pct: number | null;
   earnings: { date: string | null; days_until: number | null; timing: string | null;

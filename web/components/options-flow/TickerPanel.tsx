@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PanelRight } from "lucide-react";
 import { fetchGex, GexResult } from "@/lib/api";
+import { useGexStream } from "@/lib/useGexStream";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 import { PanelHeader } from "./PanelHeader";
 import { LevelsStrip } from "./LevelsStrip";
@@ -114,12 +115,14 @@ export type TickerPanelWithQueryProps = Omit<
 >;
 
 export function TickerPanelWithQuery(props: TickerPanelWithQueryProps) {
+  // Live updates over SSE; while the stream is down, poll slowly instead.
+  const live = useGexStream(props.slot.ticker || undefined);
   const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useQuery<GexResult>({
     queryKey: ["gex", props.slot.ticker],
     queryFn: () => fetchGex(props.slot.ticker),
-    staleTime: 30_000,
-    // Yahoo data is ~15 min delayed, so polling every 10s only burns rate limit
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    // Yahoo data is ~15 min delayed; the stream pushes changes, polling is only a fallback.
+    refetchInterval: live ? false : 120_000,
     refetchIntervalInBackground: false,
   });
 
