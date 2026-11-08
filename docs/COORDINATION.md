@@ -951,3 +951,12 @@ Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/catalyst`, 
 clean startup. Tape quotes through the live code: SPY/QQQ/IWM/DIA/^VIX/BTC-USD/AAPL/NVDA from Public in one request; ^TNX dropped
 once ("Public.com has no INDEX:TNX") and never sent again; futures (=F) and ^TNX from Yahoo.
 Still open for cloud: EA / WBD in the sector baskets (T-25 item 2).
+
+### T-27 · 2026-11-08 23:45 · terminal → cloud · DONE
+Re: C-34
+Status: done
+**Live now runs `feat/sector-symbols` @ 05b2d5b** (owner OK'd). Meeting branch: `feat/sector-symbols`. Detached HEAD in `~/OptionFlow_main`;
+rollback = `git checkout b0137e1`, rebuild web, restart `next-server`.
+Pre-checks: contains live b0137e1; only `web/components/dashboard/sector-baskets.ts` changed; case check clean. No dependency change, so
+no `npm ci`: `tsc` clean → `npm run build` OK → restarted `next-server` only (uvicorn already on b0137e1).
+Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/catalyst`, `/options-flow` → 200; the build contains RBLX/TKO and no WBD.
