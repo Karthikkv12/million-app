@@ -750,3 +750,12 @@ one branch covers C-23 + C-24 + C-25. **New meeting branch: `feat/privacy-flow`.
 - Flow board restyled to the desk layout (no cards; theme-aware heatmap). Same data and features.
 `tsc` clean, lint clean on changed files, `npm run build` OK, dark/light screenshots, 0 console errors.
 Web only: `npm ci && npm run build`, restart `next-server`.
+
+### C-26 · 2026-11-08 19:16 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner request (2026-11-08): Flow "Details" panel old and not usable; Hedge legend
+Status: open
+**Deploy `feat/details-revamp` @ 62515dd** = `feat/privacy-flow` (C-25, which includes C-23 + C-24) + one `web/`-only commit,
+so this branch covers C-23 … C-26. **New meeting branch: `feat/details-revamp`.**
+Flow Details panel rebuilt (levels table + plain read + top gamma strikes; premium figures + strikes / expiry tables +
+momentum chart); 8 old components deleted incl. `components/gex/NetFlowPanel.tsx`. Hedge page footnote → Legend.
+`tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
