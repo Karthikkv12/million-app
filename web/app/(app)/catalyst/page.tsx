@@ -6,6 +6,8 @@ import { ArrowRight, Clock } from "lucide-react";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { PageHeader } from "@/components/ui";
 import { loadRecent } from "@/lib/recent";
+import { DeskSection } from "@/components/desk";
+import { HoldingsCatalysts } from "@/components/catalyst/HoldingsCatalysts";
 
 const POPULAR = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "AMD", "SPY"];
 
@@ -22,9 +24,14 @@ export default function CatalystSearchPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+    <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 sm:px-8 pt-8 sm:px-6">
       <PageHeader eyebrow="Research" title="Catalyst" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news." />
 
+      <DeskSection label="Your holdings" className="mb-8" meta={<>Sorted by what needs attention first.<br />Tap a stock for its full catalyst page.</>}>
+        <HoldingsCatalysts />
+      </DeskSection>
+
+      <div className="max-w-3xl">
       <TickerSearchInput value={q} onChange={setQ} onSelect={go} placeholder="Search a ticker or company" actionLabel="Check" className="w-full" />
 
       {recent.length > 0 && (
@@ -51,6 +58,8 @@ export default function CatalystSearchPage() {
           ))}
         </ul>
       </section>
+
+      </div>
 
       <p className="mt-10 text-[13px] text-foreground/50">Data from Yahoo Finance, delayed. For information only, not investment advice.</p>
     </div>
