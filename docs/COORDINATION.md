@@ -14,6 +14,7 @@ Read this before starting a step, and keep to your own lane.
 
 ## Cloud session: UI and new features
 - **Owns:**
+  - `logic/unusual.py`, `backend_api/routers/unusual.py`, `tests/test_unusual.py` (done).
   - `web/app/**`, `web/components/**`, `web/lib/theme.tsx`, `web/app/globals.css`,
     `web/tailwind.config.ts`.
   - New feature files: `logic/catalyst.py`, `backend_api/routers/catalyst.py`,
@@ -26,12 +27,14 @@ Read this before starting a step, and keep to your own lane.
 | `logic/catalyst.py` | `modules/market/catalyst_service.py`, or a `modules/catalyst/` module | Same function names, same 10-minute cache |
 | `backend_api/routers/catalyst.py` | Router of that module | URL `GET /catalyst/{symbol}`, also under `/api/v1` |
 | `tests/test_catalyst.py` | `tests/catalyst/` | All 5 tests |
+| `logic/unusual.py` | `modules/flow/unusual_service.py`, or a `modules/unusual/` module; Yahoo calls through the market-data provider | Same thresholds, 5-minute cache, `scan()` signature |
+| `backend_api/routers/unusual.py` | Router of that module | `GET /unusual?symbols=&min_premium=&type=`, also under `/api/v1` |
+| `tests/test_unusual.py` | `tests/unusual/` | All 3 tests |
 | `web/lib/api.ts`: `gex_by_strike`, `call_gex_by_strike`, `put_gex_by_strike` are now `number[]` | Typed response schema for gamma-exposure | They are arrays aligned with `strikes`, not dicts |
 
 ## Coming next from the cloud session (in this order)
-1. **Catalyst page** (`web/app/(app)/catalyst/**`). UI only.
-2. **Unusual activity scanner:** `logic/unusual.py` + `routers/unusual.py` (new
-   files only), page `web/app/(app)/unusual`.
+1. ~~Catalyst page~~ (done)
+2. ~~Unusual activity scanner~~ (done)
 3. **Price chart with GEX levels:** UI only, on the stock page.
 4. **GEX replay:** reads the existing snapshots. Adds one read-only route.
 5. **Watchlist alerts:** needs a new table. **Waits until the terminal finishes step 5
