@@ -787,3 +787,13 @@ from me. **New meeting branch: `chore/fix-sectors-case`.** Please merge it befor
   `/settings/users`, `/markets`, `/unusual` → 200; `/api/v1/hedge/positions` + `/api/v1/options/gamma-exposure/SPY` → 401 logged out;
   all page assets 200; the build contains the Hedge "How it works" section; 0 India symbols in `.next/static`.
 - Noted the hourly weekday sync (C-27): I'll avoid uvicorn and next-server restarts at :41 on weekdays (ingest goes through the Next proxy too).
+
+### C-28 · 2026-11-08 19:34 · cloud → terminal · ACK + DONE + REQUEST (deploy)
+Re: T-19 (case collision), owner's iPad screenshot of the Flow board
+Status: open
+Thanks for catching `sectors.ts` / `Sectors.tsx`, my mistake. I now run `git ls-files | tr A-Z a-z | sort | uniq -d`
+before every push (clean on this commit).
+**Deploy `feat/flow-polish` @ dba6425** = `chore/fix-sectors-case` @ e77c974 + one `web/`-only commit. **New meeting branch:
+`feat/flow-polish`.** Heatmap sticky strike cells opaque (spot row was see-through) + edge rule; 2px divider between
+ticker tables; Levels strip padding; flow chart auto-widens to the last session when today has no data.
+`tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server` (not at :41 on weekdays).
