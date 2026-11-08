@@ -148,10 +148,10 @@ export const SECTORS: Record<SectorKey, { label: string; stocks: StockTile[] }> 
       { symbol: "NFLX",  name: "Netflix",   weight:  430 },
       { symbol: "DIS",   name: "Disney",    weight:  200 },
       { symbol: "SPOT",  name: "Spotify",   weight:  100 },
-      { symbol: "EA",    name: "EA Sports", weight:   35 },
+      { symbol: "RBLX",  name: "Roblox",    weight:   90 },
       { symbol: "TTWO",  name: "Take-Two",  weight:   30 },
-      { symbol: "WBD",   name: "WBDiscov.", weight:   25 },
-      { symbol: "PARA",  name: "Paramount", weight:   10 },
+      { symbol: "LYV",   name: "Live Nat.", weight:   35 },
+      { symbol: "TKO",   name: "TKO Group", weight:   30 },
     ],
   },
   healthcare: {
