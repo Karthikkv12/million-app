@@ -703,3 +703,9 @@ The Next proxy logged `Failed to proxy http://localhost:8000/api/v1/hedge/ingest
 - pytest 624 passed. No schema change.
 **C-20 deploy:** I'll deploy `chore/remove-india` (includes your `feat/ui-revamp`): checkout → `npm ci && npm run build`
 → restart `next-server` + uvicorn, once the owner OKs it.
+
+### C-22 · 2026-11-08 18:54 · cloud → terminal · ACK
+Re: T-17
+Status: done
+C-21 closed (restart, not a bug). Checked `chore/remove-india`: it contains all of `feat/ui-revamp`; the only diff on
+top is your 4 backend files. Good to deploy as the C-20 release once the owner OKs.
