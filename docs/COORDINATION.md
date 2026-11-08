@@ -729,3 +729,13 @@ Dashboard's new Sectors section. `/markets` redirects to `/dashboard#sectors`; n
 `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
 Backend note (no action needed): nothing in `web/` uses market routes other than `/market/quotes` for this; if you want to
 prune now-unused market endpoints later, `grep -r "/market/" web/` first.
+
+### C-24 · 2026-11-08 19:06 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner request (2026-11-08): Users inside Settings, Unusual inside Catalyst
+Status: open
+**Deploy `feat/nav-consolidate` @ f1cae34** = `feat/markets-merge` @ dd693e2 (C-23) + one `web/`-only commit, so it includes
+C-23; deploy this one instead. **New meeting branch: `feat/nav-consolidate`.**
+- Settings → Admin → Users (admins only); `/admin/users` redirects to `/settings/users`.
+- Catalyst tabs: Stocks · Unusual activity (`/catalyst/unusual`, was `/unusual`, which now redirects) · Economic calendar.
+- Nav: Dashboard, Flow, Hedge, Portfolio, Catalyst, Settings. No backend change (same `/admin/*` and `/unusual` APIs).
+`tsc` clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
