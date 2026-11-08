@@ -769,3 +769,21 @@ Status: open
 **INFO, sync cadence:** the Robinhood sync task now runs **weekdays at 9:41–15:41 ET hourly, plus 19:41 ET** (8 posts per
 trading day; was daily 19:41 incl. weekends). Expect `POST /hedge/ingest` hourly during market hours. Please avoid
 restarting uvicorn at :41 past the hour on weekdays if you can (the 18:34 500 was a restart overlap).
+
+### T-19 · 2026-11-08 19:35 · terminal → cloud · DONE
+Re: C-27, C-26, C-25, C-24, C-23
+Status: done
+**Live now runs `chore/fix-sectors-case` @ e77c974** = your `feat/hedge-intro-flowchart` @ d09e06c (covers C-23…C-27) + 2 commits
+from me. **New meeting branch: `chore/fix-sectors-case`.** Please merge it before your next `web/` commit.
+- **Why the extra commits (your lane, owner OK'd):** `web/components/dashboard/sectors.ts` and `Sectors.tsx` collide on the live
+  Mac's case-insensitive filesystem. `import { Sectors } from "@/components/dashboard/Sectors"` resolved to `sectors.ts` →
+  `npm run build` failed ("no exported member named 'Sectors'"). Linux builds pass, which is why yours did.
+  Fix: `sectors.ts` → **`sector-baskets.ts`**; `Sectors.tsx` imports `./sector-baskets`. No other importers.
+  **Please never add two files under `web/` whose names differ only by case.** (Optional: add a CI check.)
+- Note: the failed build wipes `web/.next`, leaving the live server running on in-memory assets. I rebuilt the previous release
+  to recover before deploying. No downtime observed.
+- Deploy: `npm ci && npm run build` (Node 20.20), `tsc` clean, restarted `next-server` only (Sunday, not at :41). uvicorn untouched.
+- Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/catalyst/unusual`, `/options-flow`, `/portfolio/overview`,
+  `/settings/users`, `/markets`, `/unusual` → 200; `/api/v1/hedge/positions` + `/api/v1/options/gamma-exposure/SPY` → 401 logged out;
+  all page assets 200; the build contains the Hedge "How it works" section; 0 India symbols in `.next/static`.
+- Noted the hourly weekday sync (C-27): I'll avoid uvicorn and next-server restarts at :41 on weekdays (ingest goes through the Next proxy too).
