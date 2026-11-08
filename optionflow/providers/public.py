@@ -28,6 +28,7 @@ Limit: 10 requests/second per account; 429 over it.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -77,13 +78,33 @@ def _f(v: Any) -> Optional[float]:
 
 def instrument_for(symbol: str) -> Optional[Dict[str, str]]:
     """Public instrument for a Yahoo-style symbol, or None when Public can't serve it
-    (non-US listings with an exchange suffix, futures, FX)."""
+    (non-US listings with an exchange suffix, futures, FX, indexes Public has refused)."""
     s = symbol.strip().upper()
     if s.startswith("^"):
-        return {"symbol": s[1:], "type": "INDEX"}
-    if not s or any(c in s for c in ".=/"):
+        inst = {"symbol": s[1:], "type": "INDEX"}
+    elif s.endswith("-USD") and s[:-4].isalpha():          # Yahoo crypto pair → Public CRYPTO
+        inst = {"symbol": s[:-4], "type": "CRYPTO"}
+    elif not s or any(c in s for c in ".=/"):
         return None
-    return {"symbol": s, "type": "EQUITY"}
+    else:
+        inst = {"symbol": s, "type": "EQUITY"}
+    return None if _key(inst) in _UNSUPPORTED else inst
+
+
+# Instruments Public refused outright ("No enum constant …Index.TNX"): a request naming one fails
+# for the whole batch, so they are dropped from then on and served by Yahoo.
+_UNSUPPORTED: set = set()
+_ENUM_REJECT = re.compile(r"No enum constant [\w.]*\.(\w+)\.(\w+)")
+
+
+def _key(inst: Dict[str, str]) -> str:
+    return f"{inst['type']}:{inst['symbol']}"
+
+
+def rejected_instrument(message: str) -> Optional[str]:
+    """'INDEX:TNX' from Public's 400 'No enum constant com.….symbology.Index.TNX', else None."""
+    m = _ENUM_REJECT.search(message or "")
+    return f"{m.group(1).upper()}:{m.group(2).upper()}" if m else None
 
 
 def quote_price(q: Dict[str, Any]) -> Optional[float]:
@@ -329,9 +350,23 @@ class PublicClient:
         """Raw quotes, one request per QUOTE_BATCH instruments."""
         out: List[Dict[str, Any]] = []
         for i in range(0, len(instruments), QUOTE_BATCH):
-            data = self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/quotes",
-                                json={"instruments": instruments[i:i + QUOTE_BATCH]})
-            out.extend(data.get("quotes") or [])
+            batch = [x for x in instruments[i:i + QUOTE_BATCH] if _key(x) not in _UNSUPPORTED]
+            for _ in range(3):                      # drop instruments Public refuses, retry the rest
+                if not batch:
+                    break
+                try:
+                    data = self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/quotes",
+                                        json={"instruments": batch})
+                except PublicError as exc:
+                    bad = rejected_instrument(str(exc))
+                    if bad is None or bad not in {_key(x) for x in batch}:
+                        raise
+                    _UNSUPPORTED.add(bad)
+                    logger.info("Public.com has no %s; using Yahoo for it from now on", bad)
+                    batch = [x for x in batch if _key(x) != bad]
+                    continue
+                out.extend(data.get("quotes") or [])
+                break
         return out
 
     def last_price(self, instrument: Dict[str, str]) -> Optional[float]:

@@ -274,3 +274,57 @@ def test_unusual_scan_refuses_only_when_both_sources_are_blocked(md):
     yahoo.gate.trip()
     with pytest.raises(MarketDataRateLimited):
         unusual.scan(["MSFT"], min_premium=100_000)
+
+
+# ── quotes: indexes Public refuses, crypto pairs ─────────────────────────────
+
+def test_rejected_index_is_dropped_and_the_batch_retried():
+    from optionflow.providers import public
+    from optionflow.providers.public import PublicQuotes
+    public._UNSUPPORTED.clear()
+    sent = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        path = req.url.path
+        if path.endswith("/access-tokens"):
+            return httpx.Response(200, json={"accessToken": "tok"})
+        insts = __import__("json").loads(req.content)["instruments"]
+        sent.append([f"{i['type']}:{i['symbol']}" for i in insts])
+        if any(i["type"] == "INDEX" and i["symbol"] == "TNX" for i in insts):
+            return httpx.Response(400, json={"code": 40, "message":
+                                  "No enum constant com.hellopublic.trading.core.symbology.Index.TNX"})
+        return httpx.Response(200, json={"quotes": [
+            {"instrument": i, "outcome": "SUCCESS", "last": "10", "previousClose": "9"} for i in insts]})
+
+    client = PublicClient("s", account_id="A", transport=httpx.MockTransport(handler),
+                          gate=RateLimitGate(source="Public.com"), min_gap=0)
+    q = PublicQuotes(client, ttl=0)
+    try:
+        got = q.quotes(["AAPL", "^TNX", "^VIX", "BTC-USD"])
+        assert set(got) == {"AAPL", "^VIX", "BTC-USD"}            # ^TNX left for Yahoo
+        assert sent == [["EQUITY:AAPL", "INDEX:TNX", "INDEX:VIX", "CRYPTO:BTC"],
+                        ["EQUITY:AAPL", "INDEX:VIX", "CRYPTO:BTC"]]
+        q.quotes(["AAPL", "^TNX"])                                 # remembered: never sent again
+        assert sent[-1] == ["EQUITY:AAPL"]
+    finally:
+        public._UNSUPPORTED.clear()
+
+
+def test_other_400s_still_raise_for_the_fallback():
+    from optionflow.providers.public import PublicError
+
+    def handler(req):
+        if req.url.path.endswith("/access-tokens"):
+            return httpx.Response(200, json={"accessToken": "tok"})
+        return httpx.Response(400, json={"message": "bad request"})
+
+    client = PublicClient("s", account_id="A", transport=httpx.MockTransport(handler),
+                          gate=RateLimitGate(source="Public.com"), min_gap=0)
+    with pytest.raises(PublicError):
+        client.quotes([{"symbol": "AAPL", "type": "EQUITY"}])
+
+
+def test_crypto_pairs_map_to_public_crypto():
+    from optionflow.providers.public import instrument_for
+    assert instrument_for("BTC-USD") == {"symbol": "BTC", "type": "CRYPTO"}
+    assert instrument_for("BRK-B") == {"symbol": "BRK-B", "type": "EQUITY"}
