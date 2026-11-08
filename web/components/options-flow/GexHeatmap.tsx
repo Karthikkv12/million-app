@@ -1,6 +1,7 @@
 "use client";
 /**
- * GexHeatmap — the Flow board: strike × expiry gamma exposure.
+ * GexHeatmap — the Flow board: strike × expiry gamma (GEX) or vanna (VEX)
+ * exposure. `metric` picks which grid the backend sent is shown.
  *
  * Rows are strikes (descending), columns are expiries, plus a leading "All"
  * column summing the displayed expiries. Every expiry cell shares one colour
@@ -52,6 +53,10 @@ export interface HeatOpts {
   dimSmall: boolean;
 }
 export const DEFAULT_HEAT_OPTS: HeatOpts = { palette: "heat", showPct: false, dimSmall: false };
+
+/** Which exposure a board shows. */
+export type Metric = "gex" | "vex";
+export const METRIC_UNIT: Record<Metric, string> = { gex: "per 1% move", vex: "per 1 vol pt" };
 
 const ramp = (stops: RGB[], t: number): RGB => {
   const x = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
@@ -113,20 +118,24 @@ export interface BoardHandle {
 
 interface Props {
   data: GexResult;
+  /** "gex" (default): gamma exposure. "vex": vanna exposure. */
+  metric?: Metric;
   nStrikes: number;
   opts: HeatOpts;
   /** CSS max-height of the scrolling board */
   maxHeight: string;
 }
 
-export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, nStrikes, opts, maxHeight }, ref) {
-  const { spot, heatmap_strikes, heatmap_expiries, heatmap_values } = data;
+export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, metric = "gex", nStrikes, opts, maxHeight }, ref) {
+  const { spot, heatmap_strikes, heatmap_expiries } = data;
+  const heatmap_values = metric === "vex" ? data.heatmap_vex_values : data.heatmap_values;
+  const isGex = metric === "gex";
   const boxRef = useRef<HTMLDivElement>(null);
 
   const model = useMemo(() => {
     const allStrikes = heatmap_strikes ?? [];
     const expiries = heatmap_expiries ?? [];
-    if (!allStrikes.length || !expiries.length) return null;
+    if (!allStrikes.length || !expiries.length || !heatmap_values?.length) return null;
 
     const byStrike = new Map<number, number[]>();
     allStrikes.forEach((s, si) => byStrike.set(s, expiries.map((_, ei) => heatmap_values?.[ei]?.[si] ?? 0)));
@@ -176,21 +185,25 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   // Centre on spot whenever the ticker or window changes
   const centeredFor = useRef("");
   useEffect(() => {
-    const key = `${data.symbol}:${nStrikes}`;
+    const key = `${data.symbol}:${metric}:${nStrikes}`;
     if (model && centeredFor.current !== key) {
       centeredFor.current = key;
       requestAnimationFrame(() => centerOn(spotStrike, undefined, false));
     }
-  }, [data.symbol, nStrikes, model, spotStrike, centerOn]);
+  }, [data.symbol, metric, nStrikes, model, spotStrike, centerOn]);
 
   if (!model) {
-    return <p className="px-4 py-16 text-center text-sm text-foreground/55">No options data for this ticker.</p>;
+    return (
+      <p className="px-4 py-16 text-center text-sm text-foreground/55">
+        {!isGex && !data.heatmap_vex_values ? "VEX isn't available from the server yet." : "No options data for this ticker."}
+      </p>
+    );
   }
 
   const { strikes, rows, expiries, vmax, vmaxTotal, king, colTotals } = model;
   const step = strikes.length > 1 ? Math.abs(strikes[0] - strikes[1]) : 0;
   const zg = data.zero_gamma;
-  const flip = zg != null && zg <= strikes[0] + step / 2 && zg >= strikes[strikes.length - 1] - step / 2 ? nearest(strikes, zg) : null;
+  const flip = isGex && zg != null && zg <= strikes[0] + step / 2 && zg >= strikes[strikes.length - 1] - step / 2 ? nearest(strikes, zg) : null;
 
   const label = (v: number, max: number) =>
     opts.showPct && max ? (v ? `${Math.round((v / max) * 100)}%` : "0%") : fmtMoney(v);
@@ -238,8 +251,8 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                         ★ King
                       </span>
                     )}
-                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
-                    {strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
+                    {isGex && strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
+                    {isGex && strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
                     {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
                   </div>
                 </td>
@@ -255,7 +268,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                   return (
                     <td
                       key={ci}
-                      title={`${fmtStrike(strike)} · ${expiries[ci]} · ${fmtMoney(v)} per 1% move`}
+                      title={`${fmtStrike(strike)} · ${expiries[ci]} · ${metric.toUpperCase()} ${fmtMoney(v)} ${METRIC_UNIT[metric]}`}
                       className={`border-b border-l border-white/[0.06] px-2 py-[5px] text-right ${isKing ? "relative z-[5] font-medium" : ""}`}
                       style={{
                         background: c.bg,

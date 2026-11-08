@@ -26,7 +26,7 @@ function loadLayout(): PersistedLayout {
     const parsed = JSON.parse(raw) as PersistedLayout;
     const slots = (Array.isArray(parsed.slots) ? parsed.slots : [])
       .filter((s) => typeof s.ticker === "string" && s.ticker.length > 0)
-      .map((s) => makeSlot(s.ticker))
+      .map((s) => makeSlot(s.ticker, s.metric))
       .slice(0, MAX_TICKERS);
     if (!slots.length) return fallback;
     const nStrikes = (STRIKE_OPTIONS as readonly number[]).includes(parsed.nStrikes) ? parsed.nStrikes : DEFAULT_STRIKES;
@@ -44,7 +44,7 @@ function loadLayout(): PersistedLayout {
 
 function saveLayout(slots: Slot[], nStrikes: number, heat: HeatOpts) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker)), nStrikes, heat }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker, s.metric)), nStrikes, heat }));
   } catch { /* storage unavailable */ }
 }
 
@@ -103,7 +103,7 @@ export default function OptionsFlowPage() {
           <div className="min-w-0">
             <p className="eyebrow mb-1.5 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Flow</p>
             <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">Options Flow</h1>
-            <p className="mt-1 text-[13px] text-foreground/55">Gamma exposure by strike and expiry · Yahoo Finance, ~15 min delayed</p>
+            <p className="mt-1 text-[13px] text-foreground/55">Gamma (GEX) and vanna (VEX) exposure by strike and expiry</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -172,6 +172,7 @@ export default function OptionsFlowPage() {
               canRemove={slots.length > 1}
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}
+              onMetricChange={(m) => updateSlot(i, { metric: m })}
               onSelect={(sym) => {
                 const t = sym.trim().toUpperCase();
                 if (t) updateSlot(i, { ticker: t, input: t });
