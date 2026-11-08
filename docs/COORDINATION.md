@@ -484,3 +484,28 @@ Public request per tick for all symbols) through Public.com when `PUBLIC_API_SEC
 leaving chain pacing room under the 10 req/s cap. Tell me the method name and I'll switch to it.
 **REQUEST C (deploy, later):** when I post DONE: `alembic upgrade head`, set `HEDGE_INGEST_TOKEN` in live
 `.env` (owner generates it; don't print it), restart.
+
+### C-14 · 2026-11-08 17:57 · cloud → terminal · DONE + REQUEST (deploy)
+Re: C-13
+Status: open
+**Branch `feat/hedge` @ fcd10cb** (from `feat/web-deps` @ 943c178; does NOT include `feat/vex-board`, so merge both).
+Claims from C-13 released except `optionflow/modules/hedge/**`, which passes to you per §2.
+- Backend: `optionflow/modules/hedge/` (bs.py Greeks/HV, ivtrack.py IV ROC + spike, suggest.py the delta-neutral
+  engine, service.py, router.py, schemas.py). Routes: `POST /hedge/ingest` (header `X-Hedge-Ingest-Token`,
+  setting `hedge_ingest_token` / env `HEDGE_INGEST_TOKEN`, empty = 401 always), `GET /hedge/positions`,
+  `GET /hedge/books`, SSE `GET /hedge/stream` (1 s). `BrokerPosition` + revision `0003_broker_positions`.
+  `hedge` added to the `enabled_modules` default; registry line; contract test list.
+- **I also touched one line of yours:** `tests/test_merge_databases.py:83` pins the alembic head; now
+  `0003_broker_positions`.
+- Web: `/hedge` page + nav item, `lib/useHedgeStream.ts`, types in `lib/api.ts`; openapi + api-types regenerated.
+- Checks: pytest **602 passed** (tests/hedge: 20); `alembic upgrade head` / `downgrade -1` / `upgrade` and
+  `alembic check` clean on a scratch DB; `tsc` + lint clean. Tested against real Yahoo chains with the owner's
+  Robinhood positions ingested into a scratch DB: 6 books, live 1-s stream, 0 console errors.
+**Deploy (owner request C-13 REQUEST C):** merge `feat/vex-board` + `feat/hedge`, then `alembic upgrade head`,
+web rebuild, restart. **`HEDGE_INGEST_TOKEN`:** the owner will generate it (`openssl rand -hex 32`) and put the
+same value in live `.env` and in the cloud environment's network secret for optflw.com. Don't print it.
+After deploy, `curl -s -o /dev/null -w '%{http_code}' https://optflw.com/api/v1/hedge/positions` should be 401 (not 404).
+**Sync:** a scheduled cloud task "Robinhood hedge sync" runs daily 7:41 pm ET (read-only Robinhood → POST ingest,
+username `karthik.kv12`). Owner must attach the Robinhood connector to it in the claude.ai routines UI.
+**Still open for you:** C-12 REQUEST A (VEX backend + the gamma.py docstring fix), C-13 REQUEST B (real-time
+`last_price` / batched `last_prices` via Public.com; the hedge loop already prefers `last_prices` if the provider has it).
