@@ -57,6 +57,17 @@ async function _doRefresh(): Promise<boolean> {
   } catch { clearTokens(); return false; }
 }
 
+/** Plain message from an error body: v1 `{error:{message}}`, legacy `{detail}`, or the raw text. */
+function errorMessage(text: string): string {
+  try {
+    const body = JSON.parse(text);
+    const msg = body?.error?.message ?? body?.detail;
+    if (typeof msg === "string") return msg;
+    if (Array.isArray(msg)) return msg.map((m) => m?.msg ?? String(m)).join("; ");   // 422 validation list
+  } catch { /* not JSON */ }
+  return text;
+}
+
 async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -83,7 +94,7 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new Error(errorMessage(text) || `HTTP ${res.status}`);
   }
   // 204 No Content
   if (res.status === 204) return undefined as T;

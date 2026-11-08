@@ -10,19 +10,15 @@ import { Pause, Play, History } from "lucide-react";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, ResponsiveContainer,
 } from "recharts";
-import { api } from "@/lib/api";
+import { api, type Schemas } from "@/lib/api";
 import { Panel, Pill, Segmented } from "@/components/ui";
 import { useChartStyle, ChartTooltip, Legend } from "@/components/chart/kit";
 
-interface Snap {
-  ts: string; spot: number; net_gex: number | null; zero_gamma: number | null;
-  call_wall: number | null; put_wall: number | null; king: number | null; profile: [number, number][];
-}
-interface Day { symbol: string; date: string | null; snapshots: Snap[]; days: string[] }
+type Day = Schemas["GexDayOut"];
 
 const time = (ts: string) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const usd = (v: number | null) => (v == null ? "—" : `$${v.toFixed(2)}`);
-const big = (v: number | null) => {
+const usd = (v?: number | null) => (v == null ? "—" : `$${v.toFixed(2)}`);
+const big = (v?: number | null) => {
   if (v == null) return "—";
   const a = Math.abs(v), s = v < 0 ? "−" : "+";
   return a >= 1e9 ? `${s}$${(a / 1e9).toFixed(2)}B` : `${s}$${(a / 1e6).toFixed(0)}M`;
