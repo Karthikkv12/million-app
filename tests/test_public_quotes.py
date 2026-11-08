@@ -96,10 +96,10 @@ def test_quote_and_last_price_come_from_public(setup):
 
 def test_last_prices_one_request_and_yahoo_for_the_rest(setup):
     fake, yahoo, md = setup
-    prices = md.last_prices(["KO", "aapl", "ZZZZQ", "RELIANCE.NS"])
-    assert prices == {"KO": 101.5, "aapl": 101.5, "ZZZZQ": 2.0, "RELIANCE.NS": 2.0}
-    assert len(fake.quote_requests) == 1 and len(fake.quote_requests[0]) == 3   # .NS never sent to Public
-    assert yahoo.calls == [("last_price", "ZZZZQ"), ("last_price", "RELIANCE.NS")]
+    prices = md.last_prices(["KO", "aapl", "ZZZZQ", "VOD.L"])
+    assert prices == {"KO": 101.5, "aapl": 101.5, "ZZZZQ": 2.0, "VOD.L": 2.0}
+    assert len(fake.quote_requests) == 1 and len(fake.quote_requests[0]) == 3   # .L never sent to Public
+    assert yahoo.calls == [("last_price", "ZZZZQ"), ("last_price", "VOD.L")]
 
 
 def test_quotes_cached_for_a_second(setup):

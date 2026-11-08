@@ -131,7 +131,7 @@ def test_parse_contracts_filters_like_yahoo():
 def test_instrument_mapping():
     assert instrument_for("spy") == {"symbol": "SPY", "type": "EQUITY"}
     assert instrument_for("^SPX") == {"symbol": "SPX", "type": "INDEX"}
-    assert instrument_for("RELIANCE.NS") is None
+    assert instrument_for("VOD.L") is None
     assert instrument_for("ES=F") is None
 
 
@@ -179,7 +179,7 @@ def test_429_trips_public_gate(public):
 def test_unsupported_symbol_raises_without_calls(public):
     fake, chains = public
     with pytest.raises(PublicError):
-        chains.option_chain("RELIANCE.NS")
+        chains.option_chain("VOD.L")
     assert fake.requests == []
 
 
@@ -207,7 +207,7 @@ def test_fallback_to_yahoo_on_public_failure(public, status):
 def test_fallback_for_non_us_symbol(public):
     _, chains = public
     yahoo = FakeYahoo()
-    assert ChainFallbackMarketData(chains, yahoo).option_chain("NIFTY.NS").source == "yfinance"
+    assert ChainFallbackMarketData(chains, yahoo).option_chain("VOD.L").source == "yfinance"
 
 
 def test_chains_blocked_only_when_both_sources_are(public):

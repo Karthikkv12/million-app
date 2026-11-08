@@ -20,11 +20,7 @@ Data source:
   is set, else / on failure Yahoo Finance (free, ~15-min delayed).
   GEXResult.data_source names the source that served the chain.
 
-Lot sizes:
-  US options:            100 contracts per lot (standard)
-  Indian index options:  NIFTY=75, BANKNIFTY=30, FINNIFTY=40, MIDCPNIFTY=75, SENSEX=20, BANKEX=20
-  Indian equity options: 1 lot = varies, but yfinance reports OI in contracts already — use 1
-                         (yfinance NSE equity OI is already in shares, not lots)
+Lot size: US-listed options only, 100 shares per contract.
 """
 from __future__ import annotations
 
@@ -38,103 +34,10 @@ import pandas as pd
 
 from optionflow.providers.market_data import MarketDataRateLimited, get_market_data
 
-# ---------------------------------------------------------------------------
-# Indian contract lot sizes (NSE F&O)
-# ---------------------------------------------------------------------------
-
-# Key: base symbol (without .NS/.BO suffix, upper-cased)
-_INDIA_LOT_SIZES: dict[str, int] = {
-    "NIFTY":        75,
-    "BANKNIFTY":    30,
-    "FINNIFTY":     40,
-    "MIDCPNIFTY":   75,
-    "SENSEX":       20,
-    "BANKEX":       20,
-    "NIFTYNXT50":   25,
-    # Popular equity lots (NSE F&O)
-    "RELIANCE":     250,
-    "TCS":          150,
-    "INFY":         300,
-    "HDFCBANK":     550,
-    "ICICIBANK":    700,
-    "SBIN":         1500,
-    "WIPRO":        1500,
-    "AXISBANK":     625,
-    "KOTAKBANK":    400,
-    "LT":           175,
-    "ITC":          3200,
-    "BHARTIARTL":   950,
-    "HCLTECH":      350,
-    "SUNPHARMA":    350,
-    "TITAN":        175,
-    "BAJFINANCE":   125,
-    "BAJAJFINSV":   125,
-    "MARUTI":       100,
-    "NESTLEIND":    40,
-    "ULTRACEMCO":   100,
-    "ASIANPAINT":   200,
-    "HINDUNILVR":   300,
-    "POWERGRID":    2700,
-    "NTPC":         2700,
-    "ONGC":         1900,
-    "COALINDIA":    2700,
-    "ADANIENT":     625,
-    "ADANIPORTS":   1250,
-    "TATAMOTORS":   1425,
-    "TATASTEEL":    5500,
-    "JSWSTEEL":     1350,
-    "HINDALCO":     2150,
-    "VEDL":         2756,
-    "CIPLA":        650,
-    "DRREDDY":      125,
-    "DIVISLAB":     200,
-    "APOLLOHOSP":   250,
-    "EICHERMOT":    175,
-    "GRASIM":       475,
-    "HEROMOTOCO":   300,
-    "M&M":          700,
-    "TECHM":        600,
-    "LTIM":         150,
-    "HDFCLIFE":     1100,
-    "SBILIFE":      750,
-    "ICICIPRULI":   2000,
-    "BPCL":         1800,
-    "IOC":          4750,
-    "GAIL":         5775,
-    "TATACONSUM":   1100,
-    "INDUSINDBK":   500,
-    "PNB":          8000,
-    "CANBK":        1875,
-    "BANDHANBNK":   3600,
-    "IDFCFIRSTB":   10000,
-    "MUTHOOTFIN":   750,
-    "CHOLAFIN":     1250,
-    "PFC":          2700,
-    "RECLTD":       3000,
-    "SIEMENS":      275,
-    "ABB":          250,
-    "HAL":          300,
-    "BEL":          3700,
-    "IRFC":         10000,
-    "ZOMATO":       4500,
-    "PAYTM":        2000,
-    "NYKAA":        1400,
-    "POLICYBZR":    937,
-    "DELHIVERY":    4000,
-}
-
-
 def _get_lot_size(symbol: str) -> int:
-    """Return the lot size for a given symbol.
-    Indian (.NS / .BO) symbols use NSE lot sizes; US symbols use 100.
-    """
-    sym_upper = symbol.upper()
-    # Strip exchange suffix
-    base = sym_upper.replace(".NS", "").replace(".BO", "").replace(".BSE", "")
-    is_indian = sym_upper.endswith((".NS", ".BO", ".BSE"))
-    if is_indian:
-        return _INDIA_LOT_SIZES.get(base, 1)   # equity lots default to 1 (OI already in shares)
-    return 100  # US standard
+    """Contract multiplier: 100 for US-listed options (the only market supported)."""
+    return 100
+
 
 # ---------------------------------------------------------------------------
 # Black-Scholes helpers (pure Python – no heavy deps)
@@ -218,7 +121,7 @@ class GEXResult:
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
     net_vex: float = 0.0
-    lot_size: int = 100   # contract multiplier used (100 for US, varies for India)
+    lot_size: int = 100   # contract multiplier (US options: always 100)
     # ── Net flow fields ──────────────────────────────────────────────────────
     call_premium: float = 0.0       # total call premium (OI × mid × lot_size)
     put_premium: float = 0.0        # total put premium (OI × mid × lot_size)

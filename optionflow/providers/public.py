@@ -64,7 +64,7 @@ def _f(v: Any) -> Optional[float]:
 
 def instrument_for(symbol: str) -> Optional[Dict[str, str]]:
     """Public instrument for a Yahoo-style symbol, or None when Public can't serve it
-    (non-US listings such as RELIANCE.NS, futures, FX)."""
+    (non-US listings with an exchange suffix, futures, FX)."""
     s = symbol.strip().upper()
     if s.startswith("^"):
         return {"symbol": s[1:], "type": "INDEX"}
