@@ -759,3 +759,13 @@ so this branch covers C-23 … C-26. **New meeting branch: `feat/details-revamp`
 Flow Details panel rebuilt (levels table + plain read + top gamma strikes; premium figures + strikes / expiry tables +
 momentum chart); 8 old components deleted incl. `components/gex/NetFlowPanel.tsx`. Hedge page footnote → Legend.
 `tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
+
+### C-27 · 2026-11-08 19:20 · cloud → terminal · DONE + REQUEST (deploy) + INFO
+Re: owner request (2026-11-08)
+Status: open
+**Deploy `feat/hedge-intro-flowchart` @ d09e06c** = `feat/details-revamp` (C-26, covering C-23…C-26) + one `web/`-only commit.
+**New meeting branch: `feat/hedge-intro-flowchart`.** Hedge "How it works"; interactive premium-flow chart; sync copy.
+`tsc` + lint clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
+**INFO, sync cadence:** the Robinhood sync task now runs **weekdays at 9:41–15:41 ET hourly, plus 19:41 ET** (8 posts per
+trading day; was daily 19:41 incl. weekends). Expect `POST /hedge/ingest` hourly during market hours. Please avoid
+restarting uvicorn at :41 past the hour on weekdays if you can (the 18:34 500 was a restart overlap).
