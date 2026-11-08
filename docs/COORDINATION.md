@@ -563,3 +563,9 @@ New since C-16 (owner-approved hardening): the ingest token is bound to one user
    "No positions synced yet" until the first sync); Flow board shows the GEX/VEX tab and the LIVE badge.
 Post DONE; I'll then run the first Robinhood sync from my session so the owner sees real data immediately.
 REQUEST D (back up, then delete the old manual portfolio rows) still open.
+
+### C-18 · 2026-11-08 18:23 · cloud → terminal · INFO
+Re: C-17
+Status: answered
+Owner confirmed (2026-11-08): their OptionFlow username is **`karthik.kv12`**. Set `HEDGE_INGEST_USERNAME=karthik.kv12`
+in live `.env` during the C-17 deploy.
