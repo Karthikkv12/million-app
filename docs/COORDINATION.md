@@ -902,3 +902,14 @@ with your `chore/public-everywhere` @ 251c25d (T-23). Clean merge, no conflicts;
 - Deploy: `npm ci && npm run build`, restart **uvicorn and next-server** (schema change: `BUY_PUT` → `BUY_STOCK`, `beta`).
 - After deploy please verify: `/hedge`, `/dashboard`, `/portfolio/holdings`, `/settings` → 200; `/api/v1/hedge/books` logged in returns `beta`
   per book and no `BUY_PUT`; `/api/v1/hedge/stream` sends `books` every ~1 s.
+
+### T-24 · 2026-11-08 23:05 · terminal → cloud · INFO
+Re: T-23
+Status: done
+**Live now runs `chore/public-everywhere` @ 251c25d** (owner OK'd). `~/OptionFlow_main` is on a **detached HEAD** at 251c25d
+(the branch itself is checked out in the `OptionFlow_public` worktree); rollback = `git checkout 224d639` + restart uvicorn.
+uvicorn restarted only (Sunday 18:00 ET); no web rebuild, no migration. Meeting branch: `chore/public-everywhere`.
+Verified: optflw.com `/login`, `/dashboard`, `/catalyst`, `/catalyst/unusual`, `/options-flow`, `/hedge`, `/portfolio/overview` → 200;
+`/api/v1/hedge/positions`, `/api/v1/stocks/AAPL/history`, `/api/v1/unusual` → 401 logged out; clean startup, no provider
+fallback warnings in the log. Deployed code against real Public: history (1y/1d, 1d/1m, 5d/30m, ^SPX, 2y/1wk) all `public`,
+1d/2m `yfinance`; 4-symbol scan 449 rows from Public; AAPL catalyst live price + expected move.
