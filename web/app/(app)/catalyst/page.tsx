@@ -24,44 +24,32 @@ export default function CatalystSearchPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 sm:px-8 pt-8 sm:px-6">
+    <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 pt-8 sm:px-8">
       <PageHeader eyebrow="Research" title="Catalyst" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news." />
 
-      <DeskSection label="Your holdings" className="mb-8" meta={<>Sorted by what needs attention first.<br />Tap a stock for its full catalyst page.</>}>
-        <HoldingsCatalysts />
-      </DeskSection>
-
-      <div className="max-w-3xl">
+      {/* Search, then quick picks on one full-width line */}
       <TickerSearchInput value={q} onChange={setQ} onSelect={go} placeholder="Search a ticker or company" actionLabel="Check" className="w-full" />
-
-      {recent.length > 0 && (
-        <section className="mt-10">
-          <h2 className="eyebrow mb-3 flex items-center gap-2"><Clock size={12} />Recent</h2>
-          <div className="flex flex-wrap gap-2">
-            {recent.map((s) => (
-              <Link key={s} href={`/catalyst/${s}`} className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 font-mono text-[13px] text-foreground transition hover:border-foreground/40">{s}</Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mt-10">
-        <h2 className="eyebrow mb-3">Popular</h2>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {POPULAR.map((s) => (
-            <li key={s}>
-              <Link href={`/catalyst/${s}`} className="group flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 transition hover:border-[var(--border-strong)]">
-                <span className="font-mono text-[14px] font-medium text-foreground">{s}</span>
-                <ArrowRight size={15} className="text-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+      <div className="mt-3 flex items-stretch border-y border-[var(--border)]">
+        <span className="hidden shrink-0 items-center pr-4 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45 sm:flex">
+          {recent.length ? <><Clock size={11} className="mr-1.5" />Recent</> : "Popular"}
+        </span>
+        <ul className="grid min-w-0 flex-1 auto-cols-fr grid-flow-col divide-x divide-[var(--border)] overflow-x-auto">
+          {(recent.length ? Array.from(new Set([...recent, ...POPULAR])) : POPULAR).slice(0, 8).map((sym) => (
+            <li key={sym} className="min-w-[72px]">
+              <Link href={`/catalyst/${sym}`} className="group flex items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-foreground/[0.04]">
+                <span className="font-mono text-[13px] font-medium text-foreground">{sym}</span>
+                <ArrowRight size={13} className="shrink-0 text-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
               </Link>
             </li>
           ))}
         </ul>
-      </section>
-
       </div>
 
-      <p className="mt-10 text-[13px] text-foreground/50">Data from Yahoo Finance, delayed. For information only, not investment advice.</p>
+      <DeskSection label="Your holdings" className="mt-4 border-t-0 pt-4" meta={<>Sorted by what needs attention first.<br />Tap a stock for its full catalyst page.</>}>
+        <HoldingsCatalysts />
+      </DeskSection>
+
+      <p className="mt-6 text-[12px] text-foreground/45">Data from Yahoo Finance, delayed. For information only, not investment advice.</p>
     </div>
   );
 }
