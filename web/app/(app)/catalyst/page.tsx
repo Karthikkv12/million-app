@@ -6,7 +6,6 @@ import { ArrowRight, Clock } from "lucide-react";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { PageHeader } from "@/components/ui";
 import { loadRecent } from "@/lib/recent";
-import EconomicCalendar from "@/components/catalyst/EconomicCalendar";
 
 const POPULAR = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "AMD", "SPY"];
 
@@ -23,8 +22,8 @@ export default function CatalystSearchPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-8 sm:px-6">
-      <PageHeader eyebrow="Research" title="Catalyst" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news. Plus the US economic calendar." />
+    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+      <PageHeader eyebrow="Research" title="Catalyst" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news." />
 
       <TickerSearchInput value={q} onChange={setQ} onSelect={go} placeholder="Search a ticker or company" actionLabel="Check" className="w-full" />
 
@@ -51,10 +50,6 @@ export default function CatalystSearchPage() {
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="mt-10">
-        <EconomicCalendar />
       </section>
 
       <p className="mt-10 text-[13px] text-foreground/50">Data from Yahoo Finance, delayed. For information only, not investment advice.</p>

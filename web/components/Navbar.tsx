@@ -7,15 +7,13 @@ import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown } from "lucide-rea
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 
-const NAV = [
+const NAV: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/dashboard",    label: "Dashboard" },
   { href: "/options-flow", label: "Flow" },
   { href: "/hedge",        label: "Hedge" },
   { href: "/portfolio",    label: "Portfolio" },
-  { href: "/unusual",      label: "Unusual" },
   { href: "/catalyst",     label: "Catalyst" },
   { href: "/settings",     label: "Settings" },
-  { href: "/admin/users",  label: "Users", adminOnly: true },
 ];
 
 export function Logo({ href = "/dashboard" }: { href?: string }) {

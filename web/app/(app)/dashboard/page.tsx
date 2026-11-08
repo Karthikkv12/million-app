@@ -242,7 +242,7 @@ export default function DashboardPage() {
       </DeskSection>
 
       <nav className="mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-strong)] pt-5 font-mono text-[12px] uppercase tracking-[0.14em]">
-        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst · calendar"], ["/unusual", "Unusual"]].map(([href, l]) => (
+        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"]].map(([href, l]) => (
           <Link key={href} href={href} className="inline-flex items-center gap-1 text-foreground/60 hover:text-foreground">{l}<ArrowUpRight size={12} /></Link>
         ))}
       </nav>

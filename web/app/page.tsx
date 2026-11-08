@@ -219,7 +219,7 @@ function Product() {
           eyebrow="Dashboard"
           title="Then zoom out to the whole tape."
           body="Sectors ranked by today's move open into heatmaps sized by market cap, next to VIX, rates, the dollar and your own book."
-          points={["Sector ETFs ranked, each with its stocks", "Indexes, futures, VIX, 10Y and dollar on one screen", "US economic calendar on the Catalyst page"]}
+          points={["Sector ETFs ranked, each with its stocks", "Indexes, futures, VIX, 10Y and dollar on one screen", "US economic calendar and unusual options activity under Catalyst"]}
           visual={<SectorTiles />}
         />
       </Container>
