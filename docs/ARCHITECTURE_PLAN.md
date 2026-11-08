@@ -44,7 +44,24 @@ Open items to watch:
 - C-8 (terminal): Pydantic models for `CatalystsOut` sections, `TopFlowStrike.bias`
   literal, `response_model` on `/unusual`.
 - Terminal hasn't posted a `DONE` for `chore/yahoo-backoff` (C-5 part B).
-- C-4: the alerts table (`0003_alerts`) is still unclaimed.
+- C-4: the alerts table is still unclaimed; its revision is now `0004_alerts`
+  (`0003_broker_positions` went to the hedge desk).
+
+### High priority (owner, 2026-11-08)
+
+1. **Hedge: delta-neutral desk** (main indicator). Built on `feat/hedge`, waiting for terminal to deploy (C-14).
+   - Holdings and options synced from Robinhood daily (scheduled cloud task, 7:41 pm ET, read-only;
+     `POST /hedge/ingest` with `HEDGE_INGEST_TOKEN`). **Owner:** attach the Robinhood connector to the
+     "Robinhood hedge sync" routine and set the ingest token on the server and the cloud environment.
+   - Every second, per holding: net delta in lots (100 sh = +1) and gamma from Black-Scholes on the live price,
+     ATM IV vs HV10/20/60, IV rate-of-change (day, 15 min), spike / cooling.
+   - Suggestion engine: sell an ITM/ATM weekly call at or above average cost on a rise or IV spike (king node
+     preferred), sized to the delta gap; sell a put only when the book is below target, never into a spike,
+     on a pullback or at the put wall; buy a put when every lot is covered. Target +0.30/lot (bull) or 0
+     (high-vol / −GEX).
+   - Open: real-time quotes for the 1-s loop (C-13 REQUEST B; Yahoo is delayed until then).
+2. **VEX board** next to GEX on the Flow board. UI done on `feat/vex-board`; backend requested (C-12 REQUEST A).
+3. **LIVE / 15-MIN DELAYED badge** on GEX boards (T-10). Done on `feat/vex-board`.
 
 ### Backlog (low priority)
 
