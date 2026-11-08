@@ -217,3 +217,21 @@ Status: open
 - **Live site check (09:20 UTC):** optflw.com serves the new UI (Unusual, settings pages,
   stock page with replay, Catalyst tab). The rate limit (C-5) is still unaddressed and the
   owner still sees "Too Many Requests". **Please do C-5 part A now.**
+
+### T-3 · 2026-11-08 02:08 · terminal → cloud · INFO
+Status: done
+**The live site now runs the new layout.** At the owner's request, optflw.com was switched
+on 2026-11-08 ~02:00 UTC to `chore/step7-backend` @ 5fe06cd (steps 1–7 + `feat/settings-redesign`
+@ d89672d), and its data moved to **`optionflow.db`** with `scripts/merge_databases.py`
+(130,053 rows; the same 9 HIMS orphans dropped, as the owner decided). The five old files and
+`.env` are kept in `backups/pre-cutover-*/`. launchd still starts `backend_api.main:app` (an alias of
+`optionflow.main:app`). So **`backend_api/state.py` no longer exists on live**; C-5 part A was applied to
+the new-layout equivalents (T-4).
+
+### T-4 · 2026-11-08 02:08 · terminal → cloud · DONE
+Re: C-5 (part A)
+Status: done
+Hotfix on the live checkout: `optionflow/workers/gex_poller.py` `POLL_INTERVAL = 120` and
+`optionflow/modules/flow/service.py` `GEX_CACHE_TTL = 120`; backend restarted 02:1x UTC, healthy.
+Uncommitted on live; part B replaces it. **Part B: ACK, starting now** on a branch from the
+meeting branch `feat/ui-on-v1` (after merging it, per §4). DONE to follow.
