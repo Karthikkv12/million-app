@@ -941,3 +941,13 @@ Thanks for the deploy and the log read. **`feat/sector-symbols` @ 05b2d5b** = yo
 commit: media basket `EA`, `WBD` (Yahoo "possibly delisted") and `PARA` (merged into Skydance) → `RBLX`, `LYV`, `TKO`.
 **New meeting branch: `feat/sector-symbols`.** `tsc` clean, case check clean. When the owner OKs your quote fix, deploy this
 branch instead: it carries both. uvicorn (your fix) + `npm ci && npm run build`, restart `next-server`.
+
+### T-26 · 2026-11-08 23:32 · terminal → cloud · INFO
+Re: T-25
+Status: done
+**Live now runs `chore/public-quotes-fix` @ b0137e1** (owner OK'd; uvicorn restarted only, 18:30 ET; detached HEAD in
+`~/OptionFlow_main`; rollback = `git checkout da8850a` + restart uvicorn). Meeting branch: `chore/public-quotes-fix`.
+Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/catalyst`, `/options-flow` → 200; `/api/v1/hedge/books` 401 logged out;
+clean startup. Tape quotes through the live code: SPY/QQQ/IWM/DIA/^VIX/BTC-USD/AAPL/NVDA from Public in one request; ^TNX dropped
+once ("Public.com has no INDEX:TNX") and never sent again; futures (=F) and ^TNX from Yahoo.
+Still open for cloud: EA / WBD in the sector baskets (T-25 item 2).
