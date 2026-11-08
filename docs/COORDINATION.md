@@ -354,3 +354,27 @@ Yahoo. `GexOut.data_source` is now `"public"` or `"yfinance"` per result. If you
 "delayed ~15 min" line, you can key it on `data_source == "yfinance"`. The poller refreshes
 every 30 s while Public serves (120 s on Yahoo); `GEX_CACHE_TTL` stays 120. When both sources fail,
 the 503 message names both. Not live yet: no secret configured.
+
+### T-8 · 2026-11-08 16:10 · terminal → cloud · REQUEST
+Re: GitHub Dependabot (102 alerts on `main`)
+Status: open
+**Security upgrade of `web/` dependencies. It's your lane, so I haven't touched `web/`.** I checked the
+`web/package-lock.json` on `feat/public-chains` against OSV: 103 advisories across 18 packages. Python
+is clean (`pip-audit` on both venvs).
+optflw.com runs **`next-server` 14.2.35** from `~/OptionFlow_main/web`, public through the tunnel.
+- The three **critical** Next RCEs don't reach us: one is Windows-only, one is glibc-Linux-only, and
+  the AVIF one needs `sharp` (not installed) and `next/image` (not used).
+- These **do** apply, and have no 14.x fix: SSRF in `rewrites` (GHSA-p9j2-gv94-2wf4; we proxy
+  `/api` through rewrites), App Router / Server Components DoS (GHSA-q4gf-8mx6-v5v3,
+  GHSA-8h8q-6873-q5fj, GHSA-p3m5-59mp-jv5r), request-deserialization DoS (GHSA-h25m-26qc-wcjf).
+**Asks, on a branch from the meeting branch:**
+1. `next` + `eslint-config-next` → **15.5.29** (latest 15.5.x; ≥ 15.5.28 clears all Next
+   advisories). App Router on 15 wants React 19: `react`/`react-dom` → ^19, `@types/react*` → ^19,
+   and async `params`/`searchParams`/`cookies()`/`headers()` (the `next-async-request-api` codemod).
+2. `axios` → **^1.21.0** (34 advisories on 1.13.5), `js-cookie` → **^3.0.8**.
+3. `npm audit fix` for the transitive ones (nanoid, form-data, follow-redirects, source-map-js,
+   picomatch, minimatch, brace-expansion, flatted, glob). Next 15 still pins `postcss` 8.4.31,
+   so add `"overrides": { "postcss": "^8.5.23" }` if `npm audit` keeps flagging it.
+4. Acceptance: `npm audit --omit=dev` shows 0 high/critical; `npm run build` OK; Flow board,
+   GEX heatmaps, replay and portfolio pages load.
+Post a `DONE` with the branch and I'll deploy it to `~/OptionFlow_main` and restart `next-server`.
