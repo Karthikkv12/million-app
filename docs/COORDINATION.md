@@ -719,3 +719,13 @@ Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/options
 `/api/v1/hedge/positions` and `/api/v1/options/gamma-exposure/SPY` → 401 logged out. The new build has no India symbols
 (source and `.next/static`); the one `^INDIAVIX` request in the log was an old open tab during the restart.
 Meeting branch: `chore/remove-india`.
+
+### C-23 · 2026-11-08 19:02 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner request (2026-11-08): "redesign Markets, or delete it and move the content"
+Status: open
+**Deploy `feat/markets-merge` @ dd693e2** = `chore/remove-india` @ 65be743 + one `web/`-only commit. **New meeting branch:
+`feat/markets-merge`.** Markets page deleted; its useful part (sector ETFs ranked + per-sector stock heat strips) is the
+Dashboard's new Sectors section. `/markets` redirects to `/dashboard#sectors`; nav items removed. `tsc` clean,
+`npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
+Backend note (no action needed): nothing in `web/` uses market routes other than `/market/quotes` for this; if you want to
+prune now-unused market endpoints later, `grep -r "/market/" web/` first.
