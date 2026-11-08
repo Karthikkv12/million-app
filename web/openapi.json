@@ -6055,57 +6055,6 @@
     "title": "TopFlowStrike",
     "type": "object"
    },
-   "UnusualScanOut": {
-    "additionalProperties": true,
-    "properties": {
-     "as_of": {
-      "title": "As Of",
-      "type": "string"
-     },
-     "call_premium": {
-      "default": 0.0,
-      "title": "Call Premium",
-      "type": "number"
-     },
-     "count": {
-      "default": 0,
-      "title": "Count",
-      "type": "integer"
-     },
-     "put_premium": {
-      "default": 0.0,
-      "title": "Put Premium",
-      "type": "number"
-     },
-     "rows": {
-      "default": [],
-      "items": {
-       "additionalProperties": true,
-       "type": "object"
-      },
-      "title": "Rows",
-      "type": "array"
-     },
-     "source": {
-      "title": "Source",
-      "type": "string"
-     },
-     "symbols": {
-      "default": [],
-      "items": {
-       "type": "string"
-      },
-      "title": "Symbols",
-      "type": "array"
-     }
-    },
-    "required": [
-     "as_of",
-     "source"
-    ],
-    "title": "UnusualScanOut",
-    "type": "object"
-   },
    "ValidationError": {
     "properties": {
      "ctx": {
@@ -8762,6 +8711,72 @@
     ]
    }
   },
+  "/api/v1/flow/{symbol}/replay": {
+   "get": {
+    "description": "GEX replay: one day of 5-minute snapshots.",
+    "operationId": "gex_replay_api_v1_flow__symbol__replay_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "description": "YYYY-MM-DD (UTC); latest day if omitted",
+      "in": "query",
+      "name": "on",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "YYYY-MM-DD (UTC); latest day if omitted",
+       "title": "On"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GexDayOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Gex Replay",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
   "/api/v1/flow/{symbol}/stream": {
    "get": {
     "description": "Server-Sent Events: a `gex` event (same body as gamma-exposure) whenever GEX changes.\n\nKeeps the symbol watched while connected, so the poller keeps it fresh.\nBetween changes it sends `: keepalive` comments.",
@@ -8850,7 +8865,7 @@
   },
   "/api/v1/gex-history/{symbol}": {
    "get": {
-    "description": "GEX replay: one day of 5-minute snapshots.",
+    "description": "Same as /flow/{symbol}/replay (the path the stock page used before the move).",
     "operationId": "gex_day_api_v1_gex_history__symbol__get",
     "parameters": [
      {
@@ -11284,7 +11299,7 @@
   },
   "/api/v1/unusual": {
    "get": {
-    "description": "Contracts trading well above their open interest (5-minute cache per symbol).",
+    "description": "Contracts trading far above open interest with large premium (delayed chain snapshots).",
     "operationId": "unusual_api_v1_unusual_get",
     "parameters": [
      {
@@ -11338,7 +11353,9 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/UnusualScanOut"
+         "additionalProperties": true,
+         "title": "Response Unusual Api V1 Unusual Get",
+         "type": "object"
         }
        }
       },

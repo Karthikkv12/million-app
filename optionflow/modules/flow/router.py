@@ -75,12 +75,23 @@ async def gex_stream(
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@history_router.get("/{symbol}", response_model=GexDayOut)
-def gex_day(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
-            _user=Depends(get_current_user)) -> GexDayOut:
-    """GEX replay: one day of 5-minute snapshots."""
+def _replay_day(symbol: str, on: Optional[str]) -> GexDayOut:
     try:
         d = date.fromisoformat(on) if on else None
     except ValueError:
         raise errors.BadRequest("Use YYYY-MM-DD for 'on'")
     return history.day(symbol, d)
+
+
+@stream_router.get("/{symbol}/replay", response_model=GexDayOut)
+def gex_replay(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
+               _user=Depends(get_current_user)) -> GexDayOut:
+    """GEX replay: one day of 5-minute snapshots."""
+    return _replay_day(symbol, on)
+
+
+@history_router.get("/{symbol}", response_model=GexDayOut)
+def gex_day(symbol: str, on: Optional[str] = Query(None, description="YYYY-MM-DD (UTC); latest day if omitted"),
+            _user=Depends(get_current_user)) -> GexDayOut:
+    """Same as /flow/{symbol}/replay (the path the stock page used before the move)."""
+    return _replay_day(symbol, on)

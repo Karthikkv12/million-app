@@ -1,4 +1,4 @@
-"""logic/unusual.py — unusual options activity from Yahoo option chains.
+"""optionflow/modules/unusual/service.py — unusual options activity from Yahoo option chains.
 
 Yahoo gives end-of-snapshot chains (≈15 min delayed), not a trade tape, so
 "unusual" here means a contract whose *day volume* is large relative to its

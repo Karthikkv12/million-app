@@ -1,1 +1,1 @@
-"""unusual module: unusual options activity scanner."""
+"""Unusual options activity scanner."""

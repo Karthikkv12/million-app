@@ -58,5 +58,6 @@ def test_gex_history_route(db_engine_and_session):
     h = {"Authorization": "Bearer " + c.post("/api/v1/auth/login", json={"username": "rita", "password": "RitaPassword123"}).json()["access_token"]}
     assert c.get("/api/v1/gex-history/SPY", headers=h).json() == {"symbol": "SPY", "date": None, "snapshots": [], "days": []}
     assert c.get("/gex-history/SPY", headers=h).status_code == 200                     # legacy path
+    assert c.get("/api/v1/flow/SPY/replay", headers=h).json()["symbol"] == "SPY"         # path GexReplay.tsx calls
     bad = c.get("/api/v1/gex-history/SPY", params={"on": "11/08"}, headers=h)
     assert bad.status_code == 400 and "YYYY-MM-DD" in bad.json()["error"]["message"]

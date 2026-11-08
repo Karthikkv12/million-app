@@ -463,6 +463,26 @@ export interface paths {
         patch: operations["update_cc_week_api_v1_credit_card_weeks__row_id__patch"];
         trace?: never;
     };
+    "/api/v1/flow/{symbol}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gex Replay
+         * @description GEX replay: one day of 5-minute snapshots.
+         */
+        get: operations["gex_replay_api_v1_flow__symbol__replay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/flow/{symbol}/stream": {
         parameters: {
             query?: never;
@@ -495,7 +515,7 @@ export interface paths {
         };
         /**
          * Gex Day
-         * @description GEX replay: one day of 5-minute snapshots.
+         * @description Same as /flow/{symbol}/replay (the path the stock page used before the move).
          */
         get: operations["gex_day_api_v1_gex_history__symbol__get"];
         put?: never;
@@ -1267,7 +1287,7 @@ export interface paths {
         };
         /**
          * Unusual
-         * @description Contracts trading well above their open interest (5-minute cache per symbol).
+         * @description Contracts trading far above open interest with large premium (delayed chain snapshots).
          */
         get: operations["unusual_api_v1_unusual_get"];
         put?: never;
@@ -2916,42 +2936,6 @@ export interface components {
             /** Strike */
             strike: number;
         };
-        /** UnusualScanOut */
-        UnusualScanOut: {
-            /** As Of */
-            as_of: string;
-            /**
-             * Call Premium
-             * @default 0
-             */
-            call_premium: number;
-            /**
-             * Count
-             * @default 0
-             */
-            count: number;
-            /**
-             * Put Premium
-             * @default 0
-             */
-            put_premium: number;
-            /**
-             * Rows
-             * @default []
-             */
-            rows: {
-                [key: string]: unknown;
-            }[];
-            /** Source */
-            source: string;
-            /**
-             * Symbols
-             * @default []
-             */
-            symbols: string[];
-        } & {
-            [key: string]: unknown;
-        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -4260,6 +4244,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gex_replay_api_v1_flow__symbol__replay_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD (UTC); latest day if omitted */
+                on?: string | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GexDayOut"];
                 };
             };
             /** @description Validation Error */
@@ -5895,7 +5913,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnusualScanOut"];
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

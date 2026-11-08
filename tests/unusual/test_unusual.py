@@ -1,4 +1,4 @@
-"""Tests for logic/unusual.py pure helpers (no network)."""
+"""Tests for optionflow/modules/unusual/service.py pure helpers (no network)."""
 from optionflow.modules.unusual.service import classify_side, is_unusual, score
 
 

@@ -36,7 +36,7 @@ export function GexReplay({ symbol }: { symbol: string }) {
 
   const { data, isLoading } = useQuery<Day>({
     queryKey: ["gexHistory", symbol, on],
-    queryFn: () => api.get<Day>(`/gex-history/${encodeURIComponent(symbol)}${on ? `?on=${on}` : ""}`),
+    queryFn: () => api.get<Day>(`/flow/${encodeURIComponent(symbol)}/replay${on ? `?on=${on}` : ""}`),
     staleTime: 60_000,
   });
   const snaps = data?.snapshots ?? [];

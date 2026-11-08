@@ -24,7 +24,7 @@ def poll_once() -> None:
     for sym in service.active_symbols():
         try:
             result = service.refresh_gex(sym)
-            history.record(result)   # replay snapshots (throttled, never raises) — cloud session request
+            history.record(result)   # GEX replay snapshot (throttled, never raises) — kept per C-5/C-6
         except Exception as exc:
             logger.debug("Poller error for %s: %s", sym, exc)
 
