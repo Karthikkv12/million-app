@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
 
+    # ── Market data: Public.com option chains for GEX (Yahoo is the fallback) ─
+    public_api_secret: Optional[str] = None     # Public.com settings → Security → API; unset = Yahoo only
+    public_account_id: Optional[str] = None     # default: first options-enabled BROKERAGE account
+
     # ── Feature modules (used from plan step 4) ─────────────────────────────
     enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget"
 

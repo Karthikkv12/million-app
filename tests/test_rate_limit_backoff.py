@@ -152,7 +152,7 @@ def test_poller_makes_no_calls_while_backing_off(monkeypatch):
     calls = []
     monkeypatch.setattr(flow_service, "active_symbols", lambda: ["SPY"])
     monkeypatch.setattr(flow_service, "refresh_gex", lambda s: calls.append(s))
-    monkeypatch.setattr(gex_poller, "is_rate_limited", lambda: True)
+    monkeypatch.setattr(gex_poller, "chains_rate_limited", lambda: True)
     gex_poller.poll_once()
     assert calls == []
     assert gex_poller.POLL_INTERVAL == 120 and flow_service.GEX_CACHE_TTL == 120

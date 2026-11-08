@@ -12,7 +12,9 @@ Dealer GEX model:
   Formula: GEX = gamma × OI × contract_size × spot² × 0.01  ($ per 1% spot move, canonical standard)
 
 Data source:
-  get_market_data() — Yahoo Finance today (free, ~15-min delayed)
+  get_market_data() — Public.com option chains (real-time) when PUBLIC_API_SECRET
+  is set, else / on failure Yahoo Finance (free, ~15-min delayed).
+  GEXResult.data_source names the source that served the chain.
 
 Lot sizes:
   US options:            100 contracts per lot (standard)
@@ -326,11 +328,12 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
 
     try:
         provider = get_market_data()
-        spot, df = provider.option_chain(sym)
+        chain = provider.option_chain(sym)
+        spot, df = chain.spot, chain.rows
         df = _fill_gamma(df, spot)
 
         result.spot = round(spot, 2)
-        result.data_source = provider.name
+        result.data_source = chain.source or provider.name
 
         if df.empty:
             result.error = f"No options data found for {sym}."

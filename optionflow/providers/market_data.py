@@ -1,9 +1,9 @@
 """optionflow/providers/market_data.py — the market-data interface.
 
 Every quote, search result, price bar and option chain the app uses comes
-through `get_market_data()`. Yahoo Finance is the only implementation today;
-another provider (e.g. Tradier) is one new class that implements the same
-methods, chosen here.
+through `get_market_data()`. Yahoo Finance serves everything by default. With
+PUBLIC_API_SECRET set, option chains (GEX) come from Public.com first and fall
+back to Yahoo (`ChainFallbackMarketData`); everything else stays on Yahoo.
 
 Tests install a fake with `use_market_data(fake)`.
 """
@@ -22,6 +22,7 @@ CHAIN_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "iv", "mid", "gamm
 class OptionChain(NamedTuple):
     spot: float
     rows: pd.DataFrame
+    source: str = ""          # provider that actually served it ("" → the provider's name)
 
 
 class MarketDataProvider(Protocol):
@@ -61,7 +62,53 @@ def get_market_data() -> MarketDataProvider:
     if _default is None:
         from optionflow.providers.yahoo import YahooMarketData
         _default = YahooMarketData()
+        from optionflow.core.settings import get_settings
+        s = get_settings()
+        if s.public_api_secret:
+            from optionflow.providers.public import PublicClient, PublicOptionChains
+            client = PublicClient(s.public_api_secret, s.public_account_id)
+            _default = ChainFallbackMarketData(PublicOptionChains(client), _default)
     return _default
+
+
+class ChainFallbackMarketData:
+    """Option chains from `chains` (Public.com), falling back to `fallback` (Yahoo).
+
+    Every other method, and `gate` (the Yahoo back-off that catalysts and the
+    scanner check), is the fallback's.
+    """
+
+    def __init__(self, chains: Any, fallback: Any):
+        self.chains = chains
+        self.fallback = fallback
+        self.name = f"{chains.name}+{fallback.name}"
+        self.gate = getattr(fallback, "gate", None)
+        self._warned = False
+
+    def __getattr__(self, attr: str) -> Any:     # search, quote, price_history, raw_ticker, …
+        return getattr(self.fallback, attr)
+
+    def chains_blocked(self) -> bool:
+        """True only when neither source can serve a chain right now."""
+        def _blocked(p: Any) -> bool:
+            g = getattr(p, "gate", None)
+            return bool(g and g.blocked())
+        return _blocked(self.chains) and _blocked(self.fallback)
+
+    def option_chain(self, symbol: str) -> OptionChain:
+        try:
+            chain = self.chains.option_chain(symbol)
+            if self._warned:
+                _log.info("%s option chains working again", self.chains.name)
+                self._warned = False
+            return chain
+        except Exception as exc:                  # any failure: auth, bad symbol, 429, outage
+            if not self._warned:
+                _log.warning("%s option chain failed for %s (%s); using %s",
+                             self.chains.name, symbol, exc, self.fallback.name)
+                self._warned = True
+        chain = self.fallback.option_chain(symbol)
+        return chain if chain.source else chain._replace(source=self.fallback.name)
 
 
 def use_market_data(provider: Optional[MarketDataProvider]) -> None:
@@ -164,6 +211,13 @@ def is_rate_limited() -> bool:
     """True while the active provider is backing off (callers can skip work or serve stale)."""
     gate = getattr(get_market_data(), "gate", None)
     return bool(gate and gate.blocked())
+
+
+def chains_rate_limited() -> bool:
+    """True while no source can serve option chains (the GEX poller skips its cycle)."""
+    md = get_market_data()
+    blocked = getattr(md, "chains_blocked", None)
+    return bool(blocked()) if blocked else is_rate_limited()
 
 
 def raise_if_rate_limited() -> None:

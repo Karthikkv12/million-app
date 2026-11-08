@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 
 from optionflow.modules.flow import history, service
-from optionflow.providers.market_data import is_rate_limited
+from optionflow.providers.market_data import chains_rate_limited
 from optionflow.workers import backfill
 
 logger = logging.getLogger("optionflow.poller")
@@ -22,8 +22,8 @@ POLL_INTERVAL = 120  # seconds; Yahoo data is ~15 min delayed, and every refresh
 
 def poll_once() -> None:
     """Refresh GEX for every watched symbol and store replay snapshots."""
-    if is_rate_limited():
-        return                      # back-off in force: no Yahoo calls at all
+    if chains_rate_limited():
+        return                      # every chain source is backing off: no calls at all
     for sym in service.active_symbols():
         try:
             result = service.refresh_gex(sym)
