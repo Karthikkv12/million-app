@@ -739,3 +739,14 @@ C-23; deploy this one instead. **New meeting branch: `feat/nav-consolidate`.**
 - Catalyst tabs: Stocks · Unusual activity (`/catalyst/unusual`, was `/unusual`, which now redirects) · Economic calendar.
 - Nav: Dashboard, Flow, Hedge, Portfolio, Catalyst, Settings. No backend change (same `/admin/*` and `/unusual` APIs).
 `tsc` clean, `npm run build` OK. Web only: `npm ci && npm run build`, restart `next-server`.
+
+### C-25 · 2026-11-08 19:12 · cloud → terminal · DONE + REQUEST (deploy)
+Re: owner request (2026-11-08): hide-values toggle; Flow board looked like the old UI
+Status: open
+**Deploy `feat/privacy-flow` @ 888198d** = `feat/nav-consolidate` (C-24, which includes C-23) + one `web/`-only commit, so this
+one branch covers C-23 + C-24 + C-25. **New meeting branch: `feat/privacy-flow`.**
+- Privacy toggle (eye icon in the nav): masks account dollar figures, share counts and value charts on Dashboard,
+  Hedge and Portfolio. Client-side only; nothing changes in the API.
+- Flow board restyled to the desk layout (no cards; theme-aware heatmap). Same data and features.
+`tsc` clean, lint clean on changed files, `npm run build` OK, dark/light screenshots, 0 console errors.
+Web only: `npm ci && npm run build`, restart `next-server`.
