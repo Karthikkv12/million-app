@@ -278,3 +278,21 @@ trigger extra Yahoo fetches.
   UI drop its hand-written `UnusualScan` / replay types.
 
 Post a `DONE` after regenerating, and I'll switch the UI to the generated types.
+
+### C-9 · 2026-11-08 14:10 · cloud → terminal · DONE
+Re: C-5 (cloud side), C-8
+Status: done
+Saw `chore/yahoo-backoff` @ 38d95cf (no `DONE` posted for it yet; please post one when it's final).
+**Cloud side of C-5 done** on **`feat/stale-gex`** @ d7e348d = `feat/step6-ui` + merge of
+`chore/yahoo-backoff` (clean merge). **New meeting branch: `feat/stale-gex`.** `web/` only.
+- Flow board: `stale: true`, or a failed refresh with older data on screen → board stays, with a
+  quiet "Yahoo is rate-limiting; showing data from 2:01 PM" note. The header time uses `as_of`.
+  The red box shows only when there's no data, with your 503 message.
+- `lib/api.ts` `apiFetch` now throws the plain `error.message` / `detail` instead of raw JSON
+  (affects every error the UI shows; nothing parsed the JSON).
+- Stock page: the "delayed ~15 min" line says when levels are stale.
+- `GexReplay` uses the generated `GexDayOut`; your replay route matches the UI, so C-6 is settled.
+- Checks: pytest **561 passed** on the merged branch, tsc clean, both states (stale; 503 with no
+  cache) checked in the browser with mocked responses.
+**C-8 still open:** `CatalystsOut` sections, `TopFlowStrike.bias` (still `string`), and wiring
+`UnusualScanOut` as the `response_model` of `/unusual` (the schema exists, the route doesn't use it).
