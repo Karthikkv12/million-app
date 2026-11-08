@@ -1,22 +1,22 @@
-"""optionflow/modules/hedge/suggest.py — the delta-neutral indicator (pure, no I/O).
+"""optionflow/modules/hedge/suggest.py — the wheel-on-spikes indicator (pure, no I/O).
 
 Units: delta and gamma in LOTS (100 shares = +1.00 delta). A short call with delta 0.70 is
 -0.70 per contract; a short put with delta -0.30 is +0.30 per contract.
 
-The engine
-1. Net delta / gamma of the holding: shares/100 + Σ contracts × option delta.
-2. Regime → target net delta per lot held:
-   - bull (dealer GEX ≥ 0 and IV/HV < HIGH_VOL_RATIO): TARGET_BULL (+0.30)
-   - high-vol / bear (GEX < 0 or IV/HV ≥ HIGH_VOL_RATIO): TARGET_NEUTRAL (0.00)
-3. gap = target − net. Within ±BAND per lot → HOLD.
-   - gap < 0 (too long): SELL_CALL on the weekly expiry, strike ≥ average cost (never lock a loss),
-     only when the stock is above average cost AND (IV spike OR up ≥ RISE_TRIGGER over average).
-     Strike = the one whose delta best matches the gap per contract, preferring the GEX king node.
-     Needs uncovered lots; if none are left, BUY_PUT is suggested instead.
-   - gap > 0 (too short, e.g. the short call went deep ITM): SELL_PUT, but never during an IV spike
-     (protocol §4); prefer the put wall / support, delta sized to the gap.
-   - otherwise WAIT, with the reason.
-Note: a SHORT put ADDS delta. It brings the book back toward target only when net < target.
+The owner's playbook (2026-11-08): only ever SELL a call, SELL a put, or BUY stock. Never buy options.
+1. Net delta / gamma of the holding: shares/100 + Σ contracts × option delta. Always shown, whatever
+   legs are on, so you see the real exposure.
+2. Reference = +1.00 per full lot (the stock alone). The book is NOT kept delta-neutral: the trades keep
+   it near +1 per lot while the premium is harvested.
+3. Spike (stock ≥ RISE_TRIGGER over average, or an ATM IV spike on an up-move), with uncovered lots
+   → SELL_CALL in the money, at the strike closest to the average cost from above (never below it).
+   That captures the spike: if called, the shares go at or above average plus the premium.
+4. Pullback (≥ PUT_PULLBACK off the day's high, a red day, or IV cooling), never during an IV spike,
+   with put capacity left → SELL_PUT at the highest strike BELOW the average cost (and at/below spot).
+   If both legs are assigned, the shares are sold at ≥ average and bought back below it.
+5. An odd lot below 100 shares → BUY_STOCK to round it up to a full lot when the price is at/below
+   the average (lowers the average, and the lot can then be worked with calls and puts).
+6. Otherwise HOLD (everything worked) or WAIT (with the reason).
 """
 from __future__ import annotations
 
@@ -26,11 +26,11 @@ from typing import List, Optional
 
 from optionflow.modules.hedge import bs
 
-TARGET_BULL = 0.30
-TARGET_NEUTRAL = 0.0
-HIGH_VOL_RATIO = 1.30     # ATM IV / HV20 at or above this = high-vol regime
-BAND = 0.15               # per lot: |gap| within this = on target
+REFERENCE_PER_LOT = 1.0  # the stock alone: what the book is measured against (not a neutral target)
+HIGH_VOL_RATIO = 1.30     # ATM IV / HV20 at or above this = high-vol regime (shown, informs reasons)
+BAND = 0.15               # per lot: |net − reference| within this counts as "near +1"
 RISE_TRIGGER = 0.02       # stock ≥ 2% over average cost
+CALL_OTM_SLACK = 0.03     # no ITM strike ≥ average: an ATM/OTM strike within 3% of spot is still OK
 MIN_DTE, MAX_DTE = 2, 9   # weekly runway; avoid 0–1 DTE gamma traps (protocol §3)
 PUT_PULLBACK = 0.01       # ≥ 1% off the intraday high counts as a pullback
 NEAR_LEVEL = 0.02         # within 2% of the put wall counts as "at support"
@@ -86,7 +86,7 @@ class Context:
 
 @dataclass
 class Suggestion:
-    action: str                     # SELL_CALL | SELL_PUT | BUY_PUT | HOLD | WAIT | TRACK
+    action: str                     # SELL_CALL | SELL_PUT | BUY_STOCK | HOLD | WAIT | TRACK
     headline: str
     reasons: List[str] = field(default_factory=list)
     strike: Optional[float] = None
@@ -98,6 +98,8 @@ class Suggestion:
     credit: Optional[float] = None          # $ total (+ received, − paid)
     net_delta_after: Optional[float] = None
     locked_gain: Optional[float] = None     # covered call: (strike − avg + premium) × shares if called
+    shares: int = 0                         # BUY_STOCK: shares to buy
+    new_avg: Optional[float] = None         # BUY_STOCK: average cost after the buy; SELL_PUT: if assigned
     warnings: List[str] = field(default_factory=list)
 
 
@@ -152,26 +154,15 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote]) -> Book:
     iv_hv = (ctx.atm_iv / ctx.hv20) if ctx.atm_iv and ctx.hv20 else None
     high_vol = (ctx.net_gex is not None and ctx.net_gex < 0) or (iv_hv is not None and iv_hv >= HIGH_VOL_RATIO)
     regime = "high-vol" if high_vol else "bull"
-    per_lot = TARGET_NEUTRAL if high_vol else TARGET_BULL
     full_lots = math.floor(shares / 100.0 + 1e-9)
-    target = per_lot * full_lots
+    target = REFERENCE_PER_LOT * full_lots
     gap = target - net
 
     for q in weekly:
         q.delta = bs.delta(spot, q.strike, bs.year_fraction(q.dte), q.iv or 0.0, q.otype)
 
     warnings = _gamma_warnings(legs)
-    if full_lots < 1:
-        s = Suggestion("TRACK", "Tracking only: no full 100-share lot held",
-                       ["Suggestions are sized against 100-share lots."], warnings=warnings)
-    elif abs(gap) <= BAND * full_lots:
-        s = Suggestion("HOLD", f"On target: net delta {net:+.2f} vs {target:+.2f}",
-                       [f"{regime} regime → target {per_lot:+.2f} per lot."], warnings=warnings)
-    elif gap < 0:
-        s = _reduce_delta(ctx, legs, weekly, net, target, full_lots, regime, warnings)
-    else:
-        s = _add_delta(ctx, weekly, net, target, regime, warnings)
-
+    s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
                 _r(target), regime, _r(gap), _r(iv_hv), legs, s)
 
@@ -184,95 +175,125 @@ def _gamma_warnings(legs: List[Leg]) -> List[str]:
     return out
 
 
-def _pick(cands: List[Quote], want: float, prefer: Optional[float], tol: float = 0.15) -> Optional[Quote]:
-    """Quote whose |delta| is closest to `want`; the preferred strike wins if within `tol`."""
-    if not cands:
-        return None
-    best = min(cands, key=lambda q: abs(abs(q.delta) - want))
-    if prefer is not None:
-        pref = [q for q in cands if abs(q.strike - prefer) < 1e-6]
-        if pref and abs(abs(pref[0].delta) - want) <= tol:
-            return pref[0]
-    return best
+def _short(legs: List[Leg], otype: str) -> int:
+    return int(round(-sum(l.quantity for l in legs if l.kind == "option" and l.otype == otype and l.quantity < 0)))
 
 
-def _reduce_delta(ctx: Context, legs: List[Leg], weekly: List[Quote], net: float, target: float,
-                  full_lots: int, regime: str, warnings: List[str]) -> Suggestion:
-    avg = ctx.avg_cost
-    short_calls = -sum(l.quantity for l in legs if l.kind == "option" and l.otype == "call" and l.quantity < 0)
-    free = int(full_lots - short_calls)
-    need = net - target                         # delta to remove (> 0)
-    reasons = [f"Net delta {net:+.2f} is above the {regime} target {target:+.2f}."]
+def _decide(ctx: Context, legs: List[Leg], weekly: List[Quote], net: float, shares: float, full_lots: int,
+            regime: str, warnings: List[str]) -> Suggestion:
+    spot, avg = ctx.spot, ctx.avg_cost
+    calls_on, puts_on = _short(legs, "call"), _short(legs, "put")
+    free_calls = max(0, full_lots - calls_on)
+    free_puts = max(0, full_lots - puts_on)
+    where = f"Net delta {net:+.2f} ({net / full_lots:+.2f} per lot)" if full_lots else f"Net delta {net:+.2f}"
 
-    if free < 1:
-        puts = [q for q in weekly if q.otype == "put" and q.strike <= ctx.spot and (q.ask or 0) > 0]
-        n = max(1, round(need / 0.5))
-        q = _pick(puts, min(need / n, 0.9), ctx.put_wall)
-        if not q:
-            return Suggestion("WAIT", "Too long, but every lot already has a covered call", reasons, warnings=warnings)
-        return Suggestion("BUY_PUT", f"Buy {n} {q.strike:g}P {q.expiry} to cut delta",
-                          reasons + ["All lots are already covered; a long put removes delta without naked calls."],
-                          q.strike, q.expiry, "put", n, _r(q.delta), _r(q.mid, 2),
-                          _r(-(q.mid or 0) * 100 * n, 2), _r(net + n * q.delta), warnings=warnings)
+    if full_lots < 1:
+        return _round_up(ctx, shares, net, warnings)
+    if avg is None:
+        return Suggestion("TRACK", "No average cost synced: can't place strikes around it", [where], warnings=warnings)
 
-    if avg is None or ctx.spot <= avg:
-        return Suggestion("WAIT", "Too long, but price is at/below average cost",
-                          reasons + [f"Calls below your ${avg or 0:.2f} average would lock in a loss; wait for a rise or an IV spike."],
+    rise = spot / avg - 1.0
+    spiking = ctx.iv_spike or rise >= RISE_TRIGGER
+    pulled_back = bool((ctx.day_high and spot <= ctx.day_high * (1 - PUT_PULLBACK))
+                       or (ctx.day_change is not None and ctx.day_change < 0) or ctx.iv_cooling)
+
+    # 1) Spike → sell an ITM call near the average.
+    if spot > avg and spiking and free_calls >= 1:
+        s = _sell_call(ctx, weekly, net, free_calls, rise, regime, warnings)
+        if s:
+            return s
+    # 2) Pullback → sell a put below the average (never into an IV spike).
+    if pulled_back and not ctx.iv_spike and free_puts >= 1:
+        n = min(free_puts, calls_on) if calls_on else 1
+        s = _sell_put(ctx, weekly, net, n, calls_on, warnings)
+        if s:
+            return s
+
+    # 3) Nothing to place: say why.
+    reasons = [where + f" vs +{REFERENCE_PER_LOT:.2f} per lot for the stock alone."]
+    if free_calls == 0 and free_puts == 0:
+        return Suggestion("HOLD", f"Fully worked: {calls_on} call{'s' * (calls_on != 1)} and {puts_on} put{'s' * (puts_on != 1)} on",
+                          reasons + ["Every lot has a short call and a short put. Let them work or expire."], warnings=warnings)
+    if ctx.iv_spike and free_calls == 0:
+        return Suggestion("WAIT", "IV is spiking and every lot is covered: don't sell puts into the spike",
+                          reasons + ["Wait for the pullback and cooling IV, then sell a put below your average."], warnings=warnings)
+    if spot <= avg and free_calls >= 1 and not pulled_back:
+        return Suggestion("WAIT", f"At/below your ${avg:,.2f} average: no call (it would lock a loss)",
+                          reasons + ["Calls below your average would lock in a loss; wait for a rise or an IV spike, "
+                                     "or a pullback day to sell a put below the average."], warnings=warnings)
+    if spot > avg and free_calls >= 1 and not spiking:
+        return Suggestion("WAIT", f"Stock {rise:+.1%} over average; waiting for +{RISE_TRIGGER:.0%} or an IV spike",
+                          reasons + ["The call is sold into strength: in the money, as close to your average as the chain allows."],
                           warnings=warnings)
-    rise = ctx.spot / avg - 1.0
-    if not (ctx.iv_spike or rise >= RISE_TRIGGER):
-        return Suggestion("WAIT", f"Stock +{rise:.1%} over average; waiting for +{RISE_TRIGGER:.0%} or an IV spike",
-                          reasons, warnings=warnings)
+    if free_puts >= 1 and not pulled_back:
+        return Suggestion("WAIT", "Call side done; waiting for a pullback to sell a put below average",
+                          reasons + ["A red day or ≥1% off today's high, with IV not spiking."], warnings=warnings)
+    return Suggestion("WAIT", "No strike fits right now", reasons, warnings=warnings)
 
-    hi = max(ctx.spot, ctx.king or ctx.spot)
-    calls = [q for q in weekly if q.otype == "call" and avg <= q.strike <= hi and (q.bid or 0) > 0]
-    if not calls:
-        return Suggestion("WAIT", "No weekly call between average cost and spot/king has a bid", reasons, warnings=warnings)
-    n = min(free, max(1, math.ceil(need - 1e-9)))
-    want = min(max(need / n, 0.3), 0.95)
-    q = _pick(calls, want, ctx.king)
-    if ctx.iv_spike:
-        reasons.append("ATM IV is spiking on an up-move: premium is inflated, harvest it now (protocol §1–2).")
-    else:
-        reasons.append(f"Stock is {rise:+.1%} over your average.")
-    if ctx.king is not None and abs(q.strike - ctx.king) < 1e-6:
-        reasons.append(f"Strike = GEX king node {ctx.king:g} (price tends to pin there into expiry).")
-    reasons.append("Selling ITM/ATM calls caps the stock; the edge is the IV crush, not direction.")
-    if abs(q.delta) < want - 0.1 and q.strike <= min(c.strike for c in calls) + 1e-6:
-        reasons.append(f"Capped by your average: the deepest strike at/above ${avg:.2f} only removes Δ {q.delta:.2f} per contract.")
+
+def _sell_call(ctx: Context, weekly: List[Quote], net: float, free: int, rise: float, regime: str,
+               warnings: List[str]) -> Optional[Suggestion]:
+    avg, spot = ctx.avg_cost or 0.0, ctx.spot
+    calls = sorted((q for q in weekly if q.otype == "call" and q.strike >= avg - 1e-9 and (q.bid or 0) > 0),
+                   key=lambda q: q.strike)
+    itm = [q for q in calls if q.strike <= spot]
+    q = itm[0] if itm else next((c for c in calls if c.strike <= spot * (1 + CALL_OTM_SLACK)), None)
+    if q is None:
+        return None
+    n = free
     prem = q.mid or q.bid or 0.0
+    reasons = [f"Stock is {rise:+.1%} over your ${avg:,.2f} average." if rise > 0 else "Stock is above your average."]
+    if ctx.iv_spike:
+        reasons.append("ATM IV is spiking on the up-move: premium is inflated, sell it now.")
+    reasons.append(f"Strike {q.strike:g} is {'in the money and ' if q.strike <= spot else ''}the closest to your average "
+                   "from above: if called, the shares go at or above average plus the premium.")
+    reasons.append(f"Then wait for a pullback and sell a put below ${avg:,.2f} to buy the shares back cheaper.")
+    if regime == "high-vol":
+        reasons.append("High-vol regime: premium is rich, the call pays more than usual.")
     locked = ((q.strike - avg) + prem) * 100 * n
-    return Suggestion("SELL_CALL", f"Sell {n} {q.strike:g}C {q.expiry} (Δ {q.delta:.2f})",
+    return Suggestion("SELL_CALL", f"Sell {n} {q.strike:g}C {q.expiry} near your average (Δ {q.delta:.2f})",
                       reasons, q.strike, q.expiry, "call", n, _r(-q.delta), _r(prem, 2),
                       _r(prem * 100 * n, 2), _r(net - n * q.delta), _r(locked, 2), warnings=warnings)
 
 
-def _add_delta(ctx: Context, weekly: List[Quote], net: float, target: float, regime: str,
-               warnings: List[str]) -> Suggestion:
-    need = target - net
-    reasons = [f"Net delta {net:+.2f} is below the {regime} target {target:+.2f} (a short put adds delta)."]
-    if ctx.iv_spike:
-        return Suggestion("WAIT", "Below target, but IV is spiking: don't sell puts into the spike",
-                          reasons + ["Protocol §4: wait for the pullback and cooling IV."], warnings=warnings)
-    pulled_back = (ctx.day_high and ctx.spot <= ctx.day_high * (1 - PUT_PULLBACK)) or (ctx.day_change is not None and ctx.day_change < 0)
-    at_support = ctx.put_wall is not None and ctx.spot <= ctx.put_wall * (1 + NEAR_LEVEL)
-    if not (pulled_back or at_support or ctx.iv_cooling):
-        return Suggestion("WAIT", "Below target; waiting for a pullback toward support",
-                          reasons, warnings=warnings)
-    puts = [q for q in weekly if q.otype == "put" and q.strike <= ctx.spot and (q.bid or 0) > 0]
+def _sell_put(ctx: Context, weekly: List[Quote], net: float, n: int, calls_on: int,
+              warnings: List[str]) -> Optional[Suggestion]:
+    avg, spot = ctx.avg_cost or 0.0, ctx.spot
+    puts = [q for q in weekly if q.otype == "put" and q.strike < avg - 1e-9 and q.strike <= spot and (q.bid or 0) > 0]
     if not puts:
-        return Suggestion("WAIT", "No weekly put at/below spot has a bid", reasons, warnings=warnings)
-    n = max(1, round(need / 0.35))
-    q = _pick(puts, min(need / n, 0.5), ctx.put_wall)
-    if pulled_back:
-        reasons.append("Stock has pulled back; buying pressure is cooling.")
+        return None
+    q = max(puts, key=lambda p: p.strike)
+    prem = q.mid or q.bid or 0.0
+    reasons = ["Stock has pulled back and IV isn't spiking."]
+    reasons.append(f"Strike {q.strike:g} is the highest below your ${avg:,.2f} average: if assigned, the shares come in "
+                   f"at {q.strike - prem:,.2f} net of premium, under your average.")
+    if calls_on:
+        reasons.append(f"Pairs with your {calls_on} short call{'s' * (calls_on != 1)}: if both are assigned you sold above "
+                       "average and bought back below it.")
+    else:
+        reasons.append("No call is on yet: assignment adds 100 shares per contract, below your average.")
     if ctx.put_wall is not None and abs(q.strike - ctx.put_wall) < 1e-6:
         reasons.append(f"Strike = put wall {ctx.put_wall:g} (dealer support).")
-    reasons.append(f"Cash-secured: needs ${q.strike * 100 * n:,.0f} set aside; assignment adds shares at a discount.")
-    prem = q.mid or q.bid or 0.0
-    return Suggestion("SELL_PUT", f"Sell {n} {q.strike:g}P {q.expiry} (Δ {q.delta:.2f})",
+    reasons.append(f"Cash-secured: needs ${q.strike * 100 * n:,.0f} set aside.")
+    return Suggestion("SELL_PUT", f"Sell {n} {q.strike:g}P {q.expiry} below your average (Δ {q.delta:.2f})",
                       reasons, q.strike, q.expiry, "put", n, _r(-q.delta), _r(prem, 2),
-                      _r(prem * 100 * n, 2), _r(net - n * q.delta), warnings=warnings)
+                      _r(prem * 100 * n, 2), _r(net - n * q.delta), new_avg=_r(q.strike - prem, 2), warnings=warnings)
+
+
+def _round_up(ctx: Context, shares: float, net: float, warnings: List[str]) -> Suggestion:
+    if shares <= 0:
+        return Suggestion("TRACK", "Options only: no shares to work", [f"Net delta {net:+.2f}."], warnings=warnings)
+    need = int(100 - (shares % 100))
+    avg = ctx.avg_cost
+    reasons = [f"{shares:g} shares: calls and puts are sized in 100-share lots."]
+    if avg is not None and ctx.spot <= avg:
+        new_avg = (avg * shares + ctx.spot * need) / (shares + need)
+        return Suggestion("BUY_STOCK", f"Buy {need} shares to round up to a full lot",
+                          reasons + [f"Price is at/below your ${avg:,.2f} average: buying lowers it to ${new_avg:,.2f}."],
+                          contracts=0, credit=_r(-ctx.spot * need, 2), net_delta_after=_r(net + need / 100.0),
+                          shares=need, new_avg=_r(new_avg, 2), warnings=warnings)
+    return Suggestion("TRACK", f"Odd lot: waiting for a dip under your average to buy {need} more",
+                      reasons, warnings=warnings)
 
 
 def pick_weekly(expiries_dte: List[tuple]) -> Optional[str]:

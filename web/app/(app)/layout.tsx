@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import { LiveProvider } from "@/lib/live";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -38,7 +39,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <AppShell>{children}</AppShell>
+    <LiveProvider>
+      <AppShell>{children}</AppShell>
+    </LiveProvider>
   );
 }
 

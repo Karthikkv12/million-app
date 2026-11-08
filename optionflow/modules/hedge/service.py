@@ -28,7 +28,8 @@ from optionflow.providers.market_data import get_market_data
 
 logger = logging.getLogger("optionflow.hedge")
 
-SPOT_TTL, QUOTE_TTL, CHAIN_TTL, HV_TTL = 1.0, 300.0, 60.0, 3600.0
+SPOT_TTL, QUOTE_TTL, CHAIN_TTL, HV_TTL, BETA_TTL = 1.0, 300.0, 60.0, 3600.0, 6 * 3600.0
+BETA_BENCH = "SPY"
 
 
 def now_iso() -> str:
@@ -180,6 +181,36 @@ def _hv(sym: str) -> Dict[str, Optional[float]]:
     return CACHE.get("hv", sym, HV_TTL, load) or {"hv10": None, "hv20": None, "hv60": None}
 
 
+def _closes(sym: str, period: str = "1y") -> Dict[str, float]:
+    """{date: close} from daily bars."""
+    df = get_market_data().price_history(sym, period, "1d")
+    if df is None or df.empty:
+        return {}
+    col = next((c for c in ("Close", "close") if c in df.columns), None)
+    if not col:
+        return {}
+    return {str(i)[:10]: float(v) for i, v in zip(df.index, df[col].tolist()) if v == v}
+
+
+def _beta(sym: str) -> Optional[float]:
+    """1-year beta of daily returns vs SPY (cov / var on dates both have). Cached for 6 h."""
+    if sym == BETA_BENCH:
+        return 1.0
+    def load():
+        bench = CACHE.get("closes", BETA_BENCH, BETA_TTL, lambda: _closes(BETA_BENCH)) or {}
+        mine = _closes(sym)
+        days = sorted(set(bench) & set(mine))
+        if len(days) < 60:
+            return None
+        rb = [bench[b] / bench[a] - 1.0 for a, b in zip(days, days[1:])]
+        rs = [mine[b] / mine[a] - 1.0 for a, b in zip(days, days[1:])]
+        mb, ms = sum(rb) / len(rb), sum(rs) / len(rs)
+        var = sum((x - mb) ** 2 for x in rb)
+        cov = sum((x - mb) * (y - ms) for x, y in zip(rb, rs))
+        return round(cov / var, 3) if var > 0 else None
+    return CACHE.get("beta", sym, BETA_TTL, load)
+
+
 def _gex(sym: str) -> Dict[str, Optional[float]]:
     def load():
         from optionflow.modules.flow import service as flow
@@ -255,7 +286,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     book = evaluate(ctx, legs, quotes).to_dict()
     book.update({
         "spot": round(spot, 4), "prev_close": prev, "day_change": day_change, "day_high": ctx.day_high,
-        "accounts": accounts, "weekly_expiry": weekly, "chain_source": chain.get("source"),
+        "accounts": accounts, "weekly_expiry": weekly, "beta": _beta(sym), "chain_source": chain.get("source"),
         "iv": {"atm_iv": ivs.atm_iv or atm_iv, "iv_open": ivs.iv_open, "iv_roc_day": ivs.iv_roc_day,
                "iv_roc_15m": ivs.iv_roc_15m, "iv_high": ivs.iv_high, "spike": ivs.spike, "cooling": ivs.cooling,
                **hv},

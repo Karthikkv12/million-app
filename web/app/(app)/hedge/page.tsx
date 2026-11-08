@@ -1,16 +1,18 @@
 "use client";
 /**
- * Hedge — delta-neutral desk, blotter layout (no cards).
- * Summary figures, a signal queue, then one dense row per holding that expands in place
- * into the trade ticket, legs and a price ladder. Live: SSE `books` every second.
+ * Hedge — the delta desk, blotter layout (no cards).
+ * Scales (book delta per lot, portfolio beta), then one row per holding that expands in place into
+ * the ticket, legs and a price ladder. Rows stack on phones and tablets; no sideways scrolling.
+ * Live: the app-wide SSE stream (lib/live.tsx) every second.
+ * Playbook (owner, 2026-11-08): only sell calls, sell puts or buy stock. Never buy options.
  */
 import { Fragment, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
-import { fetchHedgeBooks, HedgeBook, HedgeBooks, HedgeSuggestion } from "@/lib/api";
-import { useHedgeStream } from "@/lib/useHedgeStream";
-import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Tag } from "@/components/desk";
+import { HedgeBook, HedgeSuggestion } from "@/lib/api";
+import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
+import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -28,41 +30,56 @@ const ago = (iso?: string | null) => {
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
 };
 
-const TRADE = new Set(["SELL_CALL", "SELL_PUT", "BUY_PUT"]);
+const OPT = new Set(["SELL_CALL", "SELL_PUT"]);
+const TRADE = new Set(["SELL_CALL", "SELL_PUT", "BUY_STOCK"]);
 const ACTION: Record<HedgeSuggestion["action"], { tag: "accent" | "gain" | "loss" | "warn" | "neutral"; label: string; edge: "accent" | "gain" | "loss" | "warn" | null }> = {
   SELL_CALL: { tag: "accent", label: "Sell call", edge: "accent" },
   SELL_PUT: { tag: "gain", label: "Sell put", edge: "gain" },
-  BUY_PUT: { tag: "loss", label: "Buy put", edge: "loss" },
-  HOLD: { tag: "neutral", label: "On target", edge: null },
-  WAIT: { tag: "warn", label: "Wait", edge: null },
+  BUY_STOCK: { tag: "warn", label: "Buy stock", edge: "warn" },
+  HOLD: { tag: "neutral", label: "Worked", edge: null },
+  WAIT: { tag: "neutral", label: "Wait", edge: null },
   TRACK: { tag: "neutral", label: "Track", edge: null },
 };
 
-const offTarget = (b: HedgeBook) => Math.abs(b.gap ?? 0) > 0.15 * Math.max(b.lots ?? 1, 1);
+/** Per-lot delta (1.00 = the stock alone). */
+const perLot = (b: HedgeBook) => (b.lots && b.lots >= 1 ? (b.net_delta ?? 0) / Math.floor(b.lots) : null);
+/** Colour for a per-lot delta: near the stock (≥0.85), partly hedged, mostly hedged (<0.40). */
+const lotTone = (v: number | null) => (v == null ? "bg-foreground/40" : v >= 0.85 ? "bg-gain" : v >= 0.4 ? "bg-accent" : "bg-amber-500");
+const betaTone = (v?: number | null) => (v == null ? "text-foreground/40" : v >= 1.5 ? "text-loss" : v >= 1.1 ? "text-amber-600 dark:text-amber-400" : "text-foreground/75");
+const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? s?.headline
+  : s.action === "BUY_STOCK" ? `+${s.shares} sh` : `${s.contracts}× ${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`;
 
 // ── Expanded detail: ticket · legs · ladder ──────────────────────────────────
 function Detail({ b }: { b: HedgeBook }) {
   const s = b.suggestion;
-  const trade = s && TRADE.has(s.action);
+  const trade = s && OPT.has(s.action);
   return (
-    <div className="grid gap-8 bg-foreground/[0.025] px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_220px]">
+    <div className="grid gap-8 border-b border-[var(--border)] bg-foreground/[0.025] px-4 py-6 sm:px-6 md:grid-cols-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_240px]">
       <div className="min-w-0">
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Ticket</p>
         {s && (
           <>
             <p className="mt-2 text-[17px] font-medium leading-snug text-foreground">{s.headline}</p>
             {trade && (
-              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4">
+              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  [s.action === "BUY_PUT" ? "Debit" : "Credit", usd(Math.abs(s.credit ?? 0), 0)],
+                  ["Credit", usd(Math.abs(s.credit ?? 0), 0)],
                   ["Mid / sh", usd(s.premium)],
                   ["Δ / contract", sd(s.option_delta)],
                   ["Net Δ after", sd(s.net_delta_after)],
                   ...(s.locked_gain != null ? [["If called", big(s.locked_gain)]] : []),
+                  ...(s.new_avg != null ? [["Net if assigned", usd(s.new_avg)]] : []),
                   ["Contracts", String(s.contracts)],
                   ["Expiry", s.expiry ?? "—"],
                 ].map(([k, v]) => (
                   <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", ["Credit", "Debit", "If called"].includes(k) && "sensitive")}>{v}</dd></div>
+                ))}
+              </dl>
+            )}
+            {s.action === "BUY_STOCK" && (
+              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+                {[["Shares", `+${s.shares}`], ["Cost", usd(Math.abs(s.credit ?? 0), 0)], ["New avg", usd(s.new_avg)], ["Net Δ after", sd(s.net_delta_after)]].map(([k, v]) => (
+                  <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", k === "Cost" && "sensitive")}>{v}</dd></div>
                 ))}
               </dl>
             )}
@@ -99,13 +116,14 @@ function Detail({ b }: { b: HedgeBook }) {
           </tbody>
         </table>
         <div className="mt-4 grid grid-cols-3 gap-3 font-mono text-[12px]">
-          <div><p className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">HV10</p><p className="text-foreground/80">{vol(b.iv?.hv10)}</p></div>
-          <div><p className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">HV20</p><p className="text-foreground/80">{vol(b.iv?.hv20)}</p></div>
-          <div><p className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">HV60</p><p className="text-foreground/80">{vol(b.iv?.hv60)}</p></div>
+          {([["Beta", b.beta != null ? b.beta.toFixed(2) : "—"], ["Γ $/1%", big(b.dollar_gamma_1pct)], ["IV day", `${pct(b.iv?.iv_roc_day, 0)}${b.iv?.spike ? " ▲" : ""}`],
+            ["HV10", vol(b.iv?.hv10)], ["HV20", vol(b.iv?.hv20)], ["HV60", vol(b.iv?.hv60)]] as [string, string][]).map(([k, v]) => (
+            <div key={k}><p className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</p><p className={clsx("text-foreground/80", k === "Γ $/1%" && "sensitive")}>{v}</p></div>
+          ))}
         </div>
       </div>
 
-      <div>
+      <div className="min-w-0 md:col-span-2 xl:col-span-1">
         <p className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Levels</p>
         {b.spot != null && (
           <Ladder spot={b.spot} levels={[
@@ -113,7 +131,7 @@ function Detail({ b }: { b: HedgeBook }) {
             { label: "★ king", price: b.levels?.king, tone: "text-[#b45309] dark:text-[#fde725]" },
             { label: "your avg", price: b.avg_cost, tone: "text-accent" },
             { label: "put wall", price: b.levels?.put_wall, tone: "text-loss" },
-            ...(s?.strike != null && TRADE.has(s.action) ? [{ label: `trade ${s.otype === "call" ? "C" : "P"}`, price: s.strike, tone: "text-foreground/70" }] : []),
+            ...(s?.strike != null && OPT.has(s.action) ? [{ label: `trade ${s.otype === "call" ? "C" : "P"}`, price: s.strike, tone: "text-foreground/70" }] : []),
           ]} />
         )}
       </div>
@@ -142,33 +160,31 @@ function Edge({ cls }: { cls: string }) {
 
 function Legend() {
   return (
-    <DeskSection label="Legend" meta="What the symbols on the Book table mean.">
+    <DeskSection label="Legend" meta="What the symbols on this page mean.">
       <div className="grid gap-x-10 gap-y-6 md:grid-cols-2 xl:grid-cols-3">
-        <div className="grid content-start gap-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Net Δ meter (−1.5 … +1.5 per lot)</p>
-          <Item title="Your net delta, on target" sym={<Sym><span className="h-3 w-3 rounded-full bg-gain" /></Sym>}>Where your stock + options delta sits right now, within ±0.15 of target.</Item>
-          <Item title="Your net delta, off target" sym={<Sym><span className="h-3 w-3 rounded-full bg-amber-500" /></Sym>}>More than 0.15 per lot away from target: the engine looks for a trade.</Item>
-          <Item title="Target" sym={<Sym><span className="h-[18px] w-[2px] bg-accent" /></Sym>}>+0.30 per lot in a calm / bull regime, 0 in a high-vol regime.</Item>
+        <div className="grid min-w-0 grid-cols-1 content-start gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Net Δ per lot (−0.5 … +1.5)</p>
+          <Item title="Near the stock (≥ 0.85)" sym={<Sym><span className="h-3 w-3 rounded-full bg-gain" /></Sym>}>Little is sold against the lot: you carry nearly the full stock move.</Item>
+          <Item title="Partly hedged (0.40 – 0.85)" sym={<Sym><span className="h-3 w-3 rounded-full bg-accent" /></Sym>}>A call (or call + put) is working: some of the move is sold off.</Item>
+          <Item title="Mostly hedged (below 0.40)" sym={<Sym><span className="h-3 w-3 rounded-full bg-amber-500" /></Sym>}>A deep ITM call is taking most of the move.</Item>
+          <Item title="+1.00 = the stock alone" sym={<Sym><span className="h-[18px] w-[2px] bg-accent" /></Sym>}>The reference tick. The playbook keeps the book near it; it is not a delta-neutral target.</Item>
           <Item title="After the suggested trade" sym={<Sym><span className="h-2 w-2 rotate-45 border border-accent" /></Sym>}>Where net delta lands if you place the suggested trade.</Item>
-          <Item title="Zero and distance from zero" sym={<Sym><span className="absolute h-[6px] w-7 bg-foreground/15" /><span className="relative h-3 w-px bg-foreground/40" /></Sym>}>The thin tick is 0 delta; the grey band shows how far from zero you are.</Item>
         </div>
 
-        <div className="grid content-start gap-3">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Row edge &amp; signals</p>
-          <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Too long after a rise over your average or an IV spike: sell a weekly call at or above your average cost.</Item>
-          <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Below target after a pullback, never during an IV spike: a short put adds delta.</Item>
-          <Item title="Buy put / IV spike" sym={<Edge cls="bg-loss" />}>Too long with every lot already covered (buy a put), or ATM IV is spiking.</Item>
-          <Item title="Off target, waiting" sym={<Edge cls="bg-amber-500" />}>Off target, but the conditions for a trade aren&apos;t met yet (see the ticket&apos;s reasons).</Item>
-          <Item title="Tags" sym={<Sym><Tag tone="warn">wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: not yet. <b className="font-medium text-foreground/75">On target</b>: nothing to do. <b className="font-medium text-foreground/75">Track</b>: options only, no 100-share lot to size against.</Item>
+          <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Spike: the stock is ≥2% over your average or IV is spiking. Sell the call in the money, at the strike closest to your average from above.</Item>
+          <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average.</Item>
+          <Item title="Buy stock" sym={<Edge cls="bg-amber-500" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only.</Item>
         </div>
 
-        <div className="grid content-start gap-3">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Columns</p>
-          <Item title="Net Δ (lots)" sym={<Sym><span className="font-mono text-[12px] text-foreground">+0.69</span></Sym>}>100 shares = +1.00. A short call at Δ 0.70 counts −0.70; a short put at Δ −0.30 counts +0.30.</Item>
+          <Item title="Net Δ (lots)" sym={<Sym><span className="font-mono text-[12px] text-foreground">+0.69</span></Sym>}>100 shares = +1.00. A short call at Δ 0.70 counts −0.70; a short put at Δ −0.30 counts +0.30. Always the real total, whatever legs are on.</Item>
+          <Item title="β (beta)" sym={<Sym><span className="font-mono text-[12px] text-amber-600">1.84</span></Sym>}>1-year beta vs SPY: how far the stock moves for a 1% S&amp;P move. Amber ≥ 1.1, red ≥ 1.5.</Item>
+          <Item title="IV / HV" sym={<Sym><span className="font-mono text-[12px] text-foreground/80">75<span className="text-foreground/35">/71</span></span></Sym>}>At-the-money implied vol vs 20-day historical vol. Above 1.3× = premium is rich.</Item>
           <Item title="Γ $/1%" sym={<Sym><span className="font-mono text-[12px] text-loss">−$24</span></Sym>}>How much your delta-dollars change for a 1% move. Negative = short gamma (your short options).</Item>
-          <Item title="IV / HV" sym={<Sym><span className="font-mono text-[12px] text-foreground/80">75<span className="text-foreground/35">/71</span></span></Sym>}>At-the-money implied vol vs 20-day historical vol. Above 1.3× = high-vol regime, premium is rich.</Item>
-          <Item title="IV day ▲" sym={<Sym><span className="font-mono text-[12px] text-loss">+12▲</span></Sym>}>ATM IV change since the first reading today; ▲ marks a spike (IV up while the stock rises hard).</Item>
-          <Item title="hi-vol / bull" sym={<Sym><span className="font-mono text-[10.5px] text-foreground/45">bull</span></Sym>}>The regime that sets the target: hi-vol when IV/HV ≥ 1.3 or dealer gamma is negative.</Item>
         </div>
       </div>
       <p className="mt-6 text-[12px] leading-relaxed text-foreground/45">Greeks are Black-Scholes from the live price and each contract&apos;s IV. Suggestions are not orders; check the live quote before trading.</p>
@@ -191,15 +207,16 @@ function HowItWorks() {
   }
   const steps: [string, string][] = [
     ["Syncs your book", "Your Robinhood stocks and options load automatically: every hour while the market is open, and once more in the evening."],
-    ["Measures your risk live", "Every second it prices each option with Black-Scholes and adds it up per stock: your net delta (how much you gain or lose per $1 move, in 100-share lots) and gamma (how fast that changes)."],
-    ["Reads the volatility", "It compares at-the-money implied vol to recent realized vol and watches for IV spikes on up-moves, plus the dealer levels (king node, walls) from the Flow board."],
-    ["Suggests the next trade", "It sets a delta target for the regime (+0.30 per lot when calm, 0 when volatile) and tells you which call or put, strike and expiry would bring you back to it: never a call below your average cost, never a put into a spike."],
+    ["Measures your risk live", "Every second it prices each option with Black-Scholes and adds it up per stock: your real net delta (100 shares = +1.00) whatever you've sold, plus gamma and beta."],
+    ["Sells into spikes", "When the stock is ≥2% over your average or IV spikes, it suggests an in-the-money call at the strike closest to your average. If called, you sell at or above average plus the premium."],
+    ["Sells puts on pullbacks", "On a red day or a dip off the high, it suggests a put below your average. Assigned on both? You sold above average and bought back below it. It never suggests buying options."],
   ];
   return (
     <DeskSection label="How it works" meta={<button onClick={() => set(true)} className="text-accent hover:underline">Hide</button>}>
       <p className="mb-5 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
-        The Hedge desk keeps every stock you hold close to a delta target, so you collect option premium without letting the
-        position run away from you. It doesn&apos;t place orders. It tells you what to sell or buy, and why.
+        The desk harvests premium around the stocks you hold: calls sold into spikes, puts sold on pullbacks, stock bought to
+        round up odd lots. It keeps the book near +1 per lot rather than delta-neutral, and shows the real delta at all times.
+        It doesn&apos;t place orders.
       </p>
       <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map(([t, d], i) => (
@@ -214,19 +231,113 @@ function HowItWorks() {
   );
 }
 
+// ── Scales: where the whole book stands ──────────────────────────────────────
+function Scales({ books }: { books: HedgeBook[] }) {
+  const lots = books.reduce((a, b) => a + Math.floor(Math.max(b.lots ?? 0, 0)), 0);
+  const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
+  const lotDelta = lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0);
+  const per = lots ? lotDelta / lots : null;
+  const after = lots ? lotBooks.reduce((a, b) => a + (b.suggestion?.net_delta_after ?? b.net_delta ?? 0), 0) / lots : null;
+  const hasTrade = lotBooks.some((b) => b.suggestion && TRADE.has(b.suggestion.action));
+  const { beta, betaDollars } = bookBeta(books);
+  const today = dayPnl(books);
+  return (
+    <div className="grid gap-x-12 gap-y-8 border-t border-[var(--border-strong)] py-6 lg:grid-cols-2">
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot</p>
+          <p className="font-mono text-[11.5px] text-foreground/55"><span className="sensitive">{lots} lots</span> · net <Tick value={per}><span className="text-foreground">{sd(lotDelta)}</span></Tick></p>
+        </div>
+        <Scale min={-0.5} max={1.5} value={per} after={hasTrade ? after : null} label={per != null ? sd(per) : undefined} pin={lotTone(per)}
+          zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+          marks={[{ at: -0.5, label: "−0.5" }, { at: 0, label: "0 neutral", strong: true }, { at: 0.5, label: "0.5" }, { at: 1, label: "+1 stock", strong: true }, { at: 1.5, label: "1.5" }]} />
+        <p className="text-[12.5px] leading-snug text-foreground/55">
+          {per == null ? "No full 100-share lot held." : per >= 0.85 ? "You carry nearly the full stock move: room to sell calls into the next spike."
+            : per >= 0.4 ? "Calls are working against part of the book: you keep part of the move and the premium."
+            : "Short calls take most of the move: on a pullback, a put below your average adds delta back."}
+        </p>
+      </div>
+
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
+          <p className="font-mono text-[11.5px] text-foreground/55">SPY 1% ≈ <span className={clsx("sensitive", tone(betaDollars))}>{big(betaDollars * 0.01)}</span></p>
+        </div>
+        <Scale min={0} max={3} value={beta} label={beta != null ? beta.toFixed(2) : undefined}
+          pin={beta == null ? undefined : beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
+          zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+          marks={[{ at: 0, label: "0" }, { at: 1, label: "1 = market", strong: true }, { at: 2, label: "2" }, { at: 3, label: "3" }]} />
+        <p className="text-[12.5px] leading-snug text-foreground/55">
+          Delta-weighted: each stock&apos;s beta × its live delta-dollars, so short calls lower its weight.
+          {today && <> Today <Tick value={Math.round(today.total)}><span className={clsx("sensitive font-mono", tone(today.total))}>{big(today.total)}</span></Tick> live.</>}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11.5px]">
+          {[...books].filter((b) => b.beta != null).sort((a, b) => (b.beta ?? 0) - (a.beta ?? 0)).map((b) => (
+            <span key={b.symbol} className="text-foreground/55">{b.symbol} <span className={betaTone(b.beta)}>{b.beta!.toFixed(2)}</span></span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── One holding ──────────────────────────────────────────────────────────────
+function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle: () => void }) {
+  const s = b.suggestion;
+  const a = s ? ACTION[s.action] : null;
+  const per = perLot(b);
+  const lots = Math.max(Math.floor(b.lots ?? 0), 1);
+  const after = s?.net_delta_after != null && TRADE.has(s.action) ? s.net_delta_after / lots : null;
+  return (
+    <DeskRow edge={a?.edge ?? (b.iv?.spike ? "loss" : null)} onClick={onToggle} active={open}>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3 pl-4 pr-3 md:grid-cols-[150px_minmax(0,1fr)_auto] xl:grid-cols-[140px_150px_minmax(200px,1fr)_48px_96px_minmax(220px,1fr)_20px]">
+        {/* symbol + price (phones put the price on the right) */}
+        <div className="min-w-0">
+          <p className="font-mono text-[15px] font-semibold tracking-tight text-foreground">{b.symbol}
+            <span className={clsx("ml-2 font-mono text-[11px] font-normal xl:hidden", betaTone(b.beta))}>{b.beta != null ? `β ${b.beta.toFixed(2)}` : ""}</span>
+          </p>
+          <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
+        </div>
+        <div className="text-right font-mono tabular-nums md:col-start-3 md:row-start-1 xl:col-start-auto xl:row-start-auto">
+          <p className="text-[14px] text-foreground"><Tick value={b.spot} className="px-0.5">{usd(b.spot)}</Tick></p>
+          <p className="text-[11px]"><span className={tone(b.day_change)}>{pct(b.day_change, 2)}</span>
+            {b.avg_cost && b.spot ? <span className={clsx("ml-1.5", tone(b.spot - b.avg_cost))}>{pct(b.spot / b.avg_cost - 1)} avg</span> : null}</p>
+        </div>
+        {/* delta meter */}
+        <div className="col-span-2 flex items-center gap-3 md:col-span-1 md:col-start-2 md:row-start-1 xl:col-start-auto xl:row-start-auto">
+          <Meter min={-0.5} max={1.5} value={per ?? 0} target={per != null ? 1 : null} after={after} dot={lotTone(per)} />
+          <span className="w-14 shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground"><Tick value={b.net_delta}>{sd(b.net_delta)}</Tick></span>
+        </div>
+        <p className={clsx("hidden text-right font-mono text-[13px] tabular-nums xl:block", betaTone(b.beta))}>{b.beta != null ? b.beta.toFixed(2) : "—"}</p>
+        <p className="hidden text-right font-mono text-[13px] tabular-nums text-foreground/80 xl:block">
+          {vol(b.iv?.atm_iv)}<span className="text-foreground/35"> / {vol(b.iv?.hv20)}</span>{b.iv?.spike && <span className="ml-1 text-loss">▲</span>}
+        </p>
+        {/* signal */}
+        <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
+          {a && <Tag tone={a.tag}>{a.label}</Tag>}
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
+            {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
+          </span>
+          <ChevronDown size={15} className={clsx("shrink-0 text-foreground/40 transition xl:hidden", open && "rotate-180")} />
+        </div>
+        <ChevronDown size={15} className={clsx("hidden text-foreground/40 transition xl:block", open && "rotate-180")} />
+      </div>
+    </DeskRow>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function HedgePage() {
-  const live = useHedgeStream();
-  const { data, isLoading, error } = useQuery<HedgeBooks>({ queryKey: ["hedge-books"], queryFn: fetchHedgeBooks, refetchInterval: live ? false : 15_000 });
+  const live = useLive();
+  const { data, isLoading, error } = useLiveBooks();
   const [open, setOpen] = useState<string | null>(null);
   const books = (data?.books ?? []).filter((b) => !b.error);
   const errored = (data?.books ?? []).filter((b) => b.error);
   const signals = books.filter((b) => b.suggestion && TRADE.has(b.suggestion.action));
   const spikes = books.filter((b) => b.iv?.spike);
   const expiring = books.flatMap((b) => b.legs.filter((l) => l.kind === "option" && l.quantity < 0 && (l.dte ?? 99) <= 5).map((l) => ({ ...l, symbol: b.symbol })));
-  const netDelta = books.reduce((a, b) => a + (b.net_delta ?? 0), 0);
   const dollarGamma = books.reduce((a, b) => a + (b.dollar_gamma_1pct ?? 0), 0);
-  const sorted = [...signals, ...books.filter((b) => !signals.includes(b)).sort((a, b) => Number(offTarget(b)) - Number(offTarget(a)))];
+  const sorted = [...signals, ...books.filter((b) => !signals.includes(b))];
 
   useEffect(() => { if (!open && signals[0]) setOpen(signals[0].symbol); }, [open, signals]);
 
@@ -235,7 +346,7 @@ export default function HedgePage() {
       <div className="flex flex-wrap items-end justify-between gap-4 pb-5">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
-          <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Delta-neutral desk</h1>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Delta desk</h1>
         </div>
         <div className="text-right font-mono text-[11px] leading-relaxed text-foreground/55">
           <p className="flex items-center justify-end gap-1.5">
@@ -259,63 +370,30 @@ export default function HedgePage() {
 
       {!!books.length && (
         <>
-          <div className="border-t border-[var(--border-strong)] py-6">
+          <Scales books={books} />
+
+          <div className="border-t border-[var(--border)] py-5">
             <DeskFigures>
-              <DeskFigure size="lg" label="Book Δ (lots)" value={sd(netDelta)} sub={`${books.length} underlyings`} />
-              <DeskFigure sensitive size="lg" label="$ gamma / 1%" value={big(dollarGamma)} tone={dollarGamma < 0 ? "text-loss" : undefined} sub="short options = short gamma" />
-              <DeskFigure size="lg" label="Signals" value={signals.length} tone={signals.length ? "text-accent" : "text-foreground/40"} sub={signals.map((b) => b.symbol).join(" · ") || "none right now"} />
-              <DeskFigure size="lg" label="IV spikes" value={spikes.length} tone={spikes.length ? "text-loss" : "text-foreground/40"} sub={spikes.map((b) => b.symbol).join(" · ") || "calm"} />
-              <DeskFigure size="lg" label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "—"} />
+              <DeskFigure label="Signals" value={signals.length} tone={signals.length ? "text-accent" : "text-foreground/40"} sub={signals.map((b) => b.symbol).join(" · ") || "none right now"} />
+              <DeskFigure sensitive label="$ gamma / 1%" value={big(dollarGamma)} tone={dollarGamma < 0 ? "text-loss" : undefined} sub={dollarGamma < 0 ? "short gamma" : "long gamma"} />
+              <DeskFigure label="IV spikes" value={spikes.length} tone={spikes.length ? "text-loss" : "text-foreground/40"} sub={spikes.map((b) => b.symbol).join(" · ") || "calm"} />
+              <DeskFigure label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "none"} />
             </DeskFigures>
           </div>
 
           <DeskSection label="Book" meta={<>Δ in lots: 100 sh = +1.00.<br />Tap a row for the ticket, legs and levels.</>}>
-            <div className="-mx-4 overflow-x-auto sm:mx-0">
-              <div className="min-w-[860px]">
-                <div className="grid grid-cols-[110px_96px_80px_minmax(180px,1fr)_92px_96px_80px_minmax(200px,1.3fr)_24px] items-center gap-3 border-b border-[var(--border-strong)] px-4 pb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45">
-                  <span>Symbol</span><span className="text-right">Last</span><span className="text-right">vs avg</span><span>Net Δ vs target</span>
-                  <span className="text-right">Γ $/1%</span><span className="text-right">IV / HV</span><span className="text-right">IV day</span><span>Signal</span><span />
-                </div>
-                {sorted.map((b) => {
-                  const s = b.suggestion;
-                  const a = s ? ACTION[s.action] : null;
-                  const isOpen = open === b.symbol;
-                  const lots = Math.max(b.lots ?? 0, 1);
-                  return (
-                    <Fragment key={b.symbol}>
-                      <DeskRow edge={a?.edge ?? (b.iv?.spike ? "loss" : offTarget(b) ? "warn" : null)} onClick={() => setOpen(isOpen ? null : b.symbol)} active={isOpen}>
-                        <div className="grid grid-cols-[110px_96px_80px_minmax(180px,1fr)_92px_96px_80px_minmax(200px,1.3fr)_24px] items-center gap-3 px-4 py-3">
-                          <div className="min-w-0">
-                            <p className="font-mono text-[15px] font-semibold tracking-tight text-foreground">{b.symbol}</p>
-                            <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span> · {b.regime === "high-vol" ? "hi-vol" : "bull"}</p>
-                          </div>
-                          <div className="text-right font-mono tabular-nums">
-                            <p className="text-[14px] text-foreground">{usd(b.spot)}</p>
-                            <p className={clsx("text-[11px]", tone(b.day_change))}>{pct(b.day_change, 2)}</p>
-                          </div>
-                          <p className={clsx("text-right font-mono text-[13px] tabular-nums", tone(b.avg_cost && b.spot ? b.spot - b.avg_cost : null))}>{b.avg_cost && b.spot ? pct(b.spot / b.avg_cost - 1) : "—"}</p>
-                          <div className="flex items-center gap-3">
-                            <Meter value={(b.net_delta ?? 0) / lots} target={(b.target_delta ?? 0) / lots} after={s?.net_delta_after != null ? s.net_delta_after / lots : null} />
-                            <span className={clsx("w-12 shrink-0 text-right font-mono text-[13px] tabular-nums", offTarget(b) ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>{sd(b.net_delta)}</span>
-                          </div>
-                          <p className={clsx("sensitive text-right font-mono text-[13px] tabular-nums", (b.dollar_gamma_1pct ?? 0) < 0 ? "text-loss" : "text-foreground/70")}>{big(b.dollar_gamma_1pct)}</p>
-                          <p className="text-right font-mono text-[13px] tabular-nums text-foreground/80">
-                            {vol(b.iv?.atm_iv)}<span className="text-foreground/35"> / {vol(b.iv?.hv20)}</span>
-                          </p>
-                          <p className={clsx("text-right font-mono text-[13px] tabular-nums", (b.iv?.iv_roc_day ?? 0) >= 0.1 ? "text-loss" : "text-foreground/60")}>
-                            {pct(b.iv?.iv_roc_day, 0)}{b.iv?.spike && <span className="ml-1">▲</span>}
-                          </p>
-                          <div className="flex min-w-0 items-center gap-2">
-                            {a && <Tag tone={a.tag}>{a.label}</Tag>}
-                            <span className="truncate text-[12.5px] text-foreground/70">{s && TRADE.has(s.action) ? <>{`${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)} · `}<span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}</span>
-                          </div>
-                          <ChevronDown size={15} className={clsx("text-foreground/40 transition", isOpen && "rotate-180")} />
-                        </div>
-                      </DeskRow>
-                      {isOpen && <Detail b={b} />}
-                    </Fragment>
-                  );
-                })}
+            <div className="-mx-4 sm:mx-0">
+              <div className="hidden grid-cols-[140px_150px_minmax(200px,1fr)_48px_96px_minmax(220px,1fr)_20px] items-center gap-x-4 border-b border-[var(--border-strong)] pb-2 pl-4 pr-3 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45 xl:grid">
+                <span>Symbol</span><span className="text-right">Last · vs avg</span><span>Net Δ per lot · total</span><span className="text-right">β</span>
+                <span className="text-right">IV / HV</span><span>Signal</span><span />
+              </div>
+              <div className="border-t border-[var(--border-strong)] xl:border-t-0">
+                {sorted.map((b) => (
+                  <Fragment key={b.symbol}>
+                    <BookRow b={b} open={open === b.symbol} onToggle={() => setOpen(open === b.symbol ? null : b.symbol)} />
+                    {open === b.symbol && <Detail b={b} />}
+                  </Fragment>
+                ))}
                 {errored.map((b) => (
                   <DeskRow key={b.symbol}><p className="px-4 py-3 font-mono text-[13px] text-foreground/55">{b.symbol} · {b.error}</p></DeskRow>
                 ))}

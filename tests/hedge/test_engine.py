@@ -66,79 +66,81 @@ def test_iv_spike_needs_iv_jump_and_price_up():
     assert s2.cooling and not s2.spike
 
 
-# ── engine: the owner's example ───────────────────────────────────────────────
-def test_owner_example_sell_itm_call_on_rise_takes_delta_to_about_plus_0_3():
-    # 100 shares @ $100, stock at $102 → book delta +1.00; bull regime target +0.30.
-    ctx = Context("XYZ", spot=102.0, avg_cost=100.0, day_change=0.02, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+# ── engine: the owner's playbook (sell calls on spikes, puts on pullbacks, buy stock) ──
+def short_put(k, dte=5, iv=0.30, n=1):
+    return Leg("option", -n, 1.0, "put", k, EXP, dte, iv)
+
+
+def test_spike_sells_itm_call_closest_to_average():
+    # 100 sh @ $100, stock at $102 (+2%) → sell the call ITM, at the strike nearest the average from above.
+    ctx = Context("XYZ", spot=102.0, avg_cost=100.0, day_change=0.02, day_high=102.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
     book = evaluate(ctx, [stock()], chain())
     s = book.suggestion
     assert book.net_delta == pytest.approx(1.0)
-    assert s.action == "SELL_CALL" and s.contracts == 1
-    assert 100.0 <= s.strike <= 102.0                                # never below the average
-    assert s.option_delta == pytest.approx(-0.7, abs=0.08)
-    assert s.net_delta_after == pytest.approx(0.3, abs=0.08)
-    assert s.locked_gain == pytest.approx((s.strike - 100 + 1.1) * 100)
+    assert book.target_delta == 1.0                                  # reference is the stock alone, not neutral
+    assert s.action == "SELL_CALL" and s.contracts == 1 and s.strike == 100.0
+    assert s.option_delta < -0.5                                     # in the money
+    assert s.locked_gain == pytest.approx((100.0 - 100 + 1.1) * 100)
 
 
-def test_king_node_preferred_when_close_enough():
-    ctx = Context("XYZ", 102.0, 100.0, 0.02, atm_iv=0.45, hv20=0.40, net_gex=1e9, king=101.0)
-    s = evaluate(ctx, [stock()], chain()).suggestion
+def test_call_never_below_average():
+    ctx = Context("XYZ", 103.5, 100.5, 0.03, day_high=103.5, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    s = evaluate(ctx, [stock(avg=100.5)], chain()).suggestion
     assert s.action == "SELL_CALL" and s.strike == 101.0
 
 
-def test_no_call_below_average_cost():
-    ctx = Context("XYZ", 99.0, 100.0, -0.01, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+def test_no_call_at_or_below_average():
+    ctx = Context("XYZ", 99.5, 100.0, 0.005, day_high=99.6, atm_iv=0.45, hv20=0.40, net_gex=1e9)
     s = evaluate(ctx, [stock()], chain()).suggestion
     assert s.action == "WAIT" and "loss" in " ".join(s.reasons)
 
 
-def test_small_rise_without_spike_waits():
-    ctx = Context("XYZ", 101.0, 100.0, 0.01, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+def test_small_rise_without_spike_waits_spike_triggers():
+    ctx = Context("XYZ", 101.0, 100.0, 0.01, day_high=101.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
     assert evaluate(ctx, [stock()], chain()).suggestion.action == "WAIT"
-    ctx.iv_spike = True                                              # an IV spike triggers it early
+    ctx.iv_spike = True
     assert evaluate(ctx, [stock()], chain()).suggestion.action == "SELL_CALL"
 
 
-def test_pullback_after_call_is_too_long_and_lots_are_covered_so_buy_put():
-    # Shares + short 101C, stock back to $99 → call delta falls → net ≈ +0.6 > +0.30 target.
-    ctx = Context("XYZ", 99.0, 100.0, -0.02, day_high=102.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
-    book = evaluate(ctx, [stock(), short_call(101.0)], chain())
-    assert book.net_delta > 0.45
-    assert book.suggestion.action == "BUY_PUT"                       # a SHORT put would add delta
-
-
-def test_deep_itm_call_leaves_book_short_of_target_then_sell_put_on_pullback():
-    # Stock ran to $110: short 101C delta → ~0.97 → net ≈ +0.03 < +0.30. On a pullback, a short put restores delta.
-    legs = [stock(), short_call(101.0)]
-    ctx = Context("XYZ", 106.0, 100.0, 0.01, day_high=111.0, atm_iv=0.30, hv20=0.40, net_gex=1e9, put_wall=104.0)
-    book = evaluate(ctx, legs, chain())
+def test_pullback_after_call_sells_put_below_average():
+    ctx = Context("XYZ", 101.0, 100.0, -0.01, day_high=103.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    book = evaluate(ctx, [stock(), short_call(100.0)], chain())
     s = book.suggestion
-    assert book.gap > 0.15
-    assert s.action == "SELL_PUT" and s.strike <= 106.0
+    assert s.action == "SELL_PUT" and s.strike == 99.0              # highest strike below the $100 average
     assert s.option_delta > 0                                        # short put = positive delta
-    assert s.net_delta_after == pytest.approx(0.3, abs=0.2)
+    assert s.new_avg == pytest.approx(99.0 - 1.1)
+
+
+def test_never_buys_options():
+    for spot, chg, hi in [(99.0, -0.02, 102.0), (110.0, 0.05, 110.0), (106.0, 0.01, 111.0)]:
+        for legs in ([stock()], [stock(), short_call(101.0)], [stock(), short_call(101.0), short_put(98.0)]):
+            ctx = Context("XYZ", spot, 100.0, chg, day_high=hi, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+            assert evaluate(ctx, legs, chain()).suggestion.action in {"SELL_CALL", "SELL_PUT", "BUY_STOCK", "HOLD", "WAIT"}
 
 
 def test_never_sell_puts_into_an_iv_spike():
     legs = [stock(), short_call(101.0)]
-    ctx = Context("XYZ", 108.0, 100.0, 0.05, day_high=108.0, atm_iv=0.45, hv20=0.40, net_gex=1e9, iv_spike=True)
+    ctx = Context("XYZ", 108.0, 100.0, 0.05, day_high=110.0, atm_iv=0.45, hv20=0.40, net_gex=1e9, iv_spike=True)
     s = evaluate(ctx, legs, chain(0.45)).suggestion
     assert s.action == "WAIT" and "spik" in s.headline
 
 
-def test_high_vol_regime_targets_neutral():
-    ctx = Context("XYZ", 102.0, 100.0, 0.02, atm_iv=0.60, hv20=0.40, net_gex=-1e9)
-    book = evaluate(ctx, [stock()], chain(0.6))
-    assert book.regime == "high-vol" and book.target_delta == 0.0
-    s = book.suggestion
-    assert s.action == "SELL_CALL" and s.strike == 100.0                # deepest strike allowed (never below average)
-    assert any("Capped by your average" in r for r in s.reasons)
+def test_fully_worked_holds():
+    ctx = Context("XYZ", 101.0, 100.0, -0.01, day_high=103.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    s = evaluate(ctx, [stock(), short_call(100.0), short_put(99.0)], chain()).suggestion
+    assert s.action == "HOLD"
 
 
-def test_on_target_holds_and_short_dated_short_warns():
+def test_odd_lot_below_average_buys_stock_to_round_up():
+    ctx = Context("XYZ", 95.0, 100.0, -0.01, atm_iv=0.45, hv20=0.40)
+    s = evaluate(ctx, [stock(qty=60)], chain()).suggestion
+    assert s.action == "BUY_STOCK" and s.shares == 40
+    assert s.new_avg == pytest.approx((100 * 60 + 95 * 40) / 100)
+
+
+def test_short_dated_short_warns():
     ctx = Context("XYZ", 101.0, 100.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
     book = evaluate(ctx, [stock(), Leg("option", -1, 1.0, "call", 101.0, EXP, 1, 0.45)], chain())
-    # 1-DTE ATM call delta ≈ 0.5 → net ≈ +0.5: not on target, but the 0–1 DTE warning is raised.
     assert any("gamma trap" in w for w in book.suggestion.warnings)
 
 

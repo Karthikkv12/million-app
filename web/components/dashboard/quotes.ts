@@ -17,7 +17,7 @@ async function fetchQuotes(symbols: string[]): Promise<Record<string, Quote>> {
   return out;
 }
 
-/** Quotes for a fixed symbol list, refreshed every 30 s. */
-export function useQuotes(symbols: string[]) {
-  return useQuery({ queryKey: ["quotes", symbols.join(",")], queryFn: () => fetchQuotes(symbols), refetchInterval: 30_000, staleTime: 15_000 });
+/** Quotes for a fixed symbol list, refreshed every 5 s while the page is visible (Public prices are real-time). */
+export function useQuotes(symbols: string[], every = 5_000) {
+  return useQuery({ queryKey: ["quotes", symbols.join(",")], queryFn: () => fetchQuotes(symbols), refetchInterval: every, staleTime: every / 2 });
 }

@@ -1849,6 +1849,11 @@ export interface components {
             accounts: string[];
             /** Avg Cost */
             avg_cost?: number | null;
+            /**
+             * Beta
+             * @description 1-year beta of daily returns vs SPY
+             */
+            beta?: number | null;
             /** Chain Source */
             chain_source?: string | null;
             /** Day Change */
@@ -3756,7 +3761,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "SELL_CALL" | "SELL_PUT" | "BUY_PUT" | "HOLD" | "WAIT" | "TRACK";
+            action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
             /**
              * Contracts
              * @default 0
@@ -3772,6 +3777,11 @@ export interface components {
             locked_gain?: number | null;
             /** Net Delta After */
             net_delta_after?: number | null;
+            /**
+             * New Avg
+             * @description BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned
+             */
+            new_avg?: number | null;
             /** Option Delta */
             option_delta?: number | null;
             /** Otype */
@@ -3783,6 +3793,12 @@ export interface components {
              * @default []
              */
             reasons: string[];
+            /**
+             * Shares
+             * @description BUY_STOCK: shares to buy
+             * @default 0
+             */
+            shares: number;
             /** Strike */
             strike?: number | null;
             /**

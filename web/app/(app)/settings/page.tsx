@@ -19,7 +19,7 @@ export default function SettingsIndex() {
         <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Account</p>
         <h1 className="text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">Settings</h1>
       </div>
-      <div className="grid gap-8">
+      <div className="grid grid-cols-1 gap-8">
         {SETTINGS_GROUPS.filter((g) => pages.some((p) => p.group === g)).map((g) => (
           <section key={g}>
             <h2 className="eyebrow mb-2 px-1">{g}</h2>

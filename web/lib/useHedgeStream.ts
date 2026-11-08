@@ -39,9 +39,20 @@ export function useHedgeStream(enabled = true): boolean {
         }
       });
     };
-    open();
+    // pause while the tab is hidden (phones keep background tabs alive); resume on return
+    const onVis = () => {
+      if (document.hidden) {
+        if (retry) { clearTimeout(retry); retry = null; }
+        es?.close(); es = null; setLive(false);
+      } else if (!es && !closed) {
+        backoff = 3_000; open();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    if (!document.hidden) open();
     return () => {
       closed = true;
+      document.removeEventListener("visibilitychange", onVis);
       if (retry) clearTimeout(retry);
       es?.close();
       setLive(false);

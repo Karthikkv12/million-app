@@ -182,7 +182,7 @@ function PasswordField({ id, label, value, onChange, autoComplete }: {
 }) {
   const [show, setShow] = useState(false);
   return (
-    <div className="grid gap-1.5">
+    <div className="grid grid-cols-1 gap-1.5">
       <label htmlFor={id} className="text-[13px] font-medium text-foreground/80">{label}</label>
       <div className="relative">
         <input
@@ -249,7 +249,7 @@ export function PasswordSection() {
               )} />
             ))}
           </div>
-          <ul className="grid gap-1.5">
+          <ul className="grid grid-cols-1 gap-1.5">
             {RULES.map((r) => {
               const ok = r.test(next);
               return (

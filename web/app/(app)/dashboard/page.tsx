@@ -12,8 +12,9 @@ import { clsx } from "clsx";
 import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchHedgeBooks, BrokerIncome, BrokerPortfolio, GexResult, HedgeBooks } from "@/lib/api";
-import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Tag } from "@/components/desk";
+import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
+import { bookBeta, dayPnl, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
@@ -77,13 +78,18 @@ export default function DashboardPage() {
   const quotes = useQuotes(ALL);
   const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
   const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
-  const hedge = useQuery<HedgeBooks>({ queryKey: ["hedge-books"], queryFn: fetchHedgeBooks, refetchInterval: 15_000 });
+  const hedge = useLiveBooks();
   const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: 60_000 });
 
-  const p = pf.data;
+  const p = useLivePortfolio(pf.data);
   const week = inc.data?.weekly.at(-1);
-  const books = (hedge.data?.books ?? []).filter((b) => !b.error);
-  const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_PUT"].includes(b.suggestion.action));
+  const books = okBooks(hedge.data);
+  const today = dayPnl(books);
+  const { beta } = bookBeta(books);
+  const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
+  const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
+  const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
+  const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
   const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
   const expiring = (p?.options ?? []).filter((o) => o.dte != null && o.dte <= 7).sort((a, b) => (a.dte ?? 0) - (b.dte ?? 0));
   const movers = [...(p?.holdings ?? [])].filter((h) => h.day_change_pct != null).sort((a, b) => Math.abs(b.day_change_pct ?? 0) - Math.abs(a.day_change_pct ?? 0)).slice(0, 6);
@@ -107,13 +113,40 @@ export default function DashboardPage() {
       {/* ── Your book ─────────────────────────────────────────────────── */}
       <div className="py-6">
         {hasBook ? (
+          <>
           <DeskFigures>
+            {today && (
+              <DeskFigure sensitive size="lg" label="Today · live" value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
+                sub={<>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
+            )}
             <DeskFigure sensitive size="lg" label="Account value" value={usd(p!.total_value, 0)}
-              sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} since last sync</span>} />
-            <DeskFigure sensitive size="lg" label="Unrealized" value={signed(p!.unrealized, 0)} tone={tone(p!.unrealized)} sub={`stocks ${usd(p!.stock_value, 0)}`} />
+              sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} at last sync</span>} />
+            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={p!.unrealized != null ? Math.round(p!.unrealized) : null}>{signed(p!.unrealized, 0)}</Tick>} tone={tone(p!.unrealized)} sub={<>stocks <Tick value={p!.stock_value != null ? Math.round(p!.stock_value) : null}>{usd(p!.stock_value, 0)}</Tick></>} />
             <DeskFigure sensitive size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
             <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
           </DeskFigures>
+          {(perLot != null || beta != null) && (
+            <Link href="/hedge" className="mt-5 grid gap-x-12 gap-y-2 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
+              {perLot != null && (
+                <div className="min-w-0">
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
+                  <Scale min={-0.5} max={1.5} value={perLot} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
+                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-amber-500"}
+                    zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+                    marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
+                </div>
+              )}
+              {beta != null && (
+                <div className="min-w-0">
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
+                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
+                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+                    marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
+                </div>
+              )}
+            </Link>
+          )}
+          </>
         ) : (
           <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the first Robinhood sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
         )}
@@ -124,39 +157,43 @@ export default function DashboardPage() {
           {/* ── To do ───────────────────────────────────────────────── */}
           <DeskSection label="To do" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
             {!signals.length && !spikes.length && !expiring.length ? (
-              <p className="py-2 text-[14px] text-foreground/55">Nothing needs action. Every holding is on its delta target.</p>
+              <p className="py-2 text-[14px] text-foreground/55">Nothing to place right now. The desk waits for a spike (sell a call) or a pullback (sell a put).</p>
             ) : (
               <div className="border-t border-[var(--border)]">
-                {signals.map((b) => (
-                  <Link key={b.symbol} href="/hedge" className="block">
-                    <DeskRow edge={b.suggestion!.action === "SELL_PUT" ? "gain" : b.suggestion!.action === "BUY_PUT" ? "loss" : "accent"}>
-                      <div className="flex items-center gap-3 py-3 pl-4 pr-2">
-                        <span className="w-14 font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
-                        <Tag tone={b.suggestion!.action === "SELL_PUT" ? "gain" : b.suggestion!.action === "BUY_PUT" ? "loss" : "accent"}>{b.suggestion!.action.replace("_", " ").toLowerCase()}</Tag>
-                        <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground/80">{b.suggestion!.headline}</span>
-                        <span className="sensitive font-mono text-[13px] tabular-nums text-foreground">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
-                      </div>
-                    </DeskRow>
-                  </Link>
-                ))}
+                {signals.map((b) => {
+                  const act = b.suggestion!.action;
+                  const t = act === "SELL_PUT" ? "gain" : act === "BUY_STOCK" ? "warn" : "accent";
+                  return (
+                    <Link key={b.symbol} href="/hedge" className="block">
+                      <DeskRow edge={t}>
+                        <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
+                          <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
+                          <span><Tag tone={t}>{act.replace("_", " ").toLowerCase()}</Tag></span>
+                          <span className="sensitive text-right font-mono text-[13px] tabular-nums text-foreground sm:order-last">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
+                          <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">{b.suggestion!.headline}</span>
+                        </div>
+                      </DeskRow>
+                    </Link>
+                  );
+                })}
                 {spikes.map((b) => (
                   <DeskRow key={`s-${b.symbol}`} edge="loss">
-                    <div className="flex items-center gap-3 py-3 pl-4 pr-2">
-                      <span className="w-14 font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
-                      <Tag tone="loss">IV spike</Tag>
-                      <span className="truncate text-[13.5px] text-foreground/80">ATM IV {pct(b.iv?.iv_roc_day, 0)} today. Premium is rich; check the hedge desk.</span>
+                    <div className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)]">
+                      <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
+                      <span><Tag tone="loss">IV spike</Tag></span>
+                      <span className="col-span-2 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">ATM IV {pct(b.iv?.iv_roc_day, 0)} today. Premium is rich: a call near your average.</span>
                     </div>
                   </DeskRow>
                 ))}
                 {expiring.map((o, i) => (
                   <DeskRow key={`e-${i}`} edge={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : null}>
-                    <div className="flex items-center gap-3 py-3 pl-4 pr-2">
-                      <span className="w-14 font-mono text-[14px] font-semibold text-foreground">{o.symbol}</span>
-                      <Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag>
-                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground/80">
-                        {o.contracts < 0 ? "Short" : "Long"} {Math.abs(o.contracts)} {o.strike}{o.option_type === "call" ? "C" : "P"} expires {o.expiry} · spot {usd(o.spot)}
+                    <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
+                      <span className="font-mono text-[14px] font-semibold text-foreground">{o.symbol}</span>
+                      <span><Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag></span>
+                      <span className={clsx("sensitive text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
+                      <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">
+                        {o.contracts < 0 ? "Short" : "Long"} {Math.abs(o.contracts)} {o.strike}{o.option_type === "call" ? "C" : "P"} · {o.expiry.slice(5)} · spot <Tick value={o.spot}>{usd(o.spot)}</Tick>
                       </span>
-                      <span className={clsx("sensitive font-mono text-[13px] tabular-nums", tone(o.premium))}>{signed(o.premium, 0)}</span>
                     </div>
                   </DeskRow>
                 ))}
@@ -173,12 +210,12 @@ export default function DashboardPage() {
                   return (
                     <Link key={h.symbol} href={`/stocks/${h.symbol}`} className="block">
                       <DeskRow>
-                        <div className="grid grid-cols-[56px_minmax(0,1fr)_80px_76px] items-center gap-3 py-2.5 pl-4 pr-2 font-mono text-[13px] tabular-nums">
+                        <div className="grid grid-cols-[52px_minmax(0,1fr)_76px_70px] items-center gap-3 py-2.5 pl-4 pr-3 font-mono text-[13px] tabular-nums">
                           <span className="font-semibold text-foreground">{h.symbol}</span>
                           <div className="relative h-[6px] bg-foreground/[0.05]">
                             <div className={clsx("absolute inset-y-0 left-0", (h.day_change_pct ?? 0) >= 0 ? "bg-gain/70" : "bg-loss/70")} style={{ width: `${w}%` }} />
                           </div>
-                          <span className="text-right text-foreground">{usd(h.price)}</span>
+                          <span className="text-right text-foreground"><Tick value={h.price}>{usd(h.price)}</Tick></span>
                           <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}</span>
                         </div>
                       </DeskRow>
@@ -194,7 +231,7 @@ export default function DashboardPage() {
           {/* ── SPY dealer map ──────────────────────────────────────── */}
           <DeskSection label="SPY dealers" className="lg:grid-cols-1" meta={g ? <span className="inline-flex items-center gap-2"><SourceBadge data={g} /><Link href="/options-flow?ticker=SPY" className="text-accent">Flow board →</Link></span> : undefined}>
             {g ? (
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
+              <div className="grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div>
                   <Tag tone={longGamma ? "gain" : "warn"}>{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Tag>
                   <p className="mt-3 text-[13.5px] leading-relaxed text-foreground/70">
@@ -204,28 +241,28 @@ export default function DashboardPage() {
                     {g.zero_gamma != null && <> Price is <b className="font-medium text-foreground">{g.spot >= g.zero_gamma ? "above" : "below"}</b> the flip at {g.zero_gamma.toFixed(2)}.</>}
                   </p>
                 </div>
-                <Ladder spot={g.spot} height={170} levels={[
+                <div className="min-w-0 sm:min-w-[220px]"><Ladder spot={g.spot} height={170} levels={[
                   { label: "call wall", price: g.max_call_wall, tone: "text-gain" },
                   { label: "★ king", price: g.max_gex_strike, tone: "text-[#b45309] dark:text-[#fde725]" },
                   { label: "flip", price: g.zero_gamma, tone: "text-accent" },
                   { label: "put wall", price: g.max_put_wall, tone: "text-loss" },
-                ]} />
+                ]} /></div>
               </div>
             ) : <p className="text-[13px] text-foreground/50">{spy.isLoading ? "Loading SPY levels…" : "SPY levels unavailable right now."}</p>}
           </DeskSection>
 
           {/* ── Market pulse (US) ───────────────────────────────────── */}
           <DeskSection label="Market pulse" className="lg:grid-cols-1" meta="US · live">
-            <div className="grid gap-5">
+            <div className="grid grid-cols-1 gap-5">
               {PULSE.map((grp) => (
                 <div key={grp.group}>
                   <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/40">{grp.group}</p>
                   {grp.items.map((it) => {
                     const qt = quotes.data?.[it.symbol];
                     return (
-                      <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_96px_72px] items-baseline gap-3 border-b border-[var(--border)] py-1.5 font-mono text-[13px] tabular-nums last:border-0">
+                      <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
                         <span className="truncate font-sans text-[13px] text-foreground/75">{it.label}</span>
-                        <span className="text-right text-foreground">{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</span>
+                        <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
                         <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}</span>
                       </div>
                     );

@@ -86,7 +86,7 @@ class LegOut(BaseModel):
 
 
 class SuggestionOut(BaseModel):
-    action: Literal["SELL_CALL", "SELL_PUT", "BUY_PUT", "HOLD", "WAIT", "TRACK"]
+    action: Literal["SELL_CALL", "SELL_PUT", "BUY_STOCK", "HOLD", "WAIT", "TRACK"]
     headline: str
     reasons: List[str] = []
     strike: Optional[float] = None
@@ -98,6 +98,8 @@ class SuggestionOut(BaseModel):
     credit: Optional[float] = None
     net_delta_after: Optional[float] = None
     locked_gain: Optional[float] = None
+    shares: int = Field(0, description="BUY_STOCK: shares to buy")
+    new_avg: Optional[float] = Field(None, description="BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned")
     warnings: List[str] = []
 
 
@@ -136,6 +138,7 @@ class BookOut(BaseModel):
     regime: Optional[Literal["bull", "high-vol"]] = None
     gap: Optional[float] = None
     iv_hv: Optional[float] = None
+    beta: Optional[float] = Field(None, description="1-year beta of daily returns vs SPY")
     legs: List[LegOut] = []
     suggestion: Optional[SuggestionOut] = None
     spot: Optional[float] = None

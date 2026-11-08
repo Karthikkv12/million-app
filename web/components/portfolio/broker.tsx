@@ -11,6 +11,7 @@ import {
   fetchBrokerActivity, fetchBrokerHistory, fetchBrokerIncome, fetchBrokerPortfolio,
   BrokerActivity, BrokerHistoryPoint, BrokerIncome, BrokerPortfolio,
 } from "@/lib/api";
+import { useLivePortfolio } from "@/lib/live";
 
 const KEY = "portfolio_account";
 const Ctx = createContext<{ account: string | null; setAccount: (a: string | null) => void }>({ account: null, setAccount: () => {} });
@@ -26,9 +27,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 }
 export const useAccount = () => useContext(Ctx);
 
+/** The synced portfolio, re-priced every second from the live stream (lib/live.tsx). */
 export function usePortfolio() {
   const { account } = useAccount();
-  return useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", account], queryFn: () => fetchBrokerPortfolio(account), refetchInterval: 30_000 });
+  const q = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", account], queryFn: () => fetchBrokerPortfolio(account), refetchInterval: 30_000 });
+  const data = useLivePortfolio(q.data);
+  return { ...q, data };
 }
 export function useHistory(days = 365) {
   const { account } = useAccount();

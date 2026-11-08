@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip, useChartStyle } from "@/components/chart/kit";
 import { Panel, SkeletonCard } from "@/components/ui";
+import { dayPnl, okBooks, Tick, useLiveBooks } from "@/lib/live";
 import { compactUsd, Metric, NoData, pct, shortDate, signedUsd, TD, TH, tone, useHistory, useIncome, usePortfolio, usd } from "./broker";
 
 export function OverviewTab() {
@@ -10,15 +11,21 @@ export function OverviewTab() {
   const { data: hist } = useHistory(365);
   const { data: inc } = useIncome();
   const s = useChartStyle();
+  const live = useLiveBooks();
+  const today = p && !p.account_filter ? dayPnl(okBooks(live.data)) : null;
   if (isLoading) return <SkeletonCard rows={6} />;
   if (!p || (!p.accounts.length && !p.holdings.length)) return <NoData />;
   const thisMonth = inc?.monthly.at(-1);
   const dayPct = p.day_change != null && p.total_value ? p.day_change / (p.total_value - p.day_change) : null;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {today && (
+          <Metric label="Today · live" value={<Tick value={Math.round(today.total)}><span className={tone(today.total)}>{signedUsd(today.total)}</span></Tick>}
+            sub={<span>stocks <span className={tone(today.stocks)}>{signedUsd(today.stocks, 0)}</span> · options <span className={tone(today.options)}>{signedUsd(today.options, 0)}</span> est.</span>} />
+        )}
         <Metric label="Account value" value={usd(p.total_value)} sub={<span className={tone(p.day_change)}>{signedUsd(p.day_change)} {dayPct != null && `(${pct(dayPct)})`} since last sync</span>} />
-        <Metric label="Unrealized P&L" value={<span className={tone(p.unrealized)}>{signedUsd(p.unrealized)}</span>} sub={`stocks ${usd(p.stock_value, 0)}`} />
+        <Metric label="Unrealized P&L" value={<Tick value={p.unrealized != null ? Math.round(p.unrealized) : null}><span className={tone(p.unrealized)}>{signedUsd(p.unrealized)}</span></Tick>} sub={`stocks ${usd(p.stock_value, 0)}`} />
         <Metric label="Premium collected · month" value={<span className="text-gain">{signedUsd(thisMonth?.collected ?? 0)}</span>} sub={<span>realized P&L <span className={tone(thisMonth?.realized)}>{signedUsd(thisMonth?.realized ?? 0)}</span></span>} />
         <Metric label="Cash · buying power" value={usd(p.cash)} sub={`BP ${usd(p.buying_power)}`} />
       </div>

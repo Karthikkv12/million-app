@@ -67,7 +67,7 @@ function PasswordInput({ value, onChange, id }: { value: string; onChange: (v: s
     try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
   };
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-1 gap-2">
       <div className="flex gap-2">
         <input id={id} value={value} onChange={(e) => onChange(e.target.value)} className={clsx(input, "font-mono")} autoComplete="new-password" spellCheck={false} />
         <button type="button" onClick={() => onChange(generatePassword())} className="btn-ghost h-10 shrink-0 px-3" title="Generate a strong password">
@@ -164,14 +164,14 @@ function ResetPasswordDialog({ user, onClose }: { user: AdminUser; onClose: () =
   return (
     <Dialog title={`Reset password for ${user.username}`} onClose={onClose}>
       {done ? (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <p className="flex items-center gap-2 text-sm text-gain"><Check size={16} /> Password updated.</p>
           <p className="text-[13px] text-foreground/65">Send them this temporary password privately and ask them to change it in Settings:</p>
           <code className="block select-all rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm text-foreground">{password}</code>
           <div className="flex justify-end"><button onClick={onClose} className="btn-primary h-10">Done</button></div>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <PasswordInput id="rp-pass" value={password} onChange={setPassword} />
           {error && <p role="alert" className="text-[13px] text-loss">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -238,7 +238,7 @@ function RowMenu({ u, isSelf, onRole, onActive, onReset, onDelete }: {
           className="fixed z-[160] w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-float)]"
         >
           {confirm ? (
-            <div className="grid gap-2 p-2">
+            <div className="grid grid-cols-1 gap-2 p-2">
               <p className="text-[13px] text-foreground">Delete <b>{u.username}</b>? This can't be undone.</p>
               <div className="flex gap-2">
                 <button onClick={() => setConfirm(false)} className="btn-ghost h-8 flex-1 px-2 text-[13px]">Cancel</button>

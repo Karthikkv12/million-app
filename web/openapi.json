@@ -1075,6 +1075,18 @@
       ],
       "title": "Avg Cost"
      },
+     "beta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "1-year beta of daily returns vs SPY",
+      "title": "Beta"
+     },
      "chain_source": {
       "anyOf": [
        {
@@ -8217,7 +8229,7 @@
       "enum": [
        "SELL_CALL",
        "SELL_PUT",
-       "BUY_PUT",
+       "BUY_STOCK",
        "HOLD",
        "WAIT",
        "TRACK"
@@ -8278,6 +8290,18 @@
       ],
       "title": "Net Delta After"
      },
+     "new_avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned",
+      "title": "New Avg"
+     },
      "option_delta": {
       "anyOf": [
        {
@@ -8318,6 +8342,12 @@
       },
       "title": "Reasons",
       "type": "array"
+     },
+     "shares": {
+      "default": 0,
+      "description": "BUY_STOCK: shares to buy",
+      "title": "Shares",
+      "type": "integer"
      },
      "strike": {
       "anyOf": [

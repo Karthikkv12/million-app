@@ -19,7 +19,7 @@ const SYMBOLS = [...ETFS, ...STOCKS];
 const pctTxt = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
 
 export function Sectors() {
-  const { data: q } = useQuotes(SYMBOLS);
+  const { data: q } = useQuotes(SYMBOLS, 15_000);
   const [open, setOpen] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -47,8 +47,8 @@ export function Sectors() {
         return (
           <Fragment key={r.key}>
             <DeskRow onClick={canOpen ? () => setOpen(isOpen ? null : r.key) : undefined} active={isOpen}>
-              <div className="grid grid-cols-[minmax(96px,1.2fr)_minmax(56px,1fr)_62px_16px] items-center gap-3 py-2.5 pl-4 pr-2 sm:grid-cols-[minmax(0,1.3fr)_52px_minmax(80px,1fr)_68px_64px_18px]">
-                <span className="truncate text-[13.5px] text-foreground/85">{r.label}</span>
+              <div className="grid min-h-[48px] grid-cols-[minmax(0,1.25fr)_minmax(48px,1fr)_64px_16px] items-center gap-x-3 py-2 pl-4 pr-3 sm:grid-cols-[minmax(0,1.3fr)_52px_minmax(80px,1fr)_68px_64px_18px]">
+                <span className="text-[13.5px] leading-tight text-foreground/85">{r.label}</span>
                 <span className="hidden font-mono text-[11.5px] text-foreground/45 sm:inline">{r.etf ?? "basket"}</span>
                 <span className="relative h-[8px]" aria-hidden>
                   <span className="absolute inset-y-[-3px] left-1/2 w-px bg-[var(--border-strong)]" />
@@ -65,7 +65,7 @@ export function Sectors() {
               </div>
             </DeskRow>
             {isOpen && (
-              <div className="flex flex-wrap gap-[2px] bg-foreground/[0.025] p-3">
+              <div className="flex flex-wrap gap-[2px] border-b border-[var(--border)] bg-foreground/[0.025] p-3">
                 {r.stocks.map((s) => {
                   const p = q?.[s.symbol]?.change_pct ?? null;
                   const c = heatColor(p);

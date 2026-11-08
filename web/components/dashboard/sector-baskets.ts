@@ -6,7 +6,8 @@ export interface StockTile { symbol: string; name: string; weight: number }
 
 export type SectorKey =
   | "mag7" | "technology" | "finance" | "consumer"
-  | "media" | "healthcare" | "telecom" | "energy";
+  | "media" | "healthcare" | "telecom" | "energy"
+  | "industrials" | "staples" | "materials" | "realestate" | "utilities";
 
 export const SECTORS: Record<SectorKey, { label: string; stocks: StockTile[] }> = {
   mag7: {
@@ -52,18 +53,91 @@ export const SECTORS: Record<SectorKey, { label: string; stocks: StockTile[] }> 
     ],
   },
   consumer: {
-    label: "Consumer",
+    label: "Consumer discretionary",
     stocks: [
       { symbol: "AMZN", name: "Amazon",     weight: 2300 },
-      { symbol: "WMT",  name: "Walmart",    weight:  750 },
-      { symbol: "COST", name: "Costco",     weight:  430 },
-      { symbol: "PG",   name: "P&G",        weight:  390 },
-      { symbol: "KO",   name: "Coca-Cola",  weight:  270 },
-      { symbol: "PEP",  name: "PepsiCo",    weight:  200 },
+      { symbol: "TSLA", name: "Tesla",      weight:  900 },
+      { symbol: "HD",   name: "Home Depot", weight:  400 },
       { symbol: "MCD",  name: "McDonald's", weight:  215 },
+      { symbol: "BKNG", name: "Booking",    weight:  170 },
+      { symbol: "TJX",  name: "TJX",        weight:  150 },
+      { symbol: "LOW",  name: "Lowe's",     weight:  140 },
       { symbol: "NKE",  name: "Nike",       weight:  110 },
       { symbol: "SBUX", name: "Starbucks",  weight:  100 },
-      { symbol: "TGT",  name: "Target",     weight:   55 },
+      { symbol: "CMG",  name: "Chipotle",   weight:   60 },
+    ],
+  },
+  staples: {
+    label: "Consumer staples",
+    stocks: [
+      { symbol: "WMT",  name: "Walmart",     weight: 750 },
+      { symbol: "COST", name: "Costco",      weight: 430 },
+      { symbol: "PG",   name: "P&G",         weight: 390 },
+      { symbol: "KO",   name: "Coca-Cola",   weight: 270 },
+      { symbol: "PM",   name: "Philip M.",   weight: 240 },
+      { symbol: "PEP",  name: "PepsiCo",     weight: 200 },
+      { symbol: "MO",   name: "Altria",      weight: 100 },
+      { symbol: "MDLZ", name: "Mondelez",    weight:  80 },
+      { symbol: "CL",   name: "Colgate",     weight:  70 },
+      { symbol: "TGT",  name: "Target",      weight:  45 },
+    ],
+  },
+  industrials: {
+    label: "Industrials",
+    stocks: [
+      { symbol: "GE",   name: "GE Aero",     weight: 300 },
+      { symbol: "CAT",  name: "Caterpillar", weight: 250 },
+      { symbol: "RTX",  name: "RTX",         weight: 220 },
+      { symbol: "UBER", name: "Uber",        weight: 190 },
+      { symbol: "HON",  name: "Honeywell",   weight: 130 },
+      { symbol: "BA",   name: "Boeing",      weight: 160 },
+      { symbol: "UNP",  name: "Union Pac.",  weight: 135 },
+      { symbol: "DE",   name: "Deere",       weight: 130 },
+      { symbol: "LMT",  name: "Lockheed",    weight: 110 },
+      { symbol: "UPS",  name: "UPS",         weight:  80 },
+    ],
+  },
+  materials: {
+    label: "Materials",
+    stocks: [
+      { symbol: "LIN",  name: "Linde",       weight: 210 },
+      { symbol: "SHW",  name: "Sherwin-W.",  weight:  85 },
+      { symbol: "ECL",  name: "Ecolab",      weight:  75 },
+      { symbol: "APD",  name: "Air Prod.",   weight:  60 },
+      { symbol: "FCX",  name: "Freeport",    weight:  60 },
+      { symbol: "NEM",  name: "Newmont",     weight:  90 },
+      { symbol: "CTVA", name: "Corteva",     weight:  45 },
+      { symbol: "DOW",  name: "Dow",         weight:  15 },
+      { symbol: "NUE",  name: "Nucor",       weight:  35 },
+      { symbol: "MP",   name: "MP Materials",weight:  10 },
+    ],
+  },
+  realestate: {
+    label: "Real estate",
+    stocks: [
+      { symbol: "PLD",  name: "Prologis",    weight: 105 },
+      { symbol: "WELL", name: "Welltower",   weight: 110 },
+      { symbol: "AMT",  name: "Amer. Tower", weight:  85 },
+      { symbol: "EQIX", name: "Equinix",     weight:  75 },
+      { symbol: "SPG",  name: "Simon Prop.", weight:  60 },
+      { symbol: "O",    name: "Realty Inc.", weight:  52 },
+      { symbol: "PSA",  name: "Public Stor.",weight:  48 },
+      { symbol: "DLR",  name: "Digital Rlty",weight:  55 },
+      { symbol: "CCI",  name: "Crown Castle",weight:  42 },
+    ],
+  },
+  utilities: {
+    label: "Utilities",
+    stocks: [
+      { symbol: "NEE",  name: "NextEra",     weight: 160 },
+      { symbol: "SO",   name: "Southern",    weight: 100 },
+      { symbol: "CEG",  name: "Constell.",   weight: 100 },
+      { symbol: "DUK",  name: "Duke",        weight:  95 },
+      { symbol: "VST",  name: "Vistra",      weight:  65 },
+      { symbol: "AEP",  name: "AEP",         weight:  60 },
+      { symbol: "D",    name: "Dominion",    weight:  50 },
+      { symbol: "SRE",  name: "Sempra",      weight:  55 },
+      { symbol: "EXC",  name: "Exelon",      weight:  45 },
     ],
   },
   media: {
@@ -129,9 +203,9 @@ export const SECTOR_ROWS: { etf: string | null; label: string; baskets?: SectorK
   { etf: "XLF",  label: "Financials",             baskets: ["finance"] },
   { etf: "XLV",  label: "Health care",            baskets: ["healthcare"] },
   { etf: "XLE",  label: "Energy",                 baskets: ["energy"] },
-  { etf: "XLI",  label: "Industrials" },
-  { etf: "XLP",  label: "Consumer staples" },
-  { etf: "XLB",  label: "Materials" },
-  { etf: "XLRE", label: "Real estate" },
-  { etf: "XLU",  label: "Utilities" },
+  { etf: "XLI",  label: "Industrials",            baskets: ["industrials"] },
+  { etf: "XLP",  label: "Consumer staples",       baskets: ["staples"] },
+  { etf: "XLB",  label: "Materials",              baskets: ["materials"] },
+  { etf: "XLRE", label: "Real estate",            baskets: ["realestate"] },
+  { etf: "XLU",  label: "Utilities",              baskets: ["utilities"] },
 ];
