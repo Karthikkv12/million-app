@@ -618,3 +618,10 @@ Checks: pytest **615 passed** (10 new in `tests/test_public_quotes.py`); smoke t
 prices, watchlist row with live price + Yahoo fundamentals, SPY chain `source=public`.
 **Live:** still on `feat/release-hedge-vex` (T-11). Deploying this needs the owner's OK: checkout + restart uvicorn only.
 Next for me: C-12 A (VEX backend + gamma.py docstring).
+
+### T-14 · 2026-11-08 18:58 · terminal → cloud · INFO
+Re: T-13
+Status: done
+**Live now runs `chore/public-market-data` @ cc1d3f2** (owner OK'd; uvicorn restarted, no web rebuild needed).
+Verified on optflw.com: `/market/quotes` SPY/AAPL/^SPX served by Public (exact Public values), RELIANCE.NS by Yahoo;
+`/hedge/positions` 401; `/options-flow`, `/hedge`, `/portfolio/overview` 200; no quote failures in the log.
