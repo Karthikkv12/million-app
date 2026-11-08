@@ -1,7 +1,7 @@
 "use client";
 /**
- * EconomicCalendar — embeds the TradingView Economic Calendar widget.
- * Filter choices (importance + countries) persist in localStorage.
+ * EconomicCalendar — TradingView economic calendar, US events only.
+ * The importance filter persists in localStorage.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -9,34 +9,20 @@ import { useTheme } from "@/lib/theme";
 import { Panel } from "@/components/ui";
 
 // ─── constants ────────────────────────────────────────────────────────────────
+// US events only (owner, 2026-11-08). Only importance is user-selectable.
 const STORAGE_KEY = "econ_cal_filters";
+const COUNTRY_FILTER = "us";
 
 interface Filters {
   importance: string[];   // e.g. ["-1","0","1"]
-  countries:  string[];   // e.g. ["us","in","eu","gb","jp","cn"]
 }
 
-const DEFAULT_FILTERS: Filters = {
-  importance: ["-1", "0", "1"],
-  countries:  ["us", "in", "eu", "gb", "jp", "cn"],
-};
+const DEFAULT_FILTERS: Filters = { importance: ["0", "1"] };
 
 const IMPORTANCE_OPTIONS = [
   { value: "-1", label: "Low"    },
   { value:  "0", label: "Medium" },
   { value:  "1", label: "High"   },
-];
-
-const COUNTRY_OPTIONS = [
-  { value: "us", label: "🇺🇸 US" },
-  { value: "in", label: "🇮🇳 IN" },
-  { value: "eu", label: "🇪🇺 EU" },
-  { value: "gb", label: "🇬🇧 GB" },
-  { value: "jp", label: "🇯🇵 JP" },
-  { value: "cn", label: "🇨🇳 CN" },
-  { value: "ca", label: "🇨🇦 CA" },
-  { value: "au", label: "🇦🇺 AU" },
-  { value: "de", label: "🇩🇪 DE" },
 ];
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -45,11 +31,8 @@ function loadFilters(): Filters {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_FILTERS;
-    const parsed = JSON.parse(raw) as Partial<Filters>;
-    return {
-      importance: parsed.importance ?? DEFAULT_FILTERS.importance,
-      countries:  parsed.countries  ?? DEFAULT_FILTERS.countries,
-    };
+    const parsed = JSON.parse(raw) as Partial<Filters>;   // older saves also had `countries`: ignored
+    return { importance: Array.isArray(parsed.importance) ? parsed.importance : DEFAULT_FILTERS.importance };
   } catch {
     return DEFAULT_FILTERS;
   }
@@ -80,16 +63,16 @@ export default function EconomicCalendar() {
     containerRef.current.innerHTML = "";
 
     const importanceFilter = filters.importance.join(",") || "-1,0,1";
-    const countryFilter    = filters.countries.join(",")  || "us";
+    const countryFilter    = COUNTRY_FILTER;
 
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
     script.async = true;
     script.innerHTML = JSON.stringify({
       colorTheme:       theme === "dark" ? "dark" : "light",
-      isTransparent:    true,
+      isTransparent:    theme !== "dark",   // the widget only paints a dark background when it is not transparent
       width:            "100%",
-      height:           "400",
+      height:           "560",
       locale:           "en",
       importanceFilter,
       countryFilter,
@@ -106,10 +89,9 @@ export default function EconomicCalendar() {
 
   return (
     <Panel
-      title="Economic calendar"
-      sub="TradingView · times in your timezone"
+      title="US economic calendar"
+      sub="Fed, CPI, jobs, GDP… · TradingView · times in your timezone"
       padded={false}
-      className="mb-8"
     >
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--border)] px-4 py-3">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -120,16 +102,8 @@ export default function EconomicCalendar() {
               className={pill(filters.importance.includes(value))}>{label}</button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Countries</span>
-          {COUNTRY_OPTIONS.map(({ value, label }) => (
-            <button key={value} aria-pressed={filters.countries.includes(value)}
-              onClick={() => setFilters({ ...filters, countries: toggle(filters.countries, value) })}
-              className={pill(filters.countries.includes(value))}>{label}</button>
-          ))}
-        </div>
       </div>
-      <div className="tradingview-widget-container min-h-[400px]" ref={containerRef}>
+      <div className="tradingview-widget-container min-h-[560px]" ref={containerRef}>
         <div className="tradingview-widget-container__widget" />
       </div>
     </Panel>

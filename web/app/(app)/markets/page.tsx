@@ -248,11 +248,10 @@ export default function MarketsPage() {
       )}
 
       <SectionHeader label="Today" />
-      <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Breadth quotes={quotes} />
         <Sentiment quotes={quotes} />
         <VixPanel />
-        <VixPanel symbol="%5EINDIAVIX" title="India VIX" sublabel="NSE India Volatility Index" gradId="mktsIndiaVix" />
       </div>
 
       <SectionHeader label="Sectors and movers" />
