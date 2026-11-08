@@ -1557,49 +1557,18 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** ActivityOut */
-        ActivityOut: {
-            /** Account */
-            account?: string | null;
-            /**
-             * Amount
-             * @description Option fills: cash, + credit / − debit
-             */
-            amount?: number | null;
-            /** Expiry */
-            expiry?: string | null;
-            /**
-             * Ext Id
-             * @description Stable broker id: option leg id, or a derived key
-             */
-            ext_id: string;
+        /** AccountOut */
+        AccountOut: {
+            /** Broker */
+            broker?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Currency */
+            currency: string;
             /** Id */
             id: number;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "option_fill" | "realized";
-            /** Option Type */
-            option_type?: ("call" | "put") | null;
-            /** Position Effect */
-            position_effect?: ("open" | "close") | null;
-            /** Price */
-            price?: number | null;
-            /** Quantity */
-            quantity?: number | null;
-            /** Realized Gain */
-            realized_gain?: number | null;
-            /** Side */
-            side?: ("buy" | "sell" | "") | null;
-            /** Strategy */
-            strategy?: string | null;
-            /** Strike */
-            strike?: number | null;
-            /** Symbol */
-            symbol: string;
-            /** Ts */
-            ts: string;
+            /** Name */
+            name: string;
         };
         /** AdminCreateUserRequest */
         AdminCreateUserRequest: {
@@ -1944,21 +1913,6 @@ export interface components {
              */
             sort_order: number;
         };
-        /** BrokerAccountOut */
-        BrokerAccountOut: {
-            /** Color */
-            color?: string | null;
-            /** Id */
-            id?: number | null;
-            /** Is Active */
-            is_active?: boolean | null;
-            /** Name */
-            name?: string | null;
-            /** Sort Order */
-            sort_order?: number | null;
-        } & {
-            [key: string]: unknown;
-        };
         /** BrokerAccountUpdateRequest */
         BrokerAccountUpdateRequest: {
             /** Color */
@@ -1969,6 +1923,228 @@ export interface components {
             name?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /** BrokerActivityOut */
+        BrokerActivityOut: {
+            /** Account */
+            account?: string | null;
+            /**
+             * Amount
+             * @description Option fills: cash, + credit / − debit
+             */
+            amount?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Ext Id
+             * @description Stable broker id: option leg id, or a derived key
+             */
+            ext_id: string;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "option_fill" | "realized";
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /** Position Effect */
+            position_effect?: ("open" | "close") | null;
+            /** Price */
+            price?: number | null;
+            /** Quantity */
+            quantity?: number | null;
+            /** Realized Gain */
+            realized_gain?: number | null;
+            /** Side */
+            side?: ("buy" | "sell" | "") | null;
+            /** Strategy */
+            strategy?: string | null;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Ts */
+            ts: string;
+        };
+        /** BrokerHistoryPoint */
+        BrokerHistoryPoint: {
+            /** Cash */
+            cash?: number | null;
+            /** Day */
+            day: string;
+            /** Total Value */
+            total_value?: number | null;
+        };
+        /** BrokerHoldingOut */
+        BrokerHoldingOut: {
+            /**
+             * Accounts
+             * @default []
+             */
+            accounts: string[];
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Cost Basis */
+            cost_basis?: number | null;
+            /**
+             * Covered Pct
+             * @default 0
+             */
+            covered_pct: number;
+            /** Day Change Pct */
+            day_change_pct?: number | null;
+            /** Market Value */
+            market_value?: number | null;
+            /** Prev Close */
+            prev_close?: number | null;
+            /** Price */
+            price?: number | null;
+            /** Shares */
+            shares: number;
+            /**
+             * Short Calls
+             * @default 0
+             */
+            short_calls: number;
+            /** Symbol */
+            symbol: string;
+            /** Unrealized */
+            unrealized?: number | null;
+            /** Unrealized Pct */
+            unrealized_pct?: number | null;
+            /** Weight */
+            weight?: number | null;
+        };
+        /** BrokerIncomeBucket */
+        BrokerIncomeBucket: {
+            /**
+             * Bought Back
+             * @default 0
+             */
+            bought_back: number;
+            /**
+             * Collected
+             * @default 0
+             */
+            collected: number;
+            /** Period */
+            period: string;
+            /**
+             * Premium
+             * @default 0
+             */
+            premium: number;
+            /**
+             * Realized
+             * @default 0
+             */
+            realized: number;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
+            /**
+             * Wins
+             * @default 0
+             */
+            wins: number;
+        };
+        /** BrokerIncomeOut */
+        BrokerIncomeOut: {
+            /**
+             * Bought Back Total
+             * @default 0
+             */
+            bought_back_total: number;
+            /** By Symbol */
+            by_symbol: components["schemas"]["BrokerSymbolIncome"][];
+            /**
+             * Collected Total
+             * @default 0
+             */
+            collected_total: number;
+            /** Monthly */
+            monthly: components["schemas"]["BrokerIncomeBucket"][];
+            /**
+             * Premium Total
+             * @default 0
+             */
+            premium_total: number;
+            /**
+             * Realized Total
+             * @default 0
+             */
+            realized_total: number;
+            /** Since */
+            since?: string | null;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
+            /** Weekly */
+            weekly: components["schemas"]["BrokerIncomeBucket"][];
+            /** Win Rate */
+            win_rate?: number | null;
+        };
+        /** BrokerOptionOut */
+        BrokerOptionOut: {
+            /** Account */
+            account?: string | null;
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Contracts */
+            contracts: number;
+            /** Distance Pct */
+            distance_pct?: number | null;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry: string;
+            /** Moneyness */
+            moneyness?: ("ITM" | "OTM" | "ATM") | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type: string;
+            /** Premium */
+            premium?: number | null;
+            /** Spot */
+            spot?: number | null;
+            /** Strike */
+            strike: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** BrokerPortfolioOut */
+        BrokerPortfolioOut: {
+            /** Account Filter */
+            account_filter?: string | null;
+            /** Accounts */
+            accounts: components["schemas"]["optionflow__modules__hedge__schemas__BrokerAccountOut"][];
+            /** As Of */
+            as_of: string;
+            /** Buying Power */
+            buying_power?: number | null;
+            /** Cash */
+            cash?: number | null;
+            /** Day Change */
+            day_change?: number | null;
+            /** Holdings */
+            holdings: components["schemas"]["BrokerHoldingOut"][];
+            /** Options */
+            options: components["schemas"]["BrokerOptionOut"][];
+            /** Stock Value */
+            stock_value?: number | null;
+            /** Synced At */
+            synced_at?: string | null;
+            /** Total Value */
+            total_value?: number | null;
+            /** Unrealized */
+            unrealized?: number | null;
         };
         /** BrokerPositionOut */
         BrokerPositionOut: {
@@ -2013,6 +2189,36 @@ export interface components {
             symbol: string;
             /** Synced At */
             synced_at: string;
+        };
+        /** BrokerSymbolIncome */
+        BrokerSymbolIncome: {
+            /**
+             * Bought Back
+             * @default 0
+             */
+            bought_back: number;
+            /**
+             * Collected
+             * @default 0
+             */
+            collected: number;
+            /**
+             * Premium
+             * @default 0
+             */
+            premium: number;
+            /**
+             * Realized
+             * @default 0
+             */
+            realized: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
         };
         /** BudgetCreateRequest */
         BudgetCreateRequest: {
@@ -2548,15 +2754,6 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** HistoryPoint */
-        HistoryPoint: {
-            /** Cash */
-            cash?: number | null;
-            /** Day */
-            day: string;
-            /** Total Value */
-            total_value?: number | null;
-        };
         /** HoldingEventOut */
         HoldingEventOut: {
             /** Basis Delta */
@@ -2580,6 +2777,21 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** HoldingOut */
+        HoldingOut: {
+            /** Account Id */
+            account_id: number;
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Id */
+            id: number;
+            /** Quantity */
+            quantity: number;
+            /** Symbol */
+            symbol: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /** HoldingUpsertRequest */
         HoldingUpsertRequest: {
             /** Avg Cost */
@@ -2593,59 +2805,6 @@ export interface components {
         IdOut: {
             /** Id */
             id: number;
-        };
-        /** IncomeBucket */
-        IncomeBucket: {
-            /** Period */
-            period: string;
-            /**
-             * Premium
-             * @default 0
-             */
-            premium: number;
-            /**
-             * Realized
-             * @default 0
-             */
-            realized: number;
-            /**
-             * Trades
-             * @default 0
-             */
-            trades: number;
-            /**
-             * Wins
-             * @default 0
-             */
-            wins: number;
-        };
-        /** IncomeOut */
-        IncomeOut: {
-            /** By Symbol */
-            by_symbol: components["schemas"]["SymbolIncome"][];
-            /** Monthly */
-            monthly: components["schemas"]["IncomeBucket"][];
-            /**
-             * Premium Total
-             * @default 0
-             */
-            premium_total: number;
-            /**
-             * Realized Total
-             * @default 0
-             */
-            realized_total: number;
-            /** Since */
-            since?: string | null;
-            /**
-             * Trades
-             * @default 0
-             */
-            trades: number;
-            /** Weekly */
-            weekly: components["schemas"]["IncomeBucket"][];
-            /** Win Rate */
-            win_rate?: number | null;
         };
         /** IngestAccount */
         IngestAccount: {
@@ -2943,62 +3102,6 @@ export interface components {
             title: string;
             /** Url */
             url?: string | null;
-        };
-        /** OptionHoldingOut */
-        OptionHoldingOut: {
-            /** Account */
-            account?: string | null;
-            /** Avg Price */
-            avg_price?: number | null;
-            /** Contracts */
-            contracts: number;
-            /** Distance Pct */
-            distance_pct?: number | null;
-            /** Dte */
-            dte?: number | null;
-            /** Expiry */
-            expiry: string;
-            /** Moneyness */
-            moneyness?: ("ITM" | "OTM" | "ATM") | null;
-            /** Opened At */
-            opened_at?: string | null;
-            /** Option Type */
-            option_type: string;
-            /** Premium */
-            premium?: number | null;
-            /** Spot */
-            spot?: number | null;
-            /** Strike */
-            strike: number;
-            /** Symbol */
-            symbol: string;
-        };
-        /** PortfolioOut */
-        PortfolioOut: {
-            /** Account Filter */
-            account_filter?: string | null;
-            /** Accounts */
-            accounts: components["schemas"]["optionflow__modules__hedge__schemas__AccountOut"][];
-            /** As Of */
-            as_of: string;
-            /** Buying Power */
-            buying_power?: number | null;
-            /** Cash */
-            cash?: number | null;
-            /** Day Change */
-            day_change?: number | null;
-            /** Holdings */
-            holdings: components["schemas"]["optionflow__modules__hedge__schemas__HoldingOut"][];
-            /** Options */
-            options: components["schemas"]["OptionHoldingOut"][];
-            /** Stock Value */
-            stock_value?: number | null;
-            /** Synced At */
-            synced_at?: string | null;
-            /** Total Value */
-            total_value?: number | null;
-            /** Unrealized */
-            unrealized?: number | null;
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -3678,26 +3781,6 @@ export interface components {
              */
             warnings: string[];
         };
-        /** SymbolIncome */
-        SymbolIncome: {
-            /**
-             * Premium
-             * @default 0
-             */
-            premium: number;
-            /**
-             * Realized
-             * @default 0
-             */
-            realized: number;
-            /** Symbol */
-            symbol: string;
-            /**
-             * Trades
-             * @default 0
-             */
-            trades: number;
-        };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
             /** Active */
@@ -4074,8 +4157,8 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
-        /** AccountOut */
-        optionflow__modules__hedge__schemas__AccountOut: {
+        /** BrokerAccountOut */
+        optionflow__modules__hedge__schemas__BrokerAccountOut: {
             /** Account */
             account: string;
             /** Buying Power */
@@ -4097,73 +4180,20 @@ export interface components {
             /** Total Value */
             total_value?: number | null;
         };
-        /** HoldingOut */
-        optionflow__modules__hedge__schemas__HoldingOut: {
-            /**
-             * Accounts
-             * @default []
-             */
-            accounts: string[];
-            /** Avg Cost */
-            avg_cost?: number | null;
-            /** Cost Basis */
-            cost_basis?: number | null;
-            /**
-             * Covered Pct
-             * @default 0
-             */
-            covered_pct: number;
-            /** Day Change Pct */
-            day_change_pct?: number | null;
-            /** Market Value */
-            market_value?: number | null;
-            /** Prev Close */
-            prev_close?: number | null;
-            /** Price */
-            price?: number | null;
-            /** Shares */
-            shares: number;
-            /**
-             * Short Calls
-             * @default 0
-             */
-            short_calls: number;
-            /** Symbol */
-            symbol: string;
-            /** Unrealized */
-            unrealized?: number | null;
-            /** Unrealized Pct */
-            unrealized_pct?: number | null;
-            /** Weight */
-            weight?: number | null;
-        };
-        /** AccountOut */
-        optionflow__modules__portfolio__schemas__AccountOut: {
-            /** Broker */
-            broker?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Currency */
-            currency: string;
+        /** BrokerAccountOut */
+        optionflow__modules__portfolio__schemas__BrokerAccountOut: {
+            /** Color */
+            color?: string | null;
             /** Id */
-            id: number;
+            id?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
             /** Name */
-            name: string;
-        };
-        /** HoldingOut */
-        optionflow__modules__portfolio__schemas__HoldingOut: {
-            /** Account Id */
-            account_id: number;
-            /** Avg Cost */
-            avg_cost?: number | null;
-            /** Id */
-            id: number;
-            /** Quantity */
-            quantity: number;
-            /** Symbol */
-            symbol: string;
-            /** Updated At */
-            updated_at?: string | null;
+            name?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;
@@ -4189,7 +4219,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__AccountOut"][];
+                    "application/json": components["schemas"]["AccountOut"][];
                 };
             };
         };
@@ -4213,7 +4243,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__AccountOut"];
+                    "application/json": components["schemas"]["AccountOut"];
                 };
             };
             /** @description Validation Error */
@@ -4244,7 +4274,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__HoldingOut"][];
+                    "application/json": components["schemas"]["HoldingOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4279,7 +4309,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__HoldingOut"];
+                    "application/json": components["schemas"]["HoldingOut"];
                 };
             };
             /** @description Validation Error */
@@ -4735,7 +4765,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActivityOut"][];
+                    "application/json": components["schemas"]["BrokerActivityOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4767,7 +4797,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HistoryPoint"][];
+                    "application/json": components["schemas"]["BrokerHistoryPoint"][];
                 };
             };
             /** @description Validation Error */
@@ -4798,7 +4828,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IncomeOut"];
+                    "application/json": components["schemas"]["BrokerIncomeOut"];
                 };
             };
             /** @description Validation Error */
@@ -4830,7 +4860,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PortfolioOut"];
+                    "application/json": components["schemas"]["BrokerPortfolioOut"];
                 };
             };
             /** @description Validation Error */
@@ -6051,7 +6081,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"][];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"][];
                 };
             };
         };
@@ -6075,7 +6105,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"];
                 };
             };
             /** @description Validation Error */
@@ -6141,7 +6171,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"];
                 };
             };
             /** @description Validation Error */

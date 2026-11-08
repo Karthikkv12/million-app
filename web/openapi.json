@@ -98,9 +98,9 @@
     "title": "AccountCreateRequest",
     "type": "object"
    },
-   "ActivityOut": {
+   "AccountOut": {
     "properties": {
-     "account": {
+     "broker": {
       "anyOf": [
        {
         "type": "string"
@@ -109,168 +109,39 @@
         "type": "null"
        }
       ],
-      "title": "Account"
+      "title": "Broker"
      },
-     "amount": {
+     "created_at": {
       "anyOf": [
        {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "description": "Option fills: cash, + credit / \u2212 debit",
-      "title": "Amount"
-     },
-     "expiry": {
-      "anyOf": [
-       {
+        "format": "date-time",
         "type": "string"
        },
        {
         "type": "null"
        }
       ],
-      "title": "Expiry"
+      "title": "Created At"
      },
-     "ext_id": {
-      "description": "Stable broker id: option leg id, or a derived key",
-      "maxLength": 200,
-      "minLength": 1,
-      "title": "Ext Id",
+     "currency": {
+      "title": "Currency",
       "type": "string"
      },
      "id": {
       "title": "Id",
       "type": "integer"
      },
-     "kind": {
-      "enum": [
-       "option_fill",
-       "realized"
-      ],
-      "title": "Kind",
-      "type": "string"
-     },
-     "option_type": {
-      "anyOf": [
-       {
-        "enum": [
-         "call",
-         "put"
-        ],
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Option Type"
-     },
-     "position_effect": {
-      "anyOf": [
-       {
-        "enum": [
-         "open",
-         "close"
-        ],
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Position Effect"
-     },
-     "price": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Price"
-     },
-     "quantity": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Quantity"
-     },
-     "realized_gain": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Realized Gain"
-     },
-     "side": {
-      "anyOf": [
-       {
-        "enum": [
-         "buy",
-         "sell",
-         ""
-        ],
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Side"
-     },
-     "strategy": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Strategy"
-     },
-     "strike": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Strike"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     },
-     "ts": {
-      "title": "Ts",
+     "name": {
+      "title": "Name",
       "type": "string"
      }
     },
     "required": [
-     "ext_id",
-     "kind",
-     "ts",
-     "symbol",
-     "id"
+     "id",
+     "name",
+     "currency"
     ],
-    "title": "ActivityOut",
+    "title": "AccountOut",
     "type": "object"
    },
    "AdminCreateUserRequest": {
@@ -1495,68 +1366,6 @@
     "title": "BrokerAccountCreateRequest",
     "type": "object"
    },
-   "BrokerAccountOut": {
-    "additionalProperties": true,
-    "properties": {
-     "color": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Color"
-     },
-     "id": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Id"
-     },
-     "is_active": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Is Active"
-     },
-     "name": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Name"
-     },
-     "sort_order": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Sort Order"
-     }
-    },
-    "title": "BrokerAccountOut",
-    "type": "object"
-   },
    "BrokerAccountUpdateRequest": {
     "properties": {
      "color": {
@@ -1605,6 +1414,724 @@
      }
     },
     "title": "BrokerAccountUpdateRequest",
+    "type": "object"
+   },
+   "BrokerActivityOut": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account"
+     },
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Option fills: cash, + credit / \u2212 debit",
+      "title": "Amount"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "ext_id": {
+      "description": "Stable broker id: option leg id, or a derived key",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Ext Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "option_fill",
+       "realized"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "option_type": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Type"
+     },
+     "position_effect": {
+      "anyOf": [
+       {
+        "enum": [
+         "open",
+         "close"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Effect"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "realized_gain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Realized Gain"
+     },
+     "side": {
+      "anyOf": [
+       {
+        "enum": [
+         "buy",
+         "sell",
+         ""
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Side"
+     },
+     "strategy": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strategy"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "ts": {
+      "title": "Ts",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ext_id",
+     "kind",
+     "ts",
+     "symbol",
+     "id"
+    ],
+    "title": "BrokerActivityOut",
+    "type": "object"
+   },
+   "BrokerHistoryPoint": {
+    "properties": {
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "day": {
+      "title": "Day",
+      "type": "string"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     }
+    },
+    "required": [
+     "day"
+    ],
+    "title": "BrokerHistoryPoint",
+    "type": "object"
+   },
+   "BrokerHoldingOut": {
+    "properties": {
+     "accounts": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Accounts",
+      "type": "array"
+     },
+     "avg_cost": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Cost"
+     },
+     "cost_basis": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost Basis"
+     },
+     "covered_pct": {
+      "default": 0,
+      "title": "Covered Pct",
+      "type": "number"
+     },
+     "day_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change Pct"
+     },
+     "market_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Market Value"
+     },
+     "prev_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prev Close"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "shares": {
+      "title": "Shares",
+      "type": "number"
+     },
+     "short_calls": {
+      "default": 0,
+      "title": "Short Calls",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "unrealized": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized"
+     },
+     "unrealized_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized Pct"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight"
+     }
+    },
+    "required": [
+     "symbol",
+     "shares"
+    ],
+    "title": "BrokerHoldingOut",
+    "type": "object"
+   },
+   "BrokerIncomeBucket": {
+    "properties": {
+     "bought_back": {
+      "default": 0.0,
+      "title": "Bought Back",
+      "type": "number"
+     },
+     "collected": {
+      "default": 0.0,
+      "title": "Collected",
+      "type": "number"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     },
+     "premium": {
+      "default": 0.0,
+      "title": "Premium",
+      "type": "number"
+     },
+     "realized": {
+      "default": 0.0,
+      "title": "Realized",
+      "type": "number"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     },
+     "wins": {
+      "default": 0,
+      "title": "Wins",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "period"
+    ],
+    "title": "BrokerIncomeBucket",
+    "type": "object"
+   },
+   "BrokerIncomeOut": {
+    "properties": {
+     "bought_back_total": {
+      "default": 0.0,
+      "title": "Bought Back Total",
+      "type": "number"
+     },
+     "by_symbol": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerSymbolIncome"
+      },
+      "title": "By Symbol",
+      "type": "array"
+     },
+     "collected_total": {
+      "default": 0.0,
+      "title": "Collected Total",
+      "type": "number"
+     },
+     "monthly": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerIncomeBucket"
+      },
+      "title": "Monthly",
+      "type": "array"
+     },
+     "premium_total": {
+      "default": 0.0,
+      "title": "Premium Total",
+      "type": "number"
+     },
+     "realized_total": {
+      "default": 0.0,
+      "title": "Realized Total",
+      "type": "number"
+     },
+     "since": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Since"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     },
+     "weekly": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerIncomeBucket"
+      },
+      "title": "Weekly",
+      "type": "array"
+     },
+     "win_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Win Rate"
+     }
+    },
+    "required": [
+     "weekly",
+     "monthly",
+     "by_symbol"
+    ],
+    "title": "BrokerIncomeOut",
+    "type": "object"
+   },
+   "BrokerOptionOut": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account"
+     },
+     "avg_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Price"
+     },
+     "contracts": {
+      "title": "Contracts",
+      "type": "number"
+     },
+     "distance_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Distance Pct"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "moneyness": {
+      "anyOf": [
+       {
+        "enum": [
+         "ITM",
+         "OTM",
+         "ATM"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Moneyness"
+     },
+     "opened_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opened At"
+     },
+     "option_type": {
+      "title": "Option Type",
+      "type": "string"
+     },
+     "premium": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Premium"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "option_type",
+     "strike",
+     "expiry",
+     "contracts"
+    ],
+    "title": "BrokerOptionOut",
+    "type": "object"
+   },
+   "BrokerPortfolioOut": {
+    "properties": {
+     "account_filter": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Filter"
+     },
+     "accounts": {
+      "items": {
+       "$ref": "#/components/schemas/optionflow__modules__hedge__schemas__BrokerAccountOut"
+      },
+      "title": "Accounts",
+      "type": "array"
+     },
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "buying_power": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Buying Power"
+     },
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "day_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change"
+     },
+     "holdings": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerHoldingOut"
+      },
+      "title": "Holdings",
+      "type": "array"
+     },
+     "options": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerOptionOut"
+      },
+      "title": "Options",
+      "type": "array"
+     },
+     "stock_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stock Value"
+     },
+     "synced_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Synced At"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     },
+     "unrealized": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized"
+     }
+    },
+    "required": [
+     "as_of",
+     "accounts",
+     "holdings",
+     "options"
+    ],
+    "title": "BrokerPortfolioOut",
     "type": "object"
    },
    "BrokerPositionOut": {
@@ -1728,6 +2255,44 @@
      "synced_at"
     ],
     "title": "BrokerPositionOut",
+    "type": "object"
+   },
+   "BrokerSymbolIncome": {
+    "properties": {
+     "bought_back": {
+      "default": 0.0,
+      "title": "Bought Back",
+      "type": "number"
+     },
+     "collected": {
+      "default": 0.0,
+      "title": "Collected",
+      "type": "number"
+     },
+     "premium": {
+      "default": 0.0,
+      "title": "Premium",
+      "type": "number"
+     },
+     "realized": {
+      "default": 0.0,
+      "title": "Realized",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "BrokerSymbolIncome",
     "type": "object"
    },
    "BudgetCreateRequest": {
@@ -3396,41 +3961,6 @@
     "title": "HTTPValidationError",
     "type": "object"
    },
-   "HistoryPoint": {
-    "properties": {
-     "cash": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Cash"
-     },
-     "day": {
-      "title": "Day",
-      "type": "string"
-     },
-     "total_value": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Total Value"
-     }
-    },
-    "required": [
-     "day"
-    ],
-    "title": "HistoryPoint",
-    "type": "object"
-   },
    "HoldingEventOut": {
     "additionalProperties": true,
     "properties": {
@@ -3546,6 +4076,57 @@
     "title": "HoldingEventOut",
     "type": "object"
    },
+   "HoldingOut": {
+    "properties": {
+     "account_id": {
+      "title": "Account Id",
+      "type": "integer"
+     },
+     "avg_cost": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Cost"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "required": [
+     "id",
+     "account_id",
+     "symbol",
+     "quantity"
+    ],
+    "title": "HoldingOut",
+    "type": "object"
+   },
    "HoldingUpsertRequest": {
     "properties": {
      "avg_cost": {
@@ -3587,108 +4168,6 @@
      "id"
     ],
     "title": "IdOut",
-    "type": "object"
-   },
-   "IncomeBucket": {
-    "properties": {
-     "period": {
-      "title": "Period",
-      "type": "string"
-     },
-     "premium": {
-      "default": 0.0,
-      "title": "Premium",
-      "type": "number"
-     },
-     "realized": {
-      "default": 0.0,
-      "title": "Realized",
-      "type": "number"
-     },
-     "trades": {
-      "default": 0,
-      "title": "Trades",
-      "type": "integer"
-     },
-     "wins": {
-      "default": 0,
-      "title": "Wins",
-      "type": "integer"
-     }
-    },
-    "required": [
-     "period"
-    ],
-    "title": "IncomeBucket",
-    "type": "object"
-   },
-   "IncomeOut": {
-    "properties": {
-     "by_symbol": {
-      "items": {
-       "$ref": "#/components/schemas/SymbolIncome"
-      },
-      "title": "By Symbol",
-      "type": "array"
-     },
-     "monthly": {
-      "items": {
-       "$ref": "#/components/schemas/IncomeBucket"
-      },
-      "title": "Monthly",
-      "type": "array"
-     },
-     "premium_total": {
-      "default": 0.0,
-      "title": "Premium Total",
-      "type": "number"
-     },
-     "realized_total": {
-      "default": 0.0,
-      "title": "Realized Total",
-      "type": "number"
-     },
-     "since": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Since"
-     },
-     "trades": {
-      "default": 0,
-      "title": "Trades",
-      "type": "integer"
-     },
-     "weekly": {
-      "items": {
-       "$ref": "#/components/schemas/IncomeBucket"
-      },
-      "title": "Weekly",
-      "type": "array"
-     },
-     "win_rate": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Win Rate"
-     }
-    },
-    "required": [
-     "weekly",
-     "monthly",
-     "by_symbol"
-    ],
-    "title": "IncomeOut",
     "type": "object"
    },
    "IngestAccount": {
@@ -4736,257 +5215,6 @@
      "title"
     ],
     "title": "NewsItem",
-    "type": "object"
-   },
-   "OptionHoldingOut": {
-    "properties": {
-     "account": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Account"
-     },
-     "avg_price": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Avg Price"
-     },
-     "contracts": {
-      "title": "Contracts",
-      "type": "number"
-     },
-     "distance_pct": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Distance Pct"
-     },
-     "dte": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Dte"
-     },
-     "expiry": {
-      "title": "Expiry",
-      "type": "string"
-     },
-     "moneyness": {
-      "anyOf": [
-       {
-        "enum": [
-         "ITM",
-         "OTM",
-         "ATM"
-        ],
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Moneyness"
-     },
-     "opened_at": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Opened At"
-     },
-     "option_type": {
-      "title": "Option Type",
-      "type": "string"
-     },
-     "premium": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Premium"
-     },
-     "spot": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Spot"
-     },
-     "strike": {
-      "title": "Strike",
-      "type": "number"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     }
-    },
-    "required": [
-     "symbol",
-     "option_type",
-     "strike",
-     "expiry",
-     "contracts"
-    ],
-    "title": "OptionHoldingOut",
-    "type": "object"
-   },
-   "PortfolioOut": {
-    "properties": {
-     "account_filter": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Account Filter"
-     },
-     "accounts": {
-      "items": {
-       "$ref": "#/components/schemas/optionflow__modules__hedge__schemas__AccountOut"
-      },
-      "title": "Accounts",
-      "type": "array"
-     },
-     "as_of": {
-      "title": "As Of",
-      "type": "string"
-     },
-     "buying_power": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Buying Power"
-     },
-     "cash": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Cash"
-     },
-     "day_change": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Day Change"
-     },
-     "holdings": {
-      "items": {
-       "$ref": "#/components/schemas/optionflow__modules__hedge__schemas__HoldingOut"
-      },
-      "title": "Holdings",
-      "type": "array"
-     },
-     "options": {
-      "items": {
-       "$ref": "#/components/schemas/OptionHoldingOut"
-      },
-      "title": "Options",
-      "type": "array"
-     },
-     "stock_value": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Stock Value"
-     },
-     "synced_at": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Synced At"
-     },
-     "total_value": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Total Value"
-     },
-     "unrealized": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Unrealized"
-     }
-    },
-    "required": [
-     "as_of",
-     "accounts",
-     "holdings",
-     "options"
-    ],
-    "title": "PortfolioOut",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -8098,34 +8326,6 @@
     "title": "SuggestionOut",
     "type": "object"
    },
-   "SymbolIncome": {
-    "properties": {
-     "premium": {
-      "default": 0.0,
-      "title": "Premium",
-      "type": "number"
-     },
-     "realized": {
-      "default": 0.0,
-      "title": "Realized",
-      "type": "number"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     },
-     "trades": {
-      "default": 0,
-      "title": "Trades",
-      "type": "integer"
-     }
-    },
-    "required": [
-     "symbol"
-    ],
-    "title": "SymbolIncome",
-    "type": "object"
-   },
    "SymbolSummaryOut": {
     "additionalProperties": true,
     "properties": {
@@ -9606,7 +9806,7 @@
     "title": "WeekUpdateRequest",
     "type": "object"
    },
-   "optionflow__modules__hedge__schemas__AccountOut": {
+   "optionflow__modules__hedge__schemas__BrokerAccountOut": {
     "properties": {
      "account": {
       "title": "Account",
@@ -9715,147 +9915,13 @@
     "required": [
      "account"
     ],
-    "title": "AccountOut",
+    "title": "BrokerAccountOut",
     "type": "object"
    },
-   "optionflow__modules__hedge__schemas__HoldingOut": {
+   "optionflow__modules__portfolio__schemas__BrokerAccountOut": {
+    "additionalProperties": true,
     "properties": {
-     "accounts": {
-      "default": [],
-      "items": {
-       "type": "string"
-      },
-      "title": "Accounts",
-      "type": "array"
-     },
-     "avg_cost": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Avg Cost"
-     },
-     "cost_basis": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Cost Basis"
-     },
-     "covered_pct": {
-      "default": 0,
-      "title": "Covered Pct",
-      "type": "number"
-     },
-     "day_change_pct": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Day Change Pct"
-     },
-     "market_value": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Market Value"
-     },
-     "prev_close": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Prev Close"
-     },
-     "price": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Price"
-     },
-     "shares": {
-      "title": "Shares",
-      "type": "number"
-     },
-     "short_calls": {
-      "default": 0,
-      "title": "Short Calls",
-      "type": "number"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     },
-     "unrealized": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Unrealized"
-     },
-     "unrealized_pct": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Unrealized Pct"
-     },
-     "weight": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Weight"
-     }
-    },
-    "required": [
-     "symbol",
-     "shares"
-    ],
-    "title": "HoldingOut",
-    "type": "object"
-   },
-   "optionflow__modules__portfolio__schemas__AccountOut": {
-    "properties": {
-     "broker": {
+     "color": {
       "anyOf": [
        {
         "type": "string"
@@ -9864,90 +9930,54 @@
         "type": "null"
        }
       ],
-      "title": "Broker"
-     },
-     "created_at": {
-      "anyOf": [
-       {
-        "format": "date-time",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Created At"
-     },
-     "currency": {
-      "title": "Currency",
-      "type": "string"
+      "title": "Color"
      },
      "id": {
-      "title": "Id",
-      "type": "integer"
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
      },
      "name": {
-      "title": "Name",
-      "type": "string"
-     }
-    },
-    "required": [
-     "id",
-     "name",
-     "currency"
-    ],
-    "title": "AccountOut",
-    "type": "object"
-   },
-   "optionflow__modules__portfolio__schemas__HoldingOut": {
-    "properties": {
-     "account_id": {
-      "title": "Account Id",
-      "type": "integer"
-     },
-     "avg_cost": {
       "anyOf": [
        {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Avg Cost"
-     },
-     "id": {
-      "title": "Id",
-      "type": "integer"
-     },
-     "quantity": {
-      "title": "Quantity",
-      "type": "number"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     },
-     "updated_at": {
-      "anyOf": [
-       {
-        "format": "date-time",
         "type": "string"
        },
        {
         "type": "null"
        }
       ],
-      "title": "Updated At"
+      "title": "Name"
+     },
+     "sort_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sort Order"
      }
     },
-    "required": [
-     "id",
-     "account_id",
-     "symbol",
-     "quantity"
-    ],
-    "title": "HoldingOut",
+    "title": "BrokerAccountOut",
     "type": "object"
    }
   },
@@ -9974,7 +10004,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__AccountOut"
+          "$ref": "#/components/schemas/AccountOut"
          },
          "title": "Response List Trading Accounts Api V1 Accounts Get",
          "type": "array"
@@ -10011,7 +10041,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__AccountOut"
+         "$ref": "#/components/schemas/AccountOut"
         }
        }
       },
@@ -10059,7 +10089,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__HoldingOut"
+          "$ref": "#/components/schemas/HoldingOut"
          },
          "title": "Response List Account Holdings Api V1 Accounts  Account Id  Holdings Get",
          "type": "array"
@@ -10117,7 +10147,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__HoldingOut"
+         "$ref": "#/components/schemas/HoldingOut"
         }
        }
       },
@@ -10775,7 +10805,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/ActivityOut"
+          "$ref": "#/components/schemas/BrokerActivityOut"
          },
          "title": "Response Broker Activity Api V1 Broker Activity Get",
          "type": "array"
@@ -10846,7 +10876,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/HistoryPoint"
+          "$ref": "#/components/schemas/BrokerHistoryPoint"
          },
          "title": "Response Broker History Api V1 Broker History Get",
          "type": "array"
@@ -10904,7 +10934,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/IncomeOut"
+         "$ref": "#/components/schemas/BrokerIncomeOut"
         }
        }
       },
@@ -10961,7 +10991,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/PortfolioOut"
+         "$ref": "#/components/schemas/BrokerPortfolioOut"
         }
        }
       },
@@ -12936,7 +12966,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/BrokerAccountOut"
+          "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
          },
          "title": "Response List Broker Accounts Api V1 Portfolio Broker Accounts Get",
          "type": "array"
@@ -12973,7 +13003,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/BrokerAccountOut"
+         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
         }
        }
       },
@@ -13075,7 +13105,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/BrokerAccountOut"
+         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
         }
        }
       },

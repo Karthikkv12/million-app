@@ -155,7 +155,7 @@ class BooksOut(BaseModel):
 
 
 # ── Portfolio (broker-synced) ─────────────────────────────────────────────────
-class AccountOut(BaseModel):
+class BrokerAccountOut(BaseModel):
     account: str
     day: Optional[str] = None
     total_value: Optional[float] = None
@@ -168,7 +168,7 @@ class AccountOut(BaseModel):
     change: Optional[float] = None
 
 
-class HoldingOut(BaseModel):
+class BrokerHoldingOut(BaseModel):
     symbol: str
     accounts: List[str] = []
     shares: float
@@ -185,7 +185,7 @@ class HoldingOut(BaseModel):
     covered_pct: float = 0
 
 
-class OptionHoldingOut(BaseModel):
+class BrokerOptionOut(BaseModel):
     symbol: str
     account: Optional[str] = None
     option_type: str
@@ -201,52 +201,58 @@ class OptionHoldingOut(BaseModel):
     opened_at: Optional[str] = None
 
 
-class PortfolioOut(BaseModel):
+class BrokerPortfolioOut(BaseModel):
     as_of: str
     synced_at: Optional[str] = None
     account_filter: Optional[str] = None
-    accounts: List[AccountOut]
+    accounts: List[BrokerAccountOut]
     total_value: Optional[float] = None
     cash: Optional[float] = None
     buying_power: Optional[float] = None
     day_change: Optional[float] = None
     stock_value: Optional[float] = None
     unrealized: Optional[float] = None
-    holdings: List[HoldingOut]
-    options: List[OptionHoldingOut]
+    holdings: List[BrokerHoldingOut]
+    options: List[BrokerOptionOut]
 
 
-class HistoryPoint(BaseModel):
+class BrokerHistoryPoint(BaseModel):
     day: str
     total_value: Optional[float] = None
     cash: Optional[float] = None
 
 
-class IncomeBucket(BaseModel):
+class BrokerIncomeBucket(BaseModel):
     period: str
     premium: float = 0.0
+    collected: float = 0.0
+    bought_back: float = 0.0
     realized: float = 0.0
     trades: int = 0
     wins: int = 0
 
 
-class SymbolIncome(BaseModel):
+class BrokerSymbolIncome(BaseModel):
     symbol: str
     premium: float = 0.0
+    collected: float = 0.0
+    bought_back: float = 0.0
     realized: float = 0.0
     trades: int = 0
 
 
-class IncomeOut(BaseModel):
-    weekly: List[IncomeBucket]
-    monthly: List[IncomeBucket]
-    by_symbol: List[SymbolIncome]
+class BrokerIncomeOut(BaseModel):
+    weekly: List[BrokerIncomeBucket]
+    monthly: List[BrokerIncomeBucket]
+    by_symbol: List[BrokerSymbolIncome]
     premium_total: float = 0.0
+    collected_total: float = 0.0
+    bought_back_total: float = 0.0
     realized_total: float = 0.0
     trades: int = 0
     win_rate: Optional[float] = None
     since: Optional[str] = None
 
 
-class ActivityOut(IngestActivity):
+class BrokerActivityOut(IngestActivity):
     id: int

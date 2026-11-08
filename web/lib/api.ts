@@ -922,3 +922,24 @@ export type BrokerPosition = Schemas["BrokerPositionOut"];
 
 export const fetchHedgeBooks = () => api.get<HedgeBooks>("/hedge/books");
 export const fetchBrokerPositions = () => api.get<BrokerPosition[]>("/hedge/positions");
+
+// ── Portfolio, all from the Robinhood sync ───────────────────────────────────
+export type BrokerPortfolio = Schemas["BrokerPortfolioOut"];
+export type BrokerHolding = Schemas["BrokerHoldingOut"];
+export type BrokerOption = Schemas["BrokerOptionOut"];
+export type BrokerHistoryPoint = Schemas["BrokerHistoryPoint"];
+export type BrokerIncome = Schemas["BrokerIncomeOut"];
+export type BrokerActivity = Schemas["BrokerActivityOut"];
+
+const acctQ = (account?: string | null, extra: Record<string, string> = {}) => {
+  const q = new URLSearchParams(extra);
+  if (account) q.set("account", account);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+};
+export const fetchBrokerPortfolio = (account?: string | null) => api.get<BrokerPortfolio>(`/broker/portfolio${acctQ(account)}`);
+export const fetchBrokerHistory = (account?: string | null, days = 365) =>
+  api.get<BrokerHistoryPoint[]>(`/broker/history${acctQ(account, { days: String(days) })}`);
+export const fetchBrokerIncome = (account?: string | null) => api.get<BrokerIncome>(`/broker/income${acctQ(account)}`);
+export const fetchBrokerActivity = (account?: string | null, limit = 300) =>
+  api.get<BrokerActivity[]>(`/broker/activity${acctQ(account, { limit: String(limit) })}`);

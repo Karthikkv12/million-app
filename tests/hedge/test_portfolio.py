@@ -65,6 +65,7 @@ def test_activity_upserts_and_income(client):
     auth = _login(c, "owner")
     inc = c.get("/api/v1/broker/income", headers=auth).json()
     assert inc["premium_total"] == pytest.approx(59 - 74)
+    assert inc["collected_total"] == 59 and inc["bought_back_total"] == 74
     assert inc["realized_total"] == pytest.approx(11.0 - 99.0)
     assert inc["trades"] == 2 and inc["win_rate"] == 0.5
     assert {m["period"] for m in inc["monthly"]} == {"2026-10", "2026-11"}

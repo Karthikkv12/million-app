@@ -12,8 +12,8 @@ from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.auth import service as auth_service
 from optionflow.modules.hedge import portfolio as pf
 from optionflow.modules.hedge import service
-from optionflow.modules.hedge.schemas import (ActivityOut, BooksOut, BrokerPositionOut, HistoryPoint, IncomeOut,
-                                              IngestOut, IngestRequest, PortfolioOut)
+from optionflow.modules.hedge.schemas import (BrokerActivityOut, BooksOut, BrokerPositionOut, BrokerHistoryPoint, BrokerIncomeOut,
+                                              IngestOut, IngestRequest, BrokerPortfolioOut)
 
 router = APIRouter(prefix="/hedge", tags=["hedge"])
 stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
@@ -81,28 +81,28 @@ async def stream(
 
 
 # ── Portfolio (everything from the broker sync) ──────────────────────────────
-@broker_router.get("/portfolio", response_model=PortfolioOut)
+@broker_router.get("/portfolio", response_model=BrokerPortfolioOut)
 def broker_portfolio(account: Optional[str] = Query(None, description="Masked account label; all if empty"),
-                     user=Depends(get_current_user)) -> PortfolioOut:
+                     user=Depends(get_current_user)) -> BrokerPortfolioOut:
     """Account values, holdings with live prices and unrealized P&L, open options."""
-    return PortfolioOut(**pf.portfolio(int(user["sub"]), account))
+    return BrokerPortfolioOut(**pf.portfolio(int(user["sub"]), account))
 
 
-@broker_router.get("/history", response_model=List[HistoryPoint])
+@broker_router.get("/history", response_model=List[BrokerHistoryPoint])
 def broker_history(account: Optional[str] = None, days: int = Query(365, ge=7, le=3650),
-                   user=Depends(get_current_user)) -> List[HistoryPoint]:
+                   user=Depends(get_current_user)) -> List[BrokerHistoryPoint]:
     """Daily account value (sum of accounts) from each sync."""
-    return [HistoryPoint(**p) for p in pf.history(int(user["sub"]), account, days)]
+    return [BrokerHistoryPoint(**p) for p in pf.history(int(user["sub"]), account, days)]
 
 
-@broker_router.get("/income", response_model=IncomeOut)
-def broker_income(account: Optional[str] = None, user=Depends(get_current_user)) -> IncomeOut:
+@broker_router.get("/income", response_model=BrokerIncomeOut)
+def broker_income(account: Optional[str] = None, user=Depends(get_current_user)) -> BrokerIncomeOut:
     """Option premium (net cash from fills) and realized P&L by week, month and symbol."""
-    return IncomeOut(**pf.income(int(user["sub"]), account))
+    return BrokerIncomeOut(**pf.income(int(user["sub"]), account))
 
 
-@broker_router.get("/activity", response_model=List[ActivityOut])
+@broker_router.get("/activity", response_model=List[BrokerActivityOut])
 def broker_activity(account: Optional[str] = None, limit: int = Query(200, ge=1, le=2000),
-                    user=Depends(get_current_user)) -> List[ActivityOut]:
+                    user=Depends(get_current_user)) -> List[BrokerActivityOut]:
     """Option fills and realized trades, newest first."""
-    return [ActivityOut(**a) for a in pf.activity(int(user["sub"]), account, limit)]
+    return [BrokerActivityOut(**a) for a in pf.activity(int(user["sub"]), account, limit)]

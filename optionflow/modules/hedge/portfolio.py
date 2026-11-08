@@ -209,16 +209,26 @@ def _week(ts: str) -> str:
 
 
 def income(user_id: int, account: Optional[str] = None) -> Dict[str, Any]:
-    """Option premium (net cash from option fills) and realized P&L by week, month and symbol."""
-    weekly: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"premium": 0.0, "realized": 0.0, "trades": 0, "wins": 0})
-    monthly: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"premium": 0.0, "realized": 0.0, "trades": 0, "wins": 0})
-    sym: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"premium": 0.0, "realized": 0.0, "trades": 0})
+    """Option premium and realized P&L by week, month and symbol.
+
+    premium = net cash from option fills (collected − bought back), open AND closed contracts.
+    realized = the broker's realized P&L on closing trades (stocks and options); it already contains
+    closed options' premium, so premium and realized must never be added together.
+    """
+    blank = lambda: {"premium": 0.0, "collected": 0.0, "bought_back": 0.0, "realized": 0.0, "trades": 0, "wins": 0}
+    weekly: Dict[str, Dict[str, Any]] = defaultdict(blank)
+    monthly: Dict[str, Dict[str, Any]] = defaultdict(blank)
+    sym: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"premium": 0.0, "collected": 0.0, "bought_back": 0.0, "realized": 0.0, "trades": 0})
     rows = _activity(user_id, account)
     for a in rows:
         w, m = _week(a.ts), a.ts[:7]
         if a.kind == "option_fill" and a.amount is not None:
             for b in (weekly[w], monthly[m], sym[a.symbol]):
                 b["premium"] += a.amount
+                if a.amount >= 0:
+                    b["collected"] += a.amount
+                else:
+                    b["bought_back"] += -a.amount
         elif a.kind == "realized" and a.realized_gain is not None:
             win = a.realized_gain > 0
             for b in (weekly[w], monthly[m]):
@@ -234,8 +244,10 @@ def income(user_id: int, account: Optional[str] = None) -> Dict[str, Any]:
         "weekly": [{"period": k, **r2(v)} for k, v in sorted(weekly.items())][-26:],
         "monthly": [{"period": k, **r2(v)} for k, v in sorted(monthly.items())][-24:],
         "by_symbol": sorted(({"symbol": k, **r2(v)} for k, v in sym.items()),
-                            key=lambda x: -(x["premium"] + x["realized"])),
+                                                key=lambda x: -(x["collected"] + abs(x["realized"]))),
         "premium_total": round(sum(b["premium"] for b in monthly.values()), 2),
+        "collected_total": round(sum(b["collected"] for b in monthly.values()), 2),
+        "bought_back_total": round(sum(b["bought_back"] for b in monthly.values()), 2),
         "realized_total": round(sum(b["realized"] for b in monthly.values()), 2),
         "trades": trades, "win_rate": (wins / trades) if trades else None,
         "since": rows[-1].ts if rows else None,

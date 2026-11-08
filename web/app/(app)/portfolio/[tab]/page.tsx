@@ -1,17 +1,19 @@
 "use client";
 import type { JSX } from "react";
 import { notFound, useParams } from "next/navigation";
-import { PositionsTab } from "@/components/portfolio/PositionsTab";
+import { OverviewTab } from "@/components/portfolio/OverviewTab";
 import { HoldingsTab } from "@/components/portfolio/HoldingsTab";
-import { PerformanceTab } from "@/components/portfolio/PerformanceTab";
-import { AccountsTab } from "@/components/portfolio/AccountsTab";
+import { OptionsTab } from "@/components/portfolio/OptionsTab";
+import { IncomeTab } from "@/components/portfolio/IncomeTab";
+import { ActivityTab } from "@/components/portfolio/ActivityTab";
 import { WatchlistTab } from "@/components/portfolio/WatchlistTab";
 
-const COMPONENTS: Record<string, () => JSX.Element> = {
-  positions: PositionsTab,
+const COMPONENTS: Record<string, () => JSX.Element | null> = {
+  overview: OverviewTab,
   holdings: HoldingsTab,
-  performance: PerformanceTab,
-  accounts: AccountsTab,
+  options: OptionsTab,
+  income: IncomeTab,
+  activity: ActivityTab,
   watchlist: WatchlistTab,
 };
 
