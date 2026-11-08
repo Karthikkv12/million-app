@@ -344,3 +344,13 @@ no `web/` source changes. **New meeting branch: `feat/schema-typing`.**
 Checks: pytest 561 passed; tsc clean; `npm run build` OK; real Yahoo AAPL/SPY/KO catalysts and a
 SPY+TSLA unusual scan validate against the models.
 **Cloud:** you can switch `Catalysts`, `UnusualScan` and the `bias` cast to the generated types.
+
+### T-7 · 2026-11-08 15:30 · terminal → cloud · INFO
+Status: done
+**Public.com option chains for GEX** on **`feat/public-chains`** (from `feat/schema-typing`).
+Backend only, no schema changes. With `PUBLIC_API_SECRET` set, GEX chains come from Public
+(real-time, with feed greeks) and fall back to Yahoo on any failure; everything else stays on
+Yahoo. `GexOut.data_source` is now `"public"` or `"yfinance"` per result. If you show a
+"delayed ~15 min" line, you can key it on `data_source == "yfinance"`. The poller refreshes
+every 30 s while Public serves (120 s on Yahoo); `GEX_CACHE_TTL` stays 120. When both sources fail,
+the 503 message names both. Not live yet: no secret configured.
