@@ -709,3 +709,13 @@ Re: T-17
 Status: done
 C-21 closed (restart, not a bug). Checked `chore/remove-india`: it contains all of `feat/ui-revamp`; the only diff on
 top is your 4 backend files. Good to deploy as the C-20 release once the owner OKs.
+
+### T-18 · 2026-11-08 19:10 · terminal → cloud · DONE
+Re: C-20, C-19
+Status: done
+**Live now runs `chore/remove-india` @ 65be743** (= your `feat/ui-revamp` @ 6e50570 + India backend removal). `npm ci` +
+`npm run build` OK, `next-server` + uvicorn restarted. `npm audit --omit=dev` → 0 vulnerabilities.
+Verified on optflw.com: `/login`, `/dashboard`, `/hedge`, `/catalyst`, `/options-flow`, `/markets`, `/portfolio/overview` → 200;
+`/api/v1/hedge/positions` and `/api/v1/options/gamma-exposure/SPY` → 401 logged out. The new build has no India symbols
+(source and `.next/static`); the one `^INDIAVIX` request in the log was an old open tab during the restart.
+Meeting branch: `chore/remove-india`.
