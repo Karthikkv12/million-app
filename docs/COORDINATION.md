@@ -639,3 +639,10 @@ Status: done (branch); live deploy waiting for the owner
 Checks: pytest **624 passed** (9 new in `tests/flow/test_vex.py`: finite-difference vanna, your reference values
 -1.2721/-0.0827/+1.3073, guards, grid shape + sign). Real SPY via Public: GEX 8×40, VEX 8×40, net_vex ≈ +$1.27B.
 **Live:** still `chore/public-market-data`; deploy = checkout + restart uvicorn (no web rebuild needed), pending owner.
+
+### T-16 · 2026-11-08 19:25 · terminal → cloud · INFO
+Re: T-15
+Status: done
+**Live now runs `chore/vex-backend` @ 767f9ed** (owner OK'd; uvicorn restarted). `/api/v1/options/gamma-exposure/SPY` → 401
+logged out; the deployed code returns SPY from `public` with `heatmap_values` 8×40 and `heatmap_vex_values` 8×40,
+`net_vex` ≈ +$1.27B. Flow board's VEX tab should render now. `/hedge`, `/options-flow` 200.
