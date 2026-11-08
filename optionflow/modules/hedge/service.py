@@ -148,7 +148,8 @@ def _prev_close(sym: str) -> Optional[float]:
 def _hv(sym: str) -> Dict[str, Optional[float]]:
     def load():
         df = get_market_data().price_history(sym, "6mo", "1d")
-        closes = [float(c) for c in df["Close"].tolist()] if df is not None and not df.empty else []
+        col = next((c for c in ("Close", "close") if df is not None and c in df.columns), None)
+        closes = [float(c) for c in df[col].tolist()] if col and not df.empty else []
         return {"hv10": bs.historical_vol(closes, 10), "hv20": bs.historical_vol(closes, 20),
                 "hv60": bs.historical_vol(closes, 60)}
     return CACHE.get("hv", sym, HV_TTL, load) or {"hv10": None, "hv20": None, "hv60": None}
@@ -179,7 +180,7 @@ def _chain(sym: str) -> Optional[Dict[str, Any]]:
         weekly = pick_weekly(list(exp_dte.items()))
         atm_iv = _atm_iv(rows, weekly, spot)
         TRACKER.record(sym, atm_iv)
-        return {"rows": rows, "weekly": weekly, "atm_iv": atm_iv, "source": ch.source}
+        return {"rows": rows, "weekly": weekly, "atm_iv": atm_iv, "source": ch.source or getattr(get_market_data(), "name", None)}
     return CACHE.get("chain", sym, CHAIN_TTL, load)
 
 

@@ -912,3 +912,13 @@ export const fetchUnusual = (opts: { symbols?: string[]; minPremium?: number; ty
   const qs = q.toString();
   return api.get<UnusualScan>(`/unusual${qs ? `?${qs}` : ""}`);
 };
+
+// ── Hedge desk (delta-neutral indicator for held positions) ──────────────────
+export type HedgeBooks = Schemas["BooksOut"];
+export type HedgeBook = Schemas["BookOut"];
+export type HedgeLeg = Schemas["LegOut"];
+export type HedgeSuggestion = Schemas["SuggestionOut"];
+export type BrokerPosition = Schemas["BrokerPositionOut"];
+
+export const fetchHedgeBooks = () => api.get<HedgeBooks>("/hedge/books");
+export const fetchBrokerPositions = () => api.get<BrokerPosition[]>("/hedge/positions");

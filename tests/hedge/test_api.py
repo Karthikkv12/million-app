@@ -82,7 +82,7 @@ def test_books_compute_live_delta_and_suggestion(client):
     fake.last_price = lambda s: spot
     fake.quote = lambda s: {"symbol": s, "price": spot, "prev_close": 105.0, "change": 1.0, "change_pct": 0.95}
     closes = [100 * math.exp(0.01 * (i % 2)) for i in range(80)]
-    fake.price_history = lambda s, p, i: pd.DataFrame({"Close": closes})
+    fake.price_history = lambda s, p, i: pd.DataFrame({"close": closes})
     c.post("/api/v1/hedge/ingest", json=BODY, headers={"X-Hedge-Ingest-Token": TOKEN})
 
     r = c.get("/api/v1/hedge/books", headers=_login(c, "owner"))
