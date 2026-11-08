@@ -84,7 +84,7 @@ class FakePublic:
 @pytest.fixture
 def public():
     fake = FakePublic()
-    gate = RateLimitGate(first=60, maximum=900)
+    gate = RateLimitGate(first=60, maximum=900, source="Public.com")
     client = PublicClient("secret", transport=httpx.MockTransport(fake.handler), gate=gate, min_gap=0)
     chains = PublicOptionChains(client)
     chains.gate = gate
@@ -237,3 +237,52 @@ def test_default_provider_is_yahoo_without_secret(monkeypatch):
     monkeypatch.setattr(market_data, "_default", None)
     with override_settings(Settings(_env_file=None, public_api_secret="s")):
         assert market_data.get_market_data().name == "public+yfinance"
+
+
+# ── error messages and poll interval ─────────────────────────────────────────
+
+class LimitedYahoo(FakeYahoo):
+    def option_chain(self, symbol):
+        self.calls += 1
+        raise MarketDataRateLimited(300)
+
+
+def test_both_failing_names_both_sources(public):
+    fake, chains = public
+    fake.status["/access-tokens"] = 500
+    with pytest.raises(MarketDataRateLimited) as e:
+        ChainFallbackMarketData(chains, LimitedYahoo()).option_chain("KO")
+    msg = str(e.value)
+    assert "Public.com is unavailable" in msg and "Yahoo Finance is rate-limiting" in msg and "5 min" in msg
+
+
+def test_both_rate_limited_message(public):
+    fake, chains = public
+    fake.status["/quotes"] = 429
+    with pytest.raises(MarketDataRateLimited) as e:
+        ChainFallbackMarketData(chains, LimitedYahoo()).option_chain("KO")
+    assert "Public.com is rate-limiting and Yahoo Finance is rate-limiting" in str(e.value)
+
+
+def test_public_429_message_names_public(public):
+    fake, chains = public
+    fake.status["/quotes"] = 429
+    with pytest.raises(MarketDataRateLimited, match="^Public.com is rate-limiting"):
+        chains.option_chain("KO")
+
+
+def test_yahoo_message_unchanged():
+    assert str(MarketDataRateLimited(120)).startswith("Yahoo Finance is rate-limiting")
+
+
+def test_poll_interval_follows_chain_source(public, monkeypatch):
+    from optionflow.workers import gex_poller
+    _, chains = public
+    monkeypatch.setattr(market_data, "_override", FakeYahoo())
+    assert gex_poller.poll_interval() == 120                 # Yahoo only
+    monkeypatch.setattr(market_data, "_override", ChainFallbackMarketData(chains, FakeYahoo()))
+    assert gex_poller.poll_interval() == 30                  # Public serving
+    chains.gate.trip()
+    assert gex_poller.poll_interval() == 120                 # Public backing off → Yahoo pace
+    from optionflow.modules.flow import service
+    assert service.GEX_CACHE_TTL >= gex_poller.POLL_INTERVAL  # streams never trigger extra fetches

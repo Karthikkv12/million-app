@@ -43,7 +43,7 @@ MAX_CHAIN_EXPIRIES = 12       # …at most 12 of them (the board shows 8)
 MIN_REQUEST_GAP = 0.125       # seconds between requests: 8/s, under Public's 10/s
 EXPIRIES_TTL = 3600.0         # expiry lists change at most daily
 
-GATE = RateLimitGate(first=60.0, maximum=900.0)   # Public's own back-off, separate from Yahoo's
+GATE = RateLimitGate(first=60.0, maximum=900.0, source="Public.com")   # separate from Yahoo's
 
 
 class PublicError(Exception):
@@ -143,7 +143,7 @@ class PublicClient:
             raise PublicError(f"{method} {url}: {exc}") from exc
         if r.status_code == 429:
             self._gate.trip()
-            raise MarketDataRateLimited(self._gate.remaining())
+            raise MarketDataRateLimited(self._gate.remaining(), self._gate.source)
         return r
 
     def _token_value(self) -> str:
@@ -211,6 +211,8 @@ class PublicOptionChains:
     """`option_chain()` from Public.com, in the provider's OptionChain shape."""
 
     name = "public"
+    label = "Public.com"
+    realtime = True               # the GEX poller refreshes faster while this is serving
     gate = GATE
 
     def __init__(self, client: PublicClient):

@@ -103,11 +103,23 @@ class ChainFallbackMarketData:
                 self._warned = False
             return chain
         except Exception as exc:                  # any failure: auth, bad symbol, 429, outage
+            primary_error = exc
             if not self._warned:
                 _log.warning("%s option chain failed for %s (%s); using %s",
                              self.chains.name, symbol, exc, self.fallback.name)
                 self._warned = True
-        chain = self.fallback.option_chain(symbol)
+        try:
+            chain = self.fallback.option_chain(symbol)
+        except MarketDataRateLimited as exc:
+            # Both sources failed: say so, instead of blaming only the fallback.
+            minutes = max(1, round(exc.retry_after / 60))
+            primary = getattr(self.chains, "label", self.chains.name)
+            why = "is rate-limiting" if isinstance(primary_error, MarketDataRateLimited) else "is unavailable"
+            raise MarketDataRateLimited(
+                exc.retry_after, exc.source,
+                f"Option data is unavailable: {primary} {why} and {exc.source} is rate-limiting; "
+                f"try again in about {minutes} min",
+            ) from exc
         return chain if chain.source else chain._replace(source=self.fallback.name)
 
 
@@ -157,10 +169,11 @@ from optionflow.core.errors import Unavailable as _Unavailable
 class MarketDataRateLimited(_Unavailable):
     """The data source is rate-limiting us; no call was made (or the call was refused). HTTP 503."""
 
-    def __init__(self, retry_after: float):
+    def __init__(self, retry_after: float, source: str = "Yahoo Finance", message: Optional[str] = None):
         minutes = max(1, round(retry_after / 60))
-        super().__init__(f"Yahoo Finance is rate-limiting requests; try again in about {minutes} min")
+        super().__init__(message or f"{source} is rate-limiting requests; try again in about {minutes} min")
         self.retry_after = retry_after
+        self.source = source
 
 
 class RateLimitGate:
@@ -171,8 +184,9 @@ class RateLimitGate:
     Logs once per trip, not per refused call.
     """
 
-    def __init__(self, first: float = 120.0, maximum: float = 1800.0):
+    def __init__(self, first: float = 120.0, maximum: float = 1800.0, source: str = "Yahoo Finance"):
         self.first, self.maximum = first, maximum
+        self.source = source
         self._delay = 0.0
         self._until = 0.0
         self._lock = _threading.Lock()
@@ -186,7 +200,7 @@ class RateLimitGate:
     def check(self) -> None:
         left = self.remaining()
         if left > 0:
-            raise MarketDataRateLimited(left)
+            raise MarketDataRateLimited(left, self.source)
 
     def trip(self) -> None:
         with self._lock:
@@ -194,13 +208,13 @@ class RateLimitGate:
                 return
             self._delay = min(self.maximum, self._delay * 2 if self._delay else self.first)
             self._until = _time.monotonic() + self._delay
-            _log.warning("Market data rate-limited: pausing all calls for %ds", int(self._delay))
+            _log.warning("%s rate-limited: pausing all calls for %ds", self.source, int(self._delay))
 
     def ok(self) -> None:
         if self._delay and not self.blocked():
             with self._lock:
                 self._delay = 0.0
-                _log.info("Market data calls succeeding again; back-off reset")
+                _log.info("%s calls succeeding again; back-off reset", self.source)
 
     def reset(self) -> None:                   # tests
         with self._lock:
@@ -218,6 +232,13 @@ def chains_rate_limited() -> bool:
     md = get_market_data()
     blocked = getattr(md, "chains_blocked", None)
     return bool(blocked()) if blocked else is_rate_limited()
+
+
+def chains_realtime() -> bool:
+    """True while option chains come from a real-time source (Public.com, not backing off)."""
+    chains = getattr(get_market_data(), "chains", None)
+    gate = getattr(chains, "gate", None)
+    return bool(getattr(chains, "realtime", False)) and not (gate and gate.blocked())
 
 
 def raise_if_rate_limited() -> None:
