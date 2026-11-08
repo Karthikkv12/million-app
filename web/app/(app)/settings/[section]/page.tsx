@@ -1,4 +1,5 @@
 "use client";
+import type { JSX } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";

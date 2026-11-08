@@ -1,4 +1,5 @@
 "use client";
+import type { JSX } from "react";
 import { notFound, useParams } from "next/navigation";
 import { PositionsTab } from "@/components/portfolio/PositionsTab";
 import { HoldingsTab } from "@/components/portfolio/HoldingsTab";
