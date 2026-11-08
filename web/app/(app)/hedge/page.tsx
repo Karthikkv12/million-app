@@ -121,6 +121,61 @@ function Detail({ b }: { b: HedgeBook }) {
   );
 }
 
+// ── Legend: what every symbol on the blotter means ─────────────────────────
+function Sym({ children }: { children: React.ReactNode }) {
+  return <span className="relative inline-flex h-5 w-10 shrink-0 items-center justify-center">{children}</span>;
+}
+function Item({ sym, title, children }: { sym: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      {sym}
+      <div className="min-w-0">
+        <p className="text-[13px] font-medium text-foreground">{title}</p>
+        <p className="text-[12.5px] leading-snug text-foreground/55">{children}</p>
+      </div>
+    </div>
+  );
+}
+function Edge({ cls }: { cls: string }) {
+  return <Sym><span className={clsx("h-5 w-[3px]", cls)} /></Sym>;
+}
+
+function Legend() {
+  return (
+    <DeskSection label="Legend" meta="What the symbols on the Book table mean.">
+      <div className="grid gap-x-10 gap-y-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid content-start gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Net Δ meter (−1.5 … +1.5 per lot)</p>
+          <Item title="Your net delta, on target" sym={<Sym><span className="h-3 w-3 rounded-full bg-gain" /></Sym>}>Where your stock + options delta sits right now, within ±0.15 of target.</Item>
+          <Item title="Your net delta, off target" sym={<Sym><span className="h-3 w-3 rounded-full bg-amber-500" /></Sym>}>More than 0.15 per lot away from target: the engine looks for a trade.</Item>
+          <Item title="Target" sym={<Sym><span className="h-[18px] w-[2px] bg-accent" /></Sym>}>+0.30 per lot in a calm / bull regime, 0 in a high-vol regime.</Item>
+          <Item title="After the suggested trade" sym={<Sym><span className="h-2 w-2 rotate-45 border border-accent" /></Sym>}>Where net delta lands if you place the suggested trade.</Item>
+          <Item title="Zero and distance from zero" sym={<Sym><span className="absolute h-[6px] w-7 bg-foreground/15" /><span className="relative h-3 w-px bg-foreground/40" /></Sym>}>The thin tick is 0 delta; the grey band shows how far from zero you are.</Item>
+        </div>
+
+        <div className="grid content-start gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Row edge &amp; signals</p>
+          <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Too long after a rise over your average or an IV spike: sell a weekly call at or above your average cost.</Item>
+          <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Below target after a pullback, never during an IV spike: a short put adds delta.</Item>
+          <Item title="Buy put / IV spike" sym={<Edge cls="bg-loss" />}>Too long with every lot already covered (buy a put), or ATM IV is spiking.</Item>
+          <Item title="Off target, waiting" sym={<Edge cls="bg-amber-500" />}>Off target, but the conditions for a trade aren&apos;t met yet (see the ticket&apos;s reasons).</Item>
+          <Item title="Tags" sym={<Sym><Tag tone="warn">wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: not yet. <b className="font-medium text-foreground/75">On target</b>: nothing to do. <b className="font-medium text-foreground/75">Track</b>: options only, no 100-share lot to size against.</Item>
+        </div>
+
+        <div className="grid content-start gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Columns</p>
+          <Item title="Net Δ (lots)" sym={<Sym><span className="font-mono text-[12px] text-foreground">+0.69</span></Sym>}>100 shares = +1.00. A short call at Δ 0.70 counts −0.70; a short put at Δ −0.30 counts +0.30.</Item>
+          <Item title="Γ $/1%" sym={<Sym><span className="font-mono text-[12px] text-loss">−$24</span></Sym>}>How much your delta-dollars change for a 1% move. Negative = short gamma (your short options).</Item>
+          <Item title="IV / HV" sym={<Sym><span className="font-mono text-[12px] text-foreground/80">75<span className="text-foreground/35">/71</span></span></Sym>}>At-the-money implied vol vs 20-day historical vol. Above 1.3× = high-vol regime, premium is rich.</Item>
+          <Item title="IV day ▲" sym={<Sym><span className="font-mono text-[12px] text-loss">+12▲</span></Sym>}>ATM IV change since the first reading today; ▲ marks a spike (IV up while the stock rises hard).</Item>
+          <Item title="hi-vol / bull" sym={<Sym><span className="font-mono text-[10.5px] text-foreground/45">bull</span></Sym>}>The regime that sets the target: hi-vol when IV/HV ≥ 1.3 or dealer gamma is negative.</Item>
+        </div>
+      </div>
+      <p className="mt-6 text-[12px] leading-relaxed text-foreground/45">Greeks are Black-Scholes from the live price and each contract&apos;s IV. Suggestions are not orders; check the live quote before trading.</p>
+    </DeskSection>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function HedgePage() {
   const live = useHedgeStream();
@@ -228,10 +283,7 @@ export default function HedgePage() {
             </div>
           </DeskSection>
 
-          <p className="border-t border-[var(--border)] pt-4 text-[12px] leading-relaxed text-foreground/45">
-            Target Δ: +0.30 per lot in a calm/bull regime, 0 when IV/HV ≥ 1.3 or dealer gamma is negative. A short call removes delta; a short put adds it.
-            Black-Scholes from the live price and each contract&apos;s IV. Suggestions are not orders; check the live quote before trading.
-          </p>
+          <Legend />
         </>
       )}
     </DeskPage>

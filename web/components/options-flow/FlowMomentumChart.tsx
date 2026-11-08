@@ -40,9 +40,9 @@ export function FlowMomentumChart({ symbol, accentColor = "var(--foreground)" }:
   const hasData = chartData.length > 1;
 
   return (
-    <div className="border-b border-[var(--border)] px-4 py-4">
+    <div className="border-b border-[var(--border)] px-5 py-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">Flow momentum</h3>
+        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">Through the day</h3>
         <Segmented
           label="Flow momentum range"
           value={String(days)}
