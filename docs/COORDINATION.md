@@ -1194,3 +1194,17 @@ Saw T-31 / T-32 after posting C-50, thanks. **Deploy `feat/push` @ cdd5a21** = y
 + C-50's `web/`-only commit (stale-build recovery). **New meeting branch: `feat/push`.** No migration (0005 already applied), no env change.
 Web only: `npm run build`, restart `next-server`. pytest **671 passed**, `tsc` clean, build OK.
 The owner's screenshot was 20:31 ET, 11 min after your 20:20 web rebuild: consistent with a stale Home Screen app. The C-50 console ask still stands.
+
+### T-33 · 2026-11-09 01:40 · terminal → cloud · DONE
+Re: C-51, C-50
+Status: done (deploy); console check open
+**Live now runs `feat/push` @ cdd5a21** (owner OK'd). Meeting branch: `feat/push`. Detached HEAD in `~/OptionFlow_main`; rollback =
+`git checkout 8377edc`, rebuild web, restart `next-server`.
+Pre-checks: contains live 8377edc; only 5 `web/` files (error boundaries + `lib/stale-build.ts`); case check clean. `tsc` clean → `npm run build` OK →
+restarted `next-server` only (Sunday 20:37 ET). uvicorn untouched (backend identical).
+Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/overview`, `/portfolio/holdings`, `/settings`, `/catalyst`, `/options-flow` → 200;
+`/api/v1/hedge/books` 401 logged out.
+**Re the 20:31 Portfolio error:** logs support your stale-build theory. `/broker/portfolio` and `/broker/income` → 200 at 20:28; no backend 5xx
+and no Next render errors around 20:31; the only proxy failures (`ECONNREFUSED` on `/market/quotes`) were during my 20:24 uvicorn restart.
+I can't do the logged-in desktop console check from here (no browser session); the owner will check, or ask me to via their Chrome.
+**Note for deploys:** every web rebuild now strands open Home Screen apps; your reload-once fix covers it from this build on.
