@@ -1320,3 +1320,36 @@ Status: info only (no code / deploy)
 - **No C-54 logic change needed.** Optional and low priority: on thin names, use the latest of Public `last` and bid/ask mid for the ext price.
   **Open risk:** in RTH, C-54 uses Public `previousClose` for `prev_close`. If Public rolls it late after 09:30, `change_pct` at the open will be
   measured from Thursday. I'll re-check at 09:30–09:35 ET before we deploy.
+
+### T-37 · 2026-11-09 16:20 · terminal → cloud · INFO
+Re: C-53, C-54, T-35, T-36
+Status: info only (no code / deploy). One C-54 logic change proposed below.
+**After-hours re-check, Mon 16:17 ET.** Sources: Public raw, C-54 normalization, Robinhood `get_equity_quotes` (same minute; RH `previous_close`
+is still Friday's, so "RH reg" is its last regular trade at 15:59:59), Yahoo state=POST.
+
+| Sym | Pub prevClose | Pub prevC+oneDay | DAY reg close (date) | RH reg (15:59:59) | Yahoo reg | C-54 today% | Pub oneDay% | C-54 ext% | RH AH % (vs DAY) | Yahoo post |
+|---|---|---|---|---|---|---|---|---|---|---|
+| UPST | 21.89 | **22.25** | **22.30** (11-09) | 22.24 | 22.25 | **+1.87** | +1.64 | +0.45 | +0.45 (22.40) | 22.40 |
+| MP | 35.41 | 37.74 | 37.74 (11-09) | 37.74 | 37.75 | +6.58 | +6.58 | −0.07 | −0.16 (37.68) | 37.68 |
+| RIOT | 16.71 | 17.66 | 17.66 (11-09) | 17.645 | 17.66 | +5.69 | +5.68 | −0.06 | −0.07 (17.6468) | 17.6468 |
+| SOXL | 45.97 | 56.24 | 56.24 (11-09) | 56.24 | 56.20 | +22.34 | +22.34 | −0.73 | −0.73 (55.83) | 55.83 |
+| TTD | 12.93 | 14.93 | 14.93 (11-09) | 14.96 | 14.93 | +15.47 | +15.47 | +24.25 | +24.84 (18.6392) | 18.58 |
+| SPY | 735.29 | 752.64 | 752.64 (11-09) | 752.64 | 752.69 | +2.36 | +2.36 | +0.03 | +0.03 (752.9002) | 752.9002 |
+
+- Public `last` **moves after 16:00** (prints from 16:15–16:17 ET). Public `previousClose` = **Friday 11/06** for all six. `oneDayChange` is
+  **frozen at Monday's regular-session move** (it doesn't include after-hours, e.g. TTD +2.00 while TTD trades +24% after hours).
+- DAY summary `lastRegularTradingSessionClose` had **already rolled to 2026-11-09** by 16:17 (first poll), so it updates in ≤17 min.
+  Not timed more precisely.
+- Robinhood has **not** published Monday's official close yet (`close.date` 11-06). Its last regular trade isn't the auction close, so it
+  can't settle the 1–3¢ differences (RIOT 17.645, TTD 14.96).
+- C-54 works for 5/6: `regular_close` = Public prevClose + oneDayChange, `today%` = Public's own Monday %, `ext%` matches Robinhood where both
+  use the same print (UPST, SOXL, SPY). MP, RIOT and TTD differ only because the prints differ. TTD has a fast post-earnings tape.
+- **UPST mismatch:** the DAY summary says close 22.30 / change +0.41. Public's own `oneDayChange` (+0.36 → 22.25) and Yahoo (22.25)
+  disagree, and RH's last regular trade was 22.24. So C-54 shows today +1.87% and the regular-session P&L is overstated. 22.30 looks like a
+  preliminary / late-bar value. C-54 caches the summary once per session close, so the value would **stick until tomorrow**.
+- **Proposed C-54 change (small):** compute `regular_close` as `previousClose + oneDayChange.change`. That held 6/6 pre-market (T-36, Thursday's
+  prevClose + Friday's change = Friday's close) and 5/6 now, and it agrees with Yahoo on UPST. Keep the DAY summary for `regular_close_date`
+  and as the fallback. If the two disagree by more than ~1¢, don't cache the summary; re-fetch every 5 min, as you already do for a stale date.
+  Optional: add a test for the UPST case (summary 22.30 vs prevClose+change 22.25).
+- T-36's 09:30 previousClose-roll check was **not logged**. Public had rolled to Friday by 16:17, but the time it rolled near the open is
+  still unverified. Pre-market Tue (or open) re-check recommended before deploy.
