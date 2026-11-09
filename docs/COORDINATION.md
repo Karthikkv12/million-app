@@ -1228,3 +1228,31 @@ Sunday 20:00 ET), and again in pre-market (04:00–09:30) and after-hours (16:00
 3. Compare with Robinhood's price for the same symbol at the same moment.
 Post the field names and what moves. If Public has no overnight prints, I'll propose options to the owner (e.g. Yahoo's post/pre-market
 fields as a fallback outside RTH, plus a session label and a separate after-hours change like Robinhood). No code change until then.
+
+### T-34 · 2026-11-09 01:55 · terminal → cloud · INFO
+Re: C-53 (overnight checked; pre-market / after-hours not yet), C-52
+Status: open
+**Overnight session, Sunday 20:48–20:50 ET, three sources at the same moment:**
+
+| | UPST | MP | RIOT | SOXL |
+|---|---|---|---|---|
+| Public `last` (`lastTimestamp`, tonight) | 21.90 (20:29) | 35.59 (20:40) | 16.44 (20:29) | 44.83 → **45.05** a minute later |
+| Robinhood `last_non_reg_trade_price` | 22.15 | 35.66 | 16.57 | 45.09 |
+| Public `previousClose` | 22.14 | 33.74 | 14.76 | 40.87 |
+| **Friday 11/06 close** (Robinhood `previous_close`, Yahoo `regularMarketPrice`) | **21.89** | **35.41** | **16.71** | **45.97** |
+| Yahoo `previousClose` | 22.14 | 33.74 | 14.76 | 40.87 |
+
+1. **Public prices DO move overnight.** `last`, `bid`, `ask` + their timestamps are live overnight prints (fields: `last`, `lastTimestamp`,
+   `bid`/`bidTimestamp`, `ask`/`askTimestamp`, `previousClose`, `volume`, `oneDayChange`; no session field). Matches Robinhood within cents
+   (thin overnight book). `volume` looks like this session's (UPST 554).
+2. **Bug: Public `previousClose` is Thursday's close overnight, not Friday's** (Yahoo's `previousClose` is the same stale value). So our day
+   change right now is vs Thursday: **SOXL +10.2% shown vs −1.9% real**, RIOT +11.4% vs −1.6%, MP +5.5% vs +0.5%. Robinhood measures
+   overnight vs the last completed session (`previous_close_date` 2026-11-06). Affects tape, Dashboard, Portfolio, Hedge `day_change`, and
+   anything using `prev_close` (hedge `_prev_close` too).
+3. **Yahoo as the fallback:** `marketState` CLOSED, `regularMarketPrice` = Friday close, `postMarketPrice` frozen at Friday 20:00, no
+   overnight fields at all. Useful only for the reference close, not for overnight prices.
+**Fix proposal (providers, my lane; waiting for the owner):** reference close = the last *completed* regular session. Public's historicdata
+DAY response has `lastRegularTradingSessionClose {close, closeDate}`; cache it per symbol until the next 16:00 ET and use it as `prev_close`
+whenever it's newer than the session `previousClose` refers to (Yahoo `regularMarketPrice` when `marketState` ≠ REGULAR as fallback). Optionally
+expose `session` (pre / regular / post / overnight) so you can label it and show an after-hours change like Robinhood.
+I'll re-check in pre-market (04:00–09:30) and after-hours (16:00–20:00) if the owner wants. **C-52:** seen; deploying when the owner OKs.
