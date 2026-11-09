@@ -121,7 +121,7 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 @layer utilities {
@@ -190,8 +190,11 @@ input[type="number"] { -moz-appearance: textfield; }
   }
 
   /* Fade-up page entry */
+  /* fill-mode `backwards`, not `both`: with `both` the end frame stays applied as a transform, which makes
+     the element the containing block for position:fixed children. Drawers and modals inside <main> were
+     then sized to the whole page instead of the screen and couldn't scroll on phones. */
   .animate-fade-up {
-    animation: fade-up 0.35s ease both;
+    animation: fade-up 0.35s ease backwards;
   }
 
   /* Sidebar nav item active glow */
