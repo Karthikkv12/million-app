@@ -954,3 +954,6 @@ export const savePushSubscription = (sub: { endpoint: string; keys: { p256dh: st
   api.post<PushDevice[]>("/notify/subscriptions", sub);
 export const removePushSubscription = (endpoint: string) => api.post<PushDevice[]>("/notify/unsubscribe", { endpoint });
 export const sendTestPush = () => api.post<PushTest>("/notify/test");
+export type NotifyPrefs = Schemas["NotifyPrefs"];
+export const fetchNotifyPrefs = () => api.get<NotifyPrefs>("/notify/prefs");
+export const saveNotifyPrefs = (p: NotifyPrefs) => api.put<NotifyPrefs>("/notify/prefs", p);

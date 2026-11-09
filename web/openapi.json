@@ -5400,6 +5400,55 @@
     "title": "NewsItem",
     "type": "object"
    },
+   "NotifyPrefs": {
+    "properties": {
+     "buy_stock": {
+      "default": true,
+      "title": "Buy Stock",
+      "type": "boolean"
+     },
+     "buyback": {
+      "default": true,
+      "description": "A short option has given up most of its premium",
+      "title": "Buyback",
+      "type": "boolean"
+     },
+     "expiring_itm": {
+      "default": false,
+      "description": "A short option is in the money with \u2264 1 day left",
+      "title": "Expiring Itm",
+      "type": "boolean"
+     },
+     "iv_spike": {
+      "default": false,
+      "description": "ATM IV spikes on a holding",
+      "title": "Iv Spike",
+      "type": "boolean"
+     },
+     "sell_call": {
+      "default": true,
+      "title": "Sell Call",
+      "type": "boolean"
+     },
+     "sell_put": {
+      "default": true,
+      "title": "Sell Put",
+      "type": "boolean"
+     },
+     "symbols": {
+      "default": [],
+      "description": "Only these symbols; empty = every holding",
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "title": "NotifyPrefs",
+    "type": "object"
+   },
    "PortfolioSnapshotCreateRequest": {
     "properties": {
      "cash": {
@@ -12965,6 +13014,77 @@
      }
     ],
     "summary": "Devices",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/prefs": {
+   "get": {
+    "description": "Which alerts are pushed, and for which symbols (the same on every device).",
+    "operationId": "get_prefs_api_v1_notify_prefs_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Prefs",
+    "tags": [
+     "notify"
+    ]
+   },
+   "put": {
+    "operationId": "put_prefs_api_v1_notify_prefs_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NotifyPrefs"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Prefs",
     "tags": [
      "notify"
     ]

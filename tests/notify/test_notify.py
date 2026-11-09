@@ -60,9 +60,10 @@ BOOKS = {"books": [
 ]}
 
 
-def test_alerts_cover_buybacks_and_trades_only():
+def test_alerts_cover_buybacks_and_trades():
     a = service.alerts_for(BOOKS)
     assert [x["key"] for x in a] == ["bb:UPST:22.5C:2026-11-13", "sg:MP:SELL_CALL:33.5C:2026-11-13", "sg:AAPL:BUY_STOCK:40"]
+    assert [x["kind"] for x in a] == ["buyback", "sell_call", "buy_stock"]
     assert a[0]["title"] == "Buy back UPST 22.5C 11-13" and "85%" in a[0]["body"] and "$51" in a[0]["body"]
 
 
@@ -150,3 +151,45 @@ def test_api_subscribe_test_unsubscribe(client, keys, monkeypatch):
     r = client.post("/api/v1/notify/test", headers=h).json()
     assert r["sent"] == 1 and calls == [SUB["endpoint"]]
     assert client.post("/api/v1/notify/unsubscribe", json={"endpoint": SUB["endpoint"]}, headers=h).json() == []
+
+
+# ── controls (owner): which alerts, which symbols ─────────────────────────────
+EXTRA = {"books": [{"symbol": "RIOT", "spot": 16.7, "iv": {"spike": True, "iv_roc_day": 0.18}, "suggestion": {"action": "WAIT"},
+                    "legs": [{"kind": "option", "quantity": -1, "otype": "call", "strike": 14.5, "expiry": "2026-11-10", "dte": 1.0},
+                             {"kind": "option", "quantity": -1, "otype": "put", "strike": 14.0, "expiry": "2026-11-10", "dte": 1.0}]}]}
+
+
+def test_iv_spike_and_expiring_itm_alerts():
+    a = service.alerts_for(EXTRA)
+    assert [x["key"] for x in a] == ["iv:RIOT", "ex:RIOT:14.5C:2026-11-10"]           # the OTM put isn't flagged
+
+
+def test_prefs_filter_kinds_and_symbols(db_engine_and_session, keys):
+    uid = _user()
+    service.subscribe(uid, "https://push.example/1", "p", "a", None)
+    assert service.get_prefs(uid) == service.DEFAULT_PREFS
+    service.set_prefs(uid, {"buyback": True, "sell_call": False, "sell_put": False, "buy_stock": False, "symbols": ["upst", " mp "]})
+    sent = []
+    sender = lambda *a, **k: (sent.append(a[3]["tag"]), webpush.SendResult(201, False))[1]   # noqa: E731
+    assert service.run_for_user(uid, books_fn=lambda _u: BOOKS, sender=sender) == 1
+    assert sent == ["bb:UPST:22.5C:2026-11-13"]
+    service.set_prefs(uid, {"sell_call": True, "symbols": []})                      # trades now on: MP comes through
+    assert service.run_for_user(uid, books_fn=lambda _u: BOOKS, sender=sender) == 2  # MP sell call + AAPL buy stock
+    assert set(sent) == {"bb:UPST:22.5C:2026-11-13", "sg:MP:SELL_CALL:33.5C:2026-11-13", "sg:AAPL:BUY_STOCK:40"}
+
+
+def test_new_device_copies_prefs(db_engine_and_session, keys):
+    uid = _user()
+    service.subscribe(uid, "https://push.example/1", "p", "a", None)
+    service.set_prefs(uid, {"iv_spike": True, "symbols": ["RIOT"]})
+    service.subscribe(uid, "https://push.example/2", "p", "a", None)
+    assert all(s["prefs"]["iv_spike"] and s["prefs"]["symbols"] == ["RIOT"] for s in service.subscriptions(uid))
+
+
+def test_api_prefs(client, keys):
+    h = _login(client)
+    assert client.put("/api/v1/notify/prefs", json={"buyback": False}, headers=h).status_code == 409   # no device yet
+    client.post("/api/v1/notify/subscriptions", json=SUB, headers=h)
+    r = client.put("/api/v1/notify/prefs", json={"buyback": True, "sell_call": False, "symbols": ["mp"]}, headers=h).json()
+    assert r["sell_call"] is False and r["symbols"] == ["MP"] and r["iv_spike"] is False
+    assert client.get("/api/v1/notify/prefs", headers=h).json() == r

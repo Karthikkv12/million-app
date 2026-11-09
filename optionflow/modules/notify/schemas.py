@@ -25,6 +25,16 @@ class UnsubscribeIn(BaseModel):
     endpoint: str = Field(..., max_length=1000)
 
 
+class NotifyPrefs(BaseModel):
+    buyback: bool = Field(True, description="A short option has given up most of its premium")
+    sell_call: bool = True
+    sell_put: bool = True
+    buy_stock: bool = True
+    iv_spike: bool = Field(False, description="ATM IV spikes on a holding")
+    expiring_itm: bool = Field(False, description="A short option is in the money with ≤ 1 day left")
+    symbols: List[str] = Field([], max_length=100, description="Only these symbols; empty = every holding")
+
+
 class DeviceOut(BaseModel):
     id: int
     user_agent: Optional[str] = None

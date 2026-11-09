@@ -6,7 +6,89 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Send, Share } from "lucide-react";
-import { fetchPushConfig, fetchPushDevices, removePushSubscription, savePushSubscription, sendTestPush } from "@/lib/api";
+import { clsx } from "clsx";
+import { fetchNotifyPrefs, fetchPushConfig, fetchPushDevices, removePushSubscription, saveNotifyPrefs, savePushSubscription, sendTestPush, NotifyPrefs } from "@/lib/api";
+import { okBooks, useLiveBooks } from "@/lib/live";
+
+const KINDS: { key: keyof Omit<NotifyPrefs, "symbols">; label: string; desc: string }[] = [
+  { key: "buyback", label: "Buy back", desc: "A short option has given up most of its premium (80%, or 50% with 3+ days left)." },
+  { key: "sell_call", label: "Sell call", desc: "A spike: the desk suggests an in-the-money call near your average." },
+  { key: "sell_put", label: "Sell put", desc: "A pullback: the desk suggests a put below your average." },
+  { key: "buy_stock", label: "Buy stock", desc: "An odd lot at or below your average: round it up to 100 shares." },
+  { key: "iv_spike", label: "IV spike", desc: "Implied volatility jumps on a stock you hold." },
+  { key: "expiring_itm", label: "Expiring in the money", desc: "An option you sold is in the money with a day or less left." },
+];
+
+function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
+      className={clsx("relative h-6 w-10 shrink-0 rounded-full transition", on ? "bg-foreground" : "bg-foreground/20")}>
+      <span className={clsx("absolute top-0.5 h-5 w-5 rounded-full bg-[var(--background)] shadow transition-all", on ? "left-[18px]" : "left-0.5")} />
+    </button>
+  );
+}
+
+/** Which alerts, for which stocks. Saved on every device as soon as it changes. */
+function Controls() {
+  const qc = useQueryClient();
+  const prefs = useQuery({ queryKey: ["notify", "prefs"], queryFn: fetchNotifyPrefs });
+  const held = okBooks(useLiveBooks().data).map((b) => b.symbol).sort();
+  const [err, setErr] = useState<string | null>(null);
+  const p = prefs.data;
+  if (!p) return null;
+  const save = async (next: NotifyPrefs) => {
+    setErr(null);
+    qc.setQueryData(["notify", "prefs"], next);                       // optimistic
+    try { qc.setQueryData(["notify", "prefs"], await saveNotifyPrefs(next)); }
+    catch (e) { setErr((e as Error).message); qc.invalidateQueries({ queryKey: ["notify", "prefs"] }); }
+  };
+  const all = !p.symbols.length;
+  const toggleSym = (sym: string) => {
+    const cur = all ? held : p.symbols;
+    const next = cur.includes(sym) ? cur.filter((x) => x !== sym) : [...cur, sym];
+    if (!next.length) return;                                         // keep at least one; turn kinds off to mute
+    save({ ...p, symbols: next.length === held.length ? [] : next });
+  };
+  return (
+    <div className="card overflow-hidden">
+      <p className="border-b border-[var(--border)] px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">What to send</p>
+      <ul className="divide-y divide-[var(--border)]">
+        {KINDS.map((k) => (
+          <li key={k.key} className="flex items-center gap-4 px-5 py-3.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[14.5px] font-medium text-foreground">{k.label}</p>
+              <p className="text-[12.5px] leading-snug text-foreground/55">{k.desc}</p>
+            </div>
+            <Switch on={!!p[k.key]} label={k.label} onChange={(v) => save({ ...p, [k.key]: v })} />
+          </li>
+        ))}
+      </ul>
+      <div className="border-t border-[var(--border)] px-5 py-4">
+        <p className="text-[14.5px] font-medium text-foreground">Stocks</p>
+        <p className="text-[12.5px] text-foreground/55">Only alert for the ones selected.</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <button onClick={() => save({ ...p, symbols: [] })} aria-pressed={all}
+            className={clsx("h-8 rounded-full border px-3 text-[12px] font-medium", all ? "border-foreground bg-foreground text-[var(--background)]" : "border-[var(--border)] text-foreground/60")}>
+            All my stocks
+          </button>
+          {held.map((sym) => {
+            const on = all || p.symbols.includes(sym);
+            return (
+              <button key={sym} onClick={() => toggleSym(sym)} aria-pressed={on}
+                className={clsx("h-8 rounded-full border px-3 font-mono text-[12px]", on ? "border-accent bg-accent/10 text-accent" : "border-[var(--border)] text-foreground/45")}>
+                {sym}
+              </button>
+            );
+          })}
+        </div>
+        {!all && p.symbols.some((s) => !held.includes(s)) && (
+          <p className="mt-2 text-[12px] text-foreground/45">Also kept: {p.symbols.filter((s) => !held.includes(s)).join(", ")} (not held right now).</p>
+        )}
+      </div>
+      {err && <p className="border-t border-[var(--border)] px-5 py-3 text-[13px] text-loss">{err}</p>}
+    </div>
+  );
+}
 
 type State = "checking" | "unsupported" | "needs-install" | "denied" | "off" | "on";
 
@@ -91,13 +173,12 @@ export function NotificationsSection() {
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-foreground/70">
             {state === "on" ? <Bell size={18} /> : <BellOff size={18} />}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[200px] flex-1">
             <p className="text-[15px] font-medium text-foreground">
               {state === "on" ? "On for this device" : state === "checking" ? "Checking…" : "Off on this device"}
             </p>
             <p className="text-[13px] text-foreground/55">
-              Buy-backs (most of the premium captured) and new trades from the hedge desk, checked every minute while the market is open.
-              Each alert comes once a day.
+              Checked every minute while the market is open. Each alert comes once a day. Choose which below.
             </p>
           </div>
           {state === "on" ? (
@@ -124,6 +205,8 @@ export function NotificationsSection() {
           </div>
         )}
       </div>
+
+      {state === "on" && <Controls />}
 
       {!!devices.data?.length && (
         <div className="card overflow-hidden">

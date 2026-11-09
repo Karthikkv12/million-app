@@ -545,3 +545,4 @@ class PushSubscription(Base):
     user_agent = Column(String, nullable=True)
     created_at = Column(String, nullable=False)                 # ISO UTC
     last_ok_at = Column(String, nullable=True)                  # last delivery the push service accepted
+    prefs      = Column(Text, nullable=True)                    # JSON: which alerts / symbols (notify.service.DEFAULT_PREFS)

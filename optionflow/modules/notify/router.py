@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from optionflow.core.deps import get_current_user
 from optionflow.modules.notify import service
-from optionflow.modules.notify.schemas import DeviceOut, PushConfigOut, SubscriptionIn, TestOut, UnsubscribeIn
+from optionflow.modules.notify.schemas import DeviceOut, NotifyPrefs, PushConfigOut, SubscriptionIn, TestOut, UnsubscribeIn
 
 router = APIRouter(prefix="/notify", tags=["notify"])
 
@@ -50,3 +50,17 @@ def test(user=Depends(get_current_user)) -> TestOut:
                                 "url": "/dashboard", "tag": "test"})
     devs = service.subscriptions(uid)
     return TestOut(**r, devices=len(devs), devices_out=[DeviceOut(**d) for d in devs])
+
+
+@router.get("/prefs", response_model=NotifyPrefs)
+def get_prefs(user=Depends(get_current_user)) -> NotifyPrefs:
+    """Which alerts are pushed, and for which symbols (the same on every device)."""
+    return NotifyPrefs(**service.get_prefs(int(user["sub"])))
+
+
+@router.put("/prefs", response_model=NotifyPrefs)
+def put_prefs(body: NotifyPrefs, user=Depends(get_current_user)) -> NotifyPrefs:
+    uid = int(user["sub"])
+    if not service.subscriptions(uid):
+        raise HTTPException(status_code=409, detail="Turn notifications on for a device first")
+    return NotifyPrefs(**service.set_prefs(uid, body.model_dump()))

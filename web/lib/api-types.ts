@@ -836,6 +836,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notify/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Prefs
+         * @description Which alerts are pushed, and for which symbols (the same on every device).
+         */
+        get: operations["get_prefs_api_v1_notify_prefs_get"];
+        /** Put Prefs */
+        put: operations["put_prefs_api_v1_notify_prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notify/subscriptions": {
         parameters: {
             query?: never;
@@ -3272,6 +3293,48 @@ export interface components {
             title: string;
             /** Url */
             url?: string | null;
+        };
+        /** NotifyPrefs */
+        NotifyPrefs: {
+            /**
+             * Buy Stock
+             * @default true
+             */
+            buy_stock: boolean;
+            /**
+             * Buyback
+             * @description A short option has given up most of its premium
+             * @default true
+             */
+            buyback: boolean;
+            /**
+             * Expiring Itm
+             * @description A short option is in the money with ≤ 1 day left
+             * @default false
+             */
+            expiring_itm: boolean;
+            /**
+             * Iv Spike
+             * @description ATM IV spikes on a holding
+             * @default false
+             */
+            iv_spike: boolean;
+            /**
+             * Sell Call
+             * @default true
+             */
+            sell_call: boolean;
+            /**
+             * Sell Put
+             * @default true
+             */
+            sell_put: boolean;
+            /**
+             * Symbols
+             * @description Only these symbols; empty = every holding
+             * @default []
+             */
+            symbols: string[];
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -6089,6 +6152,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    get_prefs_api_v1_notify_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+        };
+    };
+    put_prefs_api_v1_notify_prefs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotifyPrefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
