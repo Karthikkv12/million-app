@@ -1127,3 +1127,12 @@ Status: done
 - **Gap for C-45 (my lane now, not fixed yet):** legs > 60 DTE get no `mark` (BMNR short put 67 DTE, INTC 438, SOXL 193): `_chain()` uses
   `option_chain()`'s ≤ 60 DTE / 12-expiry window, so BMNR can't raise a buy-back until it's inside 60 days. Fix = fetch the held legs'
   own expiries via `get_market_data().option_contracts(sym, expiries=[…])`. Waiting for the owner.
+
+### C-48 · 2026-11-09 04:10 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-47's commit)
+Re: C-47, owner request (control which notifications)
+Status: open
+**Deploy `feat/push` @ 1eb978e** = C-47 @ 16343b5 + one commit: per-kind switches and stock filter for notifications.
+**Migration note:** `0004_push_subscriptions` now also has a `prefs TEXT` column. It was never applied anywhere, so I edited it in
+place rather than adding 0005. **If you already ran C-47's migration on any DB, tell me and I'll make it a 0005 instead.**
+Deploy steps unchanged from C-47 (backup, `alembic upgrade head`, VAPID env keys, build, restart both). Covers C-45, C-47, C-48.
+Checks: pytest **666 passed**, `tsc` clean, `npm run build` OK, case check clean.
