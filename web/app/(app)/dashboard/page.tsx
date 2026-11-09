@@ -14,9 +14,9 @@ import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
-import { bookBeta, dayPnl, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
+import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
-import { Quote, useQuotes } from "@/components/dashboard/quotes";
+import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -55,6 +55,12 @@ const LABEL: Record<string, Inst> = Object.fromEntries(PULSE.flatMap((g) => g.it
 const fmtPx = (sym: string, p: number) => LABEL[sym]?.fmt?.(p) ?? p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const chg = (q?: Quote) => (q?.change_pct != null ? q.change_pct / 100 : null);
 
+/** "AH +0.31%": the move since the last close, outside the regular session (ext_change_pct is in percent). */
+function ExtPct({ m }: { m: { label: string; pct: number } | null }) {
+  if (!m) return null;
+  return <span className="whitespace-nowrap text-foreground/45">{m.label} <span className={tone(m.pct)}>{m.pct > 0 ? "+" : ""}{m.pct.toFixed(2)}%</span></span>;
+}
+
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -72,6 +78,7 @@ function Tape({ quotes }: { quotes?: Record<string, Quote> }) {
               <span className="text-foreground/50">{LABEL[s]?.label ?? s}</span>
               <span className="text-foreground">{q?.price != null ? fmtPx(s, q.price) : "—"}</span>
               <span className={tone(chg(q))}>{pct(chg(q))}</span>
+              <ExtPct m={extMove(q?.session, q?.ext_change_pct)} />
             </Link>
           );
         })}
@@ -94,6 +101,8 @@ export default function DashboardPage() {
   const week = inc.data?.weekly.at(-1);
   const books = okBooks(hedge.data);
   const today = dayPnl(books);
+  const acct = liveAccount(p, books);
+  const unreal = p?.unrealized != null ? p.unrealized + (acct?.optionsUnrealized ?? 0) : null;
   const { beta } = bookBeta(books);
   const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
   const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
@@ -127,15 +136,22 @@ export default function DashboardPage() {
         {hasBook ? (
           <>
           <DeskFigures>
+            <DeskFigure sensitive size="lg" label={acct ? "Account value · live" : "Account value"}
+              value={<Tick value={acct ? Math.round(acct.value) : null}>{usd(acct?.value ?? p!.total_value, 0)}</Tick>}
+              sub={<>at sync {usd(p!.total_value, 0)}{p!.synced_at ? ` · ${new Date(p!.synced_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</>} />
             {today && (
-              <DeskFigure sensitive size="lg" label="Today · live" value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
-                sub={<>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
+              <DeskFigure sensitive size="lg"
+                label={today.ext ? `Today · ${today.closeDate ? new Date(today.closeDate + "T12:00").toLocaleDateString(undefined, { weekday: "short" }) : "last close"}` : "Today · live"}
+                value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
+                sub={today.ext
+                  ? <><span className={tone(today.ext.total)}><Tick value={Math.round(today.ext.total)}>{signed(today.ext.total, 0)}</Tick></span> {SESSION_LABEL[today.session ?? "closed"].toLowerCase()} · live</>
+                  : <>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
             )}
-            <DeskFigure sensitive size="lg" label="Account value" value={usd(p!.total_value, 0)}
-              sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} at last sync</span>} />
-            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={p!.unrealized != null ? Math.round(p!.unrealized) : null}>{signed(p!.unrealized, 0)}</Tick>} tone={tone(p!.unrealized)} sub={<>stocks <Tick value={p!.stock_value != null ? Math.round(p!.stock_value) : null}>{usd(p!.stock_value, 0)}</Tick></>} />
-            <DeskFigure sensitive size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
-            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={unreal != null ? Math.round(unreal) : null}>{signed(unreal, 0)}</Tick>} tone={tone(unreal)}
+              sub={<>stocks {signed(p!.unrealized, 0)}{acct ? <> · options {signed(acct.optionsUnrealized, 0)}</> : null}</>} />
+            <DeskFigure sensitive size="lg" label="Net premium · this week" value={signed(week?.premium ?? 0, 0)} tone={tone(week?.premium ?? 0)}
+              sub={`sold ${usd(week?.collected ?? 0, 0)} · bought back ${usd(week?.bought_back ?? 0, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`margin buying power ${usd(p!.buying_power, 0)}`} />
           </DeskFigures>
           {(perLot != null || beta != null) && (
             <Link href="/hedge" className="mt-5 grid gap-x-12 gap-y-2 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
@@ -253,7 +269,9 @@ export default function DashboardPage() {
                             <div className={clsx("absolute inset-y-0 left-0", (h.day_change_pct ?? 0) >= 0 ? "bg-gain/70" : "bg-loss/70")} style={{ width: `${w}%` }} />
                           </div>
                           <span className="text-right text-foreground"><Tick value={h.price}>{usd(h.price)}</Tick></span>
-                          <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}</span>
+                          <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}
+                            {extMove(h.session, h.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(h.session, h.ext_change_pct)} /></span>}
+                          </span>
                         </div>
                       </DeskRow>
                     </Link>
@@ -300,7 +318,9 @@ export default function DashboardPage() {
                       <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
                         <span className="truncate font-sans text-[13px] text-foreground/75">{it.label}</span>
                         <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
-                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}</span>
+                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}
+                          {extMove(qt?.session, qt?.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(qt?.session, qt?.ext_change_pct)} /></span>}
+                        </span>
                       </div>
                     );
                   })}
