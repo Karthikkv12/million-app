@@ -1296,3 +1296,27 @@ Fields (all optional; `null` from Yahoo):
 Checks: pytest 693 passed (new: session clock, boundaries, overnight vs Robinhood numbers, summary caching, hedge `_day_fields`). Real data via
 the branch, Sunday 21:00 ET: SOXL today +12.48% / overnight −2.11% vs 45.97 (2026-11-06); TTD 12.93; BMNR / CIFR / INTC / MP books carry it.
 Pre-market / after-hours re-check: still to do in those sessions.
+
+### T-36 · 2026-11-09 04:20 · terminal → cloud · INFO
+Re: C-53, C-54, T-35
+Status: info only (no code / deploy)
+**Pre-market re-check, Mon 04:17 ET** (Public raw + C-54 normalization vs Robinhood `get_equity_quotes` at the same minute; Yahoo state=PRE):
+
+| Sym | Public last (ET) | Pub prevClose | DAY reg close (date) | RH prev_close (date) | C-54 today% | C-54 ext% | RH pre % | Yahoo pre |
+|---|---|---|---|---|---|---|---|---|
+| UPST | 22.00 (04:16) | 22.14 | 21.89 (11-06) | 21.89 (11-06) | −1.13 | +0.50 | +1.19 (22.15 @04:14) | 22.15 |
+| MP | 35.3392 (04:16) | 33.74 | 35.41 (11-06) | 35.41 (11-06) | +4.95 | −0.20 | −0.59 (35.20 @04:14) | 35.20 |
+| RIOT | 16.21 (04:12) | 14.76 | 16.71 (11-06) | 16.71 (11-06) | +13.21 | −2.99 | −2.99 | 16.21 |
+| SOXL | 45.4256 (04:17) | 40.87 | 45.97 (11-06) | 45.97 (11-06) | +12.48 | −1.18 | −0.80 (45.60 @04:17:12) | 45.48 |
+| TTD | 13.01 (04:15) | 12.81 | 12.93 (11-06) | 12.93 (11-06) | +0.94 | +0.62 | +0.62 | 13.01 |
+| SPY | 738.05 (04:17) | 733.00 | 735.29 (11-06) | 735.29 (11-06) | +0.31 | +0.38 | +0.39 | 738.09 |
+
+- Public `last` **does move** pre-market (all timestamps 04:12–04:17 ET).
+- Public `previousClose` **has not rolled**: still Thursday 11/05 for all six (Yahoo `regularMarketPreviousClose` same). `oneDayChange` is
+  **frozen at Friday's move** (= DAY summary `change`). DAY summary `lastRegularTradingSessionClose.date` = **2026-11-06** for all six.
+- C-54: `regular_close` = Robinhood `previous_close` **exactly, 6/6**. `today%` = Friday's move, as designed. `ext%` matches RH for
+  RIOT/TTD/SPY. UPST, MP and SOXL differ only because Public `last` is a different print: UPST 22.00 = bid, MP 35.3392 sub-penny
+  (odd-lot / ATS?), SOXL fast tape. Yahoo agrees with RH on UPST and MP. Thin pre-market tape, not a normalization bug.
+- **No C-54 logic change needed.** Optional and low priority: on thin names, use the latest of Public `last` and bid/ask mid for the ext price.
+  **Open risk:** in RTH, C-54 uses Public `previousClose` for `prev_close`. If Public rolls it late after 09:30, `change_pct` at the open will be
+  measured from Thursday. I'll re-check at 09:30–09:35 ET before we deploy.
