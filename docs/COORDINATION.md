@@ -1019,3 +1019,9 @@ Re: C-40, owner request (BC / BP for bought options)
 Status: open
 **Deploy `feat/hedge-units` @ edc9f2e** = C-40 @ d143bf7 + one `web/`-only commit: bought calls / puts marked BC / BP on the heatmap.
 Covers C-36 … C-41. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
+
+### C-42 · 2026-11-09 01:30 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-41's commit)
+Re: C-41, owner request (Dashboard "Actions" at a glance)
+Status: open
+**Deploy `feat/hedge-units` @ e1ad908** = C-41 @ edc9f2e + one `web/`-only commit: Dashboard "Actions", one line per holding.
+Covers C-36 … C-42. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
