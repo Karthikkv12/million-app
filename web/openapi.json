@@ -3455,6 +3455,46 @@
     "title": "CreditCardWeekRequest",
     "type": "object"
    },
+   "DeviceOut": {
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "last_ok_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Ok At"
+     },
+     "user_agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Agent"
+     }
+    },
+    "required": [
+     "id",
+     "created_at"
+    ],
+    "title": "DeviceOut",
+    "type": "object"
+   },
    "DividendOut": {
     "properties": {
      "ex_date": {
@@ -7079,6 +7119,32 @@
     "title": "PriceHistoryOut",
     "type": "object"
    },
+   "PushConfigOut": {
+    "properties": {
+     "enabled": {
+      "description": "Push is configured on the server (VAPID keys set)",
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "public_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VAPID public key, base64url; pass to pushManager.subscribe",
+      "title": "Public Key"
+     }
+    },
+    "required": [
+     "enabled"
+    ],
+    "title": "PushConfigOut",
+    "type": "object"
+   },
    "QuoteOut": {
     "properties": {
      "change": {
@@ -8345,6 +8411,45 @@
     "title": "StockInfoOut",
     "type": "object"
    },
+   "SubscriptionIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "pattern": "^https://",
+      "title": "Endpoint",
+      "type": "string"
+     },
+     "keys": {
+      "$ref": "#/components/schemas/SubscriptionKeys"
+     }
+    },
+    "required": [
+     "endpoint",
+     "keys"
+    ],
+    "title": "SubscriptionIn",
+    "type": "object"
+   },
+   "SubscriptionKeys": {
+    "properties": {
+     "auth": {
+      "maxLength": 100,
+      "title": "Auth",
+      "type": "string"
+     },
+     "p256dh": {
+      "maxLength": 200,
+      "title": "P256Dh",
+      "type": "string"
+     }
+    },
+    "required": [
+     "p256dh",
+     "auth"
+    ],
+    "title": "SubscriptionKeys",
+    "type": "object"
+   },
    "SuggestionOut": {
     "properties": {
      "action": {
@@ -8617,6 +8722,42 @@
     "title": "SyncLedgerOut",
     "type": "object"
    },
+   "TestOut": {
+    "properties": {
+     "devices": {
+      "title": "Devices",
+      "type": "integer"
+     },
+     "devices_out": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/DeviceOut"
+      },
+      "title": "Devices Out",
+      "type": "array"
+     },
+     "failed": {
+      "title": "Failed",
+      "type": "integer"
+     },
+     "removed": {
+      "title": "Removed",
+      "type": "integer"
+     },
+     "sent": {
+      "title": "Sent",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "sent",
+     "failed",
+     "removed",
+     "devices"
+    ],
+    "title": "TestOut",
+    "type": "object"
+   },
    "TickerSearchResult": {
     "properties": {
      "exchange": {
@@ -8736,6 +8877,20 @@
      "label"
     ],
     "title": "UnitOut",
+    "type": "object"
+   },
+   "UnsubscribeIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "title": "Endpoint",
+      "type": "string"
+     }
+    },
+    "required": [
+     "endpoint"
+    ],
+    "title": "UnsubscribeIn",
     "type": "object"
    },
    "UnusualRow": {
@@ -12755,6 +12910,191 @@
     "summary": "Watchlist Quotes",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/notify/config": {
+   "get": {
+    "description": "Whether push is set up on the server, and the key the browser subscribes with.",
+    "operationId": "push_config_api_v1_notify_config_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PushConfigOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Push Config",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/devices": {
+   "get": {
+    "operationId": "devices_api_v1_notify_devices_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Devices Api V1 Notify Devices Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Devices",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/subscriptions": {
+   "post": {
+    "description": "Save this browser's push subscription (from pushManager.subscribe).",
+    "operationId": "subscribe_api_v1_notify_subscriptions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubscriptionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Subscribe Api V1 Notify Subscriptions Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Subscribe",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/test": {
+   "post": {
+    "description": "Send a test notification to every device of the signed-in user.",
+    "operationId": "test_api_v1_notify_test_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Test",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/unsubscribe": {
+   "post": {
+    "operationId": "unsubscribe_api_v1_notify_unsubscribe_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UnsubscribeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Unsubscribe Api V1 Notify Unsubscribe Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unsubscribe",
+    "tags": [
+     "notify"
     ]
    }
   },

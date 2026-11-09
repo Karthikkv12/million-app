@@ -530,3 +530,18 @@ class BrokerActivity(Base):
 
 Index("ux_broker_activity_ext", BrokerActivity.user_id, BrokerActivity.source, BrokerActivity.ext_id, unique=True)
 
+
+
+class PushSubscription(Base):
+    """A browser's Web Push subscription (notify module). One row per device; the endpoint is the push
+    service URL the browser gave us, p256dh / auth its encryption keys (base64url). Deleted when the push
+    service answers 404 / 410."""
+    __tablename__ = "push_subscriptions"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint   = Column(String, nullable=False, unique=True)
+    p256dh     = Column(String, nullable=False)
+    auth       = Column(String, nullable=False)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)                 # ISO UTC
+    last_ok_at = Column(String, nullable=True)                  # last delivery the push service accepted

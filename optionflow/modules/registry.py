@@ -60,6 +60,11 @@ def _ai() -> List[APIRouter]:
     return [router]
 
 
+def _notify() -> List[APIRouter]:
+    from optionflow.modules.notify.router import router
+    return [router]
+
+
 MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "auth": _auth,
     "market": _market,
@@ -71,4 +76,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "portfolio": _portfolio,
     "budget": _budget,
     "hedge": _hedge,
+    "notify": _notify,          # phone notifications (Web Push) for the hedge desk
 }

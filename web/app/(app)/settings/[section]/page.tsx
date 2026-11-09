@@ -6,10 +6,12 @@ import { ChevronLeft } from "lucide-react";
 import { SETTINGS_PAGES } from "../registry";
 import { ProfileSection, AppearanceSection, PasswordSection, DevicesSection, ActivitySection } from "../sections";
 import { UsersSection } from "@/components/settings/UsersSection";
+import { NotificationsSection } from "@/components/settings/NotificationsSection";
 
 const COMPONENTS: Record<string, () => JSX.Element> = {
   profile: ProfileSection,
   appearance: AppearanceSection,
+  notifications: NotificationsSection,
   security: PasswordSection,
   devices: DevicesSection,
   activity: ActivitySection,

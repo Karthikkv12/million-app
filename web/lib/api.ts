@@ -943,3 +943,14 @@ export const fetchBrokerHistory = (account?: string | null, days = 365) =>
 export const fetchBrokerIncome = (account?: string | null) => api.get<BrokerIncome>(`/broker/income${acctQ(account)}`);
 export const fetchBrokerActivity = (account?: string | null, limit = 300) =>
   api.get<BrokerActivity[]>(`/broker/activity${acctQ(account, { limit: String(limit) })}`);
+
+// ── Phone notifications (Web Push) ───────────────────────────────────────────
+export type PushConfig = Schemas["PushConfigOut"];
+export type PushDevice = Schemas["DeviceOut"];
+export type PushTest = Schemas["TestOut"];
+export const fetchPushConfig = () => api.get<PushConfig>("/notify/config");
+export const fetchPushDevices = () => api.get<PushDevice[]>("/notify/devices");
+export const savePushSubscription = (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+  api.post<PushDevice[]>("/notify/subscriptions", sub);
+export const removePushSubscription = (endpoint: string) => api.post<PushDevice[]>("/notify/unsubscribe", { endpoint });
+export const sendTestPush = () => api.post<PushTest>("/notify/test");

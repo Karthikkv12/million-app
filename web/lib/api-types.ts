@@ -799,6 +799,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notify/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Push Config
+         * @description Whether push is set up on the server, and the key the browser subscribes with.
+         */
+        get: operations["push_config_api_v1_notify_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices */
+        get: operations["devices_api_v1_notify_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe
+         * @description Save this browser's push subscription (from pushManager.subscribe).
+         */
+        post: operations["subscribe_api_v1_notify_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test
+         * @description Send a test notification to every device of the signed-in user.
+         */
+        post: operations["test_api_v1_notify_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsubscribe */
+        post: operations["unsubscribe_api_v1_notify_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/options/gamma-exposure/{symbol}": {
         parameters: {
             query?: never;
@@ -2583,6 +2677,17 @@ export interface components {
              */
             week_start: string;
         };
+        /** DeviceOut */
+        DeviceOut: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Last Ok At */
+            last_ok_at?: string | null;
+            /** User Agent */
+            user_agent?: string | null;
+        };
         /** DividendOut */
         DividendOut: {
             /** Ex Date */
@@ -3548,6 +3653,19 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** PushConfigOut */
+        PushConfigOut: {
+            /**
+             * Enabled
+             * @description Push is configured on the server (VAPID keys set)
+             */
+            enabled: boolean;
+            /**
+             * Public Key
+             * @description VAPID public key, base64url; pass to pushManager.subscribe
+             */
+            public_key?: string | null;
+        };
         /** QuoteOut */
         QuoteOut: {
             /** Change */
@@ -3807,6 +3925,19 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /** SubscriptionIn */
+        SubscriptionIn: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["SubscriptionKeys"];
+        };
+        /** SubscriptionKeys */
+        SubscriptionKeys: {
+            /** Auth */
+            auth: string;
+            /** P256Dh */
+            p256dh: string;
+        };
         /** SuggestionOut */
         SuggestionOut: {
             /**
@@ -3887,6 +4018,22 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** TestOut */
+        TestOut: {
+            /** Devices */
+            devices: number;
+            /**
+             * Devices Out
+             * @default []
+             */
+            devices_out: components["schemas"]["DeviceOut"][];
+            /** Failed */
+            failed: number;
+            /** Removed */
+            removed: number;
+            /** Sent */
+            sent: number;
+        };
         /** TickerSearchResult */
         TickerSearchResult: {
             /**
@@ -3946,6 +4093,11 @@ export interface components {
              * @default 0
              */
             shares: number;
+        };
+        /** UnsubscribeIn */
+        UnsubscribeIn: {
+            /** Endpoint */
+            endpoint: string;
         };
         /** UnusualRow */
         UnusualRow: {
@@ -5888,6 +6040,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_config_api_v1_notify_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigOut"];
+                };
+            };
+        };
+    };
+    devices_api_v1_notify_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    subscribe_api_v1_notify_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_api_v1_notify_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestOut"];
+                };
+            };
+        };
+    };
+    unsubscribe_api_v1_notify_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
                 };
             };
             /** @description Validation Error */
