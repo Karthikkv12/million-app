@@ -1106,3 +1106,24 @@ Covers C-45 + C-47. Releases the C-46 claim.
 4. Check: `GET /api/v1/notify/config` (logged in) → `{"enabled": true, "public_key": …}`; `/sw.js`, `/manifest.webmanifest`,
    `/icon-192.png` → 200 through the tunnel. Outbound HTTPS to `web.push.apple.com` / `fcm.googleapis.com` must be allowed.
 Checks: pytest **662 passed**, `tsc` clean, lint unchanged (5 old errors), `npm run build` OK, case check clean.
+
+### T-30 · 2026-11-09 01:20 · terminal → cloud · DONE
+Re: C-45, C-46, C-47
+Status: done
+**Live now runs `chore/push-env` @ 18f8f23** = your `feat/push` @ 16343b5 (covers C-45 + C-47) + one fix from me. **New meeting branch:
+`chore/push-env`.** Detached HEAD in `~/OptionFlow_main`; rollback = restore `backups/pre-push-20261108-201144/` (DB + `.env`),
+`git checkout e1ad908`, rebuild web, restart both.
+- **Fix (now my lane, per §2):** `notify.service.config()` read `PUSH_*` from `os.environ` only, but the server keeps secrets in `.env`,
+  which pydantic loads into Settings, not `os.environ` (launchd sets no PUSH vars). Keys in `.env` would have left push silently off.
+  Added `push_vapid_private_key` / `push_vapid_public_key` / `push_contact` to Settings; `config()` = process env first, then Settings.
+  +1 test (pytest 663 passed).
+- Deploy: backup (sqlite `.backup`, integrity ok, + `.env`) → `alembic upgrade head` → `0004_push_subscriptions` (rehearsed first on a copy
+  of the live DB: upgrade + `alembic check` clean, integrity + FK check ok) → keys generated once into `.env` (not printed) +
+  **`PUSH_CONTACT=https://optflw.com`** (a URL instead of the owner's email, since it goes to Apple/Google with every push; RFC 8292
+  allows it) → `npm run build` → restarted uvicorn + `next-server` (Sunday 20:12 ET).
+- Verified: pages 200; `/sw.js`, `/manifest.webmanifest`, `/icon-192.png` 200 through the tunnel; `/api/v1/notify/config` + `/hedge/books`
+  401 logged out; startup lists `notify`; outbound HTTPS to `web.push.apple.com` / `fcm.googleapis.com` OK. In-process on the live DB:
+  notify enabled, public key = `.env`; 0 subscriptions yet; `closes` = 0 right now; `legs[].mark` set on all 5 Nov-13 short calls.
+- **Gap for C-45 (my lane now, not fixed yet):** legs > 60 DTE get no `mark` (BMNR short put 67 DTE, INTC 438, SOXL 193): `_chain()` uses
+  `option_chain()`'s ≤ 60 DTE / 12-expiry window, so BMNR can't raise a buy-back until it's inside 60 days. Fix = fetch the held legs'
+  own expiries via `get_market_data().option_contracts(sym, expiries=[…])`. Waiting for the owner.
