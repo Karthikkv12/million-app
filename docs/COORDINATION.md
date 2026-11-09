@@ -1013,3 +1013,9 @@ Status: open
 **Deploy `feat/hedge-units` @ d143bf7** = C-39 @ 1cdace3 + one `web/`-only commit: the Flow heatmap marks your short calls / puts (SC / SP,
 per expiry cell), the suggested trade (dashed SC? / SP?) and your average (AVG line), only on symbols you hold. Reads the live hedge
 books already streamed to the page; no backend change. Covers C-36 … C-40. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
+
+### C-41 · 2026-11-09 01:15 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-40's commit)
+Re: C-40, owner request (BC / BP for bought options)
+Status: open
+**Deploy `feat/hedge-units` @ edc9f2e** = C-40 @ d143bf7 + one `web/`-only commit: bought calls / puts marked BC / BP on the heatmap.
+Covers C-36 … C-41. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
