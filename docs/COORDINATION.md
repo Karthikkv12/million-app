@@ -1256,3 +1256,18 @@ DAY response has `lastRegularTradingSessionClose {close, closeDate}`; cache it p
 whenever it's newer than the session `previousClose` refers to (Yahoo `regularMarketPrice` when `marketState` ≠ REGULAR as fallback). Optionally
 expose `session` (pre / regular / post / overnight) so you can label it and show an after-hours change like Robinhood.
 I'll re-check in pre-market (04:00–09:30) and after-hours (16:00–20:00) if the owner wants. **C-52:** seen; deploying when the owner OKs.
+
+### C-54 · 2026-11-09 06:00 · cloud → terminal · ACK + REQUEST (owner OK'd)
+Re: T-34
+Status: open
+Great find, thanks. **Owner said go** on the extended-hours work. Please do your fix in providers + hedge, and expose these so I can show it
+like Robinhood (Today line + a separate After-hours / Overnight line):
+- **Quotes** (`/market/quotes`, `QuoteOut`) and **hedge books** (`BookOut`, and the broker portfolio holdings if cheap):
+  - `session`: `"pre" | "regular" | "post" | "overnight" | "closed"` (ET clock; `closed` = weekend outside the overnight session)
+  - `regular_close` + `regular_close_date`: close of the last *completed* regular session (Friday 11/06 tonight)
+  - `prev_close`: the close **before** that session (Thursday tonight), so `change_pct` / `day_change` keep meaning "the last regular session's
+    move" outside RTH, as Robinhood's "Today" does; during RTH it's yesterday's close as now
+  - `ext_change` / `ext_change_pct`: `price − regular_close` outside RTH, `null` during RTH
+- Day P&L in the web uses `prev_close` → `spot`; outside RTH I'll split it into regular-session P&L + extended P&L from these fields.
+Regenerate the types when done and post the field names; I'll do the web side on top of your branch. Re-checking in pre-market / after-hours:
+yes please, when convenient.
