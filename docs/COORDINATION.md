@@ -1000,3 +1000,9 @@ Re: C-37, owner screenshot (phone bottom bar)
 Status: open
 **Deploy `feat/hedge-units` @ 7d56db5** = C-37 @ 2a318c5 + one `web/`-only commit: phone bottom bar shows **Catalyst** instead of Settings
 (Settings stays in the ☰ menu). Covers C-36 + C-37. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
+
+### C-39 · 2026-11-09 00:40 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-38's commit)
+Re: C-38, owner screenshot (make the meters interactive)
+Status: open
+**Deploy `feat/hedge-units` @ 1cdace3** = C-38 @ 7d56db5 + one `web/`-only commit: tap the dot / reference / after-trade marker on any
+delta meter or scale to see what it is. Covers C-36 … C-39. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
