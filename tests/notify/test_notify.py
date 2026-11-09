@@ -193,3 +193,21 @@ def test_api_prefs(client, keys):
     r = client.put("/api/v1/notify/prefs", json={"buyback": True, "sell_call": False, "symbols": ["mp"]}, headers=h).json()
     assert r["sell_call"] is False and r["symbols"] == ["MP"] and r["iv_spike"] is False
     assert client.get("/api/v1/notify/prefs", headers=h).json() == r
+
+
+def test_config_reads_keys_from_settings_when_not_in_process_env(monkeypatch):
+    """The server keeps PUSH_* in .env, which only Settings reads (not os.environ)."""
+    from optionflow.core import settings as settings_mod
+    from optionflow.modules.notify import service, webpush
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import serialization
+    import base64
+    key = ec.generate_private_key(ec.SECP256R1())
+    raw = key.private_numbers().private_value.to_bytes(32, "big")
+    priv = base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    monkeypatch.delenv("PUSH_VAPID_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("PUSH_CONTACT", raising=False)
+    fake = settings_mod.Settings(push_vapid_private_key=priv, push_contact="https://optflw.com")
+    monkeypatch.setattr(settings_mod, "get_settings", lambda: fake)
+    got_priv, pub, contact = service.config()
+    assert got_priv is not None and pub == webpush.public_key_b64(got_priv) and contact == "https://optflw.com"

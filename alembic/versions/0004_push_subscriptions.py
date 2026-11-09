@@ -29,7 +29,6 @@ def upgrade() -> None:
     sa.Column('user_agent', sa.String(), nullable=True),
     sa.Column('created_at', sa.String(), nullable=False),
     sa.Column('last_ok_at', sa.String(), nullable=True),
-    sa.Column('prefs', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('endpoint')
