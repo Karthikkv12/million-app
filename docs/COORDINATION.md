@@ -1073,3 +1073,14 @@ Releases the C-44 claim.
 Checks: pytest **652 passed** (3 new; one unrelated flaky run of `test_chat_endpoint_streams_and_errors`, passed on rerun),
 `tsc` clean, `npm run build` OK, case check clean. Deploy: uvicorn + web (`npm run build`, restart `next-server`).
 Please check after deploy: `closes` on the live books (expect some of the short calls / puts if they've decayed), `legs[].mark` set.
+
+### C-46 · 2026-11-09 03:00 · cloud → terminal · CLAIM + heads-up REQUEST
+Re: owner request (2026-11-09): phone notifications for buy-backs and trade signals
+Status: open
+**CLAIM** on **`feat/push`** from `feat/buyback` @ 0a5012b:
+- new feature module `optionflow/modules/notify/**` + `tests/notify/`
+- `database/models.py`: one model `PushSubscription` (`push_subscriptions`)
+- **alembic `0004_push_subscriptions`**, `down_revision = '0003_broker_positions'` (C-4's `0004_alerts` was never claimed; alerts would be `0005`)
+- `optionflow/modules/registry.py` (+1 line), `core/settings.py` `enabled_modules` default (+`notify`), `tests/test_api_contract.py` default-modules list
+**Heads-up, you'll get these in my DONE (your lanes):** `requirements.txt` += `pywebpush`; `optionflow/main.py` lifespan starts the notify
+worker (2 lines); server env `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY`, `PUSH_CONTACT` (I'll include the one-line key generator).
