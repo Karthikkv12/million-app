@@ -119,14 +119,16 @@ def portfolio(user_id: int, account: Optional[str] = None, live: bool = True) ->
                 short_calls[sym] += -p["quantity"]
             options.append(p)
 
-    prices: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+    prices: Dict[str, Tuple[Optional[float], Dict[str, Any]]] = {}
     if live:
         for sym in {p["symbol"] for p in positions}:
-            prices[sym] = (service._spot(sym), service._prev_close(sym))
+            px = service._spot(sym)
+            prices[sym] = (px, service._day_fields(sym, px) if px else {})
 
     holdings = []
     for sym, h in sorted(stocks.items()):
-        px, prev = prices.get(sym, (None, None))
+        px, day = prices.get(sym, (None, {}))
+        prev = day.get("prev_close")
         shares = h["shares"]
         avg = h["cost"] / shares if shares else None
         mv = px * shares if px else None
@@ -135,7 +137,9 @@ def portfolio(user_id: int, account: Optional[str] = None, live: bool = True) ->
             "symbol": sym, "accounts": sorted(h["accounts"]), "shares": shares, "avg_cost": avg, "price": px,
             "prev_close": prev, "market_value": mv, "cost_basis": h["cost"], "unrealized": unreal,
             "unrealized_pct": (px / avg - 1.0) if px and avg else None,
-            "day_change_pct": (px / prev - 1.0) if px and prev else None,
+            "day_change_pct": day.get("day_change"),
+            "session": day.get("session"), "regular_close": day.get("regular_close"),
+            "ext_change_pct": day.get("ext_change_pct"),
             "short_calls": short_calls.get(sym, 0.0),
             "covered_pct": min(1.0, short_calls.get(sym, 0.0) * 100.0 / shares) if shares > 0 else 0.0,
         })

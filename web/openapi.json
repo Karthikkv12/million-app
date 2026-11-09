@@ -1151,6 +1151,29 @@
       ],
       "title": "Error"
      },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "spot \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
+     },
      "gap": {
       "anyOf": [
        {
@@ -1243,6 +1266,7 @@
         "type": "null"
        }
       ],
+      "description": "Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)",
       "title": "Prev Close"
      },
      "regime": {
@@ -1259,6 +1283,47 @@
        }
       ],
       "title": "Regime"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
      },
      "shares": {
       "anyOf": [
@@ -1702,7 +1767,20 @@
         "type": "null"
        }
       ],
+      "description": "Fraction. Outside the regular session: that last session's move",
       "title": "Day Change Pct"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Percent since regular_close, outside the regular session",
+      "title": "Ext Change Pct"
      },
      "market_value": {
       "anyOf": [
@@ -1736,6 +1814,35 @@
        }
       ],
       "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
      },
      "shares": {
       "title": "Shares",
@@ -7195,6 +7302,7 @@
     "type": "object"
    },
    "QuoteOut": {
+    "description": "Outside the regular session, prev_close / change / change_pct describe the last regular session's move\n(Robinhood's \"Today\") and ext_change the move since its close (after-hours / overnight).",
     "properties": {
      "change": {
       "anyOf": [
@@ -7218,6 +7326,29 @@
       ],
       "title": "Change Pct"
      },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "price \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
+     },
      "prev_close": {
       "anyOf": [
        {
@@ -7239,6 +7370,49 @@
        }
       ],
       "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "YYYY-MM-DD of regular_close",
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "US equity session (ET) when quoted; null for Yahoo-served or crypto quotes",
+      "title": "Session"
      },
      "symbol": {
       "title": "Symbol",

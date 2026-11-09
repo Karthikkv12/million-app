@@ -128,3 +128,11 @@ def user_id(db_engine_and_session):
     """A real user in the test database (rows that reference users need one)."""
     from optionflow.modules.auth import service as auth_service
     return auth_service.create_user("fixture_user", "FixturePassword12")
+
+
+@pytest.fixture(autouse=True)
+def _public_quotes_in_regular_hours(monkeypatch):
+    """Public quote normalization depends on the ET session clock; tests run in regular hours unless they
+    pin `optionflow.providers.public._now` themselves."""
+    from optionflow.providers import public
+    monkeypatch.setattr(public, "_now", lambda: public._REGULAR_HOURS)

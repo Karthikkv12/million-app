@@ -25,6 +25,10 @@ CHAIN_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "iv", "mid", "gamm
 
 # Columns of ContractChain.rows (every quoted contract, open interest or not):
 #   strike, expiry (YYYY-MM-DD), otype ("call"/"put"), oi, volume, bid, ask, last, iv (None when unquoted)
+# Extended-hours fields on a Public quote (see public.normalize_quote); None from Yahoo.
+SESSION_FIELDS = ("session", "regular_close", "regular_close_date", "ext_change", "ext_change_pct")
+QUOTE_FIELDS = ("price", "prev_close", "change", "change_pct") + SESSION_FIELDS
+
 CONTRACT_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "bid", "ask", "last", "iv"]
 
 
@@ -187,7 +191,7 @@ class PublicFirstMarketData:
     def quote(self, symbol: str) -> Dict[str, Any]:
         q = self._public_quotes([symbol]).get(symbol.strip().upper())
         if q is not None:
-            return {k: q[k] for k in ("price", "prev_close", "change", "change_pct")} | {"symbol": symbol}
+            return {k: q.get(k) for k in QUOTE_FIELDS} | {"symbol": symbol}
         return self.fallback.quote(symbol)
 
     def last_price(self, symbol: str) -> Optional[float]:

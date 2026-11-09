@@ -1985,6 +1985,13 @@ export interface components {
             dollar_gamma_1pct?: number | null;
             /** Error */
             error?: string | null;
+            /**
+             * Ext Change
+             * @description spot − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
             /** Gap */
             gap?: number | null;
             iv?: components["schemas"]["IvOut"] | null;
@@ -2002,10 +2009,22 @@ export interface components {
             net_delta?: number | null;
             /** Net Gamma */
             net_gamma?: number | null;
-            /** Prev Close */
+            /**
+             * Prev Close
+             * @description Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)
+             */
             prev_close?: number | null;
             /** Regime */
             regime?: ("bull" | "high-vol") | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /** Regular Close Date */
+            regular_close_date?: string | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Shares */
             shares?: number | null;
             /** Spot */
@@ -2125,14 +2144,26 @@ export interface components {
              * @default 0
              */
             covered_pct: number;
-            /** Day Change Pct */
+            /**
+             * Day Change Pct
+             * @description Fraction. Outside the regular session: that last session's move
+             */
             day_change_pct?: number | null;
+            /**
+             * Ext Change Pct
+             * @description Percent since regular_close, outside the regular session
+             */
+            ext_change_pct?: number | null;
             /** Market Value */
             market_value?: number | null;
             /** Prev Close */
             prev_close?: number | null;
             /** Price */
             price?: number | null;
+            /** Regular Close */
+            regular_close?: number | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Shares */
             shares: number;
             /**
@@ -3729,16 +3760,42 @@ export interface components {
              */
             public_key?: string | null;
         };
-        /** QuoteOut */
+        /**
+         * QuoteOut
+         * @description Outside the regular session, prev_close / change / change_pct describe the last regular session's move
+         *     (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight).
+         */
         QuoteOut: {
             /** Change */
             change?: number | null;
             /** Change Pct */
             change_pct?: number | null;
+            /**
+             * Ext Change
+             * @description price − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
             /** Prev Close */
             prev_close?: number | null;
             /** Price */
             price?: number | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /**
+             * Regular Close Date
+             * @description YYYY-MM-DD of regular_close
+             */
+            regular_close_date?: string | null;
+            /**
+             * Session
+             * @description US equity session (ET) when quoted; null for Yahoo-served or crypto quotes
+             */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Symbol */
             symbol: string;
         };

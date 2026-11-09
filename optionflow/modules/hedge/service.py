@@ -167,8 +167,29 @@ def _spot(sym: str) -> Optional[float]:
 
 
 def _prev_close(sym: str) -> Optional[float]:
-    q = CACHE.get("quote", sym, QUOTE_TTL, lambda: get_market_data().quote(sym))
-    return (q or {}).get("prev_close")
+    return _quote(sym).get("prev_close")
+
+
+def _quote(sym: str) -> Dict[str, Any]:
+    """Provider quote (prev_close + the session fields), cached QUOTE_TTL; {} when unavailable."""
+    return CACHE.get("quote", sym, QUOTE_TTL, lambda: get_market_data().quote(sym)) or {}
+
+
+def _day_fields(sym: str, spot: float) -> Dict[str, Any]:
+    """prev_close, day_change and the extended-hours fields for a book.
+
+    During the regular session (or when the quote has no session, e.g. from Yahoo) day_change = spot / prev − 1.
+    Outside it, like Robinhood: day_change = the last regular session's move, ext_change = spot − regular_close."""
+    q = _quote(sym)
+    prev, session, reg = q.get("prev_close"), q.get("session"), q.get("regular_close")
+    out = {"prev_close": prev, "session": session, "regular_close": reg,
+           "regular_close_date": q.get("regular_close_date"), "ext_change": None, "ext_change_pct": None,
+           "day_change": spot / prev - 1.0 if prev else None}
+    if session and session != "regular" and reg:
+        out["day_change"] = q["change_pct"] / 100.0 if q.get("change_pct") is not None else None
+        out["ext_change"] = round(spot - reg, 4)
+        out["ext_change_pct"] = round((spot - reg) / reg * 100, 4)
+    return out
 
 
 def _hv(sym: str) -> Dict[str, Optional[float]]:
@@ -309,8 +330,8 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     weekly = chain.get("weekly")
     quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)
               for (e, k, t), (iv, mid, dte) in rows.items() if e == weekly and iv > bs.MIN_SIGMA]
-    prev = _prev_close(sym)
-    day_change = spot / prev - 1.0 if prev else None
+    day = _day_fields(sym, spot)
+    prev, day_change = day["prev_close"], day["day_change"]
     ivs = TRACKER.state(sym, day_change)
     hv = _hv(sym)
     gx = _gex(sym)
@@ -318,7 +339,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
     book = evaluate(ctx, legs, quotes).to_dict()
     book.update({
-        "spot": round(spot, 4), "prev_close": prev, "day_change": day_change, "day_high": ctx.day_high,
+        "spot": round(spot, 4), **day, "day_high": ctx.day_high,
         "accounts": accounts, "weekly_expiry": weekly, "beta": _beta(sym), "chain_source": chain.get("source"),
         "iv": {"atm_iv": ivs.atm_iv or atm_iv, "iv_open": ivs.iv_open, "iv_roc_day": ivs.iv_roc_day,
                "iv_roc_15m": ivs.iv_roc_15m, "iv_high": ivs.iv_high, "spike": ivs.spike, "cooling": ivs.cooling,
