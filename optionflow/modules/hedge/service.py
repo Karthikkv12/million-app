@@ -240,6 +240,34 @@ def _chain(sym: str) -> Optional[Dict[str, Any]]:
     return CACHE.get("chain", sym, CHAIN_TTL, load)
 
 
+def _far_contracts(sym: str, expiries: List[str]) -> Dict[Tuple[str, float, str], Tuple[float, float, float]]:
+    """(iv, mid, dte) for held contracts outside the board chain's window (expiries > 60 DTE or beyond its
+    12-expiry cap), fetched for just those expiries and refreshed with the chain. {} when unavailable."""
+    def load():
+        fetch = getattr(get_market_data(), "option_contracts", None)
+        if fetch is None:
+            return {}
+        out: Dict[Tuple[str, float, str], Tuple[float, float, float]] = {}
+        for r in fetch(sym, expiries=list(expiries)).rows.itertuples(index=False):
+            bid, ask, last = (_num(r.bid), _num(r.ask), _num(r.last))
+            mid = (bid + ask) / 2 if bid and ask and ask >= bid else (last or 0.0)
+            out[(r.expiry, float(r.strike), str(r.otype))] = (_num(r.iv) or 0.0, mid, (_dte(r.expiry) or 0.0))
+        return out
+    try:
+        return CACHE.get("far", f"{sym}|{','.join(expiries)}", CHAIN_TTL, load) or {}
+    except Exception as exc:                       # no source could serve it: leave those legs unmarked
+        logger.info("hedge far contracts %s %s failed: %s", sym, expiries, exc)
+        return {}
+
+
+def _num(v: Any) -> Optional[float]:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if x == x else None
+
+
 def _atm_iv(rows: Dict[Tuple[str, float, str], Tuple[float, float, float]], expiry: Optional[str],
             spot: float) -> Optional[float]:
     if not expiry or not spot:
@@ -268,9 +296,13 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
         return {"symbol": sym, "error": f"No price for {sym} right now.", "accounts": accounts}
     rows = chain.get("rows") or {}
     atm_iv = chain.get("atm_iv")
+    far_exps = sorted({leg.expiry for leg in legs if leg.kind == "option" and leg.expiry
+                       and (leg.expiry, float(leg.strike or 0), leg.otype or "") not in rows})
+    far = _far_contracts(sym, far_exps) if far_exps else {}
     for leg in legs:                                   # IV per held contract, else ATM IV
         if leg.kind == "option":
-            hit = rows.get((leg.expiry, float(leg.strike or 0), leg.otype or ""))
+            key = (leg.expiry, float(leg.strike or 0), leg.otype or "")
+            hit = rows.get(key) or far.get(key)
             leg.iv = hit[0] if hit and hit[0] > bs.MIN_SIGMA else atm_iv
             leg.mark = hit[1] if hit and hit[1] > 0 else None
             leg.dte = _dte(leg.expiry)
