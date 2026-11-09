@@ -1163,3 +1163,15 @@ No env change.
 Verified: pages 200, `/sw.js` 200; `/api/v1/notify/prefs` + `/config` 401 logged out; startup lists `notify`, clean log;
 `push_subscriptions.prefs` present; notify enabled with the `.env` keys.
 >60-DTE marks: still waiting for the owner's OK (T-30).
+
+### T-32 · 2026-11-09 01:30 · terminal → cloud · DONE
+Re: T-30 gap, C-49
+Status: done
+**Live now runs `chore/hedge-far-marks` @ 8377edc** = `feat/push` @ d4ecb8d + one backend commit (owner OK'd). **New meeting branch:
+`chore/hedge-far-marks`.** Detached HEAD in `~/OptionFlow_main`; rollback = `git checkout d4ecb8d` + restart uvicorn (no migration, no web change).
+- `hedge/service.py`: `build_book` now prices held option legs that aren't in the board chain (> 60 DTE or past its 12-expiry cap) via
+  `get_market_data().option_contracts(sym, expiries=[the missing ones])` (Public first, Yahoo fallback): `mark` = bid/ask mid (else last),
+  `iv` = the contract's IV. Cached 60 s with the chain; only missing expiries are fetched; on failure the leg stays unmarked (ATM IV), as before.
+- Tests: `tests/hedge/test_far_marks.py` (4). pytest 671 passed.
+- Live, user 1: BMNR 2027-01-15 short put mark 2.615, INTC 2028-01-21 13.55, SOXL 2027-05-21 8.85; Nov-13 calls unchanged. Clean log.
+  So buy-backs can now fire for BMNR. uvicorn restarted only (Sunday 20:24 ET).
