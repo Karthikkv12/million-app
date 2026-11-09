@@ -32,7 +32,8 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -61,6 +62,7 @@ CHAIN_TTL = 20.0              # seconds a raw chain is reused: GEX, the scanner 
 HISTORY_TTL_INTRADAY = 30.0   # seconds an intraday bar series is reused
 HISTORY_TTL_DAILY = 300.0     # seconds a daily-or-longer bar series is reused
 
+ET = ZoneInfo("America/New_York")
 GATE = RateLimitGate(first=60.0, maximum=900.0, source="Public.com")   # separate from Yahoo's
 
 
@@ -116,15 +118,63 @@ def quote_price(q: Dict[str, Any]) -> Optional[float]:
     return (bid + ask) / 2 if bid and ask else None
 
 
-def normalize_quote(symbol: str, q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def overnight_window_start(now: Optional[datetime] = None) -> Optional[datetime]:
+    """Start (ET) of the overnight / weekend window that `now` falls in, else None.
+
+    The window runs from 20:00 ET on a weekday to 04:00 ET on the next weekday, so Friday 20:00 through
+    Monday 04:00 is one window. In it the last *completed* regular session is the reference close, like
+    Robinhood (exchange holidays aren't modelled)."""
+    et = (now or datetime.now(ET)).astimezone(ET)
+    day = et.replace(hour=20, minute=0, second=0, microsecond=0)
+    if et.weekday() < 5 and et.hour >= 20:
+        return day
+    if et.weekday() < 5 and 4 <= et.hour:
+        return None                                   # pre-market, regular or after-hours
+    back = day - timedelta(days=1)                    # before 04:00, or a weekend: start = last weekday 20:00
+    while back.weekday() >= 5:
+        back -= timedelta(days=1)
+    if et.weekday() >= 5:
+        back = day
+        while back.weekday() != 4:
+            back -= timedelta(days=1)
+    return back
+
+
+def reference_close(q: Dict[str, Any], price: float, now: Optional[datetime] = None) -> Optional[float]:
+    """The close a day change is measured from.
+
+    Public's `previousClose` stays at the close *before* the last session until the next session opens (overnight
+    on Sunday it is Thursday's close), while `oneDayChange.change` stays frozen at that last session's change. So
+    overnight / on weekends the last completed close is previousClose + oneDayChange.change. If Public has already
+    rolled over (a trade in this window and previousClose + change == the live price), previousClose is kept."""
+    prev = _f(q.get("previousClose"))
+    start = overnight_window_start(now)
+    if start is None or prev is None:
+        return prev
+    ch = _f((q.get("oneDayChange") or {}).get("change"))
+    if ch is None:
+        return prev
+    derived = round(prev + ch, 4)
+    ts = q.get("lastTimestamp")
+    try:
+        traded_in_window = bool(ts) and pd.Timestamp(ts).tz_convert(ET) >= start
+    except (ValueError, TypeError):
+        traded_in_window = False
+    if traded_in_window and abs(derived - price) < 0.006:
+        return prev                                   # oneDayChange is live: previousClose already rolled
+    return derived
+
+
+def normalize_quote(symbol: str, q: Dict[str, Any], now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
     """A Public quote → {symbol, price, prev_close, change, change_pct, volume} (Yahoo's quote shape
-    plus volume), or None when Public has no price for it."""
+    plus volume), or None when Public has no price for it. `prev_close` is the last completed regular
+    session's close overnight and on weekends (see reference_close)."""
     if q.get("outcome", "SUCCESS") != "SUCCESS":
         return None
     price = quote_price(q)
     if price is None:
         return None
-    prev = _f(q.get("previousClose"))
+    prev = reference_close(q, price, now)
     change = round(price - prev, 4) if prev is not None else None
     change_pct = round(change / prev * 100, 4) if change is not None and prev else None
     vol = _f(q.get("volume"))

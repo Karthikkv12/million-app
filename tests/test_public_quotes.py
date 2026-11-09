@@ -11,6 +11,14 @@ from optionflow.providers.market_data import PublicFirstMarketData, RateLimitGat
 from optionflow.providers.public import PublicClient, PublicOptionChains, PublicQuotes, normalize_quote
 
 
+@pytest.fixture(autouse=True)
+def _regular_hours_by_default(monkeypatch):
+    """Quotes here are regular-session quotes unless a test passes `now`: don't depend on the wall clock."""
+    from optionflow.providers import public as _public
+    real = _public.overnight_window_start
+    monkeypatch.setattr(_public, "overnight_window_start", lambda now=None: real(now) if now is not None else None)
+
+
 def _q(symbol, typ="EQUITY", last="101.5", prev="100", volume=1000, outcome="SUCCESS"):
     """Shape copied from a real Public quotes response (AAPL / SPX, 2026-11-07)."""
     return {"instrument": {"symbol": symbol, "type": typ}, "outcome": outcome, "last": last,
@@ -143,3 +151,60 @@ def test_hedge_prefetch_is_one_request(setup):
     hedge.prefetch_spots(["KO", "PEP", "AAPL"])
     assert [hedge._spot(s) for s in ("KO", "PEP", "AAPL")] == [101.5] * 3
     assert len(fake.quote_requests) == 1
+
+
+# ── overnight / weekend reference close (T-34) ───────────────────────────────
+from datetime import datetime as _dt
+from zoneinfo import ZoneInfo as _Z
+
+from optionflow.providers.public import normalize_quote as _nq, overnight_window_start as _ows
+
+_ET = _Z("America/New_York")
+_SUN_NIGHT = _dt(2026, 11, 8, 20, 48, tzinfo=_ET)          # overnight session after Friday 2026-11-06
+
+
+def _real(last, prev, change, ts):
+    """Real Public quotes, Sunday 2026-11-08 20:48 ET."""
+    return {"instrument": {"symbol": "X", "type": "EQUITY"}, "outcome": "SUCCESS", "last": last,
+            "lastTimestamp": ts, "previousClose": prev, "oneDayChange": {"change": change, "percentChange": "0"}}
+
+
+def test_window_boundaries():
+    f = lambda *a: _ows(_dt(*a, tzinfo=_ET))
+    fri8pm = _dt(2026, 11, 6, 20, 0, tzinfo=_ET)
+    assert f(2026, 11, 6, 19, 59) is None                    # Friday after-hours
+    assert f(2026, 11, 6, 20, 0) == fri8pm
+    assert f(2026, 11, 7, 12, 0) == fri8pm                   # Saturday
+    assert f(2026, 11, 8, 20, 48) == fri8pm                  # Sunday overnight
+    assert f(2026, 11, 9, 3, 59) == fri8pm                   # Monday before pre-market
+    assert f(2026, 11, 9, 4, 0) is None                      # Monday pre-market
+    assert f(2026, 11, 9, 12, 0) is None                     # regular
+    assert f(2026, 11, 10, 2, 0) == _dt(2026, 11, 9, 20, 0, tzinfo=_ET)
+
+
+@pytest.mark.parametrize("last,prev,change,ts,friday_close", [
+    ("45.23", "40.87", "5.1", "2026-11-09T01:48:00Z", 45.97),     # SOXL, traded overnight
+    ("35.59", "33.74", "1.67", "2026-11-09T01:40:40Z", 35.41),    # MP
+    ("21.90", "22.14", "-0.25", "2026-11-09T01:29:35Z", 21.89),   # UPST
+    ("7376.86", "7353.73", "23.13", "2026-11-06T21:00:00Z", 7376.86),  # SPX: no overnight prints
+])
+def test_overnight_change_is_vs_the_last_completed_session(last, prev, change, ts, friday_close):
+    q = _nq("X", _real(last, prev, change, ts), now=_SUN_NIGHT)
+    assert q["prev_close"] == pytest.approx(friday_close)
+    assert q["change"] == pytest.approx(float(last) - friday_close, abs=1e-4)
+
+
+def test_soxl_overnight_shows_minus_not_plus_ten_percent():
+    q = _nq("SOXL", _real("45.05", "40.87", "5.1", "2026-11-09T01:49:13Z"), now=_SUN_NIGHT)
+    assert q["change_pct"] == pytest.approx(-2.0, abs=0.05)
+
+
+def test_rolled_over_previous_close_is_kept():
+    # If Public has rolled (previousClose = Friday, oneDayChange live), prev + change == last: keep previousClose.
+    q = _nq("X", _real("45.05", "45.97", "-0.92", "2026-11-09T01:49:13Z"), now=_SUN_NIGHT)
+    assert q["prev_close"] == 45.97
+
+
+def test_regular_hours_use_previous_close_unchanged():
+    q = _nq("X", _real("46.50", "45.97", "0.53", "2026-11-09T15:00:00Z"), now=_dt(2026, 11, 9, 10, 0, tzinfo=_ET))
+    assert q["prev_close"] == 45.97 and q["change"] == pytest.approx(0.53)
