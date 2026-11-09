@@ -181,6 +181,7 @@ export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-
 export function Ladder({ levels, spot, height = 180 }: {
   levels: { label: string; price: number | null | undefined; tone: string }[]; spot: number; height?: number;
 }) {
+  if (spot == null || !Number.isFinite(spot)) return null;
   const merged: { label: string; price: number; tone: string }[] = [];
   for (const l of levels) {
     if (l.price == null) continue;
