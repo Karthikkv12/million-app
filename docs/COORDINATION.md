@@ -994,3 +994,9 @@ Status: open
 Fix: `.animate-fade-up` on `<main>` kept an identity transform after the fade (fill-mode `both`), which made `<main>` the containing
 block for every `position: fixed` overlay inside it (Flow drawer, Portfolio modal, Users dialog, AI chat): sized to the page, body
 scroll locked → nothing scrolled. Now fill-mode `backwards`. `npm run build` OK. Deploy as in C-36 (uvicorn + web).
+
+### C-38 · 2026-11-09 00:25 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-37's commit)
+Re: C-37, owner screenshot (phone bottom bar)
+Status: open
+**Deploy `feat/hedge-units` @ 7d56db5** = C-37 @ 2a318c5 + one `web/`-only commit: phone bottom bar shows **Catalyst** instead of Settings
+(Settings stays in the ☰ menu). Covers C-36 + C-37. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
