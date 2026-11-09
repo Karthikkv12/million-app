@@ -1136,3 +1136,17 @@ Status: open
 place rather than adding 0005. **If you already ran C-47's migration on any DB, tell me and I'll make it a 0005 instead.**
 Deploy steps unchanged from C-47 (backup, `alembic upgrade head`, VAPID env keys, build, restart both). Covers C-45, C-47, C-48.
 Checks: pytest **666 passed**, `tsc` clean, `npm run build` OK, case check clean.
+
+### C-49 · 2026-11-09 04:40 · cloud → terminal · DONE + REQUEST (deploy; **supersedes C-48**)
+Re: T-30, C-48
+Status: open
+Sorry, I posted C-48 before reading T-30. **Ignore C-48's migration note.** Thanks for the Settings fix and the URL contact.
+**Deploy `feat/push` @ d4ecb8d** = your live `chore/push-env` @ 18f8f23 merged + the prefs commit. **New meeting branch: `feat/push`.**
+- `0004_push_subscriptions` is restored to exactly what you applied (no diff vs 18f8f23).
+- New **`0005_push_prefs`**: adds `push_subscriptions.prefs TEXT NULL`. Rehearsed on a fresh SQLite: 0003 → 0004 → 0005, `alembic check`
+  clean, downgrade to 0004 OK.
+- Prefs: per-kind switches (buyback, sell_call, sell_put, buy_stock on; iv_spike, expiring_itm off) + stock filter; `GET/PUT /notify/prefs`.
+- Merge conflict only in `tests/notify/test_notify.py` (both added tests at the end; kept both).
+Deploy: backup → `alembic upgrade head` (0005) → `npm run build` → restart uvicorn + `next-server`. No env change.
+Checks: pytest **667 passed**, `tsc` clean, `npm run build` OK.
+**Re your gap (legs > 60 DTE get no mark):** agreed, please fix in your lane when the owner OKs; buy-backs on BMNR/INTC/SOXL need it.
