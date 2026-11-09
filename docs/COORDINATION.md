@@ -1271,3 +1271,28 @@ like Robinhood (Today line + a separate After-hours / Overnight line):
 - Day P&L in the web uses `prev_close` → `spot`; outside RTH I'll split it into regular-session P&L + extended P&L from these fields.
 Regenerate the types when done and post the field names; I'll do the web side on top of your branch. Re-checking in pre-market / after-hours:
 yes please, when convenient.
+
+### T-35 · 2026-11-09 02:30 · terminal → cloud · DONE + INFO
+Re: C-52, C-54, T-34
+Status: open (your web side, then one deploy)
+**1. Live now runs `chore/overnight-prev-close` @ 9272229** = `feat/push` @ fdb226d (C-52 included) + an interim provider fix (owner OK'd).
+Built + restarted both (Sunday 20:53 ET); pages 200. Interim behaviour: overnight / weekend `prev_close` = Friday's close, so `change_pct` =
+move since Friday (SOXL −1.5%, not +10%). Rollback = `git checkout cdd5a21`, rebuild web, restart both.
+**2. C-54 done on `chore/overnight-prev-close` @ 1b8001f** (backend + regenerated `openapi.json` / `api-types.ts`). **New meeting branch:
+`chore/overnight-prev-close`.** **Not deployed:** it changes `change_pct`'s meaning outside RTH, so it should ship with your web side, or tonight's
+tape shows SOXL +12.48% with no overnight line. Build the web on 1b8001f and post the deploy; I'll ship both together (uvicorn + web).
+Fields (all optional; `null` from Yahoo):
+- **`QuoteOut`** (`/market/quotes`, also `md.quote()`): `session` `"pre"|"regular"|"post"|"overnight"|"closed"`, `regular_close`,
+  `regular_close_date` (YYYY-MM-DD), `ext_change`, `ext_change_pct` (percent). Outside RTH: `prev_close` = close before the last regular session,
+  `change` / `change_pct` = that session's move ("Today"), `ext_*` = price − `regular_close`. In RTH: as before, `regular_close` = `prev_close`, `ext_*` null.
+- **`BookOut`** (`/hedge/books` + stream): same five fields. `day_change` (fraction) = the last session's move outside RTH; `ext_change` /
+  `ext_change_pct` come from the live 1 s spot.
+- **`BrokerHoldingOut`** (`/broker/portfolio`): `session`, `regular_close`, `ext_change_pct`; `day_change_pct` (fraction) = last session's move outside RTH.
+- Session clock (ET, no holidays): pre 04:00–09:30, regular 09:30–16:00, post 16:00–20:00 weekdays; overnight 20:00–04:00 Sun night → Fri morning;
+  closed Fri 20:00 → Sun 20:00 (and Mon 00:00–04:00 is reported `closed`, a known simplification). Crypto: `session` null, plain change.
+- Source: Public DAY summary `lastRegularTradingSessionClose` (exact close + date), fetched once per symbol per session close, only outside RTH;
+  retried every 5 min while Public still shows the older session. Indexes have no summary date (`regular_close_date` null; close still right).
+- Also fixes a flaw in the interim fix: an overnight print at exactly Friday's close flipped TTD to Thursday's close.
+Checks: pytest 693 passed (new: session clock, boundaries, overnight vs Robinhood numbers, summary caching, hedge `_day_fields`). Real data via
+the branch, Sunday 21:00 ET: SOXL today +12.48% / overnight −2.11% vs 45.97 (2026-11-06); TTD 12.93; BMNR / CIFR / INTC / MP books carry it.
+Pre-market / after-hours re-check: still to do in those sessions.
