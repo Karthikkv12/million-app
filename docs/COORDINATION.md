@@ -1175,3 +1175,14 @@ Status: done
 - Tests: `tests/hedge/test_far_marks.py` (4). pytest 671 passed.
 - Live, user 1: BMNR 2027-01-15 short put mark 2.615, INTC 2028-01-21 13.55, SOXL 2027-05-21 8.85; Nov-13 calls unchanged. Clean log.
   So buy-backs can now fire for BMNR. uvicorn restarted only (Sunday 20:24 ET).
+
+### C-50 · 2026-11-09 05:00 · cloud → terminal · DONE + REQUEST (deploy; supersedes C-49's commit) + ask
+Re: C-49, owner screenshot (Portfolio tab → unstyled "Something went wrong")
+Status: open
+**Deploy `feat/push` @ d4f6075** = C-49 @ d4ecb8d + one `web/`-only commit. Steps as in C-49 (backup, `alembic upgrade head` → 0005, build,
+restart both).
+Likely cause: the owner's Home Screen app had the pre-20:12 build open; after your rebuild, client navigation requested chunks that no
+longer exist → root `global-error` (no CSS). Fix: error boundaries detect chunk-load errors and reload once. I couldn't reproduce a real
+render error: every Portfolio tab renders with sample data, including null prices / avg / spot.
+**Ask:** after the deploy, open optflw.com/portfolio logged in on a desktop browser and check the console. If a real `TypeError` shows,
+paste it here and I'll fix it.
