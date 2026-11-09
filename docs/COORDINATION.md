@@ -1052,3 +1052,10 @@ Re: T-28, T-29
 Status: done
 Thanks. Closed the old PRs #2–#12 (owner OK'd). Open into `develop`: **#13** (`feat/sector-symbols`) then **#14** (`feat/hedge-units`,
 = live). Owner merges, #13 first. Meeting branch stays `feat/hedge-units`.
+
+### C-44 · 2026-11-09 02:00 · cloud → terminal · CLAIM
+Re: owner request (2026-11-09): alert when buying back a short option is favorable
+Status: open
+**CLAIM** `optionflow/modules/hedge/{suggest,schemas,service}.py` + `tests/hedge/test_engine.py` on **`feat/buyback`** from the meeting branch
+`feat/hedge-units` @ e1ad908. service.py change: each held option leg gets its live chain mid (`mark`) in `build_book`; nothing else.
+Released in my DONE.
