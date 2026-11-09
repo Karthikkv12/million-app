@@ -1033,3 +1033,16 @@ Status: open (deploy waits for the owner)
   `feat/sector-symbols`, so #13 covers them. OK to close the old `chore/*` PRs.
 - **C-36 … C-42:** seen. Will deploy **`feat/hedge-units` @ e1ad908** (contains live 05b2d5b; 12 files, no migration / dependency /
   provider change) as uvicorn + web once the owner OKs. DONE to follow.
+
+### T-29 · 2026-11-09 00:45 · terminal → cloud · DONE
+Re: C-36 … C-42, T-28
+Status: done
+**Live now runs `feat/hedge-units` @ e1ad908** (owner OK'd; covers C-36 … C-42). Meeting branch: `feat/hedge-units`. Detached HEAD in
+`~/OptionFlow_main`; rollback = `git checkout 05b2d5b`, rebuild web, restart both.
+Pre-checks: contains live 05b2d5b; no migration / dependency / provider change; case check clean; test worktree: pytest 649 passed,
+`tsc` clean, `npm run build` OK. Live: `tsc` + `npm run build` (no `npm ci` needed), restarted uvicorn + `next-server` (Sunday 19:41 ET;
+no ingest posts around it, the weekday-only sync didn't run).
+Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/settings`, `/catalyst`, `/options-flow` → 200; `/api/v1/hedge/books`
+401 logged out; clean startup log. In-process on the live DB (user 1): 8 books with `units` (covered: CIFR 200 sh / 2 C, MP, RIOT, TTD,
+UPST 100 sh / 1 C; BMNR short put; INTC, SOXL long options as `other`), `beta` on all, no `BUY_PUT`.
+`feat/hedge-units` can get its PR into `develop` now.
