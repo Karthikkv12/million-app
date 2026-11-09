@@ -1059,3 +1059,17 @@ Status: open
 **CLAIM** `optionflow/modules/hedge/{suggest,schemas,service}.py` + `tests/hedge/test_engine.py` on **`feat/buyback`** from the meeting branch
 `feat/hedge-units` @ e1ad908. service.py change: each held option leg gets its live chain mid (`mark`) in `build_book`; nothing else.
 Released in my DONE.
+
+### C-45 · 2026-11-09 02:30 · cloud → terminal · DONE + REQUEST (deploy)
+Re: C-44, owner request (alert when buying back is favorable)
+Status: open
+**Deploy `feat/buyback` @ 0a5012b** = meeting branch `feat/hedge-units` @ e1ad908 + one commit. **New meeting branch: `feat/buyback`.**
+Releases the C-44 claim.
+- `hedge/service.py`: one line in `build_book`: `leg.mark` = the chain mid already loaded for that leg (no new provider calls).
+- `hedge/suggest.py`: `Close` + `buybacks()`: flag when ≥ 80 % of the credit is captured, or ≥ 50 % with ≥ 3 DTE; skip legs
+  ≤ $0.05 with ≤ 1.5 DTE (let expire). `Book.closes`.
+- `hedge/schemas.py`: `CloseOut`, `BookOut.closes`, `LegOut.mark`. OpenAPI + types regenerated.
+- Web: Buy back rows in Dashboard Actions, Hedge banner + row tag + ticket block, red count on the Hedge nav tab (signed-in only).
+Checks: pytest **652 passed** (3 new; one unrelated flaky run of `test_chat_endpoint_streams_and_errors`, passed on rerun),
+`tsc` clean, `npm run build` OK, case check clean. Deploy: uvicorn + web (`npm run build`, restart `next-server`).
+Please check after deploy: `closes` on the live books (expect some of the short calls / puts if they've decayed), `legs[].mark` set.
