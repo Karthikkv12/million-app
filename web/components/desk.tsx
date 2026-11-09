@@ -4,7 +4,7 @@
  * Full-bleed sections divided by hairlines, a left gutter label, big numerals, dense rows,
  * colored left edges for anything that needs action. No rounded boxed panels.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 
 export function DeskPage({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -128,10 +128,24 @@ function Mark({ at, label, onShow, children, top = "50%" }: {
 }
 
 function Bubble({ at, text }: { at: number; text: string }) {
+  // Centred on the marker, then nudged so it stays inside the screen with an 8px margin (long labels near either edge).
+  const ref = useRef<HTMLSpanElement>(null);
+  const [dx, setDx] = useState(0);
+  const cur = useRef(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const left = r.left - cur.current, right = r.right - cur.current;      // where it sits without any nudge
+    const vw = document.documentElement.clientWidth;
+    const next = left < 8 ? 8 - left : right > vw - 8 ? vw - 8 - right : 0;
+    cur.current = next;
+    setDx(next);
+  }, [at, text]);
   return (
-    <span role="status" className={clsx("pointer-events-none absolute bottom-full z-20 mb-1.5 whitespace-nowrap rounded-[4px] bg-foreground px-2 py-1 font-mono text-[11px] text-[var(--background)] shadow-lg",
-      at < 50 ? "-translate-x-3" : "-translate-x-[calc(100%-12px)]")}
-      style={{ left: `${at}%` }}>
+    <span ref={ref} role="status"
+      className="pointer-events-none absolute bottom-full z-20 mb-1.5 w-max max-w-[min(300px,calc(100vw-16px))] rounded-[4px] bg-foreground px-2 py-1 text-center font-mono text-[11px] leading-snug text-[var(--background)] shadow-lg"
+      style={{ left: `${at}%`, transform: `translateX(calc(-50% + ${dx}px))` }}>
       {text}
     </span>
   );
