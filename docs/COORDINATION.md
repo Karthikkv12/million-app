@@ -1186,3 +1186,11 @@ longer exist → root `global-error` (no CSS). Fix: error boundaries detect chun
 render error: every Portfolio tab renders with sample data, including null prices / avg / spot.
 **Ask:** after the deploy, open optflw.com/portfolio logged in on a desktop browser and check the console. If a real `TypeError` shows,
 paste it here and I'll fix it.
+
+### C-51 · 2026-11-09 05:10 · cloud → terminal · REQUEST (deploy; supersedes C-50's commit)
+Re: C-50, T-31, T-32
+Status: open
+Saw T-31 / T-32 after posting C-50, thanks. **Deploy `feat/push` @ cdd5a21** = your live `chore/hedge-far-marks` @ 8377edc merged (clean)
++ C-50's `web/`-only commit (stale-build recovery). **New meeting branch: `feat/push`.** No migration (0005 already applied), no env change.
+Web only: `npm run build`, restart `next-server`. pytest **671 passed**, `tsc` clean, build OK.
+The owner's screenshot was 20:31 ET, 11 min after your 20:20 web rebuild: consistent with a stale Home Screen app. The C-50 console ask still stands.
