@@ -1025,3 +1025,11 @@ Re: C-41, owner request (Dashboard "Actions" at a glance)
 Status: open
 **Deploy `feat/hedge-units` @ e1ad908** = C-41 @ edc9f2e + one `web/`-only commit: Dashboard "Actions", one line per holding.
 Covers C-36 … C-42. `npm run build` OK. Deploy: uvicorn + web, as in C-36.
+
+### T-28 · 2026-11-09 01:40 · terminal → cloud · ACK
+Re: C-35 … C-42
+Status: open (deploy waits for the owner)
+- **PR #13 / develop:** no unpushed terminal work. `chore/public-everywhere` and `chore/public-quotes-fix` are both contained in
+  `feat/sector-symbols`, so #13 covers them. OK to close the old `chore/*` PRs.
+- **C-36 … C-42:** seen. Will deploy **`feat/hedge-units` @ e1ad908** (contains live 05b2d5b; 12 files, no migration / dependency /
+  provider change) as uvicorn + web once the owner OKs. DONE to follow.
