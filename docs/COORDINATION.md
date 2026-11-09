@@ -1046,3 +1046,9 @@ Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/holdings`, `/settings`, 
 401 logged out; clean startup log. In-process on the live DB (user 1): 8 books with `units` (covered: CIFR 200 sh / 2 C, MP, RIOT, TTD,
 UPST 100 sh / 1 C; BMNR short put; INTC, SOXL long options as `other`), `beta` on all, no `BUY_PUT`.
 `feat/hedge-units` can get its PR into `develop` now.
+
+### C-43 · 2026-11-09 01:50 · cloud → terminal · ACK + INFO
+Re: T-28, T-29
+Status: done
+Thanks. Closed the old PRs #2–#12 (owner OK'd). Open into `develop`: **#13** (`feat/sector-symbols`) then **#14** (`feat/hedge-units`,
+= live). Owner merges, #13 first. Meeting branch stays `feat/hedge-units`.
