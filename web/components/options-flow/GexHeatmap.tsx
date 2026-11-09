@@ -6,8 +6,8 @@
  * Rows are strikes (descending), columns are expiries, plus a leading "All"
  * column summing the displayed expiries. Every expiry cell shares one colour
  * scale so expiries compare directly. The largest |GEX| cell is the King node.
- * Your book (owner, 2026-11-09), only on symbols you hold: SC / SP badges in the cell of every short call / put
- * you hold (any expiry shown), a dashed SC? / SP? for the Hedge desk's suggested trade, and an AVG line at the
+ * Your book (owner, 2026-11-09), only on symbols you hold: SC / SP (sold) and BC / BP (bought) badges in the cell
+ * of every option you hold (any expiry shown), a dashed SC? / SP? for the Hedge desk's suggested trade, and an AVG line at the
  * strike nearest your average cost. Strikes or expiries outside the board still show in the strike column.
  * The board scrolls inside its own frame (sticky header + strike axis) and
  * exposes centerOnSpot / centerOnKing through a ref.
@@ -211,10 +211,13 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   const half = (strikes.length > 1 ? Math.abs(strikes[0] - strikes[1]) : 1) / 2;
   const onBoard = (k: number | null | undefined) => (k == null ? null : (() => { const n = nearest(strikes, k); return n != null && Math.abs(n - k) <= half + 1e-9 ? n : null; })());
   const avgStrike = mine?.avg_cost && (mine.shares ?? 0) > 0 ? onBoard(mine.avg_cost) : null;
-  type Pos = { kind: "SC" | "SP"; n: number; strike: number; expiry: string; suggested?: boolean };
+  type Pos = { kind: "SC" | "SP" | "BC" | "BP"; n: number; strike: number; expiry: string; suggested?: boolean };
   const positions: Pos[] = [
-    ...(mine?.legs ?? []).filter((l) => l.kind === "option" && l.quantity < 0 && l.strike != null && l.expiry)
-      .map((l) => ({ kind: (l.otype === "call" ? "SC" : "SP") as Pos["kind"], n: -l.quantity, strike: l.strike!, expiry: l.expiry! })),
+    ...(mine?.legs ?? []).filter((l) => l.kind === "option" && l.quantity !== 0 && l.strike != null && l.expiry)
+      .map((l) => ({
+        kind: (l.quantity < 0 ? (l.otype === "call" ? "SC" : "SP") : (l.otype === "call" ? "BC" : "BP")) as Pos["kind"],
+        n: Math.abs(l.quantity), strike: l.strike!, expiry: l.expiry!,
+      })),
     ...(mine?.suggestion && (mine.suggestion.action === "SELL_CALL" || mine.suggestion.action === "SELL_PUT") && mine.suggestion.strike != null && mine.suggestion.expiry
       ? [{ kind: (mine.suggestion.action === "SELL_CALL" ? "SC" : "SP") as Pos["kind"], n: mine.suggestion.contracts, strike: mine.suggestion.strike, expiry: mine.suggestion.expiry, suggested: true }] : []),
   ];
@@ -227,12 +230,16 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
     else inRow.set(k, [...(inRow.get(k) ?? []), ps]);
   }
   const offBoard = positions.filter((ps) => onBoard(ps.strike) == null);
-  const posTitle = (ps: Pos) => `${ps.suggested ? "Suggested: sell" : "You're short"} ${ps.n} ${ps.strike}${ps.kind === "SC" ? "C" : "P"} ${ps.expiry}`;
+  const isCall = (k: Pos["kind"]) => k === "SC" || k === "BC";
+  const posTitle = (ps: Pos) =>
+    `${ps.suggested ? "Suggested: sell" : ps.kind[0] === "S" ? "You sold" : "You bought"} ${ps.n} ${ps.strike}${isCall(ps.kind) ? "C" : "P"} ${ps.expiry}`;
   const Badge = ({ ps }: { ps: Pos }) => (
     <span title={posTitle(ps)} className={`inline-flex items-center rounded-[3px] px-1 text-[8.5px] font-semibold leading-[14px] tracking-[0.06em] ${
       ps.suggested
-        ? "border border-dashed border-current bg-[var(--background)] " + (ps.kind === "SC" ? "text-accent" : "text-gain")
-        : (ps.kind === "SC" ? "bg-accent text-white" : "bg-gain text-white")}`}>
+        ? "border border-dashed border-current bg-[var(--background)] " + (isCall(ps.kind) ? "text-accent" : "text-gain")
+        : ps.kind === "SC" ? "bg-accent text-white"
+        : ps.kind === "SP" ? "bg-gain text-white"
+        : "border-[1.5px] border-current bg-[var(--background)] " + (ps.kind === "BC" ? "text-accent" : "text-gain")}`}>
       {ps.kind}{ps.suggested ? "?" : ""}{ps.n > 1 ? `×${ps.n}` : ""}
     </span>
   );
@@ -250,8 +257,10 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
       {mine && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--border)] px-3 py-1.5 font-mono text-[10.5px] text-foreground/55">
           <span className="text-foreground/75">Your {mine.symbol}:</span>
-          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "" }} />short call</span>
-          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SP", n: 1, strike: 0, expiry: "" }} />short put</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "" }} />sold call</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SP", n: 1, strike: 0, expiry: "" }} />sold put</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "BC", n: 1, strike: 0, expiry: "" }} />bought call</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "BP", n: 1, strike: 0, expiry: "" }} />bought put</span>
           <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "", suggested: true }} />suggested</span>
           <span className="inline-flex items-center gap-1"><span className="rounded-[3px] border border-accent/60 px-1 text-[8.5px] font-semibold leading-[14px] text-accent">AVG</span>your average</span>
           {(offBoard.length > 0 || (mine.avg_cost && avgStrike == null && (mine.shares ?? 0) > 0)) && <span className="text-foreground/40">· off this board:</span>}
