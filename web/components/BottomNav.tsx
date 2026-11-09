@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Zap, Settings, Briefcase, Scale } from "lucide-react";
+import { LayoutDashboard, Zap, CalendarClock, Briefcase, Scale } from "lucide-react";
 import { clsx } from "clsx";
 
 const TABS = [
@@ -10,7 +10,7 @@ const TABS = [
   { href: "/options-flow", label: "Flow",    icon: Zap             },
   { href: "/hedge",        label: "Hedge",   icon: Scale           },
   { href: "/portfolio",    label: "Portfolio", icon: Briefcase     },
-  { href: "/settings",     label: "Settings", icon: Settings       },
+  { href: "/catalyst",     label: "Catalyst", icon: CalendarClock  },   // Settings lives in the ☰ menu
 ];
 
 export default function BottomNav() {
