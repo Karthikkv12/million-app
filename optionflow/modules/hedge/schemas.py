@@ -79,6 +79,7 @@ class LegOut(BaseModel):
     expiry: Optional[str] = None
     dte: Optional[float] = None
     iv: Optional[float] = None
+    mark: Optional[float] = Field(None, description="Live mid per share (options)")
     delta: float
     gamma: float
     position_delta: float
@@ -101,6 +102,21 @@ class SuggestionOut(BaseModel):
     shares: int = Field(0, description="BUY_STOCK: shares to buy")
     new_avg: Optional[float] = Field(None, description="BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned")
     warnings: List[str] = []
+
+
+class CloseOut(BaseModel):
+    otype: Literal["call", "put"]
+    strike: float
+    expiry: str
+    contracts: int
+    dte: Optional[float] = None
+    sold_at: float
+    mark: float
+    profit_pct: float
+    cost: float
+    kept: float
+    headline: str
+    reasons: List[str] = []
 
 
 class UnitOut(BaseModel):
@@ -151,6 +167,7 @@ class BookOut(BaseModel):
     legs: List[LegOut] = []
     units: List[UnitOut] = Field([], description="Covered (shares + their short calls), uncovered shares, short puts")
     suggestion: Optional[SuggestionOut] = None
+    closes: List[CloseOut] = Field([], description="Short options worth buying back now (most of the premium captured)")
     spot: Optional[float] = None
     prev_close: Optional[float] = None
     day_change: Optional[float] = None

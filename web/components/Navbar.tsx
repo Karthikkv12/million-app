@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
+import { CountBadge, useBuybackCount } from "@/lib/live";
 import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { usePrivacy } from "@/lib/privacy";
 import { useAuth } from "@/lib/auth";
@@ -62,6 +63,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const { user, logout, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const buybacks = useBuybackCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -94,6 +96,7 @@ export default function Navbar() {
               )}
             >
               {label}
+              {href === "/hedge" && <CountBadge n={buybacks} className="ml-1.5 align-[2px]" />}
             </Link>
           ))}
         </nav>
@@ -154,6 +157,7 @@ export default function Navbar() {
                 )}
               >
                 {label}
+                {href === "/hedge" && <CountBadge n={buybacks} className="ml-2 align-[2px]" />}
               </Link>
             ))}
           </nav>

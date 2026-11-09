@@ -63,6 +63,18 @@ function Detail({ b }: { b: HedgeBook }) {
   return (
     <div className="grid gap-8 border-b border-[var(--border)] bg-foreground/[0.025] px-4 py-6 sm:px-6 md:grid-cols-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_240px]">
       <div className="min-w-0">
+        {(b.closes ?? []).map((c) => (
+          <div key={`${c.strike}-${c.otype}-${c.expiry}`} className="mb-6 border-l-[3px] border-loss pl-3">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-loss">Buy back</p>
+            <p className="mt-1 text-[16px] font-medium leading-snug text-foreground">{c.headline}</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+              {[["Captured", `${Math.round(c.profit_pct * 100)}%`], ["Cost to close", usd(c.cost, 0)], ["You keep", usd(c.kept, 0)], ["Days left", c.dte != null ? Math.floor(c.dte).toString() : "—"]].map(([k, v]) => (
+                <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", k !== "Captured" && k !== "Days left" && "sensitive")}>{v}</dd></div>
+              ))}
+            </dl>
+            <ul className="mt-2 space-y-1 text-[13px] leading-snug text-foreground/70">{c.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+          </div>
+        ))}
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Ticket</p>
         {s && (
           <>
@@ -131,7 +143,7 @@ function Detail({ b }: { b: HedgeBook }) {
                   {l.kind === "stock" ? `${l.quantity} sh @ ${usd(l.avg_price)}` : `${l.quantity < 0 ? "−" : "+"}${Math.abs(l.quantity)} ${l.strike}${l.otype === "call" ? "C" : "P"} ${l.expiry?.slice(5)}`}
                   {l.kind === "option" && l.dte != null && <span className="ml-1.5 text-foreground/40">{Math.floor(l.dte)}d</span>}
                 </td>
-                <td className="py-1.5 text-right text-foreground/50">{l.kind === "option" ? vol(l.iv) : ""}</td>
+                <td className="py-1.5 text-right text-foreground/50" title={l.kind === "option" ? "live mid / IV" : undefined}>{l.kind === "option" ? <>{l.mark != null && <span className="mr-2 text-foreground/70">{usd(l.mark)}</span>}{vol(l.iv)}</> : ""}</td>
                 <td className="py-1.5 text-right text-foreground/50">{l.delta.toFixed(2)}</td>
                 <td className={clsx("py-1.5 text-right", tone(l.position_delta))}>{sd(l.position_delta)}</td>
               </tr>
@@ -200,6 +212,7 @@ function Legend() {
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Row edge &amp; signals</p>
           <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Spike: the stock is ≥2% over your average or IV is spiking. Sell the call in the money, at the strike closest to your average from above.</Item>
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
+          <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-amber-500" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
           <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only.</Item>
         </div>
@@ -354,6 +367,7 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         </p>
         {/* signal */}
         <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
+          {(b.closes?.length ?? 0) > 0 && <Tag tone="solid">Buy back</Tag>}
           {a && <Tag tone={a.tag}>{a.label}</Tag>}
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
             {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
@@ -374,12 +388,13 @@ export default function HedgePage() {
   const books = (data?.books ?? []).filter((b) => !b.error);
   const errored = (data?.books ?? []).filter((b) => b.error);
   const signals = books.filter((b) => b.suggestion && TRADE.has(b.suggestion.action));
+  const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
   const spikes = books.filter((b) => b.iv?.spike);
   const expiring = books.flatMap((b) => b.legs.filter((l) => l.kind === "option" && l.quantity < 0 && (l.dte ?? 99) <= 5).map((l) => ({ ...l, symbol: b.symbol })));
   const dollarGamma = books.reduce((a, b) => a + (b.dollar_gamma_1pct ?? 0), 0);
   const sorted = [...signals, ...books.filter((b) => !signals.includes(b))];
 
-  useEffect(() => { if (!open && signals[0]) setOpen(signals[0].symbol); }, [open, signals]);
+  useEffect(() => { if (!open && (buybacks[0]?.b ?? signals[0])) setOpen((buybacks[0]?.b ?? signals[0]).symbol); }, [open, signals, buybacks]);
 
   return (
     <DeskPage>
@@ -410,6 +425,24 @@ export default function HedgePage() {
 
       {!!books.length && (
         <>
+          {buybacks.length > 0 && (
+            <div className="border-t border-[var(--border-strong)] py-4">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground">Buy back now · {buybacks.length}</p>
+              <div className="mt-2 grid grid-cols-1 gap-1.5">
+                {buybacks.map(({ b, c }) => (
+                  <button key={`${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} onClick={() => setOpen(b.symbol)}
+                    className="flex min-w-0 items-center gap-3 border-l-[3px] border-loss bg-loss/[0.05] px-3 py-2 text-left hover:bg-loss/[0.09]">
+                    <span className="w-12 shrink-0 font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-foreground/85" title={c.headline}>
+                      {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · ${c.mark.toFixed(2)} <span className="text-foreground/45">(sold ${c.sold_at.toFixed(2)})</span>
+                    </span>
+                    <span className="shrink-0 font-mono text-[12px] tabular-nums text-gain">{Math.round(c.profit_pct * 100)}% in</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Scales books={books} />
 
           <div className="border-t border-[var(--border)] py-5">

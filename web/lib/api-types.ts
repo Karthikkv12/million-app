@@ -1856,6 +1856,12 @@ export interface components {
             beta?: number | null;
             /** Chain Source */
             chain_source?: string | null;
+            /**
+             * Closes
+             * @description Short options worth buying back now (most of the premium captured)
+             * @default []
+             */
+            closes: components["schemas"]["CloseOut"][];
             /** Day Change */
             day_change?: number | null;
             /** Day High */
@@ -2490,6 +2496,39 @@ export interface components {
             /** Messages */
             messages: components["schemas"]["ChatMessage"][];
         };
+        /** CloseOut */
+        CloseOut: {
+            /** Contracts */
+            contracts: number;
+            /** Cost */
+            cost: number;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry: string;
+            /** Headline */
+            headline: string;
+            /** Kept */
+            kept: number;
+            /** Mark */
+            mark: number;
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "call" | "put";
+            /** Profit Pct */
+            profit_pct: number;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sold At */
+            sold_at: number;
+            /** Strike */
+            strike: number;
+        };
         /** CreatedOut */
         CreatedOut: {
             /** Id */
@@ -3061,6 +3100,11 @@ export interface components {
             iv?: number | null;
             /** Kind */
             kind: string;
+            /**
+             * Mark
+             * @description Live mid per share (options)
+             */
+            mark?: number | null;
             /** Otype */
             otype?: string | null;
             /** Position Delta */

@@ -272,6 +272,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
         if leg.kind == "option":
             hit = rows.get((leg.expiry, float(leg.strike or 0), leg.otype or ""))
             leg.iv = hit[0] if hit and hit[0] > bs.MIN_SIGMA else atm_iv
+            leg.mark = hit[1] if hit and hit[1] > 0 else None
             leg.dte = _dte(leg.expiry)
     weekly = chain.get("weekly")
     quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)

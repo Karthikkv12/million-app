@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { fetchHedgeBooks, HedgeBook, HedgeBooks, BrokerPortfolio } from "@/lib/api";
 import { useHedgeStream } from "@/lib/useHedgeStream";
+import { useAuth } from "@/lib/auth";
 
 const LiveCtx = createContext(false);
 
@@ -27,9 +28,9 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
 /** Is the 1-second stream connected? */
 export const useLive = () => useContext(LiveCtx);
 
-export function useLiveBooks() {
+export function useLiveBooks(enabled = true) {
   const live = useLive();
-  return useQuery<HedgeBooks>({ queryKey: ["hedge-books"], queryFn: fetchHedgeBooks, refetchInterval: live ? false : 15_000 });
+  return useQuery<HedgeBooks>({ queryKey: ["hedge-books"], queryFn: fetchHedgeBooks, refetchInterval: live ? false : 15_000, enabled });
 }
 
 export const okBooks = (d?: HedgeBooks | null): HedgeBook[] => (d?.books ?? []).filter((b) => !b.error);
@@ -121,6 +122,24 @@ export function Tick({ value, children, className }: { value: number | null | un
   return (
     <span className={clsx("rounded-[3px] transition-colors duration-700", dir === "up" && "bg-gain/15", dir === "down" && "bg-loss/15", className)}>
       {children}
+    </span>
+  );
+}
+
+/** How many short options are worth buying back right now (for the nav badge). */
+export function useBuybackCount(): number {
+  const { user } = useAuth();                      // the landing page shares the top bar: no book when signed out
+  const { data } = useLiveBooks(!!user);
+  return okBooks(data).reduce((a, b) => a + (b.closes?.length ?? 0), 0);
+}
+
+/** Small red count badge. */
+export function CountBadge({ n, className }: { n: number; className?: string }) {
+  if (!n) return null;
+  return (
+    <span aria-label={`${n} to buy back`} title={`${n} option${n > 1 ? "s" : ""} to buy back`}
+      className={clsx("inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-loss px-1 font-mono text-[9.5px] font-semibold leading-none text-white", className)}>
+      {n}
     </span>
   );
 }

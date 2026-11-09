@@ -100,6 +100,7 @@ export default function DashboardPage() {
   const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
   const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
   const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
+  const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
   const actions = books.filter((b) => b.suggestion).sort((x, y) => ORDER.indexOf(x.suggestion!.action) - ORDER.indexOf(y.suggestion!.action));
   const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
   const expiring = (p?.options ?? []).filter((o) => o.dte != null && o.dte <= 7).sort((a, b) => (a.dte ?? 0) - (b.dte ?? 0));
@@ -167,10 +168,24 @@ export default function DashboardPage() {
         <div className="min-w-0">
           {/* ── Actions: one line per holding ───────────────────────── */}
           <DeskSection label="Actions" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
-            {!actions.length ? (
+            {!actions.length && !buybacks.length ? (
               <p className="py-2 text-[14px] text-foreground/55">Your holdings show here after the first Robinhood sync.</p>
             ) : (
               <div className="border-t border-[var(--border)]">
+                {buybacks.map(({ b, c }) => (
+                  <Link key={`bb-${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} href="/hedge" className="block">
+                    <DeskRow edge="loss">
+                      <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
+                        <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                        <span><Tag tone="solid">Buy back</Tag></span>
+                        <span className="min-w-0 truncate text-[13px] text-foreground" title={c.headline}>
+                          {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · {Math.round(c.profit_pct * 100)}% in
+                        </span>
+                        <span className="sensitive text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{usd(c.cost, 0)}</span>
+                      </div>
+                    </DeskRow>
+                  </Link>
+                ))}
                 {actions.map((b) => {
                   const s = b.suggestion!;
                   const a = ACT[s.action];
