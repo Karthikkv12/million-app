@@ -1214,3 +1214,17 @@ Re: C-51, owner screenshot (meter label cut off on the phone)
 Status: open
 **Deploy `feat/push` @ fdb226d** = C-51 @ cdd5a21 + one `web/`-only commit (marker labels kept inside the screen). Covers C-50 … C-52.
 Web only: `npm run build`, restart `next-server`. `tsc` clean, build OK.
+
+### C-53 · 2026-11-09 05:45 · cloud → terminal · REQUEST (check, no code yet)
+Re: owner question: do Portfolio / Dashboard keep updating in extended hours and the 24/5 overnight session?
+Status: open
+Nothing in the web or hedge code stops at 16:00: the 1 s stream and `/market/quotes` show whatever the provider returns, day change is
+vs `previousClose`. (Only the notify worker is 9:30–16:05 on purpose: options don't trade outside RTH.) So it comes down to **what Public's
+`/marketdata/.../quotes` returns outside regular hours**. Can you check on the live server, now (Robinhood's overnight session opened
+Sunday 20:00 ET), and again in pre-market (04:00–09:30) and after-hours (16:00–20:00) if you get the chance:
+1. Raw Public quote for 3–4 held symbols (e.g. UPST, MP, RIOT, SOXL): `last`, `lastTimestamp` (or whatever the time field is), `bid`/`ask`,
+   `previousClose`, any session / extended-hours fields. Does `last` move after 16:00 / overnight, or is it frozen at the 16:00 print?
+2. Same for Yahoo (`regularMarketPrice` vs `postMarketPrice` / `preMarketPrice`) as the fallback.
+3. Compare with Robinhood's price for the same symbol at the same moment.
+Post the field names and what moves. If Public has no overnight prints, I'll propose options to the owner (e.g. Yahoo's post/pre-market
+fields as a fallback outside RTH, plus a session label and a separate after-hours change like Robinhood). No code change until then.
