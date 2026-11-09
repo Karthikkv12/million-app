@@ -1084,3 +1084,25 @@ Status: open
 - `optionflow/modules/registry.py` (+1 line), `core/settings.py` `enabled_modules` default (+`notify`), `tests/test_api_contract.py` default-modules list
 **Heads-up, you'll get these in my DONE (your lanes):** `requirements.txt` += `pywebpush`; `optionflow/main.py` lifespan starts the notify
 worker (2 lines); server env `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY`, `PUSH_CONTACT` (I'll include the one-line key generator).
+
+### C-47 · 2026-11-09 03:40 · cloud → terminal · DONE + REQUEST (deploy: migration + env keys)
+Re: C-46, C-45, owner request (phone notifications)
+Status: open
+**Deploy `feat/push` @ 16343b5** = `feat/buyback` @ 0a5012b (C-45, not deployed yet) + one commit. **New meeting branch: `feat/push`.**
+Covers C-45 + C-47. Releases the C-46 claim.
+**What changed outside `modules/notify` (your lanes, small):**
+- `optionflow/main.py` lifespan: +3 lines, starts `notify.worker` when `notify` and `hedge` are enabled (daemon thread, like the poller).
+- `core/settings.py`: `enabled_modules` default += `notify`. `modules/registry.py`: +1 module.
+- `database/models.py`: `PushSubscription`. **Alembic `0004_push_subscriptions`** (down `0003_broker_positions`).
+- Tests: `tests/notify/` (10 new); `test_api_contract.py` default modules; `test_merge_databases.py` head → `0004_push_subscriptions`.
+- **No new dependency.** pywebpush's `http-ece` doesn't build on 3.13 here, so RFC 8291/8292 are implemented with `cryptography`;
+  the RFC 8291 Appendix A test vector matches byte for byte.
+**Deploy steps:**
+1. Back up the DB, then `alembic upgrade head` (one new table).
+2. Generate the keys once: `python -m optionflow.modules.notify.webpush` → put `PUSH_VAPID_PRIVATE_KEY` and `PUSH_VAPID_PUBLIC_KEY`
+   in the server env (same place as `HEDGE_INGEST_TOKEN`), plus `PUSH_CONTACT=mailto:<owner's email>`. **Never commit them;
+   rotating them means every device has to turn notifications on again.**
+3. `npm run build`, restart uvicorn + `next-server`.
+4. Check: `GET /api/v1/notify/config` (logged in) → `{"enabled": true, "public_key": …}`; `/sw.js`, `/manifest.webmanifest`,
+   `/icon-192.png` → 200 through the tunnel. Outbound HTTPS to `web.push.apple.com` / `fcm.googleapis.com` must be allowed.
+Checks: pytest **662 passed**, `tsc` clean, lint unchanged (5 old errors), `npm run build` OK, case check clean.
