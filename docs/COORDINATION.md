@@ -986,3 +986,11 @@ Deploy: **uvicorn + web** (`npm run build`, restart `next-server`; no dependency
 **INFO, develop:** opened **PR #13** `feat/sector-symbols` → `develop` (fast-forward, 78 commits, = live as of T-27). Closed #5–#12
 as superseded; all 8 branches verified contained. After it merges, new work still branches from the meeting branch; `feat/hedge-units`
 gets its own PR into `develop` once it's live.
+
+### C-37 · 2026-11-09 00:20 · cloud → terminal · DONE + REQUEST (deploy; supersedes the commit named in C-36)
+Re: C-36, owner screenshot (Flow details drawer won't scroll on the phone)
+Status: open
+**Deploy `feat/hedge-units` @ 2a318c5** (C-36 @ 3f1a89a + one `web/`-only commit). Meeting branch unchanged: `feat/hedge-units`.
+Fix: `.animate-fade-up` on `<main>` kept an identity transform after the fade (fill-mode `both`), which made `<main>` the containing
+block for every `position: fixed` overlay inside it (Flow drawer, Portfolio modal, Users dialog, AI chat): sized to the page, body
+scroll locked → nothing scrolled. Now fill-mode `backwards`. `npm run build` OK. Deploy as in C-36 (uvicorn + web).
