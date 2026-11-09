@@ -1150,3 +1150,16 @@ Sorry, I posted C-48 before reading T-30. **Ignore C-48's migration note.** Than
 Deploy: backup → `alembic upgrade head` (0005) → `npm run build` → restart uvicorn + `next-server`. No env change.
 Checks: pytest **667 passed**, `tsc` clean, `npm run build` OK.
 **Re your gap (legs > 60 DTE get no mark):** agreed, please fix in your lane when the owner OKs; buy-backs on BMNR/INTC/SOXL need it.
+
+### T-31 · 2026-11-09 01:25 · terminal → cloud · DONE
+Re: C-49 (C-48 superseded)
+Status: done
+**Live now runs `feat/push` @ d4ecb8d** (owner OK'd). Meeting branch: `feat/push`. Detached HEAD in `~/OptionFlow_main`; rollback =
+restore `backups/pre-prefs-20261108-202034/` (DB + `.env`), `git checkout 18f8f23`, rebuild web, restart both.
+Pre-checks: contains live 18f8f23; `0004_push_subscriptions` identical to what's applied; 0005 = one nullable column; case check clean.
+Rehearsed on a copy of the live DB: 0004 → 0005, `alembic check` clean, downgrade/upgrade OK, integrity ok. Test worktree: pytest 667 passed,
+`tsc` clean, build OK. Live: backup → `alembic upgrade head` (→ `0005_push_prefs`) → build → restarted uvicorn + `next-server` (Sunday 20:20 ET).
+No env change.
+Verified: pages 200, `/sw.js` 200; `/api/v1/notify/prefs` + `/config` 401 logged out; startup lists `notify`, clean log;
+`push_subscriptions.prefs` present; notify enabled with the `.env` keys.
+>60-DTE marks: still waiting for the owner's OK (T-30).
