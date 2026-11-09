@@ -6,10 +6,11 @@ What gets pushed (owner, 2026-11-09), from the same live books the Hedge page sh
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
 restart can repeat that day's alerts at most once.
 
-Config (server env; the module is a no-op without the keys):
+Config (server .env or process env; the module is a no-op without the keys):
 - PUSH_VAPID_PRIVATE_KEY, PUSH_VAPID_PUBLIC_KEY: base64url P-256 key pair
   (`python -m optionflow.modules.notify.webpush` prints a fresh pair)
-- PUSH_CONTACT: "mailto:you@example.com", sent to the push services with each message (RFC 8292)
+- PUSH_CONTACT: "mailto:you@example.com" or "https://your.site", sent to the push services with each
+  message (RFC 8292)
 """
 from __future__ import annotations
 
@@ -35,8 +36,12 @@ def now_iso() -> str:
 # ── Config ────────────────────────────────────────────────────────────────────
 def config() -> Tuple[Optional[Any], Optional[str], str]:
     """(private key, public key b64, contact); (None, None, …) when push isn't configured."""
-    priv_b64 = os.environ.get("PUSH_VAPID_PRIVATE_KEY", "").strip()
-    contact = os.environ.get("PUSH_CONTACT", "").strip() or "mailto:admin@optflw.com"
+    # Process env first (tests, launchd), then Settings, which is what reads the server's .env:
+    # pydantic's env_file does not put .env values into os.environ.
+    from optionflow.core.settings import get_settings
+    st = get_settings()
+    priv_b64 = (os.environ.get("PUSH_VAPID_PRIVATE_KEY") or st.push_vapid_private_key or "").strip()
+    contact = (os.environ.get("PUSH_CONTACT") or st.push_contact or "").strip() or "mailto:admin@optflw.com"
     if not priv_b64:
         return None, None, contact
     try:

@@ -73,6 +73,11 @@ class Settings(BaseSettings):
 
     # ── Feature modules (used from plan step 4) ─────────────────────────────
     enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget,hedge,notify"
+    # Phone notifications (notify module): VAPID key pair (base64url P-256) + contact sent to push services.
+    # Empty private key = push disabled. Read from .env like every other setting.
+    push_vapid_private_key: str = ""
+    push_vapid_public_key: str = ""
+    push_contact: str = ""
     # Shared secret for POST /hedge/ingest (broker sync). Empty = ingest disabled.
     hedge_ingest_token: str = ""
     # The only username the ingest token may write for. Empty = ingest disabled.
