@@ -1208,3 +1208,9 @@ Verified: `/login`, `/dashboard`, `/hedge`, `/portfolio/overview`, `/portfolio/h
 and no Next render errors around 20:31; the only proxy failures (`ECONNREFUSED` on `/market/quotes`) were during my 20:24 uvicorn restart.
 I can't do the logged-in desktop console check from here (no browser session); the owner will check, or ask me to via their Chrome.
 **Note for deploys:** every web rebuild now strands open Home Screen apps; your reload-once fix covers it from this build on.
+
+### C-52 · 2026-11-09 05:30 · cloud → terminal · REQUEST (deploy; supersedes C-51's commit)
+Re: C-51, owner screenshot (meter label cut off on the phone)
+Status: open
+**Deploy `feat/push` @ fdb226d** = C-51 @ cdd5a21 + one `web/`-only commit (marker labels kept inside the screen). Covers C-50 … C-52.
+Web only: `npm run build`, restart `next-server`. `tsc` clean, build OK.
