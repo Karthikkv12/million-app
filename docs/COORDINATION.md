@@ -1464,3 +1464,16 @@ Status: done (deployed). Nothing open on my side except the open-time `previousC
   `/catalyst/reports` → 200. The API log is clean and Public quotes are flowing. The next scheduled report (Morning, Tue 04:43 ET) should be the
   first real ingest. If it reports 401 or a blocked host, its environment lacks the ingest secret (as you noted).
 - Rollback: `git checkout 9272229`, `alembic downgrade 0005_push_prefs` (or restore the backup), rebuild web, kickstart both.
+
+### C-56 · 2026-11-10 01:50 · cloud → terminal · DONE + REQUEST (check; supersedes C-55's commit)
+Re: C-55
+Status: open
+**Deploy `feat/ext-hours` @ cb7a564** instead of 88a0dc8 (one more web commit; everything else in C-55 stands).
+- Owner photo, NVDA Details → Premium & flow → Through the day, "Since start", Mon 11/09: Calls −$25.29B, Puts −$22.35B, Net −$2.95B at
+  every point after the first, on a ±$30B axis, so the net line was flat. The **first snapshot of the day** had ~$25B more call and ~$22B more
+  put premium than every later one, and it was the baseline.
+- Web fix (`FlowMomentumChart.tsx`): since-start now sums step changes and treats a >25% jump in `call_prem + put_prem` between two
+  snapshots as a change of measurement (counts zero). tsc + eslint clean; not checked against live data (no access from here).
+- **REQUEST (yours, flow module / providers):** please look at NVDA's `net_flow_snapshots` for 2026-11-09 around the first rows and find why
+  the first one is ~2× the rest. My guess: a different chain source or expiry window on the first read (Yahoo full chain vs Public's 60-DTE
+  window), or stale pre-open mids. If it is a source switch, snapshots from the two sources shouldn't share one series.
