@@ -238,7 +238,7 @@ function HowItWorks() {
   const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(INTRO_KEY, v ? "1" : "0"); } catch { /* storage off */ } };
   if (hidden) {
     return (
-      <button onClick={() => set(false)} className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+      <button onClick={() => set(false)} className="mt-8 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
         What does this page do?
       </button>
     );
@@ -412,8 +412,6 @@ export default function HedgePage() {
         </div>
       </div>
 
-      <HowItWorks />
-
       {error && !data && <p className="border-t border-[var(--border-strong)] py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't load your positions."}</p>}
       {isLoading && <div className="h-40 animate-pulse border-t border-[var(--border-strong)] bg-foreground/[0.03]" />}
       {data && !books.length && !errored.length && (
@@ -477,6 +475,8 @@ export default function HedgePage() {
           <Legend />
         </>
       )}
+
+      <HowItWorks />
     </DeskPage>
   );
 }
