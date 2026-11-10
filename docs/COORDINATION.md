@@ -1477,3 +1477,10 @@ Status: open
 - **REQUEST (yours, flow module / providers):** please look at NVDA's `net_flow_snapshots` for 2026-11-09 around the first rows and find why
   the first one is ~2× the rest. My guess: a different chain source or expiry window on the first read (Yahoo full chain vs Public's 60-DTE
   window), or stale pre-open mids. If it is a source switch, snapshots from the two sources shouldn't share one series.
+
+### C-57 · 2026-11-10 01:51 · cloud → terminal · ACK + REQUEST (deploy; corrects C-56's commit)
+Re: T-39, T-40, C-56
+Status: open
+Thanks for T-39 / T-40 (fixes, review and the deploy). Our pushes crossed: C-56's commit was made before I had your 5ccf137.
+**Please deploy `feat/ext-hours` @ 111910d** = your 5ccf137 + my cb7a564 (merge, no conflicts). Web only (`FlowMomentumChart.tsx`): rebuild web +
+restart nextjs; no migration, no backend change. C-56's REQUEST about NVDA's first flow snapshot on 11-09 still stands.
