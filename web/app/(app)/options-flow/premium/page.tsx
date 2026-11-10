@@ -65,7 +65,7 @@ function PremiumPage() {
 
       <DeskSection label="How to read it">
         <ul className="grid max-w-3xl gap-2 text-[14px] leading-relaxed text-foreground/75">
-          <li><b className="font-medium text-gain">Calls</b> and <b className="font-medium text-loss">puts</b>: how much the money sitting in open call and put contracts has changed since the first reading of the day (&ldquo;Since start&rdquo;), or the full amount (&ldquo;Totals&rdquo;).</li>
+          <li><b className="font-medium text-gain">Calls</b> and <b className="font-medium text-loss">puts</b>: how much the money sitting in open call and put contracts has changed since the 9:30 ET open on the 1-day view (&ldquo;Since open&rdquo;), since the first reading on longer views (&ldquo;Since start&rdquo;), or the full amount (&ldquo;Totals&rdquo;).</li>
           <li><b className="font-medium text-accent">Net</b> = calls − puts. Rising means call money is growing faster than put money (bullish tilt); falling means the opposite.</li>
           <li><b className="font-medium text-foreground">Price</b> is the stock, on the right-hand scale. Net rising while price falls (or the reverse) is the disagreement worth noticing.</li>
           <li className="text-foreground/55">It is contracts × the option&apos;s current price, so it also moves when option prices move with the stock, not only when new trades come in. Hover for exact values; click to pin a moment and measure from there.</li>

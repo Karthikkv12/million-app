@@ -1,7 +1,9 @@
 "use client";
 /**
  * FlowMomentumChart — premium flow through the day, interactive.
- *  - Mode: "Since start" (premium added since the first snapshot in the window) or "Totals".
+ *  - Mode: "Since open" / "Since start" (premium added since the baseline) or "Totals". On the 1-day view the
+ *    baseline is the first snapshot at or after the 09:30 ET open: earlier snapshots still carry the previous
+ *    session's chain, so they are left out. Longer views start at the first snapshot in the window.
  *  - Series chips toggle calls / puts / net / price (price on its own right axis).
  *  - A readout bar follows the cursor; click the chart to pin a moment and the readout shows
  *    the change from the pin to the cursor. Drag the brush under the chart to zoom.
@@ -32,8 +34,23 @@ const m = (v: number | null | undefined, d = 1) => {
   const a = Math.abs(v), s = v < 0 ? "−" : v > 0 ? "+" : "";
   return a >= 1000 ? `${s}$${(a / 1000).toFixed(2)}B` : `${s}$${a.toFixed(d)}M`;
 };
+const utc = (ts: string) => new Date(/Z|[+-]\d\d:\d\d$/.test(ts) ? ts : ts + "Z");
+const etParts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** US-Eastern day and minutes after midnight of a snapshot. */
+const et = (ts: string) => {
+  const p = Object.fromEntries(etParts.formatToParts(utc(ts)).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, min: +p.hour * 60 + +p.minute };
+};
+const OPEN = 9 * 60 + 30;
+/** Index of the first snapshot at or after the latest session's 09:30 ET open; 0 when the open hasn't happened yet. */
+export function openIndex(snaps: { ts: string }[]): number {
+  if (!snaps.length) return 0;
+  const day = et(snaps[snaps.length - 1].ts).day;
+  const i = snaps.findIndex((s) => { const t = et(s.ts); return t.day === day && t.min >= OPEN; });
+  return Math.max(i, 0);
+}
 const when = (ts: string, days: number) => {
-  const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+  const d = utc(ts);
   return days === 1 ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
@@ -48,7 +65,7 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
   const [pin, setPin] = useState<number | null>(null);
   const { c, grid, xAxis, yAxis } = useChartStyle();
 
-  const { data: snaps = [], isLoading } = useQuery<FlowSnapshot[]>({
+  const { data: all = [], isLoading } = useQuery<FlowSnapshot[]>({
     queryKey: ["netFlowHistory", symbol, days],
     queryFn: () => fetchNetFlowHistory(symbol, days),
     staleTime: 30_000,
@@ -57,10 +74,17 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
 
   // No snapshots in the window (weekend, before the open)? Widen to the last session automatically.
   useEffect(() => {
-    if (picked || isLoading || snaps.length >= 2) return;
+    if (picked || isLoading || all.length >= 2) return;
     const next = DAYS.find((d) => d > days);
     if (next) setDays(next);
-  }, [picked, isLoading, snaps.length, days]);
+  }, [picked, isLoading, all.length, days]);
+  // 1-day "since" view: count from the open, not from the overnight snapshots (they repeat the previous close).
+  const fromOpen = mode === "since" && days === 1;
+  const snaps = useMemo(() => {
+    if (!fromOpen) return all;
+    const cut = all.slice(openIndex(all));
+    return cut.length >= 2 ? cut : all;
+  }, [all, fromOpen]);
   const widened = !picked && days > 1 && snaps.length >= 2;
 
   const rows = useMemo(() => {
@@ -105,7 +129,7 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">{page ? "" : "Through the day"}</h3>
         <div className="flex items-center gap-4">
-          <div className="flex">{seg<Mode>("since", mode, setMode, "Since start")}{seg<Mode>("total", mode, setMode, "Totals")}</div>
+          <div className="flex">{seg<Mode>("since", mode, (x) => { setMode(x); setPin(null); setHover(null); }, days === 1 ? "Since open" : "Since start")}{seg<Mode>("total", mode, (x) => { setMode(x); setPin(null); setHover(null); }, "Totals")}</div>
           <div className="flex">{DAYS.map((d) => seg<Day>(d, days, (x) => { setPicked(true); setDays(x); setPin(null); setHover(null); }, `${d}D`))}</div>
         </div>
       </div>
