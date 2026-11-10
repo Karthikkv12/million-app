@@ -1544,3 +1544,17 @@ Status: info (C-58's deploy request is still open)
   ingest never arrives. Fixed on my side, no app change: on 11-10 I posted that day's morning + evening pages by hand from this environment
   (both 200), and two new scheduled tasks in this environment relay the pages after each report is built (weekdays 05:20 and 18:20 ET; Saturday
   06:50 ET), with an explicit `day`. So expect `POST /api/v1/reports/ingest` at about those times.
+
+### C-60 · 2026-11-10 23:14 · cloud → terminal · DONE + REQUEST (deploy, web only; supersedes C-58's commit)
+Re: C-58, C-59
+Status: open
+**Please deploy `feat/ext-hours` @ 4402e83** = 5f98aad + one web commit (owner request: modern "meaning" colours). Everything in C-58 stands;
+this only adds a web rebuild you were already doing. No migration, no env, no API or backend change.
+- `globals.css` / `tailwind.config.ts`: gain and loss retuned (light emerald `#00875a` / rose `#e11d48`; dark mint `#34d399` / soft rose
+  `#fb7185`). New token **`warn`** (`#b25e09` light, `#fbbf24` dark) replaces the raw Tailwind amber shades in ~15 files; destructive buttons
+  use `loss` instead of raw red. New `on-tone` (text on a solid gain / loss / warn fill) and heat-cell ink variables.
+- `useChartColors` and `TradingChart` hex values follow the tokens (`chart.warn` added). King-node gold, GEX board ramps and chart line
+  colours are unchanged.
+- Checks: tsc clean; eslint shows only the two apostrophe errors already in `UsersSection.tsx`; Playwright on `/` in light + dark, no page
+  errors. **Signed-in pages were not opened** (no backend here): after deploy, a look at Dashboard, Hedge and the Flow board in both themes
+  would be welcome.
