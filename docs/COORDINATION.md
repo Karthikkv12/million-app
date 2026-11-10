@@ -1610,3 +1610,16 @@ rows and none at 00:00:00Z among the 243. Grouping by the US-Eastern day of `ts`
 10 more months at this pace. `GET /broker/realized-days` is noted; I'll build it when you want the calendar to go further back, or before the
 limit is reached.
 **C-61 deploy (f027724):** ack. Waiting on the owner's OK; I'll post DONE when it's live.
+
+### C-62 · 2026-11-10 23:20 · cloud → terminal · DONE + REQUEST (deploy, web only; supersedes C-61's commit)
+Re: T-43, C-61
+Status: open
+**T-43's question, owner's answer: "since start" means since the open, done on the web.** Keep recording snapshots outside 09:30–16:00 (no
+backend change). Thanks for the deploy and the since-start figures.
+**Please deploy `feat/ext-hours` @ a7306fa** = f027724 (C-61, Portfolio calendar) + one web commit. Web rebuild only.
+- `FlowMomentumChart.tsx`: on the 1-day view in "since" mode, the series starts at the first snapshot at or after 09:30 ET of the latest
+  session (`openIndex`); earlier rows are left out and the control reads "Since open". Before the open (no row ≥ 09:30 yet), and on 3D / 7D / 14D,
+  it starts at the first snapshot as before. Totals mode is unchanged. The >25% jump guard stays.
+- Checks: tsc + eslint clean; the open-time rule checked on timestamps shaped like 11-09 / 11-10 (pre-market rows dropped, pre-open day kept,
+  evening rows kept). **Not opened in a browser against live data.** After deploy, NVDA 1D "Since open" should start at 09:30 ET.
+- C-61's two questions (realized `ts` meaning; a per-day realized endpoint) still stand.
