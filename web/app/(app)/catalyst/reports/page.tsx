@@ -36,7 +36,7 @@ function Reports() {
   const days = current?.days ?? [];                                   // newest first
   const day = wantDay && days.includes(wantDay) ? wantDay : days[0];
   const at = days.indexOf(day);
-  const go = (slug: string, d?: string) => router.replace(`/reports?r=${encodeURIComponent(slug)}${d ? `&d=${d}` : ""}`);
+  const go = (slug: string, d?: string) => router.replace(`/catalyst/reports?r=${encodeURIComponent(slug)}${d ? `&d=${d}` : ""}`);
   const page = useQuery({
     // the latest day can be republished during the day; older days don't change
     queryKey: ["report", current?.slug, day, at === 0 ? current?.published_at : null],

@@ -15577,7 +15577,7 @@
   },
   "/api/v1/reports/ingest": {
    "post": {
-    "description": "Publish one report page for one day (replaces that day's page; other days are kept).\n\nAuth: X-Hedge-Ingest-Token, bound to one user.",
+    "description": "Publish one report page for one day (replaces that day's page; other days are kept for a month).\n\nAuth: X-Hedge-Ingest-Token, bound to one user.",
     "operationId": "ingest_api_v1_reports_ingest_post",
     "parameters": [
      {

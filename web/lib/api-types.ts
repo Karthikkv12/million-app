@@ -1532,7 +1532,7 @@ export interface paths {
         put?: never;
         /**
          * Ingest
-         * @description Publish one report page for one day (replaces that day's page; other days are kept).
+         * @description Publish one report page for one day (replaces that day's page; other days are kept for a month).
          *
          *     Auth: X-Hedge-Ingest-Token, bound to one user.
          */

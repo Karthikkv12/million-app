@@ -7,8 +7,9 @@ BODY = {"username": "owner", "slug": "morning", "title": "Morning Stock Analysis
         "html": "<title>x</title><p>hello</p>", "source_url": "https://claude.ai/artifact/abc", "day": "2026-11-09"}
 
 
-def test_publish_needs_token_and_bound_user(client):
+def test_publish_needs_token_and_bound_user(client, monkeypatch):
     c, _ = client
+    monkeypatch.setattr(reports, "today_et", lambda: "2026-11-10")
     assert c.post("/api/v1/reports/ingest", json=BODY).status_code == 401
     assert c.post("/api/v1/reports/ingest", json={**BODY, "username": "other"}, headers=H).status_code == 403
     assert c.post("/api/v1/reports/ingest", json={**BODY, "slug": "Bad Slug"}, headers=H).status_code == 422
@@ -20,6 +21,7 @@ def test_publish_needs_token_and_bound_user(client):
 
 def test_one_page_per_day_and_per_user(client, monkeypatch):
     c, _ = client
+    monkeypatch.setattr(reports, "today_et", lambda: "2026-11-10")
     assert c.post("/api/v1/reports/ingest", json=BODY, headers=H).status_code == 200
     r = c.post("/api/v1/reports/ingest", json={**BODY, "html": "<p>second</p>"}, headers=H)      # same day: replaced
     assert r.status_code == 200 and r.json()["size"] == len("<p>second</p>") and "html" not in r.json()
@@ -38,3 +40,25 @@ def test_one_page_per_day_and_per_user(client, monkeypatch):
     other = _login(c, "other")
     assert c.get("/api/v1/reports", headers=other).json() == []
     assert c.get("/api/v1/reports/morning", headers=other).status_code == 404
+
+
+def test_pages_older_than_a_month_are_deleted(client, monkeypatch):
+    c, _ = client
+    monkeypatch.setattr(reports, "today_et", lambda: "2026-11-10")
+    for d in ("2026-10-09", "2026-10-10", "2026-11-09"):                     # 32, 31 and 1 days old
+        c.post("/api/v1/reports/ingest", json={**BODY, "day": d}, headers=H)
+    c.post("/api/v1/reports/ingest", json={**BODY, "slug": "weekend", "day": "2026-10-10"}, headers=H)
+    mine = _login(c, "owner")
+    listed = {x["slug"]: x["days"] for x in c.get("/api/v1/reports", headers=mine).json()}
+    assert listed == {"morning": ["2026-11-09", "2026-10-10"], "weekend": ["2026-10-10"]}
+    monkeypatch.setattr(reports, "today_et", lambda: "2026-11-12")           # two days later: Oct 10 is now 33 days old
+    assert c.get("/api/v1/reports/weekend", headers=mine).status_code == 404  # hidden at once …
+    assert c.get("/api/v1/reports/morning?day=2026-10-10", headers=mine).status_code == 404
+    c.post("/api/v1/reports/ingest", json={**BODY, "day": "2026-11-12"}, headers=H)
+    from database.models import Report
+    from optionflow.core.db import get_session
+    s = get_session()
+    try:
+        assert sorted(r.day for r in s.query(Report).all()) == ["2026-11-09", "2026-11-12"]   # … and removed on the next publish
+    finally:
+        s.close()

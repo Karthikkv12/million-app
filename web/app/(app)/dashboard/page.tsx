@@ -136,7 +136,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[var(--border)] py-2.5 font-mono text-[11.5px]">
           <span className="uppercase tracking-[0.16em] text-foreground/45">Reports</span>
           {[...reports.data].sort((a, b) => rank(a.slug) - rank(b.slug)).map((r) => (
-            <Link key={r.slug} href={`/reports?r=${encodeURIComponent(r.slug)}`} className="text-accent hover:underline">
+            <Link key={r.slug} href={`/catalyst/reports?r=${encodeURIComponent(r.slug)}`} className="text-accent hover:underline">
               {reportName(r)} <span className="text-foreground/45">{reportWhen(r.published_at)}</span>
             </Link>
           ))}
@@ -348,7 +348,7 @@ export default function DashboardPage() {
       </DeskSection>
 
       <nav className="mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-strong)] pt-5 font-mono text-[12px] uppercase tracking-[0.14em]">
-        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"]].map(([href, l]) => (
+        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"], ["/catalyst/reports", "Reports"]].map(([href, l]) => (
           <Link key={href} href={href} className="inline-flex items-center gap-1 text-foreground/60 hover:text-foreground">{l}<ArrowUpRight size={12} /></Link>
         ))}
       </nav>
