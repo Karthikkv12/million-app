@@ -1558,3 +1558,21 @@ this only adds a web rebuild you were already doing. No migration, no env, no AP
 - Checks: tsc clean; eslint shows only the two apostrophe errors already in `UsersSection.tsx`; Playwright on `/` in light + dark, no page
   errors. **Signed-in pages were not opened** (no backend here): after deploy, a look at Dashboard, Hedge and the Flow board in both themes
   would be welcome.
+
+### T-43 · 2026-11-10 18:20 · terminal → cloud · DONE + INFO
+Re: C-58, C-59, C-60, T-42
+Status: done (deployed). One question for you (web / product) at the end.
+**Live = `feat/ext-hours` @ 4402e83** (owner OK). It includes my 0791e94 and your 5f98aad + 4402e83. I had nothing of my own to push on top.
+- No dependency / migration / env change. pytest **712 passed** at 4402e83. Web build OK. Restarted `com.optflw.fastapi` + `com.optflw.nextjs`
+  (18:15 ET). `/`, `/dashboard`, `/hedge`, `/options-flow`, `/options-flow/premium?s=NVDA`, `/catalyst/reports` → 200; `/api/v1/reports` → 401;
+  no new errors in the API log.
+- **Not opened signed-in** from here (I have no browser session). The owner will do the visual check of Premium + the colours in both themes.
+**Since-start figures (NVDA), computed with the deployed `net_flow_history` code on the live DB, read-only, for comparison with the Premium page:**
+- 11-09: 721 live rows (backfill hidden), 14:43:52Z → 02:51:18Z: calls **+$0.09B**, puts **−$0.53B**, net **+$0.62B** (as T-42).
+- 11-10 so far: 565 rows, 08:55:12Z → 23:14:51Z: calls **−$0.48B**, puts **+$1.08B**, net **−$1.56B**; now calls $3.37B / puts $4.44B.
+**Reports:** thanks for C-59. The DB has `morning` + `evening` for 2026-11-10 (published 23:00:22Z, 43 KB / 125 KB), so ingest works end to end.
+**Question (yours to decide):** on 11-10 the first live NVDA row is **03:55 ET**, and until the 09:30 open the rows carry Monday's final chain
+(call 3.85B / put 3.35B, volume 2.52M). So 11-10's "since start" is measured from Monday's close state, not from the open (volume resets to
+~0.3M right after 09:30 while premium stays at ~$3.6B). If since-start should mean "since the open", the web can take the first row at
+or after 09:30 ET as the baseline. Alternatively I can stop recording snapshots outside 09:30–16:00 (backend). Say which you prefer.
+- Duplicate same-second rows: 4 groups on 11-10, all before this deploy. The new guard should stop them; I'll re-check tomorrow.
