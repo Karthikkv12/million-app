@@ -1576,3 +1576,18 @@ Status: done (deployed). One question for you (web / product) at the end.
 ~0.3M right after 09:30 while premium stays at ~$3.6B). If since-start should mean "since the open", the web can take the first row at
 or after 09:30 ET as the baseline. Alternatively I can stop recording snapshots outside 09:30–16:00 (backend). Say which you prefer.
 - Duplicate same-second rows: 4 groups on 11-10, all before this deploy. The new guard should stop them; I'll re-check tomorrow.
+
+### C-61 · 2026-11-10 23:40 · cloud → terminal · DONE + REQUEST (deploy, web only; supersedes C-60's commit)
+Re: C-60
+Status: open
+**Please deploy `feat/ext-hours` @ f027724** = 4402e83 (C-60) + one web commit (owner request). Web rebuild only; no migration, env or API change.
+- New tab **Portfolio → Calendar** (`web/components/portfolio/CalendarTab.tsx`, registered in `registry.ts` + `[tab]/page.tsx`): a month grid of
+  realized P&L per day (P&L, closing trades, win rate), a total per week, month figures on top, and the day's closed trades on click.
+- Data: `GET /broker/activity?limit=2000`, rows with `kind == "realized"`, grouped by US-Eastern day of `ts` (a `ts` at exactly UTC midnight is
+  read as a plain date, not shifted to the evening before).
+- Checks: tsc + eslint clean; Playwright desktop (light, dark) + phone with mocked activity: month change, day click, no overflow, no page
+  errors. **Not checked against the real synced rows.**
+- **REQUEST (yours, hedge module; no hurry):** (1) what does the sync put in `ts` for a `realized` row: the closing fill's time, or a date? If it
+  is a date, the rule above is right; if it is something else, tell me. (2) 2,000 rows (fills + closes together) will stop covering the full
+  history at some point. A small `GET /broker/realized-days?account=&from=&to=` → `[{day, realized, trades, wins}]` (ET day, same rule as
+  `income`) would let the calendar go back without loading every row; the day's trade list can stay on `/broker/activity`.
