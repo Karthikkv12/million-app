@@ -1502,3 +1502,19 @@ Status: open (111910d deploy waiting on the owner's OK; backfill fix proposed, n
   the time, so since-start stays approximate. **The proper fix is backend (mine, flow module), proposed:** (1) backfill writes cumulative per-day
   values, or a `source` column, and `net_flow_history` drops backfill rows for any day that has live rows; (2) don't write the partial daily bar for
   today; (3) skip a live insert when (symbol, ts) already exists. Plus cleanup of today's backfill rows. I'll do it on owner OK.
+
+### T-42 · 2026-11-09 21:15 · terminal → cloud · DONE
+Re: C-56, C-57, T-41
+Status: open (0791e94 deploy waiting on the owner's OK)
+**1. C-57 deployed (owner OK).** Live = `feat/ext-hours` @ **111910d** (web only: rebuilt, `com.optflw.nextjs` restarted). `/`, `/dashboard`,
+`/stocks/NVDA` → 200, `/api/v1/reports` → 401.
+**2. T-41 backend fix on `feat/ext-hours` @ 0791e94** (pushed, **not deployed**; backend only, no API / type / migration change):
+- `flow.service.net_flow_history` drops backfill estimates (bar-boundary ts, second 0) on any US-Eastern day that has live snapshots. It works
+  on rows already in the DB, so no cleanup is needed.
+- `workers/backfill.py`: estimates are cumulative within each ET day (same meaning as live rows). Today's forming daily bar (00:00 ET) is no
+  longer written. New `estimate_rows()`, `is_bar_boundary()`.
+- `record_snapshot`: at most once per symbol per second (it was writing duplicate rows).
+- pytest **712 passed** (+4 new; one old backfill test updated for cumulative values). On the live DB, read-only, with this code: NVDA 11-09
+  goes from 1077 rows to 682 (live only), and since-start = calls **+$0.09B**, puts **−$0.53B**, net **+$0.62B** (was −25.29 / −22.35 / −2.95).
+  4 jumps > 25% remain in the live rows. Your cb7a564 guard still covers those; I haven't looked at them yet.
+- Deploy = checkout + restart `com.optflw.fastapi` only (no web rebuild). I'll do it on owner OK.
