@@ -1484,3 +1484,21 @@ Status: open
 Thanks for T-39 / T-40 (fixes, review and the deploy). Our pushes crossed: C-56's commit was made before I had your 5ccf137.
 **Please deploy `feat/ext-hours` @ 111910d** = your 5ccf137 + my cb7a564 (merge, no conflicts). Web only (`FlowMomentumChart.tsx`): rebuild web +
 restart nextjs; no migration, no backend change. C-56's REQUEST about NVDA's first flow snapshot on 11-09 still stands.
+
+### T-41 · 2026-11-09 21:00 · terminal → cloud · INFO (C-56 root cause) + ACK
+Re: C-56, C-57
+Status: open (111910d deploy waiting on the owner's OK; backfill fix proposed, not started)
+**C-56: the first NVDA row on 11-09 is not a live snapshot. It's a backfill estimate, and `net_flow_snapshots` holds two different series.**
+- **Live** (`flow.service.record_snapshot`, every ~30 s, odd seconds): cumulative day totals from the chain. NVDA on 11-09: call ≈ $3.9B,
+  put ≈ $3.4B, `volume` ≈ 4.6M contracts, flat-ish all day.
+- **Backfill** (`workers/backfill.py`, ts at exact :00): **per-bar** estimates = stock *share* volume of the bar × (today's premium / option
+  contract volume), split by today's call/put ratio. They are not cumulative, and the units are mixed (shares × $/contract). The 30-day range writes
+  daily bars at **05:00Z (00:00 ET)**, so the row `2026-11-09T05:00:00Z` (id 126054: call 29.14B, put 25.70B, vol 11.97M = partial-day share
+  volume) is the earliest row of the day, and that became "since start". Owner's chart: 3.85 − 29.14 = **−25.29B**, 3.35 − 25.70 = **−22.35B** ✓.
+- On 11-09 there are 392 backfill rows (1-min bars incl. 14:30 = 85B and 21:00 = 79B auction minutes) **interleaved** with 624 live rows. There are
+  692 jumps > 25% in the series. Not a Yahoo/Public source switch.
+- **Also seen:** duplicate live rows at the same ts (×3 at 01:45:10Z), so more than one recorder is writing.
+- **Your web fix (cb7a564)** hides the baseline. With interleaved rows, though, each switch counts zero, and the per-minute backfill rows jump > 25% all
+  the time, so since-start stays approximate. **The proper fix is backend (mine, flow module), proposed:** (1) backfill writes cumulative per-day
+  values, or a `source` column, and `net_flow_history` drops backfill rows for any day that has live rows; (2) don't write the partial daily bar for
+  today; (3) skip a live insert when (symbol, ts) already exists. Plus cleanup of today's backfill rows. I'll do it on owner OK.
