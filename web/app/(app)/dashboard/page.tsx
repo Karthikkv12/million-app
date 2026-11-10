@@ -171,16 +171,16 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
                   <Scale min={-0.5} max={1.5} value={perLot} tips={{ value: `Book now: ${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)} per lot · +1 = stock alone` }} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
-                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-amber-500"}
-                    zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-warn"}
+                    zones={[{ from: -0.5, to: 0.4, cls: "bg-warn/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
                     marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
                 </div>
               )}
               {beta != null && (
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
-                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
-                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-warn" : "bg-gain"}
+                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-warn/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
                     marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
                 </div>
               )}

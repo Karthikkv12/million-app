@@ -111,7 +111,7 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
       </div>
 
       {widened && (
-        <p className="mb-2 font-mono text-[11px] text-amber-700 dark:text-amber-300">No flow yet today (market closed); showing the last {days} days.</p>
+        <p className="mb-2 font-mono text-[11px] text-warn">No flow yet today (market closed); showing the last {days} days.</p>
       )}
       {isLoading || (!picked && snaps.length < 2 && days < 14) ? (
         <div className="skeleton h-48" />

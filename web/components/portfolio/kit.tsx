@@ -105,7 +105,7 @@ export function ConfirmDialog({ title, body, confirm, onConfirm, onClose, busy, 
       {error && <p className="mt-3 text-sm text-loss">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="btn-ghost h-9 px-4 text-sm">Cancel</button>
-        <button onClick={onConfirm} disabled={busy} className="btn h-9 bg-loss px-4 text-sm text-white hover:bg-loss/85 disabled:opacity-50">
+        <button onClick={onConfirm} disabled={busy} className="btn h-9 bg-loss px-4 text-sm text-on-tone hover:bg-loss/85 disabled:opacity-50">
           {busy ? "Working…" : confirm}
         </button>
       </div>

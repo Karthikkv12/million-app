@@ -16,6 +16,8 @@ const config: Config = {
         warm: "rgb(var(--warm-rgb) / <alpha-value>)",
         gain: "rgb(var(--gain-rgb) / <alpha-value>)",
         loss: "rgb(var(--loss-rgb) / <alpha-value>)",
+        warn: "rgb(var(--warn-rgb) / <alpha-value>)",
+        "on-tone": "var(--on-tone)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],

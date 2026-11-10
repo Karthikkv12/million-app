@@ -242,7 +242,7 @@ function RowMenu({ u, isSelf, onRole, onActive, onReset, onDelete }: {
               <p className="text-[13px] text-foreground">Delete <b>{u.username}</b>? This can't be undone.</p>
               <div className="flex gap-2">
                 <button onClick={() => setConfirm(false)} className="btn-ghost h-8 flex-1 px-2 text-[13px]">Cancel</button>
-                <button onClick={() => { setOpen(false); onDelete(); }} className="btn h-8 flex-1 bg-red-600 px-2 text-[13px] text-white hover:bg-red-700">Delete</button>
+                <button onClick={() => { setOpen(false); onDelete(); }} className="btn h-8 flex-1 bg-loss px-2 text-[13px] text-on-tone hover:bg-loss/85">Delete</button>
               </div>
             </div>
           ) : (
@@ -257,7 +257,7 @@ function RowMenu({ u, isSelf, onRole, onActive, onReset, onDelete }: {
                 <KeyRound size={15} />Reset password
               </button>
               <div className="my-1 h-px bg-[var(--border)]" />
-              <button className={clsx(item, "text-red-600 hover:text-loss")} disabled={isSelf} onClick={() => setConfirm(true)}>
+              <button className={clsx(item, "text-loss hover:text-loss/80")} disabled={isSelf} onClick={() => setConfirm(true)}>
                 <Trash2 size={15} />Delete user
               </button>
               {isSelf && <p className="px-2.5 pb-1 pt-1.5 text-[12px] text-foreground/45">You can't change or delete your own account here.</p>}

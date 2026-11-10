@@ -53,7 +53,7 @@ export function DeskFigures({ children, className }: { children: React.ReactNode
 export function DeskRow({ edge, children, className, onClick, active }: {
   edge?: "accent" | "gain" | "loss" | "warn" | null; children: React.ReactNode; className?: string; onClick?: () => void; active?: boolean;
 }) {
-  const E = { accent: "before:bg-accent", gain: "before:bg-gain", loss: "before:bg-loss", warn: "before:bg-amber-500" } as const;
+  const E = { accent: "before:bg-accent", gain: "before:bg-gain", loss: "before:bg-loss", warn: "before:bg-warn" } as const;
   return (
     <div
       onClick={onClick}
@@ -82,7 +82,7 @@ export function Tag({ tone = "neutral", children, className }: {
     accent: "text-accent ring-accent/40 bg-accent/[0.08]",
     gain: "text-gain ring-gain/40 bg-gain/[0.08]",
     loss: "text-loss ring-loss/40 bg-loss/[0.08]",
-    warn: "text-amber-700 dark:text-amber-300 ring-amber-500/40 bg-amber-500/[0.08]",
+    warn: "text-warn ring-warn/40 bg-warn/[0.08]",
     solid: "text-[var(--background)] bg-foreground ring-foreground",
   } as const;
   return (
@@ -184,7 +184,7 @@ export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-
         </Mark>
       )}
       <Mark at={p(value)} label="now" onShow={show("value", tips?.value ?? `Now ${f(value)}`, p(value))}>
-        <span className={clsx("h-3 w-3 rounded-full ring-2 ring-[var(--background)]", dot ?? (off ? "bg-amber-500" : "bg-gain"))} />
+        <span className={clsx("h-3 w-3 rounded-full ring-2 ring-[var(--background)]", dot ?? (off ? "bg-warn" : "bg-gain"))} />
       </Mark>
       {tip && <Bubble at={tip.at} text={tip.text} />}
     </div>

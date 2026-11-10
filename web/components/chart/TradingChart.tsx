@@ -160,8 +160,8 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
     const first = closes[0];
     const last  = closes[closes.length - 1];
     const up    = last >= first;
-    const upCol = isDark ? "#3fb37f" : "#15803d";
-    const dnCol = isDark ? "#e55d5d" : "#dc2626";
+    const upCol = isDark ? "#34d399" : "#00875a";
+    const dnCol = isDark ? "#fb7185" : "#e11d48";
 
     if (chartType === "candle") {
       const cs = chart.addSeries(CandlestickSeries, {
