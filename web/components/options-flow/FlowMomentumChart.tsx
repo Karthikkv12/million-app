@@ -5,6 +5,8 @@
  *  - Series chips toggle calls / puts / net / price (price on its own right axis).
  *  - A readout bar follows the cursor; click the chart to pin a moment and the readout shows
  *    the change from the pin to the cursor. Drag the brush under the chart to zoom.
+ *  - variant "page" (the full-size Flow → Premium page): a taller chart, calls and puts as two lines
+ *    (the drawer's thin bars blend together at that width) and a one-sentence read above it.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +18,7 @@ import { Clock, Pin, X } from "lucide-react";
 import { fetchNetFlowHistory, FlowSnapshot } from "@/lib/api";
 import { useChartStyle } from "@/components/chart/kit";
 
-interface Props { symbol: string; accentColor?: string }
+interface Props { symbol: string; accentColor?: string; variant?: "drawer" | "page" }
 
 const DAYS = [1, 3, 7, 14] as const;
 type Day = (typeof DAYS)[number];
@@ -36,7 +38,8 @@ const when = (ts: string, days: number) => {
     : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
-export function FlowMomentumChart({ symbol }: Props) {
+export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
+  const page = variant === "page";
   const [days, setDays] = useState<Day>(1);
   const [picked, setPicked] = useState(false);          // the user chose a range: don't auto-widen
   const [mode, setMode] = useState<Mode>("since");
@@ -98,9 +101,9 @@ export function FlowMomentumChart({ symbol }: Props) {
   );
 
   return (
-    <div className="border-b border-[var(--border)] px-5 py-5">
+    <div className={page ? "" : "border-b border-[var(--border)] px-5 py-5"}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">Through the day</h3>
+        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">{page ? "" : "Through the day"}</h3>
         <div className="flex items-center gap-4">
           <div className="flex">{seg<Mode>("since", mode, setMode, "Since start")}{seg<Mode>("total", mode, setMode, "Totals")}</div>
           <div className="flex">{DAYS.map((d) => seg<Day>(d, days, (x) => { setPicked(true); setDays(x); setPin(null); setHover(null); }, `${d}D`))}</div>
@@ -119,6 +122,18 @@ export function FlowMomentumChart({ symbol }: Props) {
         </div>
       ) : (
         <>
+          {page && mode === "since" && (() => {
+            const e = rows[last], lead = Math.abs(e.net) < 0.02 * Math.max(Math.abs(e.call), Math.abs(e.putVal), 1) ? null : e.net > 0;
+            const moved = (v: number) => `${v >= 0 ? "grew" : "shrank"} by ${m(Math.abs(v)).replace("+", "")}`;
+            return (
+              <p className="mb-3 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
+                Since {when(rows[0].ts, days)}, money in open <span className="text-gain">calls</span> {moved(e.call)} and
+                in open <span className="text-loss">puts</span> {moved(e.putVal)}.{" "}
+                {lead == null ? "The two moved about the same, so there is no clear tilt."
+                  : <>The gap between them (<span className="text-accent">net</span>) is <b className="font-medium text-foreground">{m(e.net)}</b>: the tilt is toward <b className="font-medium text-foreground">{lead ? "calls (bullish)" : "puts (bearish)"}</b>.</>}
+              </p>
+            );
+          })()}
           {/* Readout: follows the cursor; relative to the pin when one is set */}
           <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 border-y border-[var(--border)] py-2 font-mono text-[12px] tabular-nums sm:grid-cols-[auto_repeat(4,minmax(0,1fr))]">
             <div className="col-span-2 flex items-center gap-2 text-foreground/60 sm:col-span-1">
@@ -138,7 +153,7 @@ export function FlowMomentumChart({ symbol }: Props) {
             })()}
           </div>
 
-          <div className="h-[230px] select-none [&_*:focus]:outline-none [&_.recharts-wrapper]:outline-none">
+          <div className={clsx(page ? "h-[320px] sm:h-[460px]" : "h-[230px]", "select-none [&_*:focus]:outline-none [&_.recharts-wrapper]:outline-none")}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={rows}
@@ -163,8 +178,12 @@ export function FlowMomentumChart({ symbol }: Props) {
                 <Tooltip cursor={{ stroke: c.muted, strokeDasharray: "3 3" }} content={() => null} />
                 <ReferenceLine yAxisId="m" y={0} stroke={c.border} />
                 {pin != null && <ReferenceLine yAxisId="m" x={rows[pin].ts} stroke={c.accent} strokeDasharray="4 3" label={{ value: "pin", position: "insideTopLeft", fill: c.accent, fontSize: 10 }} />}
-                {on.call && <Bar yAxisId="m" dataKey="call" fill={c.gainSoft} maxBarSize={5} isAnimationActive={false} />}
-                {on.put && <Bar yAxisId="m" dataKey="put" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />}
+                {on.call && (page
+                  ? <Line yAxisId="m" type="monotone" dataKey="call" stroke={c.gain} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+                  : <Bar yAxisId="m" dataKey="call" fill={c.gainSoft} maxBarSize={5} isAnimationActive={false} />)}
+                {on.put && (page
+                  ? <Line yAxisId="m" type="monotone" dataKey="put" stroke={c.loss} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+                  : <Bar yAxisId="m" dataKey="put" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />)}
                 {on.net && <Area yAxisId="m" type="monotone" dataKey="net" stroke={c.accent} strokeWidth={2.25} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
                 {on.price && <Line yAxisId="px" type="monotone" dataKey="price" stroke={c.ink} strokeOpacity={0.55} strokeWidth={1.25} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
                 {rows.length > 20 && (

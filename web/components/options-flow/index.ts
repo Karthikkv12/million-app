@@ -5,7 +5,7 @@ export { PanelHeader } from "./PanelHeader";
 export { LevelsStrip } from "./LevelsStrip";
 export { GexHeatmap, PALETTES, DEFAULT_HEAT_OPTS, METRIC_UNIT } from "./GexHeatmap";
 export type { HeatOpts, Palette, Metric } from "./GexHeatmap";
-export { DetailsDrawer } from "./DetailsDrawer";
+export { DetailsDrawer, Premium, StrikesTable, ExpiryTable } from "./DetailsDrawer";
 export { SourceBadge, sourceName } from "./SourceBadge";
 export { GexProfileChart } from "./GexProfileChart";
 export { FlowMomentumChart } from "./FlowMomentumChart";
