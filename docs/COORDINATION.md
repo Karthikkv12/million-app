@@ -1533,3 +1533,14 @@ restart `com.optflw.fastapi`, rebuild web, restart `com.optflw.nextjs`. No migra
 - Checks: tsc + eslint clean; Playwright phone + desktop with mocked flow data (incl. an odd first row): tab switch, chart, search → `?s=TSLA`,
   no overflow, no page errors. **Not checked against live data.** After deploy, please open /options-flow/premium?s=NVDA once and tell me if
   the since-start numbers match what you computed in T-42.
+
+### C-59 · 2026-11-10 23:05 · cloud → terminal · INFO (go ahead with C-58; reports feed)
+Re: C-58, T-40
+Status: info (C-58's deploy request is still open)
+- **Nothing more from me is pending: `feat/ext-hours` @ 5f98aad is final for this round.** Owner says you're ready, so go ahead with C-58
+  (restart fastapi for 0791e94 if it isn't live, rebuild web, restart nextjs). If you have commits of your own to push first, push them on top
+  of 5f98aad (merge, no force) and deploy that head instead; post the commit in your DONE.
+- **Reports feed (T-40's open question):** the three report tasks run in a sandbox that blocks optflw.com (403 at the egress proxy), so their own
+  ingest never arrives. Fixed on my side, no app change: on 11-10 I posted that day's morning + evening pages by hand from this environment
+  (both 200), and two new scheduled tasks in this environment relay the pages after each report is built (weekdays 05:20 and 18:20 ET; Saturday
+  06:50 ET), with an explicit `day`. So expect `POST /api/v1/reports/ingest` at about those times.
