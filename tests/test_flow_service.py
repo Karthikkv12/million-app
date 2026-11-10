@@ -97,7 +97,9 @@ def test_backfill_estimates_snapshots_from_bars(db_engine_and_session, fake_mark
     rows = service.net_flow_history("SPY", days=1)
     assert len(rows) == 2                            # the zero-price bar is skipped
     assert (rows[0]["call_prem"], rows[0]["put_prem"], rows[0]["total_prem"]) == (600.0, 400.0, 1000.0)
-    assert rows[1]["net_flow"] == 2000.0 * 0.6 - 2000.0 * 0.4
+    # cumulative within the day, like live snapshots: (100 + 200) contracts-equivalent × $10
+    assert (rows[1]["total_prem"], rows[1]["volume"]) == (3000.0, 300)
+    assert rows[1]["net_flow"] == 3000.0 * 0.6 - 3000.0 * 0.4
 
     backfill.backfill_history("SPY", 1)              # same range again today: no-op
     assert len(service.net_flow_history("SPY", days=1)) == 2
@@ -112,3 +114,56 @@ def test_bars_from_history_formats_daily_and_intraday():
                            "low": 0.5, "close": 1.5, "volume": 10}
     assert intraday[1]["open"] is None and intraday[1]["volume"] is None
     assert bars_from_history(df, intraday=False)[0]["date"] == "2026-11-06"
+
+
+# ── T-41: backfill estimates vs live snapshots ─────────────────────────────────
+def _row(ts, cp, pp=0.0):
+    return (ts, 100.0, cp, pp, cp - pp, cp + pp, 1)
+
+
+def test_history_drops_estimates_on_days_with_live_rows():
+    rows = [
+        _row("2026-11-06T20:59:00Z", 50e9),             # Friday: estimates only → kept
+        _row("2026-11-09T05:00:00Z", 29.14e9),          # Monday 00:00 ET daily-bar estimate → dropped
+        _row("2026-11-09T14:30:00Z", 45.4e9),           # Monday 1-min estimate → dropped
+        _row("2026-11-09T14:30:21Z", 1.2e9),            # live
+        _row("2026-11-09T21:00:00Z", 42.3e9),           # estimate (auction minute) → dropped
+        _row("2026-11-09T21:00:20Z", 3.86e9),           # live
+        _row("2026-11-10T01:45:10Z", 3.85e9),           # live, still Monday in ET
+    ]
+    got = service.drop_estimates_where_live(rows)
+    assert [r[0] for r in got] == ["2026-11-06T20:59:00Z", "2026-11-09T14:30:21Z", "2026-11-09T21:00:20Z",
+                                   "2026-11-10T01:45:10Z"]
+
+
+def test_history_keeps_estimates_when_no_live_rows():
+    rows = [_row("2026-11-09T14:30:00Z", 1.0), _row("2026-11-09T14:31:00Z", 2.0)]
+    assert service.drop_estimates_where_live(rows) == rows
+
+
+def test_estimates_are_cumulative_per_et_day_and_skip_todays_daily_bar():
+    idx = pd.DatetimeIndex(["2026-11-05 05:00", "2026-11-06 05:00", "2026-11-09 05:00"], tz="UTC")
+    bars = pd.DataFrame({"close": [10.0, 11.0, 12.0], "volume": [100, 200, 50]}, index=idx)
+    now = datetime(2026, 11, 9, 15, 0, tzinfo=timezone.utc)
+    rows = backfill.estimate_rows("NVDA", bars, "1d", 0.5, 0.5, 2.0, set(), now=now)
+    assert [r["ts"] for r in rows] == ["2026-11-05T05:00:00Z", "2026-11-06T05:00:00Z"]   # Monday's bar is still forming
+    assert [r["total_prem"] for r in rows] == [200.0, 400.0]                              # each its own day: no carry-over
+
+    idx = pd.DatetimeIndex(["2026-11-06 20:58", "2026-11-06 20:59", "2026-11-09 14:30", "2026-11-09 14:31"], tz="UTC")
+    bars = pd.DataFrame({"close": 10.0, "volume": [1, 2, 3, 4]}, index=idx)
+    rows = backfill.estimate_rows("NVDA", bars, "1m", 0.6, 0.4, 1.0, {"2026-11-09T14:30:00Z"}, now=now)
+    assert [(r["ts"], r["volume"]) for r in rows] == [("2026-11-06T20:58:00Z", 1), ("2026-11-06T20:59:00Z", 3),
+                                                     ("2026-11-09T14:31:00Z", 7)]       # skipped rows still count
+
+
+def test_record_snapshot_once_per_second(monkeypatch):
+    calls = []
+    monkeypatch.setattr(service.repo, "add_snapshot", lambda **row: calls.append(row))
+    monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:10Z")
+    r = _result("NVDA", call=1.0, put=1.0, volume=1)
+    for _ in range(3):
+        service.record_snapshot(r)
+    assert len(calls) == 1
+    monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:11Z")
+    service.record_snapshot(r)
+    assert len(calls) == 2
