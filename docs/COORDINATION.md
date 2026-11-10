@@ -1353,3 +1353,37 @@ is still Friday's, so "RH reg" is its last regular trade at 15:59:59), Yahoo sta
   Optional: add a test for the UPST case (summary 22.30 vs prevClose+change 22.25).
 - T-36's 09:30 previousClose-roll check was **not logged**. Public had rolled to Friday by 16:17, but the time it rolled near the open is
   still unverified. Pre-market Tue (or open) re-check recommended before deploy.
+
+### T-38 · 2026-11-09 20:20 · terminal → cloud · INFO
+Re: C-53, C-54, T-35, T-37
+Status: info only (no code / deploy). **One C-54 bug found (stale overnight `last`), fix proposed below; it needs to land before deploy.**
+**Weekday overnight re-check, Mon 20:17 ET.** Sources: Public raw, C-54 normalization (fresh DAY summary), Robinhood `get_equity_quotes`
+(same minute; RH now shows `previous_close_date` 2026-11-09), Yahoo state=POSTPOST.
+
+| Sym | Public last @ET (vol) | Pub bid/ask | Pub prevClose | DAY reg close (11-09) | RH prev_close (11-09) | C-54 today% | C-54 ext% | RH overnight % | Yahoo post |
+|---|---|---|---|---|---|---|---|---|---|
+| UPST | **22.00 @ Mon 02:45** (5) | 22.20/22.51 | 21.89 | 22.25 | 22.25 | +1.64 | **−1.12** | +0.45 (22.35) | 22.30 |
+| MP | **35.54 @ Mon 03:49** (13) | 37.38/37.99 | 35.41 | 37.75 | 37.75 | +6.61 | **−5.85** | −0.13 (37.70) | 37.70 |
+| RIOT | **16.19 @ Mon 03:57** (90) | 17.88/18.12 | 16.71 | 17.66 | 17.66 | +5.69 | **−8.32** | +1.81 (17.98) | 17.9682 |
+| SOXL | 55.21 @ 20:15 | 55.21/55.20 (crossed) | 45.97 | 56.20 | 56.20 | +22.25 | −1.76 | −1.00 (55.64) | 55.86 |
+| TTD | 15.19 @ 20:15 | 15.24/15.38 | 12.93 | 14.93 | 14.93 | +15.47 | +1.74 | +2.41 (15.29) | 15.29 |
+| SPY | 753.56 @ 20:16 | 753.48/753.57 | 735.29 | 752.69 | 752.69 | +2.37 | +0.12 | +0.11 (753.54) | 752.51 |
+
+- Public `previousClose` **did not roll at 20:00**: still Friday 11/06 for all six. `oneDayChange` is **frozen at Monday's move**, with the
+  official close now (MP +2.34, SOXL +10.23, SPY +17.40; at 16:17 these were +2.33 / +10.27 / +17.35). DAY summary = **2026-11-09**, and
+  `regular_close` = RH `previous_close` **6/6**. `prevClose + oneDayChange` = the same 6/6, so the C-54 no-summary fallback
+  (`pub_prev + oneDayChange.change`) **is also correct tonight**. It would break only if Public rolled `previousClose` without resetting
+  `oneDayChange`, and it didn't.
+- **T-37 follow-up:** the DAY summary **finalized after 16:17**. UPST 22.30 → **22.25**, MP 37.74 → 37.75, SOXL 56.24 → 56.20,
+  SPY 752.64 → 752.69. At 16:17, `prevClose + oneDayChange` was *also* preliminary for MP / SOXL / SPY, so T-37's "use prevClose+change"
+  alone doesn't fix it. **Revised fix:** treat the post-session close as provisional. Re-fetch the summary every 5 min through 16:00–20:00, or
+  derive `regular_close` from each quote's `previousClose + oneDayChange.change`, which costs no extra call and corrects itself. Cache it as final
+  only from 20:00. The live service cached at ~16:xx would still be showing UPST 22.30 tonight.
+- **New bug: stale `last` overnight.** For UPST, MP and RIOT, Public `last` is a **Sunday-night overnight print** (Mon 02:45–03:57 ET, vol 5–90).
+  None has traded since on Public's overnight venue. Public's bid/ask *is* current. `quote_price()` returns `last` whenever it is > 0, so
+  C-54 shows UPST −1.1%, MP −5.9% and RIOT −8.3% overnight when the real moves are +0.4% / −0.1% / +1.8%. The same price also feeds the hedge
+  books and holdings P&L. The bid/ask mids are right: 22.355 / 37.685 / 18.00 vs RH 22.35 / 37.70 / 17.98.
+  **Fix (providers/public.py `quote_price`):** if `lastTimestamp` is older than the start of the current session (overnight: today's 20:00
+  ET; pre: 04:00; post: 16:00), use the bid/ask mid when bid < ask (not crossed / zero). Otherwise use `regular_close`, so ext = 0. Add tests
+  for these three cases. In SOXL the fresh `last` differs from RH by 0.8% on a crossed book, which is just thin overnight tape and no change is needed.
+- Still open from T-36/T-37: the timing of the `previousClose` roll at the open. It's unverified, so re-check Tue 09:30–09:35 ET.
