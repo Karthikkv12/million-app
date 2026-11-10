@@ -959,7 +959,10 @@ export const fetchNotifyPrefs = () => api.get<NotifyPrefs>("/notify/prefs");
 export const saveNotifyPrefs = (p: NotifyPrefs) => api.put<NotifyPrefs>("/notify/prefs", p);
 
 // ── Daily report pages (morning / evening / weekend) ─────────────────────────
-export type ReportMeta = Schemas["ReportMeta"];
+export type ReportMeta = Schemas["ReportSummary"];
 export type ReportPage = Schemas["ReportOut"];
+/** Each report's latest page plus the days it has a page for. */
 export const fetchReports = () => api.get<ReportMeta[]>("/reports");
-export const fetchReport = (slug: string) => api.get<ReportPage>(`/reports/${encodeURIComponent(slug)}`);
+/** One day's page (YYYY-MM-DD); without a day, the latest. */
+export const fetchReport = (slug: string, day?: string | null) =>
+  api.get<ReportPage>(`/reports/${encodeURIComponent(slug)}${day ? `?day=${encodeURIComponent(day)}` : ""}`);

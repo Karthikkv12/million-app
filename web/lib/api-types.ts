@@ -1510,7 +1510,7 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description The user's report pages, newest first (without the HTML).
+         * @description Each report's latest page (without the HTML) and the days it can be opened for.
          */
         get: operations["list_reports_api_v1_reports_get"];
         put?: never;
@@ -1532,7 +1532,9 @@ export interface paths {
         put?: never;
         /**
          * Ingest
-         * @description Publish (replace) one report page. Auth: X-Hedge-Ingest-Token, bound to one user.
+         * @description Publish one report page for one day (replaces that day's page; other days are kept).
+         *
+         *     Auth: X-Hedge-Ingest-Token, bound to one user.
          */
         post: operations["ingest_api_v1_reports_ingest_post"];
         delete?: never;
@@ -3896,6 +3898,11 @@ export interface components {
         };
         /** ReportIngest */
         ReportIngest: {
+            /**
+             * Day
+             * @description Date the report is for; default: today in US Eastern
+             */
+            day?: string | null;
             /** Html */
             html: string;
             /**
@@ -3912,6 +3919,11 @@ export interface components {
         };
         /** ReportMeta */
         ReportMeta: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
             /** Published At */
             published_at: string;
             /**
@@ -3928,8 +3940,42 @@ export interface components {
         };
         /** ReportOut */
         ReportOut: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
             /** Html */
             html: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ReportSummary
+         * @description The latest page of one report, plus every day it has a page for (newest first).
+         */
+        ReportSummary: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /**
+             * Days
+             * @default []
+             */
+            days: string[];
             /** Published At */
             published_at: string;
             /**
@@ -7744,7 +7790,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReportMeta"][];
+                    "application/json": components["schemas"]["ReportSummary"][];
                 };
             };
         };
@@ -7786,7 +7832,10 @@ export interface operations {
     };
     get_report_api_v1_reports__slug__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Default: the latest day */
+                day?: string | null;
+            };
             header?: never;
             path: {
                 slug: string;

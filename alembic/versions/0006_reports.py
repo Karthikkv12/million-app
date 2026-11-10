@@ -24,13 +24,14 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('slug', sa.String(), nullable=False),
+    sa.Column('day', sa.String(), nullable=False),
     sa.Column('title', sa.String(), nullable=False),
     sa.Column('html', sa.Text(), nullable=False),
     sa.Column('source_url', sa.String(), nullable=True),
     sa.Column('published_at', sa.String(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('user_id', 'slug', name='uq_reports_user_slug')
+    sa.UniqueConstraint('user_id', 'slug', 'day', name='uq_reports_user_slug_day')
     )
     with op.batch_alter_table('reports', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_reports_user_id'), ['user_id'], unique=False)

@@ -13,3 +13,8 @@ export function reportWhen(iso: string): string {
   if (now.getTime() - d.getTime() < 6 * 86400e3) return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${t}`;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/** "Mon, Nov 9" for a YYYY-MM-DD day (no time-zone shift). */
+export function dayLabel(day: string, year = false): string {
+  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) });
+}

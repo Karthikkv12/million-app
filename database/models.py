@@ -550,12 +550,13 @@ class PushSubscription(Base):
 
 class Report(Base):
     """A daily report page (morning / evening / weekend …) pushed by a scheduled task (hedge.reports).
-    One row per (user, slug): each push replaces the page, like the artifact it mirrors."""
+    One row per (user, slug, day): a push replaces that day's page and earlier days are kept."""
     __tablename__ = "reports"
-    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_reports_user_slug"),)
+    __table_args__ = (UniqueConstraint("user_id", "slug", "day", name="uq_reports_user_slug_day"),)
     id           = Column(Integer, primary_key=True)
     user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     slug         = Column(String, nullable=False)                # "morning", "evening", "weekend"
+    day          = Column(String, nullable=False)                # YYYY-MM-DD the report is for (US Eastern)
     title        = Column(String, nullable=False)
     html         = Column(Text, nullable=False)                  # the whole page; shown in a sandboxed frame
     source_url   = Column(String, nullable=True)                 # the artifact it mirrors

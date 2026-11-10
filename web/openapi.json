@@ -7574,6 +7574,19 @@
    },
    "ReportIngest": {
     "properties": {
+     "day": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Date the report is for; default: today in US Eastern",
+      "title": "Day"
+     },
      "html": {
       "maxLength": 4000000,
       "minLength": 1,
@@ -7622,6 +7635,11 @@
    },
    "ReportMeta": {
     "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
      "published_at": {
       "title": "Published At",
       "type": "string"
@@ -7653,6 +7671,7 @@
     },
     "required": [
      "slug",
+     "day",
      "title",
      "published_at",
      "size"
@@ -7662,6 +7681,11 @@
    },
    "ReportOut": {
     "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
      "html": {
       "title": "Html",
       "type": "string"
@@ -7697,12 +7721,68 @@
     },
     "required": [
      "slug",
+     "day",
      "title",
      "published_at",
      "size",
      "html"
     ],
     "title": "ReportOut",
+    "type": "object"
+   },
+   "ReportSummary": {
+    "description": "The latest page of one report, plus every day it has a page for (newest first).",
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "days": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportSummary",
     "type": "object"
    },
    "SeedHoldingsOut": {
@@ -15466,7 +15546,7 @@
   },
   "/api/v1/reports": {
    "get": {
-    "description": "The user's report pages, newest first (without the HTML).",
+    "description": "Each report's latest page (without the HTML) and the days it can be opened for.",
     "operationId": "list_reports_api_v1_reports_get",
     "responses": {
      "200": {
@@ -15474,7 +15554,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/ReportMeta"
+          "$ref": "#/components/schemas/ReportSummary"
          },
          "title": "Response List Reports Api V1 Reports Get",
          "type": "array"
@@ -15497,7 +15577,7 @@
   },
   "/api/v1/reports/ingest": {
    "post": {
-    "description": "Publish (replace) one report page. Auth: X-Hedge-Ingest-Token, bound to one user.",
+    "description": "Publish one report page for one day (replaces that day's page; other days are kept).\n\nAuth: X-Hedge-Ingest-Token, bound to one user.",
     "operationId": "ingest_api_v1_reports_ingest_post",
     "parameters": [
      {
@@ -15566,6 +15646,25 @@
       "schema": {
        "title": "Slug",
        "type": "string"
+      }
+     },
+     {
+      "description": "Default: the latest day",
+      "in": "query",
+      "name": "day",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Default: the latest day",
+       "title": "Day"
       }
      }
     ],
