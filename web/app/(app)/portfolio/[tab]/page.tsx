@@ -5,6 +5,7 @@ import { OverviewTab } from "@/components/portfolio/OverviewTab";
 import { HoldingsTab } from "@/components/portfolio/HoldingsTab";
 import { OptionsTab } from "@/components/portfolio/OptionsTab";
 import { IncomeTab } from "@/components/portfolio/IncomeTab";
+import { CalendarTab } from "@/components/portfolio/CalendarTab";
 import { ActivityTab } from "@/components/portfolio/ActivityTab";
 import { WatchlistTab } from "@/components/portfolio/WatchlistTab";
 
@@ -13,6 +14,7 @@ const COMPONENTS: Record<string, () => JSX.Element | null> = {
   holdings: HoldingsTab,
   options: OptionsTab,
   income: IncomeTab,
+  calendar: CalendarTab,
   activity: ActivityTab,
   watchlist: WatchlistTab,
 };
