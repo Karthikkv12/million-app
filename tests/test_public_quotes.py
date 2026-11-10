@@ -252,3 +252,99 @@ def test_crypto_keeps_the_plain_day_change(monkeypatch):
     assert got["session"] is None and got["ext_change"] is None and got["regular_close"] is None
     assert got["prev_close"] == 40.87
     assert c.summaries == 0
+
+
+# ── T-38: a stale last trade in an extended session; T-37: the after-hours close is provisional ────────────────
+_MON_NIGHT = _dt(2026, 11, 9, 20, 17, tzinfo=_ET)          # weekday overnight after Monday 2026-11-09
+
+
+def _night(last, ts, bid, ask, prev, change):
+    """Real Public quote shape, Monday 2026-11-09 20:17 ET (T-38)."""
+    return {**_real(last, prev, change, ts=ts), "bid": bid, "ask": ask}
+
+
+def test_session_start():
+    assert _public.session_start(_MON_NIGHT) == _dt(2026, 11, 9, 20, 0, tzinfo=_ET)
+    assert _public.session_start(_dt(2026, 11, 10, 3, 0, tzinfo=_ET)) == _dt(2026, 11, 9, 20, 0, tzinfo=_ET)
+    assert _public.session_start(_SUN_NIGHT) == _dt(2026, 11, 8, 20, 0, tzinfo=_ET)
+    assert _public.session_start(_dt(2026, 11, 9, 4, 17, tzinfo=_ET)) == _dt(2026, 11, 9, 4, 0, tzinfo=_ET)
+    assert _public.session_start(_dt(2026, 11, 9, 16, 17, tzinfo=_ET)) == _dt(2026, 11, 9, 16, 0, tzinfo=_ET)
+    assert _public.session_start(_dt(2026, 11, 9, 10, 0, tzinfo=_ET)) is None
+    assert _public.session_start(_dt(2026, 11, 7, 12, 0, tzinfo=_ET)) is None
+
+
+@pytest.mark.parametrize("sym,last,ts,bid,ask,prev,change,close,mid", [
+    # last = Sunday-night overnight print (Mon 02:45–03:57 ET); Robinhood showed 22.35 / 37.70 / 17.98
+    ("UPST", "22.00", "2026-11-09T07:45:11Z", "22.20", "22.51", "21.89", "0.36", 22.25, 22.355),
+    ("MP", "35.54", "2026-11-09T08:49:53.123456789Z", "37.38", "37.99", "35.41", "2.34", 37.75, 37.685),
+    ("RIOT", "16.19", "2026-11-09T08:57:45Z", "17.88", "18.12", "16.71", "0.95", 17.66, 18.00),
+])
+def test_stale_overnight_last_uses_the_live_book(sym, last, ts, bid, ask, prev, change, close, mid):
+    reg = {"close": close, "date": "2026-11-09", "change": float(change)}
+    q = _nq(sym, _night(last, ts, bid, ask, prev, change), now=_MON_NIGHT, regular=reg)
+    assert q["price"] == pytest.approx(mid)
+    assert q["regular_close"] == close
+    assert q["ext_change"] == pytest.approx(mid - close)
+    assert abs(q["ext_change_pct"]) < 2                       # was −1.1 / −5.9 / −8.3 %
+
+
+def test_fresh_overnight_last_is_kept():
+    q = _nq("SPY", _night("753.56", "2026-11-10T01:16:51Z", "753.48", "753.57", "735.29", "17.4"), now=_MON_NIGHT,
+            regular={"close": 752.69, "date": "2026-11-09", "change": 17.4})
+    assert q["price"] == 753.56 and q["ext_change"] == pytest.approx(0.87)
+
+
+@pytest.mark.parametrize("bid,ask", [("55.21", "55.20"), ("0", "0"), (None, None), ("15.00", "25.00")])
+def test_stale_last_without_a_usable_book_shows_no_ext_move(bid, ask):
+    # crossed, empty or too wide (> 5%): price falls back to the regular close
+    q = _nq("X", _night("16.19", "2026-11-09T08:57:45Z", bid, ask, "16.71", "0.95"), now=_MON_NIGHT,
+            regular={"close": 17.66, "date": "2026-11-09", "change": 0.95})
+    assert q["price"] == 17.66 and q["ext_change"] == 0.0 and q["change"] == pytest.approx(0.95)
+
+
+def test_stale_last_without_any_regular_close_keeps_the_last():
+    q = _nq("X", {**_night("16.19", "2026-11-09T08:57:45Z", None, None, None, None)}, now=_MON_NIGHT)
+    assert q["price"] == 16.19
+
+
+def test_regular_session_ignores_last_timestamp():
+    q = _nq("X", _night("46.50", "2026-11-06T20:59:00Z", "46.00", "47.00", "45.97", "0.53"),
+            now=_dt(2026, 11, 9, 10, 0, tzinfo=_ET))
+    assert q["price"] == 46.50
+
+
+class _ProvisionalClient(_SummaryClient):
+    """DAY summary that is preliminary at first, then final (UPST, Monday 2026-11-09)."""
+    def __init__(self):
+        super().__init__()
+        self.close = ("22.30", "0.41")
+
+    def quotes(self, instruments):
+        return [{"instrument": i, "outcome": "SUCCESS", "last": "22.40", "previousClose": "21.89",
+                 "oneDayChange": {"change": "0.36"}} for i in instruments]
+
+    def day_summary(self, inst):
+        self.summaries += 1
+        return {"lastRegularTradingSessionClose": {"close": self.close[0], "closeDate": "2026-11-09",
+                                                   "change": self.close[1]}}
+
+
+def test_after_hours_close_is_refreshed_until_20(monkeypatch):
+    c = _ProvisionalClient()
+    q = _public.PublicQuotes(c, ttl=0)
+    clock = [1000.0]
+    monkeypatch.setattr(_public.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(_public, "_now", lambda: _dt(2026, 11, 9, 16, 17, tzinfo=_ET))
+    assert q.quotes(["UPST"])["UPST"]["regular_close"] == 22.30
+    q.quotes(["UPST"])
+    assert c.summaries == 1                                   # within REGULAR_RETRY: cached
+    c.close = ("22.25", "0.36")
+    clock[0] += _public.REGULAR_RETRY + 1
+    assert q.quotes(["UPST"])["UPST"]["regular_close"] == 22.25   # post: refetched although the date was fresh
+    assert c.summaries == 2
+    monkeypatch.setattr(_public, "_now", lambda: _MON_NIGHT)
+    q.quotes(["UPST"])
+    assert c.summaries == 3                                   # first overnight read replaces the provisional value
+    clock[0] += 10 * _public.REGULAR_RETRY
+    q.quotes(["UPST"])
+    assert c.summaries == 3                                   # final from then on
