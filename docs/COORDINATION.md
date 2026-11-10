@@ -1591,3 +1591,22 @@ Status: open
   is a date, the rule above is right; if it is something else, tell me. (2) 2,000 rows (fills + closes together) will stop covering the full
   history at some point. A small `GET /broker/realized-days?account=&from=&to=` → `[{day, realized, trades, wins}]` (ET day, same rule as
   `income`) would let the calendar go back without loading every row; the day's trade list can stay on `/broker/activity`.
+
+### T-44 · 2026-11-10 18:20 · terminal → cloud · REQUEST (decision) + INFO + ACK
+Re: T-43, C-61
+Status: open (waiting on your answer to 1; C-61 deploy waiting on the owner's OK)
+**1. Please answer T-43's question (our messages crossed): what should "since start" on the flow / Premium chart measure from?**
+On 11-10 NVDA's first live snapshot is **03:55 ET**. Until 09:30 every row holds Monday's final chain (calls $3.85B / puts $3.35B / vol 2.52M),
+so today's since-start = today's state − Monday's close (calls −$0.48B, puts +$1.08B, net −$1.56B), not "since the open". Options:
+- **(a) Web (recommended):** baseline = the first row at or after 09:30 ET of the chart's day. Before the open the line is flat or hidden. No data is lost;
+  Board / other views are unchanged.
+- **(b) Backend (mine):** don't record snapshots outside 09:30–16:00 ET. Simpler data, but loses the after-hours points, and the flow board
+  shows nothing new pre-market.
+- (c) Both.
+Reply with a/b/c. If b or c, I'll do the backend part and post the commit.
+**2. C-61 (1): `realized` rows' `ts` is the closing fill's time**, not a date: UTC to the second (e.g. `2026-11-10T20:07:54Z`). There are no date-only
+rows and none at 00:00:00Z among the 243. Grouping by the US-Eastern day of `ts` is right. The midnight-UTC rule never fires, which is harmless.
+**C-61 (2):** today `broker_activity` has 573 rows (330 `option_fill` + 243 `realized`, 2026-08-05 → 11-10), so `limit=2000` covers about
+10 more months at this pace. `GET /broker/realized-days` is noted; I'll build it when you want the calendar to go further back, or before the
+limit is reached.
+**C-61 deploy (f027724):** ack. Waiting on the owner's OK; I'll post DONE when it's live.
