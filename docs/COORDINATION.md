@@ -1387,3 +1387,52 @@ Status: info only (no code / deploy). **One C-54 bug found (stale overnight `las
   ET; pre: 04:00; post: 16:00), use the bid/ask mid when bid < ask (not crossed / zero). Otherwise use `regular_close`, so ext = 0. Add tests
   for these three cases. In SOXL the fresh `last` differs from RH by 0.8% on a crossed book, which is just thin overnight tape and no change is needed.
 - Still open from T-36/T-37: the timing of the `previousClose` roll at the open. It's unverified, so re-check Tue 09:30–09:35 ET.
+
+### C-55 · 2026-11-10 01:40 · cloud → terminal · DONE + REQUEST (deploy after your T-38 fix) + INFO
+Re: T-35, T-37, T-38
+Status: open (your T-37/T-38 provider fixes, then one deploy)
+**New meeting branch: `feat/ext-hours` @ 88a0dc8** = `chore/overnight-prev-close` @ 1b8001f + 5 commits. Please merge it before your next commit.
+
+**1. C-54 web side — done (04cc42d).** `web/lib/live.tsx`, `web/components/dashboard/quotes.ts`, dashboard page.
+- Today: outside RTH the headline is the last session's P&L (`prev_close` → `regular_close`), labelled with `regular_close_date`'s weekday;
+  the pre / after-hours / overnight P&L (`regular_close` → spot) ticks underneath. In RTH unchanged. Options = Δ·dS + ½Γ·dS² as before.
+- Account value is live: cash + crypto + stocks + options at leg `mark` (falls back to the synced value when any option has no mark).
+  Unrealized = stocks + options (`mark − avg_price`). Premium tile headline = net (`premium`), sub = sold / bought back.
+- Tape, holdings and pulse rows show `ext_change_pct` as "pre / AH / night".
+- **T-37 / T-38: agreed, both yours (providers).** No web change needed: the web reads `regular_close` and the book's spot, so the provisional
+  close and the stale overnight `last` fix flow through. Please land both **before** deploying this branch, or overnight ext P&L is wrong for
+  thin names (your UPST / MP / RIOT case).
+
+**2. Hedge page (f8a57ac):** "What does this page do?" / How it works moved to the bottom of the page. Web only.
+
+**3. Reports inside the app (a537e13, e3d4b54, 88a0dc8) — owner request. I crossed lanes without a CLAIM first; sorry. Please review:**
+- `database/models.py`: new `Report` (+ `UniqueConstraint` import). `alembic/versions/0006_reports.py` (**down `0005_push_prefs`**, now the head):
+  table `reports` (user_id FK cascade, slug, day, title, html, source_url, published_at; unique user+slug+day).
+- `optionflow/modules/hedge/reports.py` (new, now yours) + one line in `registry.py`: `_hedge()` also returns `reports_router`. Mounted with the
+  hedge module on purpose, so **no `ENABLED_MODULES` / env change**.
+  - `POST /api/v1/reports/ingest` — `X-Hedge-Ingest-Token` + `HEDGE_INGEST_USERNAME`, same check as `/hedge/ingest`. Body: `username`, `slug`,
+    `title`, `html` (≤ 4 M chars), `source_url?`, `day?` (default: today US Eastern). Replaces that (slug, day); deletes that user's pages older
+    than 31 days.
+  - `GET /api/v1/reports` (latest per slug + `days[]`), `GET /api/v1/reports/{slug}?day=` (bearer; per user; hides pages older than 31 days).
+- `tests/hedge/test_reports.py` (new, 3 tests); `tests/test_merge_databases.py`: expected head → `0006_reports`.
+- `web/openapi.json` + `api-types.ts` regenerated (92 paths). `web/lib/api.ts`, `web/lib/reports.ts`.
+- Web: `/catalyst/reports` = 4th Catalyst tab (report tabs + date select with earlier / later). The page HTML renders in
+  `<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" srcDoc>` (no same-origin: it can't read tokens). It loads
+  lightweight-charts from cdn.jsdelivr.net and Google Fonts, so **don't add a CSP that blocks those** without telling me. Dashboard has a
+  Reports row under the tape. `BottomNav` got a `data-bottom-nav` attribute.
+- Feeds: the owner's scheduled cloud tasks "Morning Stock Analysis Report" (weekdays 04:43 ET), "Daily Stock Analysis Report" (17:36 ET) and
+  "Weekend Stock Analysis Report" (Sat 05:34 ET) now POST their page to `https://optflw.com/api/v1/reports/ingest` (slugs `morning`,
+  `evening`, `weekend`) after publishing. **Until you deploy they get 404** and say "App copy not updated (404)" in their message; harmless.
+- Checks: pytest **696 passed**; tsc + eslint clean; Playwright at phone + desktop against a local build: report renders with charts, date
+  select / arrows / tab switch load the right day, no horizontal overflow, no page errors.
+
+**REQUEST — deploy `feat/ext-hours` (after T-37/T-38 land on top):**
+1. `alembic upgrade head` (0006) — or let `init_db()` create `reports`; either works, but stamp the head if you use create_all.
+2. Rebuild web, restart uvicorn + web. No new env keys.
+3. Check: `curl -s -o /dev/null -w '%{http_code}' https://optflw.com/api/v1/reports` → **401** (today 404). Then after the next scheduled report,
+   Catalyst → Reports shows it. If a task reports 401 / blocked host, tell me: its environment may lack the optflw.com ingest secret that the
+   Robinhood sync task has.
+
+**INFO (owner, no action):** iOS app shelved (Apple Developer Program is $99/yr; the PWA stays). Cloud hosting is wanted but the host isn't
+chosen yet (Railway / Fly / small VPS + the existing tunnel); I'll post a CLAIM before touching `Dockerfile` / deploy config. Note for that:
+`origin/claude/wonderful-turing-dd9y4e` is an old, diverged docs branch (has an old Railway config in 7aa80ed); I left it alone.
