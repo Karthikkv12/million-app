@@ -22,6 +22,8 @@ const DAYS = [1, 3, 7, 14] as const;
 type Day = (typeof DAYS)[number];
 type Mode = "since" | "total";
 type Key = "call" | "put" | "net" | "price";
+/** A jump in total open premium bigger than this between two snapshots is a change of measurement, not flow. */
+const BREAK = 0.25;
 
 const m = (v: number | null | undefined, d = 1) => {
   if (v == null) return "—";
@@ -60,15 +62,22 @@ export function FlowMomentumChart({ symbol }: Props) {
 
   const rows = useMemo(() => {
     if (!snaps.length) return [];
-    const f = snaps[0];
+    // "Since start" adds up the change between snapshots. A snapshot whose total premium jumps by more than BREAK against
+    // the one before it is a different measurement (another data source or expiry window, e.g. the first read of the day),
+    // not flow: that step counts as zero, so one odd snapshot can't flatten the whole chart.
+    let dc = 0, dp = 0;
     return snaps.map((s, i) => {
       const call = s.call_prem / 1e6, put = s.put_prem / 1e6, net = s.net_flow / 1e6;
+      if (i > 0) {
+        const q = snaps[i - 1], was = q.call_prem + q.put_prem, now = s.call_prem + s.put_prem;
+        if (!(Math.abs(now - was) > BREAK * Math.max(was, now))) { dc += (s.call_prem - q.call_prem) / 1e6; dp += (s.put_prem - q.put_prem) / 1e6; }
+      }
       return {
         i, ts: s.ts, price: s.price,
-        call: mode === "since" ? call - f.call_prem / 1e6 : call,
-        putVal: mode === "since" ? put - f.put_prem / 1e6 : put,          // real value (readout)
-        put: mode === "since" ? put - f.put_prem / 1e6 : -put,           // plotted: totals mirror puts below zero
-        net: mode === "since" ? net - f.net_flow / 1e6 : net,
+        call: mode === "since" ? dc : call,
+        putVal: mode === "since" ? dp : put,          // real value (readout)
+        put: mode === "since" ? dp : -put,           // plotted: totals mirror puts below zero
+        net: mode === "since" ? dc - dp : net,
         raw: { call, put, net, volume: s.volume },
       };
     });
@@ -156,7 +165,7 @@ export function FlowMomentumChart({ symbol }: Props) {
                 {pin != null && <ReferenceLine yAxisId="m" x={rows[pin].ts} stroke={c.accent} strokeDasharray="4 3" label={{ value: "pin", position: "insideTopLeft", fill: c.accent, fontSize: 10 }} />}
                 {on.call && <Bar yAxisId="m" dataKey="call" fill={c.gainSoft} maxBarSize={5} isAnimationActive={false} />}
                 {on.put && <Bar yAxisId="m" dataKey="put" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />}
-                {on.net && <Area yAxisId="m" type="monotone" dataKey="net" stroke={c.accent} strokeWidth={1.75} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
+                {on.net && <Area yAxisId="m" type="monotone" dataKey="net" stroke={c.accent} strokeWidth={2.25} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
                 {on.price && <Line yAxisId="px" type="monotone" dataKey="price" stroke={c.ink} strokeOpacity={0.55} strokeWidth={1.25} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
                 {rows.length > 20 && (
                   <Brush dataKey="ts" height={20} travellerWidth={8} stroke={c.border} fill="transparent" tickFormatter={(v: string) => when(v, days)} />
