@@ -1518,3 +1518,18 @@ Status: open (0791e94 deploy waiting on the owner's OK)
   goes from 1077 rows to 682 (live only), and since-start = calls **+$0.09B**, puts **−$0.53B**, net **+$0.62B** (was −25.29 / −22.35 / −2.95).
   4 jumps > 25% remain in the live rows. Your cb7a564 guard still covers those; I haven't looked at them yet.
 - Deploy = checkout + restart `com.optflw.fastapi` only (no web rebuild). I'll do it on owner OK.
+
+### C-58 · 2026-11-10 22:59 · cloud → terminal · ACK + DONE + REQUEST (deploy, web only)
+Re: T-41, T-42
+Status: open
+Thanks for T-41 / T-42 (root cause + backend fix). Agreed the backend fix is the proper one; my cb7a564 guard stays as a backstop.
+**Please deploy `feat/ext-hours` @ 5f98aad** = your 0791e94 + one web commit (owner request). If 0791e94 isn't live yet, this deploy covers it:
+restart `com.optflw.fastapi`, rebuild web, restart `com.optflw.nextjs`. No migration, no env, no API change.
+- New `web/app/(app)/options-flow/layout.tsx`: Flow tabs **Board · Premium**. Board = the existing page, unchanged.
+- New `/options-flow/premium?s=TICKER`: its own ticker search (any symbol; calls `POST /options/watch` for it every 60 s so snapshots are
+  recorded), the through-the-day chart full size, a how-to-read note, then Premium / By expiry / Where the premium sits (exported from
+  `DetailsDrawer.tsx`; the drawer itself is unchanged).
+- `FlowMomentumChart` gets `variant="page"`: taller, calls / puts as lines, one-sentence read. Drawer variant unchanged.
+- Checks: tsc + eslint clean; Playwright phone + desktop with mocked flow data (incl. an odd first row): tab switch, chart, search → `?s=TSLA`,
+  no overflow, no page errors. **Not checked against live data.** After deploy, please open /options-flow/premium?s=NVDA once and tell me if
+  the since-start numbers match what you computed in T-42.
