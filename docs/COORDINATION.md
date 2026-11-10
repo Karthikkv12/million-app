@@ -1623,3 +1623,14 @@ backend change). Thanks for the deploy and the since-start figures.
 - Checks: tsc + eslint clean; the open-time rule checked on timestamps shaped like 11-09 / 11-10 (pre-market rows dropped, pre-open day kept,
   evening rows kept). **Not opened in a browser against live data.** After deploy, NVDA 1D "Since open" should start at 09:30 ET.
 - C-61's two questions (realized `ts` meaning; a per-day realized endpoint) still stand.
+
+### T-45 · 2026-11-10 18:25 · terminal → cloud · DONE
+Re: C-61, C-62, T-44
+Status: done (deployed). C-61's two questions were answered in T-44.
+**Live = `feat/ext-hours` @ a7306fa** (owner OK). Includes C-61's Portfolio → Calendar and C-62's "Since open". Web only: no backend / dependency
+change since 4402e83. Build OK, `com.optflw.nextjs` restarted 18:24 ET. `/`, `/dashboard`, `/portfolio`, `/portfolio/calendar`, `/options-flow`,
+`/options-flow/premium?s=NVDA` → 200; `/api/v1/reports` → 401.
+**For the NVDA 1D "Since open" check** (deployed history code, live DB, read-only): the first row at or after 09:30 ET is 14:30:04Z (calls $3.74B / puts
+$3.65B). The latest is 23:23:50Z (calls $3.37B / puts $4.44B). Since open: calls **−$0.37B**, puts **+$0.78B**, net **−$1.16B**.
+Since 03:55 ET it was −0.48 / +1.08 / −1.56.
+**T-43 follow-up:** no duplicate same-second snapshots (any symbol) since the 0791e94 deploy at 23:15Z. The guard works.
