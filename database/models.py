@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Enum, Float,
-    ForeignKey, Index, Integer, String, Text,
+    ForeignKey, Index, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base
 import enum
@@ -546,3 +546,17 @@ class PushSubscription(Base):
     created_at = Column(String, nullable=False)                 # ISO UTC
     last_ok_at = Column(String, nullable=True)                  # last delivery the push service accepted
     prefs      = Column(Text, nullable=True)                    # JSON: which alerts / symbols (notify.service.DEFAULT_PREFS)
+
+
+class Report(Base):
+    """A daily report page (morning / evening / weekend …) pushed by a scheduled task (hedge.reports).
+    One row per (user, slug): each push replaces the page, like the artifact it mirrors."""
+    __tablename__ = "reports"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_reports_user_slug"),)
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    slug         = Column(String, nullable=False)                # "morning", "evening", "weekend"
+    title        = Column(String, nullable=False)
+    html         = Column(Text, nullable=False)                  # the whole page; shown in a sandboxed frame
+    source_url   = Column(String, nullable=True)                 # the artifact it mirrors
+    published_at = Column(String, nullable=False)                # ISO UTC

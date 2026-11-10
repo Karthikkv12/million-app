@@ -12,7 +12,8 @@ import { clsx } from "clsx";
 import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { rank, reportName, reportWhen } from "@/lib/reports";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
 import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   const quotes = useQuotes(ALL);
   const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
   const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
+  const reports = useQuery({ queryKey: ["reports"], queryFn: fetchReports, refetchInterval: 5 * 60_000 });
   const hedge = useLiveBooks();
   const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: 60_000 });
 
@@ -130,6 +132,16 @@ export default function DashboardPage() {
       </div>
 
       <Tape quotes={quotes.data} />
+      {!!reports.data?.length && (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[var(--border)] py-2.5 font-mono text-[11.5px]">
+          <span className="uppercase tracking-[0.16em] text-foreground/45">Reports</span>
+          {[...reports.data].sort((a, b) => rank(a.slug) - rank(b.slug)).map((r) => (
+            <Link key={r.slug} href={`/reports?r=${encodeURIComponent(r.slug)}`} className="text-accent hover:underline">
+              {reportName(r)} <span className="text-foreground/45">{reportWhen(r.published_at)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* ── Your book ─────────────────────────────────────────────────── */}
       <div className="py-6">

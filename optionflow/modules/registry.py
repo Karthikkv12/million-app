@@ -51,8 +51,9 @@ def _unusual() -> List[APIRouter]:
 
 
 def _hedge() -> List[APIRouter]:
+    from optionflow.modules.hedge.reports import router as reports_router
     from optionflow.modules.hedge.router import broker_router, router, stream_router
-    return [router, stream_router, broker_router]
+    return [router, stream_router, broker_router, reports_router]
 
 
 def _ai() -> List[APIRouter]:

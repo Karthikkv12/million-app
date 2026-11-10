@@ -7572,6 +7572,139 @@
     "title": "RecalculatedHolding",
     "type": "object"
    },
+   "ReportIngest": {
+    "properties": {
+     "html": {
+      "maxLength": 4000000,
+      "minLength": 1,
+      "title": "Html",
+      "type": "string"
+     },
+     "slug": {
+      "description": "\"morning\", \"evening\", \"weekend\"",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 64,
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "slug",
+     "title",
+     "html"
+    ],
+    "title": "ReportIngest",
+    "type": "object"
+   },
+   "ReportMeta": {
+    "properties": {
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportMeta",
+    "type": "object"
+   },
+   "ReportOut": {
+    "properties": {
+     "html": {
+      "title": "Html",
+      "type": "string"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "title",
+     "published_at",
+     "size",
+     "html"
+    ],
+    "title": "ReportOut",
+    "type": "object"
+   },
    "SeedHoldingsOut": {
     "additionalProperties": true,
     "properties": {
@@ -15328,6 +15461,144 @@
     "summary": "Live Quote",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/reports": {
+   "get": {
+    "description": "The user's report pages, newest first (without the HTML).",
+    "operationId": "list_reports_api_v1_reports_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReportMeta"
+         },
+         "title": "Response List Reports Api V1 Reports Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Reports",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/ingest": {
+   "post": {
+    "description": "Publish (replace) one report page. Auth: X-Hedge-Ingest-Token, bound to one user.",
+    "operationId": "ingest_api_v1_reports_ingest_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-hedge-ingest-token",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Hedge-Ingest-Token"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReportIngest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportMeta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ingest",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/{slug}": {
+   "get": {
+    "operationId": "get_report_api_v1_reports__slug__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "slug",
+      "required": true,
+      "schema": {
+       "title": "Slug",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Report",
+    "tags": [
+     "reports"
     ]
    }
   },

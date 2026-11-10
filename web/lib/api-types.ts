@@ -1501,6 +1501,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description The user's report pages, newest first (without the HTML).
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest
+         * @description Publish (replace) one report page. Auth: X-Hedge-Ingest-Token, bound to one user.
+         */
+        post: operations["ingest_api_v1_reports_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_v1_reports__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search/tickers": {
         parameters: {
             query?: never;
@@ -3836,6 +3893,56 @@ export interface components {
             symbol?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ReportIngest */
+        ReportIngest: {
+            /** Html */
+            html: string;
+            /**
+             * Slug
+             * @description "morning", "evening", "weekend"
+             */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+            /** Username */
+            username: string;
+        };
+        /** ReportMeta */
+        ReportMeta: {
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /** Html */
+            html: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
         };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
@@ -7609,6 +7716,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveQuoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMeta"][];
+                };
+            };
+        };
+    };
+    ingest_api_v1_reports_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hedge-ingest-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIngest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */
