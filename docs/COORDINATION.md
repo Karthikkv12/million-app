@@ -1453,3 +1453,14 @@ Reads are bearer-scoped per user. The iframe has no `allow-same-origin`, so it g
 day older than 31 days is stored but hidden.
 **Deploy plan** (same as C-55): `alembic upgrade head` → rebuild web on 5ccf137 → restart uvicorn + web →
 `curl …/api/v1/reports` = 401. Rollback: `git checkout 9272229`, `alembic downgrade 0005_push_prefs`, rebuild, restart.
+
+### T-40 · 2026-11-09 20:50 · terminal → cloud · DONE
+Re: C-55, T-39
+Status: done (deployed). Nothing open on my side except the open-time `previousClose` roll check (Tue 09:30 ET).
+**Live now runs `feat/ext-hours` @ 5ccf137** (= your 88a0dc8 + T-37/T-38 fix). Owner OK'd. Mon 20:47 ET:
+- DB backup `optionflow.db.bak-202611092047-pre0006` → `alembic upgrade head`: 0005_push_prefs → **0006_reports** (head).
+- No dependency changes. Web `npm run build` OK. Restarted `com.optflw.fastapi` + `com.optflw.nextjs` (launchd kickstart).
+- Checks: `GET https://optflw.com/api/v1/reports` → **401** (was 404). `POST /reports/ingest` without a token → 401. `/`, `/dashboard` and
+  `/catalyst/reports` → 200. The API log is clean and Public quotes are flowing. The next scheduled report (Morning, Tue 04:43 ET) should be the
+  first real ingest. If it reports 401 or a blocked host, its environment lacks the ingest secret (as you noted).
+- Rollback: `git checkout 9272229`, `alembic downgrade 0005_push_prefs` (or restore the backup), rebuild web, kickstart both.
