@@ -16,6 +16,7 @@ import { useChartStyle, ChartTooltip, Legend } from "@/components/chart/kit";
 
 type Day = Schemas["GexDayOut"];
 
+const PROFILE_ROWS = 16;
 const time = (ts: string) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toFixed(2)}`);
 const big = (v?: number | null) => {
@@ -34,6 +35,7 @@ export function GexReplay({ symbol }: { symbol: string }) {
     queryKey: ["gexHistory", symbol, on],
     queryFn: () => api.get<Day>(`/flow/${encodeURIComponent(symbol)}/replay${on ? `?on=${on}` : ""}`),
     staleTime: 60_000,
+    refetchInterval: 60_000,          // a snapshot is stored every 5 min while the symbol is watched
   });
   const snaps = data?.snapshots ?? [];
 
@@ -45,7 +47,12 @@ export function GexReplay({ symbol }: { symbol: string }) {
   }, [playing, snaps.length]);
 
   const cur = snaps[i];
-  const maxAbs = useMemo(() => Math.max(1, ...(cur?.profile ?? []).map(([, v]) => Math.abs(v))), [cur]);
+  // The 16 strikes nearest the price at this snapshot, highest first (the stored profile has 30; a scroll box
+  // that started at the top hid the ones around the price).
+  const near = useMemo(() => !cur ? [] : [...cur.profile].sort((a, b) => Math.abs(a[0] - cur.spot) - Math.abs(b[0] - cur.spot))
+    .slice(0, PROFILE_ROWS).sort((a, b) => b[0] - a[0]), [cur]);
+  const maxAbs = useMemo(() => Math.max(1, ...near.map(([, v]) => Math.abs(v))), [near]);
+  const spotRow = useMemo(() => (near.length && cur ? near.reduce((b, r) => (Math.abs(r[0] - cur.spot) < Math.abs(b[0] - cur.spot) ? r : b))[0] : null), [near, cur]);
   const chart = snaps.map((s) => ({ ts: s.ts, spot: s.spot, flip: s.zero_gamma, call: s.call_wall, put: s.put_wall, king: s.king }));
 
   return (
@@ -62,7 +69,7 @@ export function GexReplay({ symbol }: { symbol: string }) {
           <History size={22} className="text-foreground/35" />
           <p className="text-[14px] text-foreground/75">No replay for {symbol} yet.</p>
           <p className="max-w-md text-[13px] text-foreground/55">
-            Snapshots are saved every 5 minutes while {symbol} is open on the Flow board during market hours. Come back after a session to scrub through how the levels moved.
+            Snapshots are saved every 5 minutes while {symbol} is open here or on the Flow board. Come back after a session to scrub through how the levels moved.
           </p>
         </div>
       ) : (
@@ -116,12 +123,12 @@ export function GexReplay({ symbol }: { symbol: string }) {
                   <span className="text-foreground/55">King</span><span className="text-right text-foreground">{usd(cur.king)}</span>
                 </div>
                 <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Net GEX by strike</p>
-                <div className="grid max-h-56 gap-[2px] overflow-y-auto pr-1">
-                  {[...cur.profile].reverse().map(([k, v]) => {
-                    const near = Math.abs(k - cur.spot) === Math.min(...cur.profile.map(([s]) => Math.abs(s - cur.spot)));
+                <div className="grid gap-[2px]">
+                  {near.map(([k, v]) => {
+                    const atSpot = k === spotRow;
                     return (
-                      <div key={k} className="grid grid-cols-[48px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1 font-mono text-[11px]">
-                        <span className={near ? "font-medium text-accent" : "text-foreground/55"}>{k}</span>
+                      <div key={k} className={`grid grid-cols-[56px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1 font-mono text-[11px] ${atSpot ? "rounded-sm bg-foreground/[0.05]" : ""}`}>
+                        <span className={atSpot ? "font-medium text-accent" : "text-foreground/55"}>{k}{atSpot ? " ▸" : ""}</span>
                         <span className="flex justify-end">{v < 0 && <span className="h-2 rounded-l-sm bg-loss" style={{ width: `${(Math.abs(v) / maxAbs) * 100}%` }} />}</span>
                         <span className="flex">{v > 0 && <span className="h-2 rounded-r-sm bg-gain" style={{ width: `${(v / maxAbs) * 100}%` }} />}</span>
                       </div>
