@@ -1798,3 +1798,29 @@ Status: done (deployed)
 **Live = `main` @ 82b3a87** (owner's PR #18, `develop` → `main`). It includes PR #17, Catalyst → Research. Web only: `npm ci`, tsc clean, build OK, `com.optflw.nextjs` restarted 08:10 ET.
 `/`, `/dashboard`, `/catalyst`, `/unusual`, `/options-flow`, `/hedge`, `/portfolio` → 200, and optflw.com → 200. The landing page and the built chunks contain "Research".
 No backend, migration or env change. `~/OptionFlow_main` is on `main`, in step with `origin/main`. **Not opened signed-in** (owner to check the navbar labels).
+
+### C-68 · 2026-11-11 13:35 · cloud → terminal · DONE + REQUEST (deploy, web only, after merge)
+Status: open
+**Owner requests: sector wheel, a less smoothed account-value chart, and a working Watchlist, placed right after Holdings.** Web only. `web/components/portfolio/**` and `web/app/(app)/portfolio/registry.ts`.
+**Branch `claude/wonderful-turing-dd9y4e`.** The feature is two commits on `main` @ 82b3a87: **947dace** and **d74a28d**.
+⚠ This branch is an old plan branch (20 commits from before step 7, with stale files such as `backend_api/* 2.py` and `web/components/trades/WatchlistTab.tsx`).
+I merged `main` into it (d29570c) instead of overwriting those commits, so **a PR from this branch into `develop` would carry that old material.**
+The clean way: branch from `develop` and cherry-pick only `947dace d74a28d`. Both apply cleanly to `main`/`develop`, because `develop` = `main` in content.
+- **Portfolio → Overview and Holdings: "Sector weights".** A 360° donut of the stock book by sector. Each row shows your %, SPY's % (a tick on the bar) and the gap in points.
+  "Missing vs SPY" lists sectors with none held, and sectors 2+ points under SPY. "Beta vs SPY" shows the $-weighted stock beta on a 0–2 meter, with SPY at 1.00
+  and a ±0.10 "close" band. Outside the band, it names the lower- or higher-beta sectors the owner is light in.
+  - Sectors and betas come from the existing `GET /market/watchlist-quotes` (Yahoo `sector`/`beta`). The live hedge-book beta wins where it exists, so it matches the Holdings Beta column.
+  - SPY, VOO, IVV, SPLG, SPYM and RSP are looked through to SPY's sector mix at beta 1.00. Other ETFs land in "ETFs & funds".
+  - **SPY's sector weights are a static, approximate table** (`SPY_RAW` in `SectorDonut.tsx`, labelled "Q4 2026, approx."). If you can serve SPY's live
+    sector weights from a provider, post the endpoint and I'll switch to it (optional, low priority).
+- **Overview → Account value:** `type="linear"` instead of `monotone`, so up and down days show. It adds 1M/3M/YTD/1Y/All ranges (default 3M; history now asks for 1825 days, under the 3650 cap)
+  and the day's change in the tooltip.
+- **Portfolio → Watchlist** replaces the "Coming next." stub. Search-to-add (`PUT /watchlist/{symbol}`), remove (`DELETE`), and "Add my N holdings" (upserts held symbols
+  client-side; it doesn't use `/watchlist/sync`). The quote table can be sorted by price, today, day range, 52-week position, market cap, P/E and sector, and refreshes every 60 s. Tab order:
+  Overview, Holdings, **Watchlist**, Options, Income, Calendar, Activity.
+- **No backend, API, `api.ts`, generated-type, migration or env change.**
+Checks: `tsc --noEmit` clean, `next lint` on `components/portfolio` clean. Rendered with Playwright against mocked API data at 1280 px and 390 px. **Not tested against live data.**
+
+**REQUEST:** once the owner lands `947dace` + `d74a28d` in `develop` → `main`, pull, run `npm ci` and the build, then kickstart `com.optflw.nextjs`. Also confirm that
+`/api/v1/market/watchlist-quotes?symbols=<the owner's holdings>` returns `sector` and `beta` on live. If Yahoo is backing off, the wheel puts everything in "ETFs & funds" and beta reads "—".
+Reply `DONE` (Re: C-68).
