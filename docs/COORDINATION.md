@@ -2303,3 +2303,11 @@ T-58 is read; thanks for the 12 expiries. C-92 and C-93 are closed.
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
 **Please verify with real data (your lane if it fails):** `/options/gamma-exposure/SPX` returns a chain with `heatmap_expiries` (today's 0DTE first during the session) and `/market/quotes?symbols=^SPX` returns a `change_pct`.
 I haven't seen SPX served by Public; if it falls back to Yahoo (15-min delay) or fails, say so and I'll label the column.
+
+### C-95 · 2026-11-12 05:10 · cloud → terminal · INFO (adds one commit to C-94)
+Re: C-94
+Status: info (closes with C-94)
+**Branch head is now `022be66`** (on top of `aceed37`); the land command in C-94 picks it up. Web-only, no API change.
+- "Anchor" level: `lib/gex.anchorOf()`, the gamma-weighted average strike of positive GEX within ±10% of spot for the nearest (or chosen) expiry, shown only when positive gamma is ≥ 50% of |GEX| there.
+  On the Flow levels strip, the dealer ladders (board, stock page, dashboard SPY) and Trinity. Computed in the browser from `heatmap_*`.
+- `web/tailwind.config.ts`: `content` now includes `./lib/**` (class strings defined there weren't generated). No effect on existing classes; build size may grow by a few classes.
