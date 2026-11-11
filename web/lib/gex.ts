@@ -54,3 +54,43 @@ export function shortExpiry(exp: string): string {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   } catch { return exp; }
 }
+
+
+// ── Anchor ───────────────────────────────────────────────────────────────────
+/** Within this share of the price either way. */
+export const ANCHOR_BAND = 0.10;
+/** Positive GEX must be at least this share of all |GEX| in the band, or there is nothing to pin to. */
+export const ANCHOR_MIN_SHARE = 0.5;
+export const ANCHOR_TONE = "text-[#0e7490] dark:text-[#67e8f9]";
+
+export interface Anchor {
+  price: number;        // gamma-weighted average strike
+  expiry: string;
+  share: number;        // positive GEX ÷ all |GEX| in the band (how dominant the pin is)
+}
+
+/**
+ * The Anchor: the gamma-weighted average strike of POSITIVE GEX within ±ANCHOR_BAND of the price, for one expiry
+ * (default: the nearest). Long-gamma dealers sell rallies into those strikes and buy dips toward them, so the
+ * weighted centre is a steadier pin estimate than the single largest strike (the King). Null when positive GEX
+ * doesn't dominate near the price (short gamma or thin: moves run, there is no pin) or the data is missing.
+ */
+export function anchorOf(
+  d: { spot: number; heatmap_expiries?: string[] | null; heatmap_strikes?: number[] | null; heatmap_values?: number[][] | null } | null | undefined,
+  expiry?: string | null,
+): Anchor | null {
+  const exps = d?.heatmap_expiries ?? [];
+  const strikes = d?.heatmap_strikes ?? [];
+  if (!d || !d.spot || !exps.length || !strikes.length) return null;
+  const exp = expiry && exps.includes(expiry) ? expiry : exps[0];
+  const row = d.heatmap_values?.[exps.indexOf(exp)] ?? [];
+  let pos = 0, abs = 0, weighted = 0;
+  strikes.forEach((k, i) => {
+    if (Math.abs(k / d.spot - 1) > ANCHOR_BAND + 1e-9) return;   // tolerance: 110/100 - 1 is 0.10000000000000009
+    const g = row[i] ?? 0;
+    abs += Math.abs(g);
+    if (g > 0) { pos += g; weighted += k * g; }
+  });
+  if (pos <= 0 || abs <= 0 || pos / abs < ANCHOR_MIN_SHARE) return null;
+  return { price: Math.round((weighted / pos) * 100) / 100, expiry: exp, share: pos / abs };
+}
