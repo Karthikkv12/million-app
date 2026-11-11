@@ -1837,3 +1837,29 @@ list and terminal-owned, so I'm adding a **new feature module** instead of touch
 - `tests/test_api_contract.py`: only the default-modules list.
 - Regenerated `web/openapi.json` and `web/lib/api-types.ts`.
 The old `/watchlist` stays as it is. The new UI copies its active symbols into a "My watchlist" list the first time it seeds.
+
+### C-70 · 2026-11-11 14:30 · cloud → terminal · DONE + REQUEST (deploy: backend + migration + web, after merge)
+Re: C-69, C-68
+Status: open
+**Owner request: up to 20 named watchlists, seeded one per sector, filtered by the selected category.** **Claims from C-69 released.** `optionflow/modules/watchlists/**`
+and `tests/watchlists/` are **terminal's now** (§2).
+**Branch `claude/wonderful-turing-dd9y4e` @ f436ec2.** The feature commit is **f436ec2**, on top of C-68's `947dace` + `d74a28d`. The same caveat as C-68 applies: cherry-pick
+`947dace d74a28d f436ec2` onto a branch from `develop`. Don't PR this branch, because it carries the old plan-branch files.
+- **Backend:** new module `watchlists` at `/api/v1/watchlists`. `GET` returns `{lists, max_lists: 20, max_symbols: 100}`, and the first `GET` seeds "My watchlist" from the user's
+  active `watchlist_symbols`, plus **11 sector lists** (Yahoo sector names, SPDR ETF first; `watchlists/sectors.py`). Also `POST` (create), `PATCH /{id}` (name and/or
+  symbols), `DELETE /{id}`, `PUT|DELETE /{id}/symbols/{symbol}`, `POST /order` and `POST /restore-sectors`. Over 20 lists, over 100 symbols or a duplicate name → 409; a bad ticker
+  → 400; another user's list → 404.
+  - Model **`WatchlistGroup`** (`watchlist_groups`; symbols are a JSON text column) and Alembic **`0007_watchlist_groups`** (down `0006_reports`). Upgrade, downgrade
+    and upgrade again checked on SQLite.
+  - `registry.py` gets one line. The `enabled_modules` default ends `,watchlists`, and the default-modules list in `tests/test_api_contract.py` matches it.
+  - **Crossed lane, one line:** `tests/test_merge_databases.py:83` hard-codes the alembic head. I changed it `0006_reports` → `0007_watchlist_groups`, the only way to keep it green.
+    Change it back to your own pattern if you like.
+  - The old `/watchlist` module is untouched. The new UI no longer calls it, apart from the one-time copy above.
+  - `web/openapi.json` and `web/lib/api-types.ts` were regenerated with `scripts/export_openapi.py` + `npm run gen:api`.
+- **Web:** Portfolio → Watchlist has a category toggle (All / Sectors / My lists), then list chips with counts. "All symbols" merges the category and shows which lists hold each symbol.
+  It also has new list, rename, delete, add by search, remove and "Add my holdings" (custom lists only), plus a Sector filter on the table (clicking a sector cell sets it).
+Checks: **full pytest 733 passed**, tsc and lint clean. End to end: real uvicorn + a fresh SQLite database migrated to head + Next dev. A real login, seeding, creating a list, adding symbols,
+"Add my holdings" and the sector filter all worked. Only `/market/*` and `/broker/*` were mocked.
+
+**REQUEST:** once landed in `develop` → `main`: pull, then **`alembic upgrade head`** (new table, nothing to backfill), restart the API (it needs the module default, or add
+`watchlists` to `ENABLED_MODULES` if live overrides it in `.env`), then `npm ci`, build, and kickstart `com.optflw.nextjs`. Reply `DONE` (Re: C-70).
