@@ -4,9 +4,9 @@
  * Each list saves its own column ids, in order (WatchlistGroup.columns); null = DEFAULT_COLUMNS.
  * Ids are stored server-side, so never rename one: add a new id instead.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { clsx } from "clsx";
-import { ArrowDown, ArrowUp, Check, X } from "lucide-react";
+import { Check, GripVertical, X } from "lucide-react";
 import type { OptionMetrics, WatchlistQuote } from "@/lib/api";
 import { pct, tone, usd } from "./broker";
 
@@ -133,9 +133,33 @@ export function ColumnPicker({ value, onChange, onClose, onReset }: {
   const [q, setQ] = useState("");
   const on = new Set(value);
   const toggle = (id: string) => onChange(on.has(id) ? value.filter((x) => x !== id) : [...value, id]);
-  const move = (i: number, d: -1 | 1) => {
-    const j = i + d;
+  // Drag to reorder (mouse and touch, by the ⠿ handle). The order is local while dragging and saved once on drop.
+  const [drag, setDrag] = useState<{ id: string; order: string[] } | null>(null);
+  const rowsRef = useRef(new Map<string, HTMLDivElement>());
+  const order = drag?.order ?? value;
+  const onDown = (e: React.PointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ id, order: value });
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag) return;
+    const rest = drag.order.filter((x) => x !== drag.id);
+    // New slot = how many of the other rows sit above the pointer.
+    const at = rest.filter((x) => { const r = rowsRef.current.get(x)?.getBoundingClientRect(); return r && r.top + r.height / 2 < e.clientY; }).length;
+    const next = [...rest.slice(0, at), drag.id, ...rest.slice(at)];
+    if (next.join() !== drag.order.join()) setDrag({ id: drag.id, order: next });
+  };
+  const onUp = () => {
+    if (drag && drag.order.join() !== value.join()) onChange(drag.order);
+    setDrag(null);
+  };
+  /** Keyboard: focus the handle, ↑/↓ moves the column. */
+  const onKey = (e: React.KeyboardEvent, i: number) => {
+    const j = e.key === "ArrowUp" ? i - 1 : e.key === "ArrowDown" ? i + 1 : -1;
     if (j < 0 || j >= value.length) return;
+    e.preventDefault();
     const next = [...value];
     [next[i], next[j]] = [next[j], next[i]];
     onChange(next);
@@ -152,14 +176,22 @@ export function ColumnPicker({ value, onChange, onClose, onReset }: {
       </div>
       <div className="overflow-y-auto p-1.5">
         <p className="px-2 pb-1 pt-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">Shown · {value.length}</p>
-        {value.map((id, i) => {
+        <p className="px-2 pb-1 text-[11px] text-foreground/40">Drag ⠿ to reorder: top = leftmost column.</p>
+        {order.map((id, i) => {
           const c = COL.get(id)!;
+          const dragging = drag?.id === id;
           return (
-            <div key={id} className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-[var(--surface-2)]">
+            <div key={id} ref={(el) => { if (el) rowsRef.current.set(id, el); else rowsRef.current.delete(id); }}
+              className={clsx("flex select-none items-center gap-1 rounded-lg px-1 py-1.5 transition-shadow",
+                dragging ? "relative z-10 bg-[var(--surface-2)] shadow-[var(--shadow-float)] ring-1 ring-[var(--border-strong)]" : "hover:bg-[var(--surface-2)]")}>
+              <button aria-label={`Drag to move ${c.label}`} title="Drag to reorder"
+                onPointerDown={(e) => onDown(e, id)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => setDrag(null)}
+                onKeyDown={(e) => onKey(e, i)}
+                className={clsx("touch-none rounded p-1.5 text-foreground/40 hover:text-foreground", dragging ? "cursor-grabbing text-foreground" : "cursor-grab")}>
+                <GripVertical size={16} />
+              </button>
               <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{c.label}<span className="ml-1.5 text-[11px] text-foreground/40">{c.group}</span></span>
-              <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${c.label} left`} className="rounded p-1 text-foreground/50 hover:text-foreground disabled:opacity-25"><ArrowUp size={13} /></button>
-              <button onClick={() => move(i, 1)} disabled={i === value.length - 1} aria-label={`Move ${c.label} right`} className="rounded p-1 text-foreground/50 hover:text-foreground disabled:opacity-25"><ArrowDown size={13} /></button>
-              <button onClick={() => toggle(id)} aria-label={`Hide ${c.label}`} className="rounded p-1 text-foreground/50 hover:text-loss"><X size={13} /></button>
+              <button onClick={() => toggle(id)} aria-label={`Hide ${c.label}`} className="rounded p-1.5 text-foreground/50 hover:text-loss"><X size={14} /></button>
             </div>
           );
         })}
