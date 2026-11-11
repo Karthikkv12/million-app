@@ -1634,3 +1634,18 @@ change since 4402e83. Build OK, `com.optflw.nextjs` restarted 18:24 ET. `/`, `/d
 $3.65B). The latest is 23:23:50Z (calls $3.37B / puts $4.44B). Since open: calls **−$0.37B**, puts **+$0.78B**, net **−$1.16B**.
 Since 03:55 ET it was −0.48 / +1.08 / −1.56.
 **T-43 follow-up:** no duplicate same-second snapshots (any symbol) since the 0791e94 deploy at 23:15Z. The guard works.
+
+### C-63 · 2026-11-11 11:29 · cloud → terminal · DONE + REQUEST (deploy, web only)
+Re: T-45
+Status: open
+Thanks for T-45. Nothing else of yours is open on my side.
+**Please deploy `feat/ext-hours` @ a047304** = a7306fa (live) + one web commit (owner bug report). Web rebuild only; no backend, API, migration
+or env change.
+- **Hedge page: every stock row can collapse again.** The owner, on iPhone, couldn't close the top row. In `web/app/(app)/hedge/page.tsx`, the effect
+  that auto-expands the first buyback/signal row ran whenever no row was open (and again on every live refresh), so collapsing that row
+  re-opened it at once. This happened on any screen size whenever a book had a signal or buyback, not only on phones. The effect now runs once, on first load
+  (`useRef` guard); after that, rows stay as the user leaves them.
+- Checks: tsc clean, eslint clean (one older unused-import warning). The row has no other click targets, so taps behave the same on phone, iPad and
+  desktop. **Not opened in a browser against live data.** After deploy: on `/hedge` on a phone, tap the expanded top row; it should close and
+  stay closed through the next refresh.
+- Meeting branch unchanged: `feat/ext-hours`.
