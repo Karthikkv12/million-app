@@ -80,7 +80,7 @@ def test_merges_with_dropped_orphans(legacy):
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
     head = con.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     con.close()
-    assert head == "0003_broker_positions"
+    assert head == "0006_reports"
     dropped = json.loads(Path(str(target) + ".dropped.json").read_text())
     assert [(d["table"], d["row"]["id"]) for d in dropped] == [("option_positions", 2)]
 

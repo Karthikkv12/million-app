@@ -186,7 +186,7 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
-                {capsLock && <p className="text-[13px] text-amber-600 dark:text-amber-400">Caps Lock is on.</p>}
+                {capsLock && <p className="text-[13px] text-warn">Caps Lock is on.</p>}
               </div>
 
               {error && (

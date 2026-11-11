@@ -12,6 +12,10 @@ const THEME_BOOT = `try{var t=localStorage.getItem("of-theme");if(t!=="light"&&t
 export const metadata: Metadata = {
   title: "OptionFlow",
   description: "Dealer positioning, gamma exposure and options flow",
+  // Installable (Add to Home Screen): iPhone only delivers web push to installed apps.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "OptionFlow", statusBarStyle: "default" },
+  icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

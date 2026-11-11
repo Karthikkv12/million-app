@@ -238,7 +238,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
       ps.suggested
         ? "border border-dashed border-current bg-[var(--background)] " + (isCall(ps.kind) ? "text-accent" : "text-gain")
         : ps.kind === "SC" ? "bg-accent text-white"
-        : ps.kind === "SP" ? "bg-gain text-white"
+        : ps.kind === "SP" ? "bg-gain text-on-tone"
         : "border-[1.5px] border-current bg-[var(--background)] " + (ps.kind === "BC" ? "text-accent" : "text-gain")}`}>
       {ps.kind}{ps.suggested ? "?" : ""}{ps.n > 1 ? `×${ps.n}` : ""}
     </span>

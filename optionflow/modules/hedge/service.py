@@ -167,8 +167,29 @@ def _spot(sym: str) -> Optional[float]:
 
 
 def _prev_close(sym: str) -> Optional[float]:
-    q = CACHE.get("quote", sym, QUOTE_TTL, lambda: get_market_data().quote(sym))
-    return (q or {}).get("prev_close")
+    return _quote(sym).get("prev_close")
+
+
+def _quote(sym: str) -> Dict[str, Any]:
+    """Provider quote (prev_close + the session fields), cached QUOTE_TTL; {} when unavailable."""
+    return CACHE.get("quote", sym, QUOTE_TTL, lambda: get_market_data().quote(sym)) or {}
+
+
+def _day_fields(sym: str, spot: float) -> Dict[str, Any]:
+    """prev_close, day_change and the extended-hours fields for a book.
+
+    During the regular session (or when the quote has no session, e.g. from Yahoo) day_change = spot / prev − 1.
+    Outside it, like Robinhood: day_change = the last regular session's move, ext_change = spot − regular_close."""
+    q = _quote(sym)
+    prev, session, reg = q.get("prev_close"), q.get("session"), q.get("regular_close")
+    out = {"prev_close": prev, "session": session, "regular_close": reg,
+           "regular_close_date": q.get("regular_close_date"), "ext_change": None, "ext_change_pct": None,
+           "day_change": spot / prev - 1.0 if prev else None}
+    if session and session != "regular" and reg:
+        out["day_change"] = q["change_pct"] / 100.0 if q.get("change_pct") is not None else None
+        out["ext_change"] = round(spot - reg, 4)
+        out["ext_change_pct"] = round((spot - reg) / reg * 100, 4)
+    return out
 
 
 def _hv(sym: str) -> Dict[str, Optional[float]]:
@@ -240,6 +261,34 @@ def _chain(sym: str) -> Optional[Dict[str, Any]]:
     return CACHE.get("chain", sym, CHAIN_TTL, load)
 
 
+def _far_contracts(sym: str, expiries: List[str]) -> Dict[Tuple[str, float, str], Tuple[float, float, float]]:
+    """(iv, mid, dte) for held contracts outside the board chain's window (expiries > 60 DTE or beyond its
+    12-expiry cap), fetched for just those expiries and refreshed with the chain. {} when unavailable."""
+    def load():
+        fetch = getattr(get_market_data(), "option_contracts", None)
+        if fetch is None:
+            return {}
+        out: Dict[Tuple[str, float, str], Tuple[float, float, float]] = {}
+        for r in fetch(sym, expiries=list(expiries)).rows.itertuples(index=False):
+            bid, ask, last = (_num(r.bid), _num(r.ask), _num(r.last))
+            mid = (bid + ask) / 2 if bid and ask and ask >= bid else (last or 0.0)
+            out[(r.expiry, float(r.strike), str(r.otype))] = (_num(r.iv) or 0.0, mid, (_dte(r.expiry) or 0.0))
+        return out
+    try:
+        return CACHE.get("far", f"{sym}|{','.join(expiries)}", CHAIN_TTL, load) or {}
+    except Exception as exc:                       # no source could serve it: leave those legs unmarked
+        logger.info("hedge far contracts %s %s failed: %s", sym, expiries, exc)
+        return {}
+
+
+def _num(v: Any) -> Optional[float]:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if x == x else None
+
+
 def _atm_iv(rows: Dict[Tuple[str, float, str], Tuple[float, float, float]], expiry: Optional[str],
             spot: float) -> Optional[float]:
     if not expiry or not spot:
@@ -268,16 +317,21 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
         return {"symbol": sym, "error": f"No price for {sym} right now.", "accounts": accounts}
     rows = chain.get("rows") or {}
     atm_iv = chain.get("atm_iv")
+    far_exps = sorted({leg.expiry for leg in legs if leg.kind == "option" and leg.expiry
+                       and (leg.expiry, float(leg.strike or 0), leg.otype or "") not in rows})
+    far = _far_contracts(sym, far_exps) if far_exps else {}
     for leg in legs:                                   # IV per held contract, else ATM IV
         if leg.kind == "option":
-            hit = rows.get((leg.expiry, float(leg.strike or 0), leg.otype or ""))
+            key = (leg.expiry, float(leg.strike or 0), leg.otype or "")
+            hit = rows.get(key) or far.get(key)
             leg.iv = hit[0] if hit and hit[0] > bs.MIN_SIGMA else atm_iv
+            leg.mark = hit[1] if hit and hit[1] > 0 else None
             leg.dte = _dte(leg.expiry)
     weekly = chain.get("weekly")
     quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)
               for (e, k, t), (iv, mid, dte) in rows.items() if e == weekly and iv > bs.MIN_SIGMA]
-    prev = _prev_close(sym)
-    day_change = spot / prev - 1.0 if prev else None
+    day = _day_fields(sym, spot)
+    prev, day_change = day["prev_close"], day["day_change"]
     ivs = TRACKER.state(sym, day_change)
     hv = _hv(sym)
     gx = _gex(sym)
@@ -285,7 +339,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
     book = evaluate(ctx, legs, quotes).to_dict()
     book.update({
-        "spot": round(spot, 4), "prev_close": prev, "day_change": day_change, "day_high": ctx.day_high,
+        "spot": round(spot, 4), **day, "day_high": ctx.day_high,
         "accounts": accounts, "weekly_expiry": weekly, "beta": _beta(sym), "chain_source": chain.get("source"),
         "iv": {"atm_iv": ivs.atm_iv or atm_iv, "iv_open": ivs.iv_open, "iv_roc_day": ivs.iv_roc_day,
                "iv_roc_15m": ivs.iv_roc_15m, "iv_high": ivs.iv_high, "spike": ivs.spike, "cooling": ivs.cooling,

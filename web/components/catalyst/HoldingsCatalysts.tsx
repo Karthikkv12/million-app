@@ -89,7 +89,7 @@ export function HoldingsCatalysts() {
                         <p className={clsx("text-[11px]", tone(c.change_pct))}>{pct(c.change_pct, 2)}</p>
                       </div>
                       <div>
-                        <p className={clsx(!r.upcoming ? "text-foreground/45" : c.earnings.days_until != null && c.earnings.days_until <= 14 ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>{shortDate(c.earnings.date)}</p>
+                        <p className={clsx(!r.upcoming ? "text-foreground/45" : c.earnings.days_until != null && c.earnings.days_until <= 14 ? "text-warn" : "text-foreground")}>{shortDate(c.earnings.date)}</p>
                         <p className="text-[11px] text-foreground/45">
                           {!c.earnings.date ? "" : !r.upcoming ? "reported" : `in ${c.earnings.days_until}d`}
                           {r.upcoming && c.earnings.timing ? ` · ${c.earnings.timing.replace("before open", "BMO").replace("after close", "AMC")}` : ""}

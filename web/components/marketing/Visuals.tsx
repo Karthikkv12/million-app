@@ -1,6 +1,7 @@
 "use client";
 /** Static, illustrative product visuals for the marketing pages. Sample data only. */
 import { clsx } from "clsx";
+import { heatColor } from "@/components/ui";
 
 export function WindowFrame({ title, children, className, tone = "surface" }: {
   title: string; children: React.ReactNode; className?: string; tone?: "surface" | "dark";
@@ -32,10 +33,7 @@ const TILES: { s: string; w: number; ch: number }[][] = [
   [{ s: "INTC", w: 18, ch: -3.2 }, { s: "QCOM", w: 20, ch: 1.1 }, { s: "TXN", w: 18, ch: 0.5 }, { s: "IBM", w: 22, ch: -0.7 }, { s: "NOW", w: 22, ch: 1.8 }],
 ];
 
-function tileColor(ch: number): string {
-  const a = Math.min(Math.abs(ch) / 3, 1);
-  return ch >= 0 ? `rgba(53,183,121,${0.18 + a * 0.62})` : `rgba(220,38,38,${0.18 + a * 0.62})`;
-}
+
 
 export function SectorTiles({ className }: { className?: string }) {
   return (
@@ -46,8 +44,8 @@ export function SectorTiles({ className }: { className?: string }) {
             {row.map((t) => (
               <div
                 key={t.s}
-                className="flex min-w-0 flex-col items-center justify-center rounded-md text-foreground"
-                style={{ flexGrow: t.w, flexBasis: 0, background: tileColor(t.ch) }}
+                className="flex min-w-0 flex-col items-center justify-center rounded-md"
+                style={{ flexGrow: t.w, flexBasis: 0, background: heatColor(t.ch).bg, color: heatColor(t.ch).fg }}
               >
                 <span className="truncate font-mono text-[12px] font-medium">{t.s}</span>
                 <span className="font-mono text-[11px] tabular-nums opacity-80">{t.ch > 0 ? "+" : ""}{t.ch.toFixed(1)}%</span>

@@ -4,7 +4,7 @@
  * Full-bleed sections divided by hairlines, a left gutter label, big numerals, dense rows,
  * colored left edges for anything that needs action. No rounded boxed panels.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 
 export function DeskPage({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -53,7 +53,7 @@ export function DeskFigures({ children, className }: { children: React.ReactNode
 export function DeskRow({ edge, children, className, onClick, active }: {
   edge?: "accent" | "gain" | "loss" | "warn" | null; children: React.ReactNode; className?: string; onClick?: () => void; active?: boolean;
 }) {
-  const E = { accent: "before:bg-accent", gain: "before:bg-gain", loss: "before:bg-loss", warn: "before:bg-amber-500" } as const;
+  const E = { accent: "before:bg-accent", gain: "before:bg-gain", loss: "before:bg-loss", warn: "before:bg-warn" } as const;
   return (
     <div
       onClick={onClick}
@@ -82,7 +82,7 @@ export function Tag({ tone = "neutral", children, className }: {
     accent: "text-accent ring-accent/40 bg-accent/[0.08]",
     gain: "text-gain ring-gain/40 bg-gain/[0.08]",
     loss: "text-loss ring-loss/40 bg-loss/[0.08]",
-    warn: "text-amber-700 dark:text-amber-300 ring-amber-500/40 bg-amber-500/[0.08]",
+    warn: "text-warn ring-warn/40 bg-warn/[0.08]",
     solid: "text-[var(--background)] bg-foreground ring-foreground",
   } as const;
   return (
@@ -128,10 +128,24 @@ function Mark({ at, label, onShow, children, top = "50%" }: {
 }
 
 function Bubble({ at, text }: { at: number; text: string }) {
+  // Centred on the marker, then nudged so it stays inside the screen with an 8px margin (long labels near either edge).
+  const ref = useRef<HTMLSpanElement>(null);
+  const [dx, setDx] = useState(0);
+  const cur = useRef(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const left = r.left - cur.current, right = r.right - cur.current;      // where it sits without any nudge
+    const vw = document.documentElement.clientWidth;
+    const next = left < 8 ? 8 - left : right > vw - 8 ? vw - 8 - right : 0;
+    cur.current = next;
+    setDx(next);
+  }, [at, text]);
   return (
-    <span role="status" className={clsx("pointer-events-none absolute bottom-full z-20 mb-1.5 whitespace-nowrap rounded-[4px] bg-foreground px-2 py-1 font-mono text-[11px] text-[var(--background)] shadow-lg",
-      at < 50 ? "-translate-x-3" : "-translate-x-[calc(100%-12px)]")}
-      style={{ left: `${at}%` }}>
+    <span ref={ref} role="status"
+      className="pointer-events-none absolute bottom-full z-20 mb-1.5 w-max max-w-[min(300px,calc(100vw-16px))] rounded-[4px] bg-foreground px-2 py-1 text-center font-mono text-[11px] leading-snug text-[var(--background)] shadow-lg"
+      style={{ left: `${at}%`, transform: `translateX(calc(-50% + ${dx}px))` }}>
       {text}
     </span>
   );
@@ -170,7 +184,7 @@ export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-
         </Mark>
       )}
       <Mark at={p(value)} label="now" onShow={show("value", tips?.value ?? `Now ${f(value)}`, p(value))}>
-        <span className={clsx("h-3 w-3 rounded-full ring-2 ring-[var(--background)]", dot ?? (off ? "bg-amber-500" : "bg-gain"))} />
+        <span className={clsx("h-3 w-3 rounded-full ring-2 ring-[var(--background)]", dot ?? (off ? "bg-warn" : "bg-gain"))} />
       </Mark>
       {tip && <Bubble at={tip.at} text={tip.text} />}
     </div>
@@ -181,6 +195,7 @@ export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-
 export function Ladder({ levels, spot, height = 180 }: {
   levels: { label: string; price: number | null | undefined; tone: string }[]; spot: number; height?: number;
 }) {
+  if (spot == null || !Number.isFinite(spot)) return null;
   const merged: { label: string; price: number; tone: string }[] = [];
   for (const l of levels) {
     if (l.price == null) continue;

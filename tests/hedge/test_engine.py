@@ -183,3 +183,34 @@ def test_put_that_pays_too_little_waits():
     ctx = Context("XYZ", 101.0, 100.0, -0.01, day_high=103.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
     s = evaluate(ctx, [stock(), short_call(100.0)], cheap).suggestion
     assert s.action == "WAIT" and "too little" in s.headline
+
+
+# ── buy-backs (owner): close a short option once most of the premium is captured ──────────
+def sold(otype, k, sold_at, mark, dte=5, n=1):
+    l = Leg("option", -n, sold_at, otype, k, EXP, dte, 0.4)
+    l.mark = mark
+    return l
+
+
+def test_buyback_at_80pct_any_time():
+    ctx = Context("XYZ", 100.0, 95.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    book = evaluate(ctx, [stock(avg=95.0), sold("call", 110.0, 1.00, 0.15, dte=2)], chain())
+    assert len(book.closes) == 1
+    c = book.closes[0]
+    assert c.profit_pct == pytest.approx(0.85) and c.cost == pytest.approx(15.0) and c.kept == pytest.approx(85.0)
+    assert "Buy back 1 110C" in c.headline
+
+
+def test_buyback_at_50pct_only_with_time_left():
+    ctx = Context("XYZ", 100.0, 95.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    early = evaluate(ctx, [stock(avg=95.0), sold("put", 90.0, 1.00, 0.45, dte=6)], chain())
+    late = evaluate(ctx, [stock(avg=95.0), sold("put", 90.0, 1.00, 0.45, dte=2)], chain())
+    assert len(early.closes) == 1 and not late.closes
+
+
+def test_no_buyback_when_not_enough_profit_or_worthless_at_expiry():
+    ctx = Context("XYZ", 100.0, 95.0, 0.0, atm_iv=0.45, hv20=0.40, net_gex=1e9)
+    assert not evaluate(ctx, [stock(avg=95.0), sold("call", 101.0, 1.00, 0.70)], chain()).closes
+    assert not evaluate(ctx, [stock(avg=95.0), sold("call", 110.0, 1.00, 0.03, dte=1)], chain()).closes   # let it expire
+    no_mark = sold("call", 110.0, 1.00, None)
+    assert not evaluate(ctx, [stock(avg=95.0), no_mark], chain()).closes

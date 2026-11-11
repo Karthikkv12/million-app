@@ -799,6 +799,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notify/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Push Config
+         * @description Whether push is set up on the server, and the key the browser subscribes with.
+         */
+        get: operations["push_config_api_v1_notify_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices */
+        get: operations["devices_api_v1_notify_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Prefs
+         * @description Which alerts are pushed, and for which symbols (the same on every device).
+         */
+        get: operations["get_prefs_api_v1_notify_prefs_get"];
+        /** Put Prefs */
+        put: operations["put_prefs_api_v1_notify_prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe
+         * @description Save this browser's push subscription (from pushManager.subscribe).
+         */
+        post: operations["subscribe_api_v1_notify_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test
+         * @description Send a test notification to every device of the signed-in user.
+         */
+        post: operations["test_api_v1_notify_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsubscribe */
+        post: operations["unsubscribe_api_v1_notify_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/options/gamma-exposure/{symbol}": {
         parameters: {
             query?: never;
@@ -1386,6 +1501,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description Each report's latest page (without the HTML) and the days it can be opened for.
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest
+         * @description Publish one report page for one day (replaces that day's page; other days are kept for a month).
+         *
+         *     Auth: X-Hedge-Ingest-Token, bound to one user.
+         */
+        post: operations["ingest_api_v1_reports_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_v1_reports__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search/tickers": {
         parameters: {
             query?: never;
@@ -1795,7 +1969,7 @@ export interface components {
         /** AuthRefreshRequest */
         AuthRefreshRequest: {
             /** Refresh Token */
-            refresh_token: string;
+            refresh_token?: string | null;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -1856,6 +2030,12 @@ export interface components {
             beta?: number | null;
             /** Chain Source */
             chain_source?: string | null;
+            /**
+             * Closes
+             * @description Short options worth buying back now (most of the premium captured)
+             * @default []
+             */
+            closes: components["schemas"]["CloseOut"][];
             /** Day Change */
             day_change?: number | null;
             /** Day High */
@@ -1864,6 +2044,13 @@ export interface components {
             dollar_gamma_1pct?: number | null;
             /** Error */
             error?: string | null;
+            /**
+             * Ext Change
+             * @description spot − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
             /** Gap */
             gap?: number | null;
             iv?: components["schemas"]["IvOut"] | null;
@@ -1881,10 +2068,22 @@ export interface components {
             net_delta?: number | null;
             /** Net Gamma */
             net_gamma?: number | null;
-            /** Prev Close */
+            /**
+             * Prev Close
+             * @description Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)
+             */
             prev_close?: number | null;
             /** Regime */
             regime?: ("bull" | "high-vol") | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /** Regular Close Date */
+            regular_close_date?: string | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Shares */
             shares?: number | null;
             /** Spot */
@@ -2004,14 +2203,26 @@ export interface components {
              * @default 0
              */
             covered_pct: number;
-            /** Day Change Pct */
+            /**
+             * Day Change Pct
+             * @description Fraction. Outside the regular session: that last session's move
+             */
             day_change_pct?: number | null;
+            /**
+             * Ext Change Pct
+             * @description Percent since regular_close, outside the regular session
+             */
+            ext_change_pct?: number | null;
             /** Market Value */
             market_value?: number | null;
             /** Prev Close */
             prev_close?: number | null;
             /** Price */
             price?: number | null;
+            /** Regular Close */
+            regular_close?: number | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Shares */
             shares: number;
             /**
@@ -2490,6 +2701,39 @@ export interface components {
             /** Messages */
             messages: components["schemas"]["ChatMessage"][];
         };
+        /** CloseOut */
+        CloseOut: {
+            /** Contracts */
+            contracts: number;
+            /** Cost */
+            cost: number;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry: string;
+            /** Headline */
+            headline: string;
+            /** Kept */
+            kept: number;
+            /** Mark */
+            mark: number;
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "call" | "put";
+            /** Profit Pct */
+            profit_pct: number;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sold At */
+            sold_at: number;
+            /** Strike */
+            strike: number;
+        };
         /** CreatedOut */
         CreatedOut: {
             /** Id */
@@ -2543,6 +2787,17 @@ export interface components {
              * Format: date-time
              */
             week_start: string;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Last Ok At */
+            last_ok_at?: string | null;
+            /** User Agent */
+            user_agent?: string | null;
         };
         /** DividendOut */
         DividendOut: {
@@ -3061,6 +3316,11 @@ export interface components {
             iv?: number | null;
             /** Kind */
             kind: string;
+            /**
+             * Mark
+             * @description Live mid per share (options)
+             */
+            mark?: number | null;
             /** Otype */
             otype?: string | null;
             /** Position Delta */
@@ -3123,6 +3383,48 @@ export interface components {
             title: string;
             /** Url */
             url?: string | null;
+        };
+        /** NotifyPrefs */
+        NotifyPrefs: {
+            /**
+             * Buy Stock
+             * @default true
+             */
+            buy_stock: boolean;
+            /**
+             * Buyback
+             * @description A short option has given up most of its premium
+             * @default true
+             */
+            buyback: boolean;
+            /**
+             * Expiring Itm
+             * @description A short option is in the money with ≤ 1 day left
+             * @default false
+             */
+            expiring_itm: boolean;
+            /**
+             * Iv Spike
+             * @description ATM IV spikes on a holding
+             * @default false
+             */
+            iv_spike: boolean;
+            /**
+             * Sell Call
+             * @default true
+             */
+            sell_call: boolean;
+            /**
+             * Sell Put
+             * @default true
+             */
+            sell_put: boolean;
+            /**
+             * Symbols
+             * @description Only these symbols; empty = every holding
+             * @default []
+             */
+            symbols: string[];
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -3504,16 +3806,55 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
-        /** QuoteOut */
+        /** PushConfigOut */
+        PushConfigOut: {
+            /**
+             * Enabled
+             * @description Push is configured on the server (VAPID keys set)
+             */
+            enabled: boolean;
+            /**
+             * Public Key
+             * @description VAPID public key, base64url; pass to pushManager.subscribe
+             */
+            public_key?: string | null;
+        };
+        /**
+         * QuoteOut
+         * @description Outside the regular session, prev_close / change / change_pct describe the last regular session's move
+         *     (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight).
+         */
         QuoteOut: {
             /** Change */
             change?: number | null;
             /** Change Pct */
             change_pct?: number | null;
+            /**
+             * Ext Change
+             * @description price − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
             /** Prev Close */
             prev_close?: number | null;
             /** Price */
             price?: number | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /**
+             * Regular Close Date
+             * @description YYYY-MM-DD of regular_close
+             */
+            regular_close_date?: string | null;
+            /**
+             * Session
+             * @description US equity session (ET) when quoted; null for Yahoo-served or crypto quotes
+             */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Symbol */
             symbol: string;
         };
@@ -3554,6 +3895,100 @@ export interface components {
             symbol?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ReportIngest */
+        ReportIngest: {
+            /**
+             * Day
+             * @description Date the report is for; default: today in US Eastern
+             */
+            day?: string | null;
+            /** Html */
+            html: string;
+            /**
+             * Slug
+             * @description "morning", "evening", "weekend"
+             */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+            /** Username */
+            username: string;
+        };
+        /** ReportMeta */
+        ReportMeta: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /** Html */
+            html: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ReportSummary
+         * @description The latest page of one report, plus every day it has a page for (newest first).
+         */
+        ReportSummary: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /**
+             * Days
+             * @default []
+             */
+            days: string[];
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
         };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
@@ -3763,6 +4198,19 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /** SubscriptionIn */
+        SubscriptionIn: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["SubscriptionKeys"];
+        };
+        /** SubscriptionKeys */
+        SubscriptionKeys: {
+            /** Auth */
+            auth: string;
+            /** P256Dh */
+            p256dh: string;
+        };
         /** SuggestionOut */
         SuggestionOut: {
             /**
@@ -3843,6 +4291,22 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** TestOut */
+        TestOut: {
+            /** Devices */
+            devices: number;
+            /**
+             * Devices Out
+             * @default []
+             */
+            devices_out: components["schemas"]["DeviceOut"][];
+            /** Failed */
+            failed: number;
+            /** Removed */
+            removed: number;
+            /** Sent */
+            sent: number;
+        };
         /** TickerSearchResult */
         TickerSearchResult: {
             /**
@@ -3902,6 +4366,11 @@ export interface components {
              * @default 0
              */
             shares: number;
+        };
+        /** UnsubscribeIn */
+        UnsubscribeIn: {
+            /** Endpoint */
+            endpoint: string;
         };
         /** UnusualRow */
         UnusualRow: {
@@ -4695,9 +5164,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["AuthRefreshRequest"];
+                "application/json": components["schemas"]["AuthRefreshRequest"] | null;
             };
         };
         responses: {
@@ -5844,6 +6313,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_config_api_v1_notify_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigOut"];
+                };
+            };
+        };
+    };
+    devices_api_v1_notify_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    get_prefs_api_v1_notify_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+        };
+    };
+    put_prefs_api_v1_notify_prefs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotifyPrefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subscribe_api_v1_notify_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_api_v1_notify_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestOut"];
+                };
+            };
+        };
+    };
+    unsubscribe_api_v1_notify_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7114,6 +7762,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveQuoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSummary"][];
+                };
+            };
+        };
+    };
+    ingest_api_v1_reports_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hedge-ingest-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIngest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__slug__get: {
+        parameters: {
+            query?: {
+                /** @description Default: the latest day */
+                day?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */

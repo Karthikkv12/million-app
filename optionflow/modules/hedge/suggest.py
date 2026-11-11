@@ -20,7 +20,12 @@ The owner's playbook (2026-11-08): only ever SELL a call, SELL a put, or BUY sto
 
 Units (owner, 2026-11-08): shares covered by short calls and those calls are ONE unit (300 sh + 3 short calls),
 the rest of the shares are a second unit (500 sh + 3 calls → 300 covered + 200 uncovered), short puts a third.
-Each unit's delta is reported next to the total. A call suggestion covers the whole uncovered unit at once
+Each unit's delta is reported next to the total.
+
+Buy-backs (owner, 2026-11-09): every short option is checked against its live mid every second. Buying it back is
+flagged when most of the premium is already captured: ≥ TAKE_PROFIT (80 %) at any time, or ≥ EARLY_PROFIT (50 %) with
+≥ EARLY_MIN_DTE days left (the rest of the premium isn't worth the risk and the time). Closing frees the lot (call)
+or the cash (put) for the next spike / pullback. A leg worth ≤ $0.05 with ≤ 1.5 days left is left to expire. A call suggestion covers the whole uncovered unit at once
 (200 sh → 2 calls), and it then joins the covered unit.
 """
 from __future__ import annotations
@@ -38,6 +43,11 @@ RISE_TRIGGER = 0.02       # stock ≥ 2% over average cost
 CALL_OTM_SLACK = 0.03     # no ITM strike ≥ average: an ATM/OTM strike within 3% of spot is still OK
 MIN_PUT_YIELD = 0.002     # a put must pay ≥ 0.2% of its strike (and ≥ $0.05/sh), or it isn't worth the cash it ties up
 MIN_PUT_PREMIUM = 0.05
+TAKE_PROFIT = 0.80        # buy back once 80 % of the credit is captured
+EARLY_PROFIT = 0.50       # … or 50 % with at least EARLY_MIN_DTE days left
+EARLY_MIN_DTE = 3.0
+LET_EXPIRE_MARK = 0.05    # worth ≤ $0.05/sh with ≤ 1.5 days left: let it expire, don't pay to close
+LET_EXPIRE_DTE = 1.5
 MIN_DTE, MAX_DTE = 2, 9   # weekly runway; avoid 0–1 DTE gamma traps (protocol §3)
 PUT_PULLBACK = 0.01       # ≥ 1% off the intraday high counts as a pullback
 NEAR_LEVEL = 0.02         # within 2% of the put wall counts as "at support"
@@ -53,6 +63,7 @@ class Leg:
     expiry: Optional[str] = None
     dte: Optional[float] = None
     iv: Optional[float] = None
+    mark: Optional[float] = None    # live mid per share (options), from the chain
     # filled by greeks()
     delta: float = 0.0              # per one long option, per share
     gamma: float = 0.0
@@ -111,6 +122,23 @@ class Suggestion:
 
 
 @dataclass
+class Close:
+    """A short option worth buying back now."""
+    otype: str
+    strike: float
+    expiry: str
+    contracts: int
+    dte: Optional[float]
+    sold_at: float                  # premium received per share
+    mark: float                     # live mid per share
+    profit_pct: float               # share of the credit captured
+    cost: float                     # $ to buy back
+    kept: float                     # $ profit kept
+    headline: str
+    reasons: List[str] = field(default_factory=list)
+
+
+@dataclass
 class Unit:
     kind: str                       # "covered" | "uncovered" | "puts" | "other"
     label: str                      # e.g. "300 sh + 3 short calls"
@@ -136,6 +164,7 @@ class Book:
     legs: List[Leg]
     suggestion: Suggestion
     units: List[Unit] = field(default_factory=list)
+    closes: List[Close] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -182,7 +211,34 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote]) -> Book:
     warnings = _gamma_warnings(legs)
     s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
-                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs))
+                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), buybacks(legs))
+
+
+def buybacks(legs: List[Leg]) -> List[Close]:
+    out: List[Close] = []
+    for l in legs:
+        if l.kind != "option" or l.quantity >= 0 or not l.avg_price or l.mark is None or l.strike is None or not l.expiry:
+            continue
+        dte = l.dte if l.dte is not None else 99.0
+        if l.mark <= LET_EXPIRE_MARK and dte <= LET_EXPIRE_DTE:
+            continue                                         # let it expire worthless
+        profit = 1.0 - l.mark / l.avg_price
+        if profit >= TAKE_PROFIT:
+            why = f"{profit:.0%} of the premium is in; the last {1 - profit:.0%} isn't worth the risk."
+        elif profit >= EARLY_PROFIT and dte >= EARLY_MIN_DTE:
+            why = f"{profit:.0%} of the premium is in with {dte:.0f} days still to go: take it early."
+        else:
+            continue
+        n = int(round(-l.quantity))
+        cost, kept = l.mark * 100 * n, (l.avg_price - l.mark) * 100 * n
+        c = "C" if l.otype == "call" else "P"
+        frees = ("Frees the shares for the next call on a spike." if l.otype == "call"
+                 else "Frees the cash for the next put on a pullback.")
+        out.append(Close(l.otype or "", l.strike, l.expiry, n, _r(dte, 2), _r(l.avg_price, 2), _r(l.mark, 2), _r(profit, 3),
+                         _r(cost, 2), _r(kept, 2),
+                         f"Buy back {n} {l.strike:g}{c} {l.expiry} at ~${l.mark:.2f} (sold ${l.avg_price:.2f})",
+                         [why, f"Costs ${cost:,.0f} to close; you keep ${kept:,.0f}.", frees]))
+    return out
 
 
 def units(legs: List[Leg]) -> List[Unit]:

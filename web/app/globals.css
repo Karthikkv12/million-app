@@ -18,8 +18,15 @@
   --accent-rgb:     47 91 234;
   --warm:           #f2711c;
   --warm-rgb:       242 113 28;
-  --gain-rgb:       21 128 61;    /* #15803d */
-  --loss-rgb:       220 38 38;    /* #dc2626 */
+  /* Meaning colours: gain = up / good / live, loss = down / bad / destructive, warn = caution / stale.
+     Emerald, rose and amber rather than pure green and red. Charts need the same values as hex:
+     keep `useChartColors` (components/ui.tsx) in step. */
+  --gain-rgb:       0 135 90;     /* #00875a emerald */
+  --loss-rgb:       225 29 72;    /* #e11d48 rose */
+  --warn-rgb:       178 94 9;     /* #b25e09 amber */
+  --on-tone:        #ffffff;      /* text on a solid gain / loss / warn fill */
+  --heat-fg:        #ffffff;      /* text on a strong heat cell */
+  --heat-fg-max:    #ffffff;      /* text on the most saturated heat cells */
   --dot:            rgba(14, 15, 18, 0.075);
   --shadow-float:   0 30px 80px -40px rgba(14, 15, 18, 0.35);
   --brand:          #0e0f12;
@@ -42,8 +49,12 @@
   --accent-rgb:     122 162 255;
   --warm:           #ff9f5a;
   --warm-rgb:       255 159 90;
-  --gain-rgb:       63 179 127;   /* #3fb37f muted green */
-  --loss-rgb:       229 93 93;    /* #e55d5d muted red */
+  --gain-rgb:       52 211 153;   /* #34d399 mint */
+  --loss-rgb:       251 113 133;  /* #fb7185 soft rose */
+  --warn-rgb:       251 191 36;   /* #fbbf24 amber */
+  --on-tone:        #0b0f14;      /* the fills are light here, so text on them is dark */
+  --heat-fg:        #ffffff;
+  --heat-fg-max:    #0b0f14;
   --dot:            rgba(148, 163, 184, 0.07);
   --shadow-float:   0 40px 100px -40px rgba(0, 0, 0, 0.85);
   --brand:          #e6e9ef;

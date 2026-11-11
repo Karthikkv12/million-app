@@ -6,7 +6,7 @@
  * Live: the app-wide SSE stream (lib/live.tsx) every second.
  * Playbook (owner, 2026-11-08): only sell calls, sell puts or buy stock. Never buy options.
  */
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
@@ -44,15 +44,15 @@ const ACTION: Record<HedgeSuggestion["action"], { tag: "accent" | "gain" | "loss
 const UNIT: Record<HedgeBook["units"][number]["kind"], { label: string; cls: string }> = {
   covered: { label: "covered", cls: "text-accent" },
   uncovered: { label: "uncovered", cls: "text-gain" },
-  puts: { label: "puts", cls: "text-amber-600 dark:text-amber-400" },
+  puts: { label: "puts", cls: "text-warn" },
   other: { label: "other", cls: "text-foreground/50" },
 };
 
 /** Per-lot delta (1.00 = the stock alone). */
 const perLot = (b: HedgeBook) => (b.lots && b.lots >= 1 ? (b.net_delta ?? 0) / Math.floor(b.lots) : null);
 /** Colour for a per-lot delta: near the stock (≥0.85), partly hedged, mostly hedged (<0.40). */
-const lotTone = (v: number | null) => (v == null ? "bg-foreground/40" : v >= 0.85 ? "bg-gain" : v >= 0.4 ? "bg-accent" : "bg-amber-500");
-const betaTone = (v?: number | null) => (v == null ? "text-foreground/40" : v >= 1.5 ? "text-loss" : v >= 1.1 ? "text-amber-600 dark:text-amber-400" : "text-foreground/75");
+const lotTone = (v: number | null) => (v == null ? "bg-foreground/40" : v >= 0.85 ? "bg-gain" : v >= 0.4 ? "bg-accent" : "bg-warn");
+const betaTone = (v?: number | null) => (v == null ? "text-foreground/40" : v >= 1.5 ? "text-loss" : v >= 1.1 ? "text-warn" : "text-foreground/75");
 const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? s?.headline
   : s.action === "BUY_STOCK" ? `+${s.shares} sh` : `${s.contracts}× ${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`;
 
@@ -63,6 +63,18 @@ function Detail({ b }: { b: HedgeBook }) {
   return (
     <div className="grid gap-8 border-b border-[var(--border)] bg-foreground/[0.025] px-4 py-6 sm:px-6 md:grid-cols-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_240px]">
       <div className="min-w-0">
+        {(b.closes ?? []).map((c) => (
+          <div key={`${c.strike}-${c.otype}-${c.expiry}`} className="mb-6 border-l-[3px] border-loss pl-3">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-loss">Buy back</p>
+            <p className="mt-1 text-[16px] font-medium leading-snug text-foreground">{c.headline}</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+              {[["Captured", `${Math.round(c.profit_pct * 100)}%`], ["Cost to close", usd(c.cost, 0)], ["You keep", usd(c.kept, 0)], ["Days left", c.dte != null ? Math.floor(c.dte).toString() : "—"]].map(([k, v]) => (
+                <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", k !== "Captured" && k !== "Days left" && "sensitive")}>{v}</dd></div>
+              ))}
+            </dl>
+            <ul className="mt-2 space-y-1 text-[13px] leading-snug text-foreground/70">{c.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+          </div>
+        ))}
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Ticket</p>
         {s && (
           <>
@@ -96,7 +108,7 @@ function Detail({ b }: { b: HedgeBook }) {
               </ol>
             )}
             {!!s.warnings?.length && (
-              <ul className="mt-3 space-y-1 text-[13px] text-amber-700 dark:text-amber-300">
+              <ul className="mt-3 space-y-1 text-[13px] text-warn">
                 {s.warnings.map((w) => <li key={w} className="flex gap-2"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{w}</li>)}
               </ul>
             )}
@@ -131,7 +143,7 @@ function Detail({ b }: { b: HedgeBook }) {
                   {l.kind === "stock" ? `${l.quantity} sh @ ${usd(l.avg_price)}` : `${l.quantity < 0 ? "−" : "+"}${Math.abs(l.quantity)} ${l.strike}${l.otype === "call" ? "C" : "P"} ${l.expiry?.slice(5)}`}
                   {l.kind === "option" && l.dte != null && <span className="ml-1.5 text-foreground/40">{Math.floor(l.dte)}d</span>}
                 </td>
-                <td className="py-1.5 text-right text-foreground/50">{l.kind === "option" ? vol(l.iv) : ""}</td>
+                <td className="py-1.5 text-right text-foreground/50" title={l.kind === "option" ? "live mid / IV" : undefined}>{l.kind === "option" ? <>{l.mark != null && <span className="mr-2 text-foreground/70">{usd(l.mark)}</span>}{vol(l.iv)}</> : ""}</td>
                 <td className="py-1.5 text-right text-foreground/50">{l.delta.toFixed(2)}</td>
                 <td className={clsx("py-1.5 text-right", tone(l.position_delta))}>{sd(l.position_delta)}</td>
               </tr>
@@ -190,7 +202,7 @@ function Legend() {
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Net Δ per lot (−0.5 … +1.5)</p>
           <Item title="Near the stock (≥ 0.85)" sym={<Sym><span className="h-3 w-3 rounded-full bg-gain" /></Sym>}>Little is sold against the lot: you carry nearly the full stock move.</Item>
           <Item title="Partly hedged (0.40 – 0.85)" sym={<Sym><span className="h-3 w-3 rounded-full bg-accent" /></Sym>}>A call (or call + put) is working: some of the move is sold off.</Item>
-          <Item title="Mostly hedged (below 0.40)" sym={<Sym><span className="h-3 w-3 rounded-full bg-amber-500" /></Sym>}>A deep ITM call is taking most of the move.</Item>
+          <Item title="Mostly hedged (below 0.40)" sym={<Sym><span className="h-3 w-3 rounded-full bg-warn" /></Sym>}>A deep ITM call is taking most of the move.</Item>
           <Item title="+1.00 = the stock alone" sym={<Sym><span className="h-[18px] w-[2px] bg-accent" /></Sym>}>The reference tick. The playbook keeps the book near it; it is not a delta-neutral target.</Item>
           <Item title="After the suggested trade" sym={<Sym><span className="h-2 w-2 rotate-45 border border-accent" /></Sym>}>Where net delta lands if you place the suggested trade.</Item>
           <Item title="Units" sym={<Sym><span className="font-mono text-[10px] text-accent">cov</span></Sym>}>Shares covered by short calls plus those calls are one unit (300 sh + 3 calls); the rest is another (200 sh). Each shows its own delta; a new call covers the whole uncovered unit at once.</Item>
@@ -200,14 +212,15 @@ function Legend() {
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Row edge &amp; signals</p>
           <Item title="Sell call" sym={<Edge cls="bg-accent" />}>Spike: the stock is ≥2% over your average or IV is spiking. Sell the call in the money, at the strike closest to your average from above.</Item>
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
-          <Item title="Buy stock" sym={<Edge cls="bg-amber-500" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
+          <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
+          <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
           <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Columns</p>
           <Item title="Net Δ (lots)" sym={<Sym><span className="font-mono text-[12px] text-foreground">+0.69</span></Sym>}>100 shares = +1.00. A short call at Δ 0.70 counts −0.70; a short put at Δ −0.30 counts +0.30. Always the real total, whatever legs are on.</Item>
-          <Item title="β (beta)" sym={<Sym><span className="font-mono text-[12px] text-amber-600">1.84</span></Sym>}>1-year beta vs SPY: how far the stock moves for a 1% S&amp;P move. Amber ≥ 1.1, red ≥ 1.5.</Item>
+          <Item title="β (beta)" sym={<Sym><span className="font-mono text-[12px] text-warn">1.84</span></Sym>}>1-year beta vs SPY: how far the stock moves for a 1% S&amp;P move. Amber ≥ 1.1, red ≥ 1.5.</Item>
           <Item title="IV / HV" sym={<Sym><span className="font-mono text-[12px] text-foreground/80">75<span className="text-foreground/35">/71</span></span></Sym>}>At-the-money implied vol vs 20-day historical vol. Above 1.3× = premium is rich.</Item>
           <Item title="Γ $/1%" sym={<Sym><span className="font-mono text-[12px] text-loss">−$24</span></Sym>}>How much your delta-dollars change for a 1% move. Negative = short gamma (your short options).</Item>
         </div>
@@ -225,7 +238,7 @@ function HowItWorks() {
   const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(INTRO_KEY, v ? "1" : "0"); } catch { /* storage off */ } };
   if (hidden) {
     return (
-      <button onClick={() => set(false)} className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+      <button onClick={() => set(false)} className="mt-8 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
         What does this page do?
       </button>
     );
@@ -275,7 +288,7 @@ function Scales({ books }: { books: HedgeBook[] }) {
         </div>
         <Scale min={-0.5} max={1.5} value={per} after={hasTrade ? after : null} label={per != null ? sd(per) : undefined} pin={lotTone(per)}
           tips={{ value: per != null ? `Book now: ${sd(per)} per lot over ${lots} lots` : undefined, after: after != null ? `If you place every suggested trade: ${sd(after)} per lot` : undefined }}
-          zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+          zones={[{ from: -0.5, to: 0.4, cls: "bg-warn/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
           marks={[{ at: -0.5, label: "−0.5" }, { at: 0, label: "0 neutral", strong: true }, { at: 0.5, label: "0.5" }, { at: 1, label: "+1 stock", strong: true }, { at: 1.5, label: "1.5" }]} />
         <p className="text-[12.5px] leading-snug text-foreground/55">
           {per == null ? "No full 100-share lot held." : per >= 0.85 ? "You carry nearly the full stock move: room to sell calls into the next spike."
@@ -291,8 +304,8 @@ function Scales({ books }: { books: HedgeBook[] }) {
         </div>
         <Scale min={0} max={3} value={beta} label={beta != null ? beta.toFixed(2) : undefined}
           tips={{ value: beta != null ? `Portfolio beta ${beta.toFixed(2)}: SPY ±1% ≈ ${betaDollars >= 0 ? "±" : "∓"}${big(Math.abs(betaDollars * 0.01)).slice(1)}` : undefined }}
-          pin={beta == null ? undefined : beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
-          zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+          pin={beta == null ? undefined : beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-warn" : "bg-gain"}
+          zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-warn/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
           marks={[{ at: 0, label: "0" }, { at: 1, label: "1 = market", strong: true }, { at: 2, label: "2" }, { at: 3, label: "3" }]} />
         <p className="text-[12.5px] leading-snug text-foreground/55">
           Delta-weighted: each stock&apos;s beta × its live delta-dollars, so short calls lower its weight.
@@ -354,6 +367,7 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         </p>
         {/* signal */}
         <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
+          {(b.closes?.length ?? 0) > 0 && <Tag tone="solid">Buy back</Tag>}
           {a && <Tag tone={a.tag}>{a.label}</Tag>}
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
             {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
@@ -371,15 +385,25 @@ export default function HedgePage() {
   const live = useLive();
   const { data, isLoading, error } = useLiveBooks();
   const [open, setOpen] = useState<string | null>(null);
+  const autoOpened = useRef(false);
   const books = (data?.books ?? []).filter((b) => !b.error);
   const errored = (data?.books ?? []).filter((b) => b.error);
   const signals = books.filter((b) => b.suggestion && TRADE.has(b.suggestion.action));
+  const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
   const spikes = books.filter((b) => b.iv?.spike);
   const expiring = books.flatMap((b) => b.legs.filter((l) => l.kind === "option" && l.quantity < 0 && (l.dte ?? 99) <= 5).map((l) => ({ ...l, symbol: b.symbol })));
   const dollarGamma = books.reduce((a, b) => a + (b.dollar_gamma_1pct ?? 0), 0);
   const sorted = [...signals, ...books.filter((b) => !signals.includes(b))];
 
-  useEffect(() => { if (!open && signals[0]) setOpen(signals[0].symbol); }, [open, signals]);
+  // Auto-expand the top actionable row once on first load only — never again, so every row
+  // (including that one) can be collapsed and stays collapsed across live refreshes.
+  useEffect(() => {
+    if (autoOpened.current) return;
+    const first = buybacks[0]?.b ?? signals[0];
+    if (!first) return;
+    autoOpened.current = true;
+    setOpen((cur) => cur ?? first.symbol);
+  }, [signals, buybacks]);
 
   return (
     <DeskPage>
@@ -390,14 +414,12 @@ export default function HedgePage() {
         </div>
         <div className="text-right font-mono text-[11px] leading-relaxed text-foreground/55">
           <p className="flex items-center justify-end gap-1.5">
-            <span className={clsx("h-1.5 w-1.5 rounded-full", live ? "animate-pulse bg-gain" : "bg-amber-500")} />
+            <span className={clsx("h-1.5 w-1.5 rounded-full", live ? "animate-pulse bg-gain" : "bg-warn")} />
             {live ? "live · 1s" : "reconnecting"}
           </p>
           <p>robinhood sync {ago(data?.synced_at) ?? "pending"}</p>
         </div>
       </div>
-
-      <HowItWorks />
 
       {error && !data && <p className="border-t border-[var(--border-strong)] py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't load your positions."}</p>}
       {isLoading && <div className="h-40 animate-pulse border-t border-[var(--border-strong)] bg-foreground/[0.03]" />}
@@ -410,6 +432,24 @@ export default function HedgePage() {
 
       {!!books.length && (
         <>
+          {buybacks.length > 0 && (
+            <div className="border-t border-[var(--border-strong)] py-4">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground">Buy back now · {buybacks.length}</p>
+              <div className="mt-2 grid grid-cols-1 gap-1.5">
+                {buybacks.map(({ b, c }) => (
+                  <button key={`${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} onClick={() => setOpen(b.symbol)}
+                    className="flex min-w-0 items-center gap-3 border-l-[3px] border-loss bg-loss/[0.05] px-3 py-2 text-left hover:bg-loss/[0.09]">
+                    <span className="w-12 shrink-0 font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-foreground/85" title={c.headline}>
+                      {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · ${c.mark.toFixed(2)} <span className="text-foreground/45">(sold ${c.sold_at.toFixed(2)})</span>
+                    </span>
+                    <span className="shrink-0 font-mono text-[12px] tabular-nums text-gain">{Math.round(c.profit_pct * 100)}% in</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Scales books={books} />
 
           <div className="border-t border-[var(--border)] py-5">
@@ -417,7 +457,7 @@ export default function HedgePage() {
               <DeskFigure label="Signals" value={signals.length} tone={signals.length ? "text-accent" : "text-foreground/40"} sub={signals.map((b) => b.symbol).join(" · ") || "none right now"} />
               <DeskFigure sensitive label="$ gamma / 1%" value={big(dollarGamma)} tone={dollarGamma < 0 ? "text-loss" : undefined} sub={dollarGamma < 0 ? "short gamma" : "long gamma"} />
               <DeskFigure label="IV spikes" value={spikes.length} tone={spikes.length ? "text-loss" : "text-foreground/40"} sub={spikes.map((b) => b.symbol).join(" · ") || "calm"} />
-              <DeskFigure label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "none"} />
+              <DeskFigure label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-warn" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "none"} />
             </DeskFigures>
           </div>
 
@@ -444,6 +484,8 @@ export default function HedgePage() {
           <Legend />
         </>
       )}
+
+      <HowItWorks />
     </DeskPage>
   );
 }

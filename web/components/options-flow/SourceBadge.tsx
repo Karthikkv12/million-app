@@ -30,10 +30,10 @@ export function SourceBadge({ data, className = "" }: { data: Pick<GexResult, "d
     <span
       title={title}
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 font-mono text-[9px] font-medium uppercase leading-[16px] tracking-[0.1em] ${
-        live ? "border-gain/40 bg-gain/10 text-gain" : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        live ? "border-gain/40 bg-gain/10 text-gain" : "border-warn/40 bg-warn/10 text-warn"
       } ${className}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-gain" : "bg-amber-500"}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-gain" : "bg-warn"}`} />
       {live ? "Live" : "15-min delayed"}
       {data?.stale && <span className="normal-case tracking-normal opacity-80">· cached{cachedFor ? ` ${cachedFor}` : ""}</span>}
     </span>

@@ -342,7 +342,7 @@ const PILL_TONE = {
   neutral: "border-[var(--border-strong)] text-foreground/70",
   good:    "border-gain/30 bg-gain/10 text-gain",
   bad:     "border-loss/30 bg-loss/10 text-loss",
-  warn:    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  warn:    "border-warn/30 bg-warn/10 text-warn",
   accent:  "border-accent/30 bg-accent/10 text-accent",
 };
 /** Small rounded label for state: role, status, regime. */
@@ -389,10 +389,10 @@ export function heatColor(pct: number | null | undefined, cap = 3): { bg: string
   if (pct == null || Number.isNaN(pct)) return { bg: "rgb(var(--foreground-rgb) / 0.06)", fg: "rgb(var(--foreground-rgb) / 0.6)" };
   const a = Math.min(Math.abs(pct) / cap, 1);
   if (Math.abs(pct) < 0.05) return { bg: "rgb(var(--foreground-rgb) / 0.08)", fg: "rgb(var(--foreground-rgb) / 0.8)" };
-  const strong = a > 0.55;
-  return pct > 0
-    ? { bg: `rgb(var(--gain-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" }
-    : { bg: `rgb(var(--loss-rgb) / ${0.12 + a * 0.68})`, fg: strong ? "#ffffff" : "rgb(var(--foreground-rgb) / 0.9)" };
+  // Text follows the fill: page ink on faint cells, then the theme's heat inks (the dark theme's
+  // brightest cells are light enough to need dark text).
+  const fg = a > 0.8 ? "var(--heat-fg-max)" : a > 0.55 ? "var(--heat-fg)" : "rgb(var(--foreground-rgb) / 0.9)";
+  return { bg: `rgb(var(--${pct > 0 ? "gain" : "loss"}-rgb) / ${0.12 + a * 0.68})`, fg };
 }
 
 /**
@@ -407,10 +407,12 @@ export function useChartColors() {
     ink:    dark ? "#e6e9ef" : "#0e0f12",
     muted:  dark ? "rgba(203,213,225,0.5)" : "rgba(14,15,18,0.45)",
     grid:   dark ? "rgba(148,163,184,0.10)" : "rgba(14,15,18,0.07)",
-    gain:   dark ? "#3fb37f" : "#15803d",
-    loss:   dark ? "#e55d5d" : "#dc2626",
-    gainSoft: dark ? "rgba(63,179,127,0.35)" : "rgba(21,128,61,0.28)",
-    lossSoft: dark ? "rgba(229,93,93,0.35)" : "rgba(220,38,38,0.25)",
+    // Same values as --gain-rgb / --loss-rgb / --warn-rgb in globals.css.
+    gain:   dark ? "#34d399" : "#00875a",
+    loss:   dark ? "#fb7185" : "#e11d48",
+    warn:   dark ? "#fbbf24" : "#b25e09",
+    gainSoft: dark ? "rgba(52,211,153,0.35)" : "rgba(0,135,90,0.28)",
+    lossSoft: dark ? "rgba(251,113,133,0.35)" : "rgba(225,29,72,0.25)",
     surface: dark ? "#141a22" : "#ffffff",
     border:  dark ? "rgba(148,163,184,0.18)" : "rgba(14,15,18,0.12)",
   };

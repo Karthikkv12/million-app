@@ -12,11 +12,12 @@ import { clsx } from "clsx";
 import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { rank, reportName, reportWhen } from "@/lib/reports";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
-import { bookBeta, dayPnl, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
+import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
-import { Quote, useQuotes } from "@/components/dashboard/quotes";
+import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -55,6 +56,12 @@ const LABEL: Record<string, Inst> = Object.fromEntries(PULSE.flatMap((g) => g.it
 const fmtPx = (sym: string, p: number) => LABEL[sym]?.fmt?.(p) ?? p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const chg = (q?: Quote) => (q?.change_pct != null ? q.change_pct / 100 : null);
 
+/** "AH +0.31%": the move since the last close, outside the regular session (ext_change_pct is in percent). */
+function ExtPct({ m }: { m: { label: string; pct: number } | null }) {
+  if (!m) return null;
+  return <span className="whitespace-nowrap text-foreground/45">{m.label} <span className={tone(m.pct)}>{m.pct > 0 ? "+" : ""}{m.pct.toFixed(2)}%</span></span>;
+}
+
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -72,6 +79,7 @@ function Tape({ quotes }: { quotes?: Record<string, Quote> }) {
               <span className="text-foreground/50">{LABEL[s]?.label ?? s}</span>
               <span className="text-foreground">{q?.price != null ? fmtPx(s, q.price) : "—"}</span>
               <span className={tone(chg(q))}>{pct(chg(q))}</span>
+              <ExtPct m={extMove(q?.session, q?.ext_change_pct)} />
             </Link>
           );
         })}
@@ -87,6 +95,7 @@ export default function DashboardPage() {
   const quotes = useQuotes(ALL);
   const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
   const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
+  const reports = useQuery({ queryKey: ["reports"], queryFn: fetchReports, refetchInterval: 5 * 60_000 });
   const hedge = useLiveBooks();
   const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: 60_000 });
 
@@ -94,12 +103,15 @@ export default function DashboardPage() {
   const week = inc.data?.weekly.at(-1);
   const books = okBooks(hedge.data);
   const today = dayPnl(books);
+  const acct = liveAccount(p, books);
+  const unreal = p?.unrealized != null ? p.unrealized + (acct?.optionsUnrealized ?? 0) : null;
   const { beta } = bookBeta(books);
   const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
   const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
   const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
   const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
   const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
+  const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
   const actions = books.filter((b) => b.suggestion).sort((x, y) => ORDER.indexOf(x.suggestion!.action) - ORDER.indexOf(y.suggestion!.action));
   const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
   const expiring = (p?.options ?? []).filter((o) => o.dte != null && o.dte <= 7).sort((a, b) => (a.dte ?? 0) - (b.dte ?? 0));
@@ -120,21 +132,38 @@ export default function DashboardPage() {
       </div>
 
       <Tape quotes={quotes.data} />
+      {!!reports.data?.length && (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[var(--border)] py-2.5 font-mono text-[11.5px]">
+          <span className="uppercase tracking-[0.16em] text-foreground/45">Reports</span>
+          {[...reports.data].sort((a, b) => rank(a.slug) - rank(b.slug)).map((r) => (
+            <Link key={r.slug} href={`/catalyst/reports?r=${encodeURIComponent(r.slug)}`} className="text-accent hover:underline">
+              {reportName(r)} <span className="text-foreground/45">{reportWhen(r.published_at)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* ── Your book ─────────────────────────────────────────────────── */}
       <div className="py-6">
         {hasBook ? (
           <>
           <DeskFigures>
+            <DeskFigure sensitive size="lg" label={acct ? "Account value · live" : "Account value"}
+              value={<Tick value={acct ? Math.round(acct.value) : null}>{usd(acct?.value ?? p!.total_value, 0)}</Tick>}
+              sub={<>at sync {usd(p!.total_value, 0)}{p!.synced_at ? ` · ${new Date(p!.synced_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</>} />
             {today && (
-              <DeskFigure sensitive size="lg" label="Today · live" value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
-                sub={<>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
+              <DeskFigure sensitive size="lg"
+                label={today.ext ? `Today · ${today.closeDate ? new Date(today.closeDate + "T12:00").toLocaleDateString(undefined, { weekday: "short" }) : "last close"}` : "Today · live"}
+                value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
+                sub={today.ext
+                  ? <><span className={tone(today.ext.total)}><Tick value={Math.round(today.ext.total)}>{signed(today.ext.total, 0)}</Tick></span> {SESSION_LABEL[today.session ?? "closed"].toLowerCase()} · live</>
+                  : <>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
             )}
-            <DeskFigure sensitive size="lg" label="Account value" value={usd(p!.total_value, 0)}
-              sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} at last sync</span>} />
-            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={p!.unrealized != null ? Math.round(p!.unrealized) : null}>{signed(p!.unrealized, 0)}</Tick>} tone={tone(p!.unrealized)} sub={<>stocks <Tick value={p!.stock_value != null ? Math.round(p!.stock_value) : null}>{usd(p!.stock_value, 0)}</Tick></>} />
-            <DeskFigure sensitive size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
-            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={unreal != null ? Math.round(unreal) : null}>{signed(unreal, 0)}</Tick>} tone={tone(unreal)}
+              sub={<>stocks {signed(p!.unrealized, 0)}{acct ? <> · options {signed(acct.optionsUnrealized, 0)}</> : null}</>} />
+            <DeskFigure sensitive size="lg" label="Net premium · this week" value={signed(week?.premium ?? 0, 0)} tone={tone(week?.premium ?? 0)}
+              sub={`sold ${usd(week?.collected ?? 0, 0)} · bought back ${usd(week?.bought_back ?? 0, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`margin buying power ${usd(p!.buying_power, 0)}`} />
           </DeskFigures>
           {(perLot != null || beta != null) && (
             <Link href="/hedge" className="mt-5 grid gap-x-12 gap-y-2 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
@@ -142,16 +171,16 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
                   <Scale min={-0.5} max={1.5} value={perLot} tips={{ value: `Book now: ${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)} per lot · +1 = stock alone` }} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
-                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-amber-500"}
-                    zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-warn"}
+                    zones={[{ from: -0.5, to: 0.4, cls: "bg-warn/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
                     marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
                 </div>
               )}
               {beta != null && (
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
-                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
-                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-warn" : "bg-gain"}
+                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-warn/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
                     marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
                 </div>
               )}
@@ -167,10 +196,24 @@ export default function DashboardPage() {
         <div className="min-w-0">
           {/* ── Actions: one line per holding ───────────────────────── */}
           <DeskSection label="Actions" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
-            {!actions.length ? (
+            {!actions.length && !buybacks.length ? (
               <p className="py-2 text-[14px] text-foreground/55">Your holdings show here after the first Robinhood sync.</p>
             ) : (
               <div className="border-t border-[var(--border)]">
+                {buybacks.map(({ b, c }) => (
+                  <Link key={`bb-${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} href="/hedge" className="block">
+                    <DeskRow edge="loss">
+                      <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
+                        <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                        <span><Tag tone="solid">Buy back</Tag></span>
+                        <span className="min-w-0 truncate text-[13px] text-foreground" title={c.headline}>
+                          {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · {Math.round(c.profit_pct * 100)}% in
+                        </span>
+                        <span className="sensitive text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{usd(c.cost, 0)}</span>
+                      </div>
+                    </DeskRow>
+                  </Link>
+                ))}
                 {actions.map((b) => {
                   const s = b.suggestion!;
                   const a = ACT[s.action];
@@ -238,7 +281,9 @@ export default function DashboardPage() {
                             <div className={clsx("absolute inset-y-0 left-0", (h.day_change_pct ?? 0) >= 0 ? "bg-gain/70" : "bg-loss/70")} style={{ width: `${w}%` }} />
                           </div>
                           <span className="text-right text-foreground"><Tick value={h.price}>{usd(h.price)}</Tick></span>
-                          <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}</span>
+                          <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}
+                            {extMove(h.session, h.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(h.session, h.ext_change_pct)} /></span>}
+                          </span>
                         </div>
                       </DeskRow>
                     </Link>
@@ -285,7 +330,9 @@ export default function DashboardPage() {
                       <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
                         <span className="truncate font-sans text-[13px] text-foreground/75">{it.label}</span>
                         <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
-                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}</span>
+                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}
+                          {extMove(qt?.session, qt?.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(qt?.session, qt?.ext_change_pct)} /></span>}
+                        </span>
                       </div>
                     );
                   })}
@@ -301,7 +348,7 @@ export default function DashboardPage() {
       </DeskSection>
 
       <nav className="mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-strong)] pt-5 font-mono text-[12px] uppercase tracking-[0.14em]">
-        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"]].map(([href, l]) => (
+        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"], ["/catalyst/reports", "Reports"]].map(([href, l]) => (
           <Link key={href} href={href} className="inline-flex items-center gap-1 text-foreground/60 hover:text-foreground">{l}<ArrowUpRight size={12} /></Link>
         ))}
       </nav>

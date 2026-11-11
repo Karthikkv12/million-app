@@ -12,7 +12,7 @@ function SyncStatus() {
   const { data } = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 60_000 });
   return (
     <p className="font-mono text-[11px] text-foreground/50">
-      <span className={clsx("mr-1.5 inline-block h-1.5 w-1.5 rounded-full", data?.synced_at ? "bg-gain" : "bg-amber-500")} />
+      <span className={clsx("mr-1.5 inline-block h-1.5 w-1.5 rounded-full", data?.synced_at ? "bg-gain" : "bg-warn")} />
       Robinhood · synced {ago(data?.synced_at) ?? "never"} · hourly in market hours
     </p>
   );

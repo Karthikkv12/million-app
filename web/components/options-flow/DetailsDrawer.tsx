@@ -121,7 +121,7 @@ function TopGamma({ d }: { d: GexResult }) {
 }
 
 // ── Flow ──────────────────────────────────────────────────────────────────────
-function Premium({ d }: { d: GexResult }) {
+export function Premium({ d }: { d: GexResult }) {
   const call = d.call_premium ?? 0, put = d.put_premium ?? 0, tot = call + put || 1;
   const ratio = put ? call / put : null;
   const figs: [string, string, string?][] = [
@@ -153,7 +153,7 @@ function Premium({ d }: { d: GexResult }) {
   );
 }
 
-function StrikesTable({ d }: { d: GexResult }) {
+export function StrikesTable({ d }: { d: GexResult }) {
   const rows = d.top_flow_strikes ?? [];
   if (!rows.length) return null;
   return (
@@ -183,7 +183,7 @@ function StrikesTable({ d }: { d: GexResult }) {
   );
 }
 
-function ExpiryTable({ d }: { d: GexResult }) {
+export function ExpiryTable({ d }: { d: GexResult }) {
   const rows = (d.flow_by_expiry ?? []).slice(0, 8);
   if (!rows.length) return null;
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.net)));

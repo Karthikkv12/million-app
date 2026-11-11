@@ -79,6 +79,7 @@ class LegOut(BaseModel):
     expiry: Optional[str] = None
     dte: Optional[float] = None
     iv: Optional[float] = None
+    mark: Optional[float] = Field(None, description="Live mid per share (options)")
     delta: float
     gamma: float
     position_delta: float
@@ -101,6 +102,21 @@ class SuggestionOut(BaseModel):
     shares: int = Field(0, description="BUY_STOCK: shares to buy")
     new_avg: Optional[float] = Field(None, description="BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned")
     warnings: List[str] = []
+
+
+class CloseOut(BaseModel):
+    otype: Literal["call", "put"]
+    strike: float
+    expiry: str
+    contracts: int
+    dte: Optional[float] = None
+    sold_at: float
+    mark: float
+    profit_pct: float
+    cost: float
+    kept: float
+    headline: str
+    reasons: List[str] = []
 
 
 class UnitOut(BaseModel):
@@ -151,9 +167,16 @@ class BookOut(BaseModel):
     legs: List[LegOut] = []
     units: List[UnitOut] = Field([], description="Covered (shares + their short calls), uncovered shares, short puts")
     suggestion: Optional[SuggestionOut] = None
+    closes: List[CloseOut] = Field([], description="Short options worth buying back now (most of the premium captured)")
     spot: Optional[float] = None
-    prev_close: Optional[float] = None
+    prev_close: Optional[float] = Field(None, description="Yesterday's close in the regular session; outside it, the close "
+                                        "before the last regular session (so day_change = that session's move)")
     day_change: Optional[float] = None
+    session: Optional[Literal["pre", "regular", "post", "overnight", "closed"]] = None
+    regular_close: Optional[float] = Field(None, description="Close of the last completed regular session")
+    regular_close_date: Optional[str] = None
+    ext_change: Optional[float] = Field(None, description="spot − regular_close outside the regular session; null during it")
+    ext_change_pct: Optional[float] = None
     day_high: Optional[float] = None
     weekly_expiry: Optional[str] = None
     chain_source: Optional[str] = None
@@ -192,7 +215,10 @@ class BrokerHoldingOut(BaseModel):
     cost_basis: Optional[float] = None
     unrealized: Optional[float] = None
     unrealized_pct: Optional[float] = None
-    day_change_pct: Optional[float] = None
+    day_change_pct: Optional[float] = Field(None, description="Fraction. Outside the regular session: that last session's move")
+    session: Optional[Literal["pre", "regular", "post", "overnight", "closed"]] = None
+    regular_close: Optional[float] = None
+    ext_change_pct: Optional[float] = Field(None, description="Percent since regular_close, outside the regular session")
     weight: Optional[float] = None
     short_calls: float = 0
     covered_pct: float = 0

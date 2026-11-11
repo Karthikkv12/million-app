@@ -908,14 +908,17 @@
    "AuthRefreshRequest": {
     "properties": {
      "refresh_token": {
-      "minLength": 1,
-      "title": "Refresh Token",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refresh Token"
      }
     },
-    "required": [
-     "refresh_token"
-    ],
     "title": "AuthRefreshRequest",
     "type": "object"
    },
@@ -1098,6 +1101,15 @@
       ],
       "title": "Chain Source"
      },
+     "closes": {
+      "default": [],
+      "description": "Short options worth buying back now (most of the premium captured)",
+      "items": {
+       "$ref": "#/components/schemas/CloseOut"
+      },
+      "title": "Closes",
+      "type": "array"
+     },
      "day_change": {
       "anyOf": [
        {
@@ -1141,6 +1153,29 @@
        }
       ],
       "title": "Error"
+     },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "spot \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
      },
      "gap": {
       "anyOf": [
@@ -1234,6 +1269,7 @@
         "type": "null"
        }
       ],
+      "description": "Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)",
       "title": "Prev Close"
      },
      "regime": {
@@ -1250,6 +1286,47 @@
        }
       ],
       "title": "Regime"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
      },
      "shares": {
       "anyOf": [
@@ -1693,7 +1770,20 @@
         "type": "null"
        }
       ],
+      "description": "Fraction. Outside the regular session: that last session's move",
       "title": "Day Change Pct"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Percent since regular_close, outside the regular session",
+      "title": "Ext Change Pct"
      },
      "market_value": {
       "anyOf": [
@@ -1727,6 +1817,35 @@
        }
       ],
       "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
      },
      "shares": {
       "title": "Shares",
@@ -3178,6 +3297,87 @@
     "title": "ChatRequest",
     "type": "object"
    },
+   "CloseOut": {
+    "properties": {
+     "contracts": {
+      "title": "Contracts",
+      "type": "integer"
+     },
+     "cost": {
+      "title": "Cost",
+      "type": "number"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "headline": {
+      "title": "Headline",
+      "type": "string"
+     },
+     "kept": {
+      "title": "Kept",
+      "type": "number"
+     },
+     "mark": {
+      "title": "Mark",
+      "type": "number"
+     },
+     "otype": {
+      "enum": [
+       "call",
+       "put"
+      ],
+      "title": "Otype",
+      "type": "string"
+     },
+     "profit_pct": {
+      "title": "Profit Pct",
+      "type": "number"
+     },
+     "reasons": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "sold_at": {
+      "title": "Sold At",
+      "type": "number"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "otype",
+     "strike",
+     "expiry",
+     "contracts",
+     "sold_at",
+     "mark",
+     "profit_pct",
+     "cost",
+     "kept",
+     "headline"
+    ],
+    "title": "CloseOut",
+    "type": "object"
+   },
    "CreatedOut": {
     "properties": {
      "id": {
@@ -3363,6 +3563,46 @@
      "balance"
     ],
     "title": "CreditCardWeekRequest",
+    "type": "object"
+   },
+   "DeviceOut": {
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "last_ok_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Ok At"
+     },
+     "user_agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Agent"
+     }
+    },
+    "required": [
+     "id",
+     "created_at"
+    ],
+    "title": "DeviceOut",
     "type": "object"
    },
    "DividendOut": {
@@ -4977,6 +5217,18 @@
       "title": "Kind",
       "type": "string"
      },
+     "mark": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live mid per share (options)",
+      "title": "Mark"
+     },
      "otype": {
       "anyOf": [
        {
@@ -5256,6 +5508,55 @@
      "title"
     ],
     "title": "NewsItem",
+    "type": "object"
+   },
+   "NotifyPrefs": {
+    "properties": {
+     "buy_stock": {
+      "default": true,
+      "title": "Buy Stock",
+      "type": "boolean"
+     },
+     "buyback": {
+      "default": true,
+      "description": "A short option has given up most of its premium",
+      "title": "Buyback",
+      "type": "boolean"
+     },
+     "expiring_itm": {
+      "default": false,
+      "description": "A short option is in the money with \u2264 1 day left",
+      "title": "Expiring Itm",
+      "type": "boolean"
+     },
+     "iv_spike": {
+      "default": false,
+      "description": "ATM IV spikes on a holding",
+      "title": "Iv Spike",
+      "type": "boolean"
+     },
+     "sell_call": {
+      "default": true,
+      "title": "Sell Call",
+      "type": "boolean"
+     },
+     "sell_put": {
+      "default": true,
+      "title": "Sell Put",
+      "type": "boolean"
+     },
+     "symbols": {
+      "default": [],
+      "description": "Only these symbols; empty = every holding",
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "title": "NotifyPrefs",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -6977,7 +7278,34 @@
     "title": "PriceHistoryOut",
     "type": "object"
    },
+   "PushConfigOut": {
+    "properties": {
+     "enabled": {
+      "description": "Push is configured on the server (VAPID keys set)",
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "public_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VAPID public key, base64url; pass to pushManager.subscribe",
+      "title": "Public Key"
+     }
+    },
+    "required": [
+     "enabled"
+    ],
+    "title": "PushConfigOut",
+    "type": "object"
+   },
    "QuoteOut": {
+    "description": "Outside the regular session, prev_close / change / change_pct describe the last regular session's move\n(Robinhood's \"Today\") and ext_change the move since its close (after-hours / overnight).",
     "properties": {
      "change": {
       "anyOf": [
@@ -7001,6 +7329,29 @@
       ],
       "title": "Change Pct"
      },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "price \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
+     },
      "prev_close": {
       "anyOf": [
        {
@@ -7022,6 +7373,49 @@
        }
       ],
       "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "YYYY-MM-DD of regular_close",
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "US equity session (ET) when quoted; null for Yahoo-served or crypto quotes",
+      "title": "Session"
      },
      "symbol": {
       "title": "Symbol",
@@ -7179,6 +7573,219 @@
      }
     },
     "title": "RecalculatedHolding",
+    "type": "object"
+   },
+   "ReportIngest": {
+    "properties": {
+     "day": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Date the report is for; default: today in US Eastern",
+      "title": "Day"
+     },
+     "html": {
+      "maxLength": 4000000,
+      "minLength": 1,
+      "title": "Html",
+      "type": "string"
+     },
+     "slug": {
+      "description": "\"morning\", \"evening\", \"weekend\"",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 64,
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "slug",
+     "title",
+     "html"
+    ],
+    "title": "ReportIngest",
+    "type": "object"
+   },
+   "ReportMeta": {
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportMeta",
+    "type": "object"
+   },
+   "ReportOut": {
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "html": {
+      "title": "Html",
+      "type": "string"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size",
+     "html"
+    ],
+    "title": "ReportOut",
+    "type": "object"
+   },
+   "ReportSummary": {
+    "description": "The latest page of one report, plus every day it has a page for (newest first).",
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "days": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportSummary",
     "type": "object"
    },
    "SeedHoldingsOut": {
@@ -8243,6 +8850,45 @@
     "title": "StockInfoOut",
     "type": "object"
    },
+   "SubscriptionIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "pattern": "^https://",
+      "title": "Endpoint",
+      "type": "string"
+     },
+     "keys": {
+      "$ref": "#/components/schemas/SubscriptionKeys"
+     }
+    },
+    "required": [
+     "endpoint",
+     "keys"
+    ],
+    "title": "SubscriptionIn",
+    "type": "object"
+   },
+   "SubscriptionKeys": {
+    "properties": {
+     "auth": {
+      "maxLength": 100,
+      "title": "Auth",
+      "type": "string"
+     },
+     "p256dh": {
+      "maxLength": 200,
+      "title": "P256Dh",
+      "type": "string"
+     }
+    },
+    "required": [
+     "p256dh",
+     "auth"
+    ],
+    "title": "SubscriptionKeys",
+    "type": "object"
+   },
    "SuggestionOut": {
     "properties": {
      "action": {
@@ -8515,6 +9161,42 @@
     "title": "SyncLedgerOut",
     "type": "object"
    },
+   "TestOut": {
+    "properties": {
+     "devices": {
+      "title": "Devices",
+      "type": "integer"
+     },
+     "devices_out": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/DeviceOut"
+      },
+      "title": "Devices Out",
+      "type": "array"
+     },
+     "failed": {
+      "title": "Failed",
+      "type": "integer"
+     },
+     "removed": {
+      "title": "Removed",
+      "type": "integer"
+     },
+     "sent": {
+      "title": "Sent",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "sent",
+     "failed",
+     "removed",
+     "devices"
+    ],
+    "title": "TestOut",
+    "type": "object"
+   },
    "TickerSearchResult": {
     "properties": {
      "exchange": {
@@ -8634,6 +9316,20 @@
      "label"
     ],
     "title": "UnitOut",
+    "type": "object"
+   },
+   "UnsubscribeIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "title": "Endpoint",
+      "type": "string"
+     }
+    },
+    "required": [
+     "endpoint"
+    ],
+    "title": "UnsubscribeIn",
     "type": "object"
    },
    "UnusualRow": {
@@ -10739,11 +11435,18 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AuthRefreshRequest"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/AuthRefreshRequest"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Req"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {
@@ -12653,6 +13356,262 @@
     "summary": "Watchlist Quotes",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/notify/config": {
+   "get": {
+    "description": "Whether push is set up on the server, and the key the browser subscribes with.",
+    "operationId": "push_config_api_v1_notify_config_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PushConfigOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Push Config",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/devices": {
+   "get": {
+    "operationId": "devices_api_v1_notify_devices_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Devices Api V1 Notify Devices Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Devices",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/prefs": {
+   "get": {
+    "description": "Which alerts are pushed, and for which symbols (the same on every device).",
+    "operationId": "get_prefs_api_v1_notify_prefs_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Prefs",
+    "tags": [
+     "notify"
+    ]
+   },
+   "put": {
+    "operationId": "put_prefs_api_v1_notify_prefs_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NotifyPrefs"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Prefs",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/subscriptions": {
+   "post": {
+    "description": "Save this browser's push subscription (from pushManager.subscribe).",
+    "operationId": "subscribe_api_v1_notify_subscriptions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubscriptionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Subscribe Api V1 Notify Subscriptions Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Subscribe",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/test": {
+   "post": {
+    "description": "Send a test notification to every device of the signed-in user.",
+    "operationId": "test_api_v1_notify_test_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Test",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/unsubscribe": {
+   "post": {
+    "operationId": "unsubscribe_api_v1_notify_unsubscribe_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UnsubscribeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Unsubscribe Api V1 Notify Unsubscribe Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unsubscribe",
+    "tags": [
+     "notify"
     ]
    }
   },
@@ -14592,6 +15551,163 @@
     "summary": "Live Quote",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/reports": {
+   "get": {
+    "description": "Each report's latest page (without the HTML) and the days it can be opened for.",
+    "operationId": "list_reports_api_v1_reports_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReportSummary"
+         },
+         "title": "Response List Reports Api V1 Reports Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Reports",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/ingest": {
+   "post": {
+    "description": "Publish one report page for one day (replaces that day's page; other days are kept for a month).\n\nAuth: X-Hedge-Ingest-Token, bound to one user.",
+    "operationId": "ingest_api_v1_reports_ingest_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-hedge-ingest-token",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Hedge-Ingest-Token"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReportIngest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportMeta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ingest",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/{slug}": {
+   "get": {
+    "operationId": "get_report_api_v1_reports__slug__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "slug",
+      "required": true,
+      "schema": {
+       "title": "Slug",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Default: the latest day",
+      "in": "query",
+      "name": "day",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Default: the latest day",
+       "title": "Day"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Report",
+    "tags": [
+     "reports"
     ]
    }
   },

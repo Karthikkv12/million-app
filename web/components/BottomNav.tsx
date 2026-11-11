@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, Zap, CalendarClock, Briefcase, Scale } from "lucide-react";
 import { clsx } from "clsx";
+import { CountBadge, useBuybackCount } from "@/lib/live";
 
 const TABS = [
   { href: "/dashboard",    label: "Home",    icon: LayoutDashboard },
@@ -15,6 +16,7 @@ const TABS = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const buybacks = useBuybackCount();
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
@@ -48,6 +50,7 @@ export default function BottomNav() {
 
   return (
     <nav
+      data-bottom-nav
       className={clsx(
         "md:hidden fixed bottom-0 inset-x-0 z-40 pb-safe transition-transform duration-300 ease-in-out",
         hidden ? "translate-y-full" : "translate-y-0",
@@ -71,7 +74,10 @@ export default function BottomNav() {
                 {active && (
                   <span className="absolute inset-1 bg-foreground/[0.07] rounded-xl" />
                 )}
-                <Icon size={19} strokeWidth={active ? 2.2 : 1.7} />
+                <span className="relative">
+                  <Icon size={19} strokeWidth={active ? 2.2 : 1.7} />
+                  {href === "/hedge" && <CountBadge n={buybacks} className="absolute -right-2.5 -top-1.5" />}
+                </span>
                 {label}
               </Link>
             );

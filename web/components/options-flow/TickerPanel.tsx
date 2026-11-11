@@ -98,8 +98,8 @@ export function TickerPanel({
       {data && !apiError && (
         <>
           {staleNote && (
-            <p role="status" className="flex items-center gap-1.5 px-4 py-1 text-[11px] text-amber-700 dark:text-amber-300">
-              <Clock size={12} className="shrink-0 text-amber-500" /> {staleNote}
+            <p role="status" className="flex items-center gap-1.5 px-4 py-1 text-[11px] text-warn">
+              <Clock size={12} className="shrink-0 text-warn" /> {staleNote}
             </p>
           )}
           <LevelsStrip data={data} metric={metric} />

@@ -32,7 +32,8 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -57,10 +58,15 @@ MIN_REQUEST_GAP = 0.125       # seconds between requests: 8/s, under Public's 10
 EXPIRIES_TTL = 3600.0         # expiry lists change at most daily
 QUOTE_TTL = 1.0               # seconds a quote is reused: collapses bursts (hedge loop, pages) into one request
 QUOTE_BATCH = 50              # instruments per quotes request
+REGULAR_RETRY = 300.0         # seconds between DAY-summary retries while Public still shows the previous session,
+                              # and between refreshes 16:00–20:00 while the day's close is still provisional (T-37/T-38)
+STALE_MID_MAX_SPREAD = 0.05   # a stale last trade is replaced by the bid/ask mid only when the spread is within 5% of it
 CHAIN_TTL = 20.0              # seconds a raw chain is reused: GEX, the scanner and catalysts share fetches
 HISTORY_TTL_INTRADAY = 30.0   # seconds an intraday bar series is reused
 HISTORY_TTL_DAILY = 300.0     # seconds a daily-or-longer bar series is reused
 
+ET = ZoneInfo("America/New_York")
+_REGULAR_HOURS = datetime(2026, 1, 7, 12, 0, tzinfo=ET)     # any regular-session instant (a Wednesday noon)
 GATE = RateLimitGate(first=60.0, maximum=900.0, source="Public.com")   # separate from Yahoo's
 
 
@@ -107,29 +113,146 @@ def rejected_instrument(message: str) -> Optional[str]:
     return f"{m.group(1).upper()}:{m.group(2).upper()}" if m else None
 
 
-def quote_price(q: Dict[str, Any]) -> Optional[float]:
-    """Last trade, else the bid/ask midpoint, else None."""
+_TS = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$")
+
+
+def _parse_ts(value: Any) -> Optional[datetime]:
+    """Public's ISO timestamp ('2026-11-09T07:45:11.123456789Z', nanoseconds allowed) → aware datetime, else None."""
+    m = _TS.match(str(value or "").strip())
+    if not m:
+        return None
+    frac = (m.group(2) or "")[:6].ljust(6, "0")
+    tz = m.group(3) or "Z"
+    try:
+        return datetime.fromisoformat(f"{m.group(1)}.{frac}{'+00:00' if tz == 'Z' else tz}")
+    except ValueError:
+        return None
+
+
+def quote_price(q: Dict[str, Any], since: Optional[datetime] = None) -> Optional[float]:
+    """Last trade, else the bid/ask midpoint, else None.
+
+    With `since` (the start of the current extended session), a last trade stamped before it is stale — e.g. a
+    thin name's last overnight print from the night before (T-38: UPST / MP / RIOT showed −1…−8% "overnight").
+    Then the midpoint of a live book (0 < bid ≤ ask, spread ≤ STALE_MID_MAX_SPREAD) is used, else None so the
+    caller can fall back to the regular close."""
     last = _f(q.get("last"))
-    if last and last > 0:
-        return last
     bid, ask = _f(q.get("bid")), _f(q.get("ask"))
+    if last and last > 0:
+        ts = _parse_ts(q.get("lastTimestamp")) if since is not None else None
+        if ts is None or ts >= since:
+            return last
+        if bid and ask and 0 < bid <= ask and (ask - bid) <= STALE_MID_MAX_SPREAD * (bid + ask) / 2:
+            return (bid + ask) / 2
+        return None
     return (bid + ask) / 2 if bid and ask else None
 
 
-def normalize_quote(symbol: str, q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """A Public quote → {symbol, price, prev_close, change, change_pct, volume} (Yahoo's quote shape
-    plus volume), or None when Public has no price for it."""
+def _now() -> datetime:
+    return datetime.now(ET)                           # tests pin this
+
+
+def market_session(now: Optional[datetime] = None) -> str:
+    """US equity session on the ET clock: "pre" 04:00–09:30, "regular" 09:30–16:00, "post" 16:00–20:00 on
+    weekdays; "overnight" 20:00–04:00 from Sunday night to Friday morning; "closed" Friday 20:00 – Sunday 20:00.
+    Exchange holidays aren't modelled."""
+    et = (now or _now()).astimezone(ET)
+    wd, hm = et.weekday(), et.hour * 60 + et.minute
+    if wd >= 5 or (wd == 4 and hm >= 20 * 60):
+        return "overnight" if wd == 6 and hm >= 20 * 60 else "closed"
+    if hm < 4 * 60:
+        return "closed" if wd == 0 else "overnight"   # Monday 00:00–04:00 is still Sunday night's session
+    if hm < 9 * 60 + 30:
+        return "pre"
+    if hm < 16 * 60:
+        return "regular"
+    if hm < 20 * 60:
+        return "post"
+    return "overnight"
+
+
+def session_start(now: Optional[datetime] = None) -> Optional[datetime]:
+    """When the current extended session ("pre" / "post" / "overnight") began, else None (regular, closed)."""
+    et = (now or _now()).astimezone(ET)
+    session = market_session(et)
+    at = {"pre": (4, 0), "post": (16, 0), "overnight": (20, 0)}.get(session)
+    if at is None:
+        return None
+    start = et.replace(hour=at[0], minute=at[1], second=0, microsecond=0)
+    return start - timedelta(days=1) if start > et else start     # overnight after midnight began yesterday 20:00
+
+
+def last_close_boundary(now: Optional[datetime] = None) -> datetime:
+    """The most recent weekday 16:00 ET at or before `now`: when the last regular session ended."""
+    et = (now or _now()).astimezone(ET)
+    b = et.replace(hour=16, minute=0, second=0, microsecond=0)
+    if et < b:
+        b -= timedelta(days=1)
+    while b.weekday() >= 5:
+        b -= timedelta(days=1)
+    return b
+
+
+def parse_regular_close(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """{close, date, change} of the last completed regular session from a DAY historicdata summary."""
+    last = payload.get("lastRegularTradingSessionClose") or {}
+    close, day = _f(last.get("close")), last.get("closeDate")
+    if close is None or not day:
+        return None
+    return {"close": close, "date": str(day)[:10], "change": _f(last.get("change"))}
+
+
+def normalize_quote(symbol: str, q: Dict[str, Any], now: Optional[datetime] = None,
+                    regular: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """A Public quote → Yahoo's quote shape plus volume and the session fields, or None when Public has no price.
+
+    {symbol, price, prev_close, change, change_pct, volume,
+     session, regular_close, regular_close_date, ext_change, ext_change_pct}
+
+    During the regular session: prev_close = yesterday's close, change = price − prev_close, no ext_*.
+    Outside it (Robinhood's "Today" + "After-hours / Overnight"): regular_close = the last completed regular session's
+    close, prev_close = the close before that, change = that session's move, ext_change = price − regular_close.
+    `regular` is that session from the DAY summary ({close, date, change}); without it, Public's frozen
+    oneDayChange stands in (previousClose stays the close *before* the last session until the next one opens)."""
     if q.get("outcome", "SUCCESS") != "SUCCESS":
         return None
-    price = quote_price(q)
+    session = market_session(now)
+    since = session_start(now) if session != "regular" else None
+    price = quote_price(q, since)
+    stale = price is None and since is not None
+    if stale:
+        price = quote_price(q)                            # provisional; replaced by the regular close below
     if price is None:
         return None
-    prev = _f(q.get("previousClose"))
-    change = round(price - prev, 4) if prev is not None else None
-    change_pct = round(change / prev * 100, 4) if change is not None and prev else None
+    pub_prev = _f(q.get("previousClose"))
     vol = _f(q.get("volume"))
-    return {"symbol": symbol, "price": price, "prev_close": prev, "change": change,
-            "change_pct": change_pct, "volume": int(vol) if vol else None}
+    out = {"symbol": symbol, "price": price, "volume": int(vol) if vol else None, "session": session,
+           "regular_close": None, "regular_close_date": None, "ext_change": None, "ext_change_pct": None}
+    if session == "regular":
+        prev = pub_prev
+        out["regular_close"] = prev
+        if regular and prev is not None and abs(regular["close"] - prev) < 0.006:
+            out["regular_close_date"] = regular["date"]
+        change = round(price - prev, 4) if prev is not None else None
+    else:
+        if regular and regular.get("change") is not None:
+            reg_close, reg_date, change = regular["close"], regular["date"], regular["change"]
+        else:
+            ch = _f((q.get("oneDayChange") or {}).get("change"))
+            reg_close = round(pub_prev + ch, 4) if pub_prev is not None and ch is not None else pub_prev
+            reg_date, change = (regular or {}).get("date"), ch
+        prev = round(reg_close - change, 4) if reg_close is not None and change is not None else pub_prev
+        out.update(regular_close=reg_close, regular_close_date=reg_date)
+        if stale and reg_close:                           # no trade this session and no usable book: no ext move
+            price = reg_close
+            out["price"] = price
+        if reg_close:
+            out["ext_change"] = round(price - reg_close, 4)
+            out["ext_change_pct"] = round((price - reg_close) / reg_close * 100, 4)
+    out["prev_close"] = prev
+    out["change"] = round(change, 4) if change is not None else None
+    out["change_pct"] = round(change / prev * 100, 4) if change is not None and prev else None
+    return out
 
 
 def parse_contracts(exp: str, payload: Dict[str, Any], T: float) -> List[Dict[str, Any]]:
@@ -384,6 +507,10 @@ class PublicClient:
         return self._authed("POST", f"/userapigateway/marketdata/{self.account_id()}/option-chain",
                             json={"instrument": instrument, "expirationDate": expiry})
 
+    def day_summary(self, instrument: Dict[str, str]) -> Dict[str, Any]:
+        """DAY historicdata without an aggregation: the only form that carries lastRegularTradingSessionClose."""
+        return self._authed("GET", f"/userapigateway/historicdata/{instrument['type']}/{instrument['symbol']}/DAY")
+
     def bars(self, instrument: Dict[str, str], period: str, aggregation: str) -> Dict[str, Any]:
         params = {"tradingSessionToggle": "REGULAR_HOURS"} if instrument["type"] == "EQUITY" else None
         return self._authed("GET", f"/userapigateway/historicdata/{instrument['type']}/"
@@ -402,6 +529,35 @@ class PublicQuotes:
         self.ttl = ttl
         self._cache: Dict[str, Tuple[float, Optional[Dict[str, Any]]]] = {}
         self._lock = threading.Lock()
+        # Last completed regular session per instrument:
+        # (session boundary, fetched at, {close, date, change} | None, fetched in "post" i.e. provisional)
+        self._regular: Dict[str, Tuple[datetime, float, Optional[Dict[str, Any]], bool]] = {}
+
+    def _regular_close(self, inst: Dict[str, str], session: str, now: datetime) -> Optional[Dict[str, Any]]:
+        """The last completed regular session for `inst` (DAY summary), cached per session close.
+        Fetched only outside the regular session (that's when the quote fields can't give it); refetched every
+        REGULAR_RETRY seconds while Public still reports an older session, and also through the after-hours
+        session (16:00–20:00): the close is preliminary then (T-37/T-38: UPST 22.30 at 16:17, 22.25 by 20:17).
+        A value fetched in "post" is never kept as final. Never raises."""
+        key = _key(inst)
+        boundary = last_close_boundary(now)
+        hit = self._regular.get(key)
+        if hit and hit[0] == boundary:
+            data = hit[2]
+            fresh = data is not None and data["date"] == boundary.date().isoformat()
+            final = fresh and not hit[3] and session != "post"
+            leaving_post = hit[3] and session != "post"     # first read after 20:00 replaces the provisional close
+            if final or session == "regular" or (time.monotonic() - hit[1] < REGULAR_RETRY and not leaving_post):
+                return data
+        elif session == "regular":
+            return hit[2] if hit else None
+        try:
+            data = parse_regular_close(self.client.day_summary(inst))
+        except (PublicError, MarketDataRateLimited) as exc:
+            logger.info("Public DAY summary %s failed: %s", key, exc)
+            return hit[2] if hit else None
+        self._regular[key] = (boundary, time.monotonic(), data, session == "post")
+        return data
 
     def quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
         """{SYMBOL: normalized quote} for every symbol Public could price; others are left out.
@@ -427,11 +583,23 @@ class PublicQuotes:
             return out
         by_key = {f"{i['type']}:{i['symbol']}": sym for sym, i in missing}
         fetched: Dict[str, Optional[Dict[str, Any]]] = {sym: None for sym, _ in missing}
+        now_et = _now()
+        session = market_session(now_et)
         for q in self.client.quotes([i for _, i in missing]):
             inst = q.get("instrument") or {}
             sym = by_key.get(f"{inst.get('type')}:{str(inst.get('symbol') or '').upper()}")
-            if sym:
-                fetched[sym] = normalize_quote(sym, q)
+            if not sym:
+                continue
+            if inst.get("type") == "CRYPTO":            # trades around the clock: always the plain day change
+                fetched[sym] = normalize_quote(sym, q, now=_REGULAR_HOURS)
+                if fetched[sym]:
+                    fetched[sym].update(session=None, regular_close=None, regular_close_date=None)
+                continue
+            regular = None
+            if q.get("outcome", "SUCCESS") == "SUCCESS":
+                regular = self._regular_close({"symbol": str(inst.get("symbol")).upper(), "type": inst.get("type")},
+                                              session, now_et)
+            fetched[sym] = normalize_quote(sym, q, now=now_et, regular=regular)
         stamp = time.monotonic()
         with self._lock:
             for sym, q in fetched.items():

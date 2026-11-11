@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from cachetools import TTLCache
 
 from optionflow.core import errors
-from optionflow.providers.market_data import bars_from_history, get_market_data
+from optionflow.providers.market_data import QUOTE_FIELDS, bars_from_history, get_market_data
 
 # Bounded TTL caches (maxsize caps memory; ttl in seconds)
 _search_cache: TTLCache = TTLCache(maxsize=256, ttl=60)
@@ -59,17 +59,16 @@ def quotes(symbols: str) -> List[Dict[str, Any]]:
     out = []
     for s in syms:
         q = live.get(s)
-        out.append({k: q[k] for k in ("price", "prev_close", "change", "change_pct")} | {"symbol": s}
-                   if q is not None else md.quote(s))
+        out.append({k: q.get(k) for k in QUOTE_FIELDS} | {"symbol": s} if q is not None else md.quote(s))
     return out
 
 
-_PRICE_FIELDS = ("price", "prev_close", "change", "change_pct")
+_PRICE_FIELDS = QUOTE_FIELDS
 
 
 def _overlay(row: Dict[str, Any], q: Dict[str, Any]) -> Dict[str, Any]:
     """Cached fundamentals + live price fields (and volume / relative volume when Public has them)."""
-    row = dict(row) | {k: q[k] for k in _PRICE_FIELDS} | {"error": None}   # a live price beats a Yahoo error
+    row = dict(row) | {k: q.get(k) for k in _PRICE_FIELDS} | {"error": None}   # a live price beats a Yahoo error
     if q.get("volume"):
         row["volume"] = q["volume"]
         if row.get("avg_volume"):

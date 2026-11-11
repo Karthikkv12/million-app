@@ -32,7 +32,7 @@ export function OptionsTab() {
                 <td className={`sensitive ${TD} text-right text-foreground/80`}>{Math.abs(o.contracts)}</td>
                 <td className={`${TD} text-right`}>
                   <span className="text-foreground/80">{o.expiry}</span>
-                  <span className={clsx("ml-1.5 text-[11px]", (o.dte ?? 99) <= 1 ? "text-loss" : (o.dte ?? 99) <= 5 ? "text-amber-600 dark:text-amber-400" : "text-foreground/45")}>{o.dte}d</span>
+                  <span className={clsx("ml-1.5 text-[11px]", (o.dte ?? 99) <= 1 ? "text-loss" : (o.dte ?? 99) <= 5 ? "text-warn" : "text-foreground/45")}>{o.dte}d</span>
                 </td>
                 <td className={`${TD} text-right text-foreground/70`}>{usd(o.avg_price)}</td>
                 <td className={`sensitive ${TD} text-right ${(o.premium ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{signedUsd(o.premium, 0)}</td>

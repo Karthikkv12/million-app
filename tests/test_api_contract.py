@@ -100,7 +100,8 @@ def test_signup_closed_403(api):
     assert r.status_code == 403
 
 
-def test_refresh_rotates_and_old_token_dies(api):
+def test_refresh_rotates_and_old_token_dies(api, settings_override):
+    settings_override(refresh_reuse_grace_seconds=0)   # no two-tabs grace: any replay counts as reuse
     client, url = api
     uid = _user()
     rt = _login(client, url).json()["refresh_token"]
@@ -109,7 +110,9 @@ def test_refresh_rotates_and_old_token_dies(api):
     body = r.json()
     assert body["user_id"] == uid and body["username"] == "alice" and body["refresh_token"] != rt
     again = client.post(url("/auth/refresh"), json={"refresh_token": rt})
-    assert again.status_code == 401 and _error_text(again) == "Invalid refresh token"
+    assert again.status_code == 401 and _error_text(again) == "Session ended for security. Please sign in again."
+    # ...and the replay signed out the token it was rotated into.
+    assert client.post(url("/auth/refresh"), json={"refresh_token": body["refresh_token"]}).status_code == 401
 
 
 def test_logout_revokes_access_and_refresh(api):
@@ -308,7 +311,7 @@ def test_enabled_modules_switch_routes_on_and_off(caplog):
     assert "unknown module 'nonsense'" in caplog.text
 
     default = create_app(Settings(_env_file=None))
-    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst", "unusual", "portfolio", "budget", "hedge"]
+    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst", "unusual", "portfolio", "budget", "hedge", "notify"]
     assert TestClient(default).get("/api/v1/portfolio/weeks").status_code == 401   # on by default (plan step 7)
     assert "ai" not in default.state.enabled_modules
 
