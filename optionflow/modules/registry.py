@@ -89,5 +89,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "budget": _budget,
     "hedge": _hedge,
     "notify": _notify,          # phone notifications (Web Push) for the hedge desk
-    "strategy": _strategy,      # the owner's options strategy (drives hedge actions) + market scanner
+    "strategy": _strategy,      # the owner's options strategy (drives the hedge desk's actions)
 }

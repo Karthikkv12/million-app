@@ -34,12 +34,3 @@ def chain(spot=100.0, iv=0.40, dtes=(5, 30), lo=70, hi=130, step=1.0):
                     out.append(q)
             k += step
     return out
-
-
-def rows(spot=100.0, iv=0.40, dtes=(30,), lo=70, hi=130, oi=500):
-    """Chain rows as the provider's option_contracts returns them."""
-    out = []
-    for q in chain(spot, iv, dtes, lo, hi):
-        out.append({"strike": q.strike, "expiry": q.expiry, "otype": q.otype, "oi": oi, "volume": 10,
-                    "bid": q.bid, "ask": q.ask, "last": q.mid, "iv": q.iv})
-    return out

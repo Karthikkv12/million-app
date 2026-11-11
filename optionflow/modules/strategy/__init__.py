@@ -1,1 +1,1 @@
-"""Strategy module: the owner's chosen options strategy drives the hedge desk's actions and the market scanner."""
+"""Strategy module: the owner's chosen options strategy drives the hedge desk's actions."""

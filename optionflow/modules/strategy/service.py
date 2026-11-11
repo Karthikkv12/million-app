@@ -1,18 +1,15 @@
-"""optionflow/modules/strategy/service.py — the user's strategy, rule overrides, scanner filters and picks (DB)."""
+"""optionflow/modules/strategy/service.py — the user's strategy and rule overrides (DB)."""
 from __future__ import annotations
 
 import json
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from zoneinfo import ZoneInfo
+from typing import Any, Dict, Optional
 
 from optionflow.core.db import get_session
 from optionflow.modules.strategy import catalog
-from optionflow.modules.strategy.filters import clean_filters
 
-ET = ZoneInfo("America/New_York")
 _RULES_TTL = 5.0                     # the desk asks every second; a change shows within 5 s (set() clears it at once)
 _rules_cache: Dict[int, tuple] = {}
 _lock = threading.Lock()
@@ -26,10 +23,6 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def today_et() -> str:
-    return datetime.now(ET).date().isoformat()
-
-
 def _json(raw: Optional[str]) -> Dict[str, Any]:
     try:
         v = json.loads(raw) if raw else {}
@@ -39,7 +32,7 @@ def _json(raw: Optional[str]) -> Dict[str, Any]:
 
 
 def get_settings(user_id: int) -> Dict[str, Any]:
-    """{strategy, rules (effective), overrides, scanner (filters), notify, updated_at}."""
+    """{strategy, rules (effective), overrides, updated_at}."""
     from database.models import StrategySetting as S
     s = get_session()
     try:
@@ -47,16 +40,14 @@ def get_settings(user_id: int) -> Dict[str, Any]:
         key = row.strategy if row and row.strategy in catalog.CATALOG else catalog.DEFAULT_KEY
         overrides = catalog.clean_overrides(_json(row.rules) if row else {})
         return {"strategy": key, "rules": catalog.rules_for(key, overrides).to_dict(), "overrides": overrides,
-                "scanner": clean_filters(_json(row.scanner) if row else {}), "notify": bool(row.notify) if row else False,
                 "updated_at": row.updated_at if row else None}
     finally:
         s.close()
 
 
-def update_settings(user_id: int, *, strategy: Optional[str] = None, rules: Optional[Dict[str, Any]] = None,
-                    scanner: Optional[Dict[str, Any]] = None, notify: Optional[bool] = None) -> Dict[str, Any]:
+def update_settings(user_id: int, *, strategy: Optional[str] = None, rules: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Partial update. Changing the strategy clears the rule overrides unless new ones are given
-    (each strategy has its own defaults). `rules` / `scanner` replace the stored objects."""
+    (each strategy has its own defaults). `rules` replaces the stored overrides; {} = defaults."""
     from database.models import StrategySetting as S
     if strategy is not None and strategy not in catalog.CATALOG:
         raise StrategyError(f"Unknown strategy {strategy!r}")
@@ -64,7 +55,7 @@ def update_settings(user_id: int, *, strategy: Optional[str] = None, rules: Opti
     try:
         row = s.query(S).filter(S.user_id == user_id).first()
         if row is None:
-            row = S(user_id=user_id, strategy=catalog.DEFAULT_KEY, notify=False, updated_at=now_iso())
+            row = S(user_id=user_id, strategy=catalog.DEFAULT_KEY, updated_at=now_iso())
             s.add(row)
         if strategy is not None and strategy != row.strategy:
             row.strategy = strategy
@@ -72,10 +63,6 @@ def update_settings(user_id: int, *, strategy: Optional[str] = None, rules: Opti
                 row.rules = None
         if rules is not None:
             row.rules = json.dumps(catalog.clean_overrides(rules)) if rules else None
-        if scanner is not None:
-            row.scanner = json.dumps(clean_filters(scanner)) if scanner else None
-        if notify is not None:
-            row.notify = bool(notify)
         row.updated_at = now_iso()
         s.commit()
     finally:
@@ -96,57 +83,3 @@ def rules_for_user(user_id: int) -> Optional[catalog.Rules]:
     with _lock:
         _rules_cache[user_id] = (time.time(), rules)
     return rules
-
-
-def notify_users() -> List[int]:
-    """Users who asked for scanner notifications."""
-    from database.models import StrategySetting as S
-    s = get_session()
-    try:
-        return [r.user_id for r in s.query(S).filter(S.notify.is_(True)).all()]
-    finally:
-        s.close()
-
-
-# ── Picks ────────────────────────────────────────────────────────────────────
-def record_picks(user_id: int, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Store today's picks; returns the rows that are new today (not stored before)."""
-    from database.models import ScannerPick as P
-    day = today_et()
-    s = get_session()
-    try:
-        seen = {k for (k,) in s.query(P.key).filter(P.user_id == user_id, P.day == day).all()}
-        fresh = []
-        for r in rows:
-            if r["key"] in seen:
-                continue
-            seen.add(r["key"])
-            s.add(P(user_id=user_id, day=day, key=r["key"], symbol=r["symbol"], strategy=r["strategy"],
-                    score=r.get("score"), payload=json.dumps(r), notified=False, created_at=now_iso()))
-            fresh.append(r)
-        s.commit()
-        return fresh
-    finally:
-        s.close()
-
-
-def mark_notified(user_id: int, keys: List[str]) -> None:
-    from database.models import ScannerPick as P
-    if not keys:
-        return
-    s = get_session()
-    try:
-        s.query(P).filter(P.user_id == user_id, P.day == today_et(), P.key.in_(keys)).update({"notified": True}, synchronize_session=False)
-        s.commit()
-    finally:
-        s.close()
-
-
-def recent_picks(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-    from database.models import ScannerPick as P
-    s = get_session()
-    try:
-        rows = s.query(P).filter(P.user_id == user_id).order_by(P.id.desc()).limit(limit).all()
-        return [{**_json(r.payload), "found_at": r.created_at, "day": r.day, "notified": bool(r.notified)} for r in rows]
-    finally:
-        s.close()

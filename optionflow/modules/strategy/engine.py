@@ -1,8 +1,6 @@
 """optionflow/modules/strategy/engine.py — contract picking and the desk's action for each strategy (pure, no I/O).
 
-Used two ways:
-- the hedge desk (hedge.suggest.evaluate → decide) for a holding, with its legs, average cost and live chain;
-- the scanner (strategy.scanner) for any stock, with `pick` / `put_spread` on that stock's chain.
+Called by the hedge desk (hedge.suggest.evaluate → decide) for a holding, with its legs, average cost and live chain.
 
 Quotes carry delta already (filled by the caller at the current spot). Premiums are mids per share.
 """

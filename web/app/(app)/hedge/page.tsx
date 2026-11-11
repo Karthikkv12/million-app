@@ -4,7 +4,7 @@
  * Scales (book delta per lot, portfolio beta), then one row per holding that expands in place into
  * the ticket, legs and a price ladder. Rows stack on phones and tablets; no sideways scrolling.
  * Live: the app-wide SSE stream (lib/live.tsx) every second.
- * Actions follow the strategy picked in the Hedge tab bar (GET /strategy; spike wheel by default).
+ * Actions follow the strategy picked in the header dropdown (GET /strategy; spike wheel by default).
  */
 import { Fragment, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
@@ -12,6 +12,7 @@ import { AlertTriangle, ChevronDown } from "lucide-react";
 import { HedgeBook, HedgeSuggestion } from "@/lib/api";
 import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
+import { StrategyPicker } from "@/components/strategy/StrategyPicker";
 import { useStrategy } from "@/components/strategy/useStrategy";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -259,7 +260,7 @@ function HowItWorks() {
   return (
     <DeskSection label="How it works" meta={<>{current ? <>Strategy: <span className="text-foreground">{current.name}</span><br /></> : null}<button onClick={() => set(true)} className="text-accent hover:underline">Hide</button></>}>
       <p className="mb-5 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
-        {current?.summary ?? "The desk suggests trades around the stocks you hold."} Change the strategy from the dropdown above;
+        {current?.summary ?? "The desk suggests trades around the stocks you hold."} Change the strategy from the dropdown at the top;
         the actions, buy-backs and phone alerts follow it within seconds. It shows the real delta at all times and doesn&apos;t place orders.
       </p>
       <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -418,12 +419,15 @@ export default function HedgePage() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
           <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Delta desk</h1>
         </div>
-        <div className="text-right font-mono text-[11px] leading-relaxed text-foreground/55">
-          <p className="flex items-center justify-end gap-1.5">
-            <span className={clsx("h-1.5 w-1.5 rounded-full", live ? "animate-pulse bg-gain" : "bg-warn")} />
-            {live ? "live · 1s" : "reconnecting"}
-          </p>
-          <p>robinhood sync {ago(data?.synced_at) ?? "pending"}</p>
+        <div className="flex w-full flex-wrap items-end justify-between gap-x-5 gap-y-3 sm:w-auto sm:flex-nowrap">
+          <div className="w-full sm:w-auto"><StrategyPicker /></div>
+          <div className="text-right font-mono text-[11px] leading-relaxed text-foreground/55 max-sm:ml-auto">
+            <p className="flex items-center justify-end gap-1.5">
+              <span className={clsx("h-1.5 w-1.5 rounded-full", live ? "animate-pulse bg-gain" : "bg-warn")} />
+              {live ? "live · 1s" : "reconnecting"}
+            </p>
+            <p>robinhood sync {ago(data?.synced_at) ?? "pending"}</p>
+          </div>
         </div>
       </div>
 

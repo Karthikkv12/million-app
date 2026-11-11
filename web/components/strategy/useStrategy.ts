@@ -1,5 +1,5 @@
 "use client";
-/** The owner's strategy (GET /strategy), shared by the desk and the scanner. Saving refreshes both. */
+/** The owner's strategy (GET /strategy). Saving refreshes the desk's books. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchStrategy, saveStrategy, StrategyInfo, StrategyState, StrategyUpdate } from "@/lib/api";
 

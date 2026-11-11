@@ -1,5 +1,5 @@
 "use client";
-/** Strategy dropdown: the desk's actions and the scanner follow whatever is picked here. */
+/** Strategy dropdown: the desk's actions follow whatever is picked here. */
 import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Check, ChevronDown } from "lucide-react";

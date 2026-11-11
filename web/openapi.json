@@ -5722,22 +5722,6 @@
     "title": "OptionMetricsOut",
     "type": "object"
    },
-   "PicksOut": {
-    "properties": {
-     "picks": {
-      "items": {
-       "$ref": "#/components/schemas/ScanRow"
-      },
-      "title": "Picks",
-      "type": "array"
-     }
-    },
-    "required": [
-     "picks"
-    ],
-    "title": "PicksOut",
-    "type": "object"
-   },
    "PortfolioSnapshotCreateRequest": {
     "properties": {
      "cash": {
@@ -7967,357 +7951,6 @@
     "title": "ReportSummary",
     "type": "object"
    },
-   "ScanOut": {
-    "properties": {
-     "as_of": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "As Of"
-     },
-     "chains": {
-      "default": 0,
-      "title": "Chains",
-      "type": "integer"
-     },
-     "new": {
-      "default": [],
-      "items": {
-       "type": "string"
-      },
-      "title": "New",
-      "type": "array"
-     },
-     "rows": {
-      "default": [],
-      "items": {
-       "$ref": "#/components/schemas/ScanRow"
-      },
-      "title": "Rows",
-      "type": "array"
-     },
-     "running": {
-      "default": false,
-      "title": "Running",
-      "type": "boolean"
-     },
-     "screened": {
-      "default": 0,
-      "title": "Screened",
-      "type": "integer"
-     },
-     "seconds": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Seconds"
-     },
-     "skipped": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "default": {},
-      "title": "Skipped",
-      "type": "object"
-     },
-     "strategy": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Strategy"
-     },
-     "strategy_name": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Strategy Name"
-     },
-     "universe": {
-      "default": 0,
-      "title": "Universe",
-      "type": "integer"
-     }
-    },
-    "title": "ScanOut",
-    "type": "object"
-   },
-   "ScanRow": {
-    "properties": {
-     "action": {
-      "description": "SELL_PUT | SELL_PUT_SPREAD | BUY_WRITE",
-      "title": "Action",
-      "type": "string"
-     },
-     "collateral": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Collateral"
-     },
-     "credit": {
-      "title": "Credit",
-      "type": "number"
-     },
-     "day_change": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Day Change"
-     },
-     "delta": {
-      "title": "Delta",
-      "type": "number"
-     },
-     "dte": {
-      "title": "Dte",
-      "type": "number"
-     },
-     "earnings": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Earnings"
-     },
-     "expiry": {
-      "title": "Expiry",
-      "type": "string"
-     },
-     "found_at": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Found At"
-     },
-     "headline": {
-      "title": "Headline",
-      "type": "string"
-     },
-     "hv20": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Hv20"
-     },
-     "iv": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Iv"
-     },
-     "iv_hv": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Iv Hv"
-     },
-     "iv_pctile": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Iv Pctile"
-     },
-     "key": {
-      "title": "Key",
-      "type": "string"
-     },
-     "long_strike": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Long Strike"
-     },
-     "max_loss": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Max Loss"
-     },
-     "notified": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Notified"
-     },
-     "oi": {
-      "title": "Oi",
-      "type": "integer"
-     },
-     "premium": {
-      "title": "Premium",
-      "type": "number"
-     },
-     "pullback": {
-      "title": "Pullback",
-      "type": "number"
-     },
-     "reasons": {
-      "default": [],
-      "items": {
-       "type": "string"
-      },
-      "title": "Reasons",
-      "type": "array"
-     },
-     "rsi": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Rsi"
-     },
-     "score": {
-      "title": "Score",
-      "type": "number"
-     },
-     "sma200_gap": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Sma200 Gap"
-     },
-     "spot": {
-      "title": "Spot",
-      "type": "number"
-     },
-     "spread_pct": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Spread Pct"
-     },
-     "strategy": {
-      "title": "Strategy",
-      "type": "string"
-     },
-     "strike": {
-      "title": "Strike",
-      "type": "number"
-     },
-     "symbol": {
-      "title": "Symbol",
-      "type": "string"
-     },
-     "yield_ann": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Yield Ann"
-     }
-    },
-    "required": [
-     "key",
-     "symbol",
-     "strategy",
-     "action",
-     "headline",
-     "strike",
-     "expiry",
-     "dte",
-     "delta",
-     "premium",
-     "credit",
-     "spot",
-     "pullback",
-     "oi",
-     "score"
-    ],
-    "title": "ScanRow",
-    "type": "object"
-   },
    "SeedHoldingsOut": {
     "additionalProperties": true,
     "properties": {
@@ -9399,11 +9032,6 @@
       "title": "Name",
       "type": "string"
      },
-     "scanner": {
-      "description": "What the scanner looks for with this strategy",
-      "title": "Scanner",
-      "type": "string"
-     },
      "sides": {
       "description": "put | call | both: the legs it opens",
       "title": "Sides",
@@ -9431,7 +9059,6 @@
      "steps",
      "sides",
      "buys_options",
-     "scanner",
      "defaults"
     ],
     "title": "StrategyInfo",
@@ -9439,16 +9066,6 @@
    },
    "StrategyOut": {
     "properties": {
-     "filters_default": {
-      "additionalProperties": true,
-      "title": "Filters Default",
-      "type": "object"
-     },
-     "notify": {
-      "description": "Push new scanner picks to every device",
-      "title": "Notify",
-      "type": "boolean"
-     },
      "overrides": {
       "additionalProperties": true,
       "title": "Overrides",
@@ -9458,12 +9075,6 @@
       "additionalProperties": true,
       "description": "Effective rules: the strategy's defaults + overrides",
       "title": "Rules",
-      "type": "object"
-     },
-     "scanner": {
-      "additionalProperties": true,
-      "description": "Scanner filters",
-      "title": "Scanner",
       "type": "object"
      },
      "strategies": {
@@ -9493,21 +9104,13 @@
      "strategy",
      "rules",
      "overrides",
-     "scanner",
-     "notify",
-     "strategies",
-     "filters_default"
+     "strategies"
     ],
     "title": "StrategyOut",
     "type": "object"
    },
    "StrategySettingsOut": {
     "properties": {
-     "notify": {
-      "description": "Push new scanner picks to every device",
-      "title": "Notify",
-      "type": "boolean"
-     },
      "overrides": {
       "additionalProperties": true,
       "title": "Overrides",
@@ -9517,12 +9120,6 @@
       "additionalProperties": true,
       "description": "Effective rules: the strategy's defaults + overrides",
       "title": "Rules",
-      "type": "object"
-     },
-     "scanner": {
-      "additionalProperties": true,
-      "description": "Scanner filters",
-      "title": "Scanner",
       "type": "object"
      },
      "strategy": {
@@ -9544,26 +9141,13 @@
     "required": [
      "strategy",
      "rules",
-     "overrides",
-     "scanner",
-     "notify"
+     "overrides"
     ],
     "title": "StrategySettingsOut",
     "type": "object"
    },
    "StrategyUpdate": {
     "properties": {
-     "notify": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Notify"
-     },
      "rules": {
       "anyOf": [
        {
@@ -9576,19 +9160,6 @@
       ],
       "description": "Overrides of the strategy's rules; {} = defaults",
       "title": "Rules"
-     },
-     "scanner": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "description": "Scanner filters; {} = defaults",
-      "title": "Scanner"
      },
      "strategy": {
       "anyOf": [
@@ -16885,7 +16456,7 @@
   },
   "/api/v1/strategy": {
    "get": {
-    "description": "The strategy the desk runs, its rules, the scanner filters, and every strategy on offer.",
+    "description": "The strategy the desk runs, its rules, and every strategy on offer.",
     "operationId": "get_strategy_api_v1_strategy_get",
     "responses": {
      "200": {
@@ -16910,7 +16481,7 @@
     ]
    },
    "put": {
-    "description": "Set the strategy (the desk's actions follow within seconds), rule overrides, scanner filters, notifications.",
+    "description": "Set the strategy (the desk's actions follow within seconds) and/or rule overrides.",
     "operationId": "put_strategy_api_v1_strategy_put",
     "requestBody": {
      "content": {
@@ -16950,109 +16521,6 @@
      }
     ],
     "summary": "Put Strategy",
-    "tags": [
-     "strategy"
-    ]
-   }
-  },
-  "/api/v1/strategy/picks": {
-   "get": {
-    "description": "Every pick the scanner stored, newest first (one per contract per day).",
-    "operationId": "picks_api_v1_strategy_picks_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "limit",
-      "required": false,
-      "schema": {
-       "default": 100,
-       "maximum": 500,
-       "minimum": 1,
-       "title": "Limit",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/PicksOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Picks",
-    "tags": [
-     "strategy"
-    ]
-   }
-  },
-  "/api/v1/strategy/scan": {
-   "get": {
-    "description": "The last scan (manual or background) since the server started; empty before the first.",
-    "operationId": "latest_scan_api_v1_strategy_scan_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ScanOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Latest Scan",
-    "tags": [
-     "strategy"
-    ]
-   },
-   "post": {
-    "description": "Scan the market now with the saved strategy and filters (30\u201390 s the first time; bars are cached).",
-    "operationId": "run_scan_api_v1_strategy_scan_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ScanOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Run Scan",
     "tags": [
      "strategy"
     ]

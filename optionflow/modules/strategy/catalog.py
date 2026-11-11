@@ -1,7 +1,7 @@
-"""optionflow/modules/strategy/catalog.py — the strategies the desk and the scanner can run (pure data).
+"""optionflow/modules/strategy/catalog.py — the strategies the hedge desk can run (pure data).
 
-Each strategy has rules (`Rules`) with defaults; the owner can override any of them in Settings, and the same
-rules pick contracts on the desk (for holdings) and in the scanner (across the market).
+Each strategy has rules (`Rules`) with defaults; the owner can override any of them (PUT /strategy), and the
+engine (strategy.engine) picks contracts for the desk's holdings with them.
 
 spike_wheel is the desk's original playbook (hedge.suggest): calls in the money near the average on spikes, puts
 below the average on pullbacks. It ignores the delta / DTE rules (it has its own); only take-profit applies to it
@@ -51,7 +51,6 @@ class Strategy:
     steps: List[List[str]]           # [[title, text], …] for the desk's "How it works"
     sides: str                       # "put" | "call" | "both": which legs it opens
     buys_options: bool
-    scanner: str                     # what the market scanner looks for with this strategy
     rules: Rules
 
 
@@ -64,7 +63,6 @@ CATALOG: Dict[str, Strategy] = {s.key: s for s in [
          ["Rounds up odd lots", "Under 100 shares and at/below your average: buy the rest of the lot."],
          ["Buys back early", "80% of the premium in, or 50% with 3+ days left: close it and free the lot or the cash."]],
         "both", False,
-        "Stocks that pulled back with rich IV: a weekly put below the price to start a position.",
         Rules("spike_wheel", 0.20, 0.40, 2, 9, 0.10, 0.80, 0.50, True, True)),
     Strategy(
         "wheel", "The wheel",
@@ -74,7 +72,6 @@ CATALOG: Dict[str, Strategy] = {s.key: s for s in [
          ["Take 50%", "Buy back at half the premium and sell the next one."],
          ["Called away", "Shares go at a profit; start again with puts."]],
         "both", False,
-        "Stocks you'd own after a pullback, with IV above realized: a 0.20–0.35Δ put 3–6 weeks out.",
         Rules("wheel")),
     Strategy(
         "covered_call", "Covered calls",
@@ -84,7 +81,6 @@ CATALOG: Dict[str, Strategy] = {s.key: s for s in [
          ["Take 50%", "Buy back at half the premium and sell the next one."],
          ["Odd lots", "Under 100 shares and at/below your average: buy the rest of the lot."]],
         "call", False,
-        "Buy-writes: liquid stocks with rich IV where 100 shares plus a 0.20–0.35Δ call pays your minimum yield.",
         Rules("covered_call", require_pullback=False)),
     Strategy(
         "cash_secured_put", "Cash-secured puts",
@@ -94,7 +90,6 @@ CATALOG: Dict[str, Strategy] = {s.key: s for s in [
          ["Take 50%", "Buy back at half the premium."],
          ["Assigned?", "You own the stock below today's price; switch to the wheel or covered calls."]],
         "put", False,
-        "Pullbacks in stocks above their 200-day average, with IV above realized: a 0.20–0.35Δ put 3–6 weeks out.",
         Rules("cash_secured_put", require_pullback=True)),
     Strategy(
         "put_credit_spread", "Put credit spreads",
@@ -104,7 +99,6 @@ CATALOG: Dict[str, Strategy] = {s.key: s for s in [
          ["Credit ≥ 20% of the width", "Max loss = width − credit, known up front."],
          ["Take 50%", "Close the spread at half the credit."]],
         "put", True,
-        "Pullbacks with rich IV where a ~5%-wide put spread collects at least 20% of its width.",
         Rules("put_credit_spread", 0.20, 0.35, 21, 45, 0.20, require_pullback=True)),
 ]}
 
@@ -147,4 +141,4 @@ def clean_overrides(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 def describe() -> List[Dict[str, Any]]:
     return [{"key": s.key, "name": s.name, "summary": s.summary, "steps": s.steps, "sides": s.sides,
-             "buys_options": s.buys_options, "scanner": s.scanner, "defaults": s.rules.to_dict()} for s in CATALOG.values()]
+             "buys_options": s.buys_options, "defaults": s.rules.to_dict()} for s in CATALOG.values()]

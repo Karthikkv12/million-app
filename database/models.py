@@ -581,31 +581,12 @@ class WatchlistGroup(Base):
 
 
 class StrategySetting(Base):
-    """The user's options strategy (strategy module): it drives the hedge desk's actions and the scanner.
-    `strategy` is a key from strategy.catalog; `rules` the user's overrides of that strategy's rules and
-    `scanner` the scanner's filters (both JSON objects, cleaned by the module); `notify` = push new scanner picks."""
+    """The user's options strategy (strategy module): it drives the hedge desk's actions.
+    `strategy` is a key from strategy.catalog; `rules` the user's overrides of that strategy's rules (JSON object,
+    cleaned by the module; null = the strategy's defaults)."""
     __tablename__ = "strategy_settings"
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     strategy   = Column(String, nullable=False, default="spike_wheel")
-    rules      = Column(Text, nullable=True)                        # JSON overrides; null = the strategy's defaults
-    scanner    = Column(Text, nullable=True)                        # JSON filters; null = defaults
-    notify     = Column(Boolean, nullable=False, default=False)
+    rules      = Column(Text, nullable=True)
     updated_at = Column(String, nullable=False)                     # ISO UTC
-
-
-class ScannerPick(Base):
-    """A trade the scanner found (strategy module). One row per user, day (US Eastern) and contract, so a pick is
-    pushed once a day even across restarts; `payload` is the scanner row as JSON."""
-    __tablename__ = "scanner_picks"
-    __table_args__ = (UniqueConstraint("user_id", "day", "key", name="uq_scanner_picks_user_day_key"),)
-    id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    day        = Column(String, nullable=False)                     # YYYY-MM-DD, US Eastern
-    key        = Column(String, nullable=False)                     # strategy:symbol:strike(/long):expiry
-    symbol     = Column(String, nullable=False)
-    strategy   = Column(String, nullable=False)
-    score      = Column(Float, nullable=True)
-    payload    = Column(Text, nullable=False)
-    notified   = Column(Boolean, nullable=False, default=False)
-    created_at = Column(String, nullable=False)                     # ISO UTC
