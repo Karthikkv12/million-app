@@ -1,14 +1,19 @@
 "use client";
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { clsx } from "clsx";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip, useChartStyle } from "@/components/chart/kit";
 import { Panel, SkeletonCard } from "@/components/ui";
 import { dayPnl, okBooks, Tick, useLiveBooks } from "@/lib/live";
+import { SectorDonut } from "./SectorDonut";
 import { compactUsd, Metric, NoData, pct, shortDate, signedUsd, TD, TH, tone, useHistory, useIncome, usePortfolio, usd } from "./broker";
 
 export function OverviewTab() {
   const { data: p, isLoading } = usePortfolio();
-  const { data: hist } = useHistory(365);
+  const { data: allHist } = useHistory(1825);
+  const [range, setRange] = useState<Range>("3M");
+  const hist = useMemo(() => withChange(clip(allHist ?? [], range)), [allHist, range]);
   const { data: inc } = useIncome();
   const s = useChartStyle();
   const live = useLiveBooks();
@@ -30,8 +35,9 @@ export function OverviewTab() {
         <Metric label="Cash · buying power" value={usd(p.cash)} sub={`BP ${usd(p.buying_power)}`} />
       </div>
 
-      <Panel title="Account value" sub={hist?.length ? `${hist.length} daily syncs` : undefined}>
-        {hist && hist.length > 1 ? (
+      <Panel title="Account value" sub={hist.length ? `${hist.length} daily syncs` : undefined}
+        actions={<RangeChips value={range} onChange={setRange} />}>
+        {hist.length > 1 ? (
           <div className="sensitive-blur h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hist} margin={{ top: 6, right: 6, bottom: 0, left: 4 }}>
@@ -44,13 +50,22 @@ export function OverviewTab() {
                 <CartesianGrid {...s.grid} />
                 <XAxis dataKey="day" {...s.xAxis} tickFormatter={shortDate} minTickGap={40} />
                 <YAxis {...s.yAxis} width={56} domain={["auto", "auto"]} tickFormatter={(v: number) => compactUsd(v)} />
-                <Tooltip cursor={s.cursor} content={<ChartTooltip title={(l) => shortDate(String(l))} format={(pl) => [{ label: "Value", value: usd(pl[0].value) }, { label: "Cash", value: usd(pl[0].payload.cash) }]} />} />
-                <Area type="monotone" dataKey="total_value" stroke={s.c.accent} strokeWidth={1.75} fill="url(#pv)" dot={false} isAnimationActive={false} />
+                <Tooltip cursor={s.cursor} content={<ChartTooltip title={(l) => shortDate(String(l))} format={(pl) => [
+                  { label: "Value", value: usd(pl[0].value) },
+                  { label: "Day", value: pl[0].payload.change == null ? "—" : signedUsd(pl[0].payload.change) },
+                  { label: "Cash", value: usd(pl[0].payload.cash) },
+                ]} />} />
+                {/* Straight segments between daily syncs: every up and down day shows, nothing is smoothed away. */}
+                <Area type="linear" dataKey="total_value" stroke={s.c.accent} strokeWidth={1.75} fill="url(#pv)" isAnimationActive={false}
+                  dot={hist.length <= 45 ? { r: 2.5, fill: s.c.accent, stroke: s.c.surface, strokeWidth: 1 } : false}
+                  activeDot={{ r: 4, fill: s.c.accent, stroke: s.c.surface, strokeWidth: 2 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         ) : <p className="py-10 text-center text-[13px] text-foreground/55">The chart fills in as daily syncs come in.</p>}
       </Panel>
+
+      <SectorDonut holdings={p.holdings} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Accounts" padded={false}>
@@ -83,6 +98,36 @@ export function OverviewTab() {
           </table>
         </Panel>
       </div>
+    </div>
+  );
+}
+
+type Range = "1M" | "3M" | "YTD" | "1Y" | "All";
+const RANGES: Range[] = ["1M", "3M", "YTD", "1Y", "All"];
+type Point = { day: string; total_value?: number | null; cash?: number | null };
+
+function clip<T extends Point>(rows: T[], r: Range): T[] {
+  if (r === "All" || !rows.length) return rows;
+  const d = new Date();
+  if (r === "YTD") d.setMonth(0, 1);
+  else d.setDate(d.getDate() - (r === "1M" ? 31 : r === "3M" ? 92 : 366));
+  const from = d.toISOString().slice(0, 10);
+  return rows.filter((x) => x.day >= from);
+}
+
+const withChange = <T extends Point>(rows: T[]) =>
+  rows.map((x, i) => ({ ...x, change: i && x.total_value != null && rows[i - 1].total_value != null ? x.total_value - rows[i - 1].total_value! : null }));
+
+function RangeChips({ value, onChange }: { value: Range; onChange: (r: Range) => void }) {
+  return (
+    <div className="flex gap-0.5">
+      {RANGES.map((r) => (
+        <button key={r} onClick={() => onChange(r)} aria-pressed={value === r}
+          className={clsx("h-7 rounded-md px-2 font-mono text-[11px] transition",
+            value === r ? "bg-[var(--surface-2)] text-foreground" : "text-foreground/50 hover:text-foreground")}>
+          {r}
+        </button>
+      ))}
     </div>
   );
 }
