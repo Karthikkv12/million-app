@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { Panel, SkeletonCard } from "@/components/ui";
 import { Tick, useLiveBooks, okBooks } from "@/lib/live";
+import { SectorDonut } from "./SectorDonut";
 import { NoData, pct, signedUsd, TD, TH, tone, usePortfolio, usd } from "./broker";
 
 export function HoldingsTab() {
@@ -11,6 +12,8 @@ export function HoldingsTab() {
   if (!p?.holdings.length) return <NoData what="stocks" />;
   const rows = [...p.holdings].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
   return (
+    <div className="space-y-4">
+    <SectorDonut holdings={p.holdings} />
     <Panel padded={false} title="Stocks" sub={`${rows.length} positions · live prices`}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[820px]">
@@ -53,5 +56,6 @@ export function HoldingsTab() {
         </table>
       </div>
     </Panel>
+    </div>
   );
 }

@@ -5559,6 +5559,157 @@
     "title": "NotifyPrefs",
     "type": "object"
    },
+   "OptionMetricsOut": {
+    "properties": {
+     "atm_call_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Atm Call Delta"
+     },
+     "atm_iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM implied vol of the weekly expiry, fraction (0.42 = 42%)",
+      "title": "Atm Iv"
+     },
+     "atm_put_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Atm Put Delta"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "expected_move": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "\u00b1 $ to that expiry: spot \u00d7 IV \u00d7 \u221a(dte/365)",
+      "title": "Expected Move"
+     },
+     "expected_move_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Move Pct"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The weekly expiry used",
+      "title": "Expiry"
+     },
+     "hv20": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "20-day historical vol, annualised fraction",
+      "title": "Hv20"
+     },
+     "iv_change_day": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM IV now vs the first reading today, fraction",
+      "title": "Iv Change Day"
+     },
+     "iv_hv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "atm_iv / hv20",
+      "title": "Iv Hv"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "OptionMetricsOut",
+    "type": "object"
+   },
    "PortfolioSnapshotCreateRequest": {
     "properties": {
      "cash": {
@@ -9652,6 +9803,133 @@
     "title": "WatchRequest",
     "type": "object"
    },
+   "WatchlistCreateIn": {
+    "properties": {
+     "name": {
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "symbols": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "WatchlistCreateIn",
+    "type": "object"
+   },
+   "WatchlistGroupOut": {
+    "properties": {
+     "columns": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Column ids the user picked for this list, in order; null = the default set",
+      "title": "Columns"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "description": "\"sector\" = seeded one per sector; \"custom\" = made by the user",
+      "enum": [
+       "custom",
+       "sector"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "position": {
+      "title": "Position",
+      "type": "integer"
+     },
+     "sector": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Sector name (Yahoo naming) for kind='sector'",
+      "title": "Sector"
+     },
+     "symbols": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Symbols",
+      "type": "array"
+     },
+     "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "kind",
+     "position",
+     "symbols",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "WatchlistGroupOut",
+    "type": "object"
+   },
+   "WatchlistGroupsOut": {
+    "properties": {
+     "lists": {
+      "items": {
+       "$ref": "#/components/schemas/WatchlistGroupOut"
+      },
+      "title": "Lists",
+      "type": "array"
+     },
+     "max_lists": {
+      "title": "Max Lists",
+      "type": "integer"
+     },
+     "max_symbols": {
+      "title": "Max Symbols",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "lists",
+     "max_lists",
+     "max_symbols"
+    ],
+    "title": "WatchlistGroupsOut",
+    "type": "object"
+   },
    "WatchlistItemOut": {
     "properties": {
      "added_at": {
@@ -9722,6 +10000,24 @@
      "is_active"
     ],
     "title": "WatchlistItemOut",
+    "type": "object"
+   },
+   "WatchlistOrderIn": {
+    "properties": {
+     "ids": {
+      "description": "List ids in the new display order",
+      "items": {
+       "type": "integer"
+      },
+      "maxItems": 20,
+      "title": "Ids",
+      "type": "array"
+     }
+    },
+    "required": [
+     "ids"
+    ],
+    "title": "WatchlistOrderIn",
     "type": "object"
    },
    "WatchlistRowOut": {
@@ -10044,6 +10340,57 @@
      "total_added"
     ],
     "title": "WatchlistSyncOut",
+    "type": "object"
+   },
+   "WatchlistUpdateIn": {
+    "properties": {
+     "columns": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "maxItems": 40,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Replaces the column set (and its order); [] = reset to default",
+      "title": "Columns"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 40,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "symbols": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "maxItems": 100,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Replaces the list (and its order)",
+      "title": "Symbols"
+     }
+    },
+    "title": "WatchlistUpdateIn",
     "type": "object"
    },
    "WatchlistUpsertRequest": {
@@ -16118,6 +16465,412 @@
     "summary": "Add Or Update",
     "tags": [
      "watchlist"
+    ]
+   }
+  },
+  "/api/v1/watchlists": {
+   "get": {
+    "description": "Every list in display order. The first call creates \"My watchlist\" plus one list per sector.",
+    "operationId": "get_lists_api_v1_watchlists_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Lists",
+    "tags": [
+     "watchlists"
+    ]
+   },
+   "post": {
+    "description": "New list (409 at the 20-list limit or on a duplicate name).",
+    "operationId": "create_list_api_v1_watchlists_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WatchlistCreateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create List",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/option-metrics": {
+   "get": {
+    "description": "ATM IV, IV change today, HV20, IV/HV, weekly expected move and ATM deltas, for the option columns.",
+    "operationId": "option_metrics_api_v1_watchlists_option_metrics_get",
+    "parameters": [
+     {
+      "description": "Comma-separated, up to 40",
+      "in": "query",
+      "name": "symbols",
+      "required": true,
+      "schema": {
+       "description": "Comma-separated, up to 40",
+       "maxLength": 600,
+       "title": "Symbols",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/OptionMetricsOut"
+         },
+         "title": "Response Option Metrics Api V1 Watchlists Option Metrics Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Option Metrics",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/order": {
+   "post": {
+    "operationId": "reorder_api_v1_watchlists_order_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WatchlistOrderIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reorder",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/restore-sectors": {
+   "post": {
+    "description": "Put back any deleted sector list, while there is room under 20.",
+    "operationId": "restore_sectors_api_v1_watchlists_restore_sectors_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Restore Sectors",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/{list_id}": {
+   "delete": {
+    "operationId": "delete_list_api_v1_watchlists__list_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "list_id",
+      "required": true,
+      "schema": {
+       "title": "List Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete List",
+    "tags": [
+     "watchlists"
+    ]
+   },
+   "patch": {
+    "description": "Rename, replace the symbols, and/or replace the columns (each in order).",
+    "operationId": "update_list_api_v1_watchlists__list_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "list_id",
+      "required": true,
+      "schema": {
+       "title": "List Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WatchlistUpdateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update List",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/{list_id}/symbols/{symbol}": {
+   "delete": {
+    "operationId": "remove_symbol_api_v1_watchlists__list_id__symbols__symbol__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "list_id",
+      "required": true,
+      "schema": {
+       "title": "List Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Symbol",
+    "tags": [
+     "watchlists"
+    ]
+   },
+   "put": {
+    "operationId": "add_symbol_api_v1_watchlists__list_id__symbols__symbol__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "list_id",
+      "required": true,
+      "schema": {
+       "title": "List Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WatchlistGroupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Symbol",
+    "tags": [
+     "watchlists"
     ]
    }
   }
