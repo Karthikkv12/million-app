@@ -266,6 +266,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/broker/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Broker Activity
+         * @description Option fills and realized trades, newest first.
+         */
+        get: operations["broker_activity_api_v1_broker_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/broker/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Broker History
+         * @description Daily account value (sum of accounts) from each sync.
+         */
+        get: operations["broker_history_api_v1_broker_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/broker/income": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Broker Income
+         * @description Option premium (net cash from fills) and realized P&L by week, month and symbol.
+         */
+        get: operations["broker_income_api_v1_broker_income_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/broker/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Broker Portfolio
+         * @description Account values, holdings with live prices and unrealized P&L, open options.
+         */
+        get: operations["broker_portfolio_api_v1_broker_portfolio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/budget": {
         parameters: {
             query?: never;
@@ -546,6 +626,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Books
+         * @description Net delta / gamma, IV vs HV and the delta-neutral suggestion for every holding.
+         */
+        get: operations["books_api_v1_hedge_books_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest
+         * @description Daily broker sync. Replaces positions; upserts today's account values and the activity history.
+         *
+         *     Auth: X-Hedge-Ingest-Token (not a user login).
+         */
+        post: operations["ingest_api_v1_hedge_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Positions
+         * @description Positions from the last broker sync.
+         */
+        get: operations["positions_api_v1_hedge_positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hedge/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream
+         * @description Server-Sent Events: a `books` event (same body as GET /hedge/books) every `interval` seconds.
+         */
+        get: operations["stream_api_v1_hedge_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/holdings/{holding_id}": {
         parameters: {
             query?: never;
@@ -631,6 +793,121 @@ export interface paths {
         get: operations["watchlist_quotes_api_v1_market_watchlist_quotes_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Push Config
+         * @description Whether push is set up on the server, and the key the browser subscribes with.
+         */
+        get: operations["push_config_api_v1_notify_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices */
+        get: operations["devices_api_v1_notify_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Prefs
+         * @description Which alerts are pushed, and for which symbols (the same on every device).
+         */
+        get: operations["get_prefs_api_v1_notify_prefs_get"];
+        /** Put Prefs */
+        put: operations["put_prefs_api_v1_notify_prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe
+         * @description Save this browser's push subscription (from pushManager.subscribe).
+         */
+        post: operations["subscribe_api_v1_notify_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test
+         * @description Send a test notification to every device of the signed-in user.
+         */
+        post: operations["test_api_v1_notify_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsubscribe */
+        post: operations["unsubscribe_api_v1_notify_unsubscribe_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1224,6 +1501,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description Each report's latest page (without the HTML) and the days it can be opened for.
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest
+         * @description Publish one report page for one day (replaces that day's page; other days are kept for a month).
+         *
+         *     Auth: X-Hedge-Ingest-Token, bound to one user.
+         */
+        post: operations["ingest_api_v1_reports_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_v1_reports__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search/tickers": {
         parameters: {
             query?: never;
@@ -1633,7 +1969,7 @@ export interface components {
         /** AuthRefreshRequest */
         AuthRefreshRequest: {
             /** Refresh Token */
-            refresh_token: string;
+            refresh_token?: string | null;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -1678,6 +2014,103 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** BookOut */
+        BookOut: {
+            /**
+             * Accounts
+             * @default []
+             */
+            accounts: string[];
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /**
+             * Beta
+             * @description 1-year beta of daily returns vs SPY
+             */
+            beta?: number | null;
+            /** Chain Source */
+            chain_source?: string | null;
+            /**
+             * Closes
+             * @description Short options worth buying back now (most of the premium captured)
+             * @default []
+             */
+            closes: components["schemas"]["CloseOut"][];
+            /** Day Change */
+            day_change?: number | null;
+            /** Day High */
+            day_high?: number | null;
+            /** Dollar Gamma 1Pct */
+            dollar_gamma_1pct?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Ext Change
+             * @description spot − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
+            /** Gap */
+            gap?: number | null;
+            iv?: components["schemas"]["IvOut"] | null;
+            /** Iv Hv */
+            iv_hv?: number | null;
+            /**
+             * Legs
+             * @default []
+             */
+            legs: components["schemas"]["LegOut"][];
+            levels?: components["schemas"]["LevelsOut"] | null;
+            /** Lots */
+            lots?: number | null;
+            /** Net Delta */
+            net_delta?: number | null;
+            /** Net Gamma */
+            net_gamma?: number | null;
+            /**
+             * Prev Close
+             * @description Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)
+             */
+            prev_close?: number | null;
+            /** Regime */
+            regime?: ("bull" | "high-vol") | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /** Regular Close Date */
+            regular_close_date?: string | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
+            /** Shares */
+            shares?: number | null;
+            /** Spot */
+            spot?: number | null;
+            suggestion?: components["schemas"]["SuggestionOut"] | null;
+            /** Symbol */
+            symbol: string;
+            /** Target Delta */
+            target_delta?: number | null;
+            /**
+             * Units
+             * @description Covered (shares + their short calls), uncovered shares, short puts
+             * @default []
+             */
+            units: components["schemas"]["UnitOut"][];
+            /** Weekly Expiry */
+            weekly_expiry?: string | null;
+        };
+        /** BooksOut */
+        BooksOut: {
+            /** As Of */
+            as_of: string;
+            /** Books */
+            books: components["schemas"]["BookOut"][];
+            /** Synced At */
+            synced_at?: string | null;
+        };
         /** BrokerAccountCreateRequest */
         BrokerAccountCreateRequest: {
             /** Color */
@@ -1690,21 +2123,6 @@ export interface components {
              */
             sort_order: number;
         };
-        /** BrokerAccountOut */
-        BrokerAccountOut: {
-            /** Color */
-            color?: string | null;
-            /** Id */
-            id?: number | null;
-            /** Is Active */
-            is_active?: boolean | null;
-            /** Name */
-            name?: string | null;
-            /** Sort Order */
-            sort_order?: number | null;
-        } & {
-            [key: string]: unknown;
-        };
         /** BrokerAccountUpdateRequest */
         BrokerAccountUpdateRequest: {
             /** Color */
@@ -1715,6 +2133,314 @@ export interface components {
             name?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /** BrokerActivityOut */
+        BrokerActivityOut: {
+            /** Account */
+            account?: string | null;
+            /**
+             * Amount
+             * @description Option fills: cash, + credit / − debit
+             */
+            amount?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Ext Id
+             * @description Stable broker id: option leg id, or a derived key
+             */
+            ext_id: string;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "option_fill" | "realized";
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /** Position Effect */
+            position_effect?: ("open" | "close") | null;
+            /** Price */
+            price?: number | null;
+            /** Quantity */
+            quantity?: number | null;
+            /** Realized Gain */
+            realized_gain?: number | null;
+            /** Side */
+            side?: ("buy" | "sell" | "") | null;
+            /** Strategy */
+            strategy?: string | null;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Ts */
+            ts: string;
+        };
+        /** BrokerHistoryPoint */
+        BrokerHistoryPoint: {
+            /** Cash */
+            cash?: number | null;
+            /** Day */
+            day: string;
+            /** Total Value */
+            total_value?: number | null;
+        };
+        /** BrokerHoldingOut */
+        BrokerHoldingOut: {
+            /**
+             * Accounts
+             * @default []
+             */
+            accounts: string[];
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Cost Basis */
+            cost_basis?: number | null;
+            /**
+             * Covered Pct
+             * @default 0
+             */
+            covered_pct: number;
+            /**
+             * Day Change Pct
+             * @description Fraction. Outside the regular session: that last session's move
+             */
+            day_change_pct?: number | null;
+            /**
+             * Ext Change Pct
+             * @description Percent since regular_close, outside the regular session
+             */
+            ext_change_pct?: number | null;
+            /** Market Value */
+            market_value?: number | null;
+            /** Prev Close */
+            prev_close?: number | null;
+            /** Price */
+            price?: number | null;
+            /** Regular Close */
+            regular_close?: number | null;
+            /** Session */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
+            /** Shares */
+            shares: number;
+            /**
+             * Short Calls
+             * @default 0
+             */
+            short_calls: number;
+            /** Symbol */
+            symbol: string;
+            /** Unrealized */
+            unrealized?: number | null;
+            /** Unrealized Pct */
+            unrealized_pct?: number | null;
+            /** Weight */
+            weight?: number | null;
+        };
+        /** BrokerIncomeBucket */
+        BrokerIncomeBucket: {
+            /**
+             * Bought Back
+             * @default 0
+             */
+            bought_back: number;
+            /**
+             * Collected
+             * @default 0
+             */
+            collected: number;
+            /** Period */
+            period: string;
+            /**
+             * Premium
+             * @default 0
+             */
+            premium: number;
+            /**
+             * Realized
+             * @default 0
+             */
+            realized: number;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
+            /**
+             * Wins
+             * @default 0
+             */
+            wins: number;
+        };
+        /** BrokerIncomeOut */
+        BrokerIncomeOut: {
+            /**
+             * Bought Back Total
+             * @default 0
+             */
+            bought_back_total: number;
+            /** By Symbol */
+            by_symbol: components["schemas"]["BrokerSymbolIncome"][];
+            /**
+             * Collected Total
+             * @default 0
+             */
+            collected_total: number;
+            /** Monthly */
+            monthly: components["schemas"]["BrokerIncomeBucket"][];
+            /**
+             * Premium Total
+             * @default 0
+             */
+            premium_total: number;
+            /**
+             * Realized Total
+             * @default 0
+             */
+            realized_total: number;
+            /** Since */
+            since?: string | null;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
+            /** Weekly */
+            weekly: components["schemas"]["BrokerIncomeBucket"][];
+            /** Win Rate */
+            win_rate?: number | null;
+        };
+        /** BrokerOptionOut */
+        BrokerOptionOut: {
+            /** Account */
+            account?: string | null;
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Contracts */
+            contracts: number;
+            /** Distance Pct */
+            distance_pct?: number | null;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry: string;
+            /** Moneyness */
+            moneyness?: ("ITM" | "OTM" | "ATM") | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type: string;
+            /** Premium */
+            premium?: number | null;
+            /** Spot */
+            spot?: number | null;
+            /** Strike */
+            strike: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** BrokerPortfolioOut */
+        BrokerPortfolioOut: {
+            /** Account Filter */
+            account_filter?: string | null;
+            /** Accounts */
+            accounts: components["schemas"]["optionflow__modules__hedge__schemas__BrokerAccountOut"][];
+            /** As Of */
+            as_of: string;
+            /** Buying Power */
+            buying_power?: number | null;
+            /** Cash */
+            cash?: number | null;
+            /** Day Change */
+            day_change?: number | null;
+            /** Holdings */
+            holdings: components["schemas"]["BrokerHoldingOut"][];
+            /** Options */
+            options: components["schemas"]["BrokerOptionOut"][];
+            /** Stock Value */
+            stock_value?: number | null;
+            /** Synced At */
+            synced_at?: string | null;
+            /** Total Value */
+            total_value?: number | null;
+            /** Unrealized */
+            unrealized?: number | null;
+        };
+        /** BrokerPositionOut */
+        BrokerPositionOut: {
+            /**
+             * Account
+             * @description Masked label, e.g. "Trading ••8453". Never a full account number.
+             */
+            account?: string | null;
+            /**
+             * Avg Price
+             * @description Per share; option premium per share
+             */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "option";
+            /**
+             * Multiplier
+             * @default 100
+             */
+            multiplier: number;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /**
+             * Quantity
+             * @description Signed: long > 0, short < 0 (shares or contracts)
+             */
+            quantity: number;
+            /** Source */
+            source: string;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Synced At */
+            synced_at: string;
+        };
+        /** BrokerSymbolIncome */
+        BrokerSymbolIncome: {
+            /**
+             * Bought Back
+             * @default 0
+             */
+            bought_back: number;
+            /**
+             * Collected
+             * @default 0
+             */
+            collected: number;
+            /**
+             * Premium
+             * @default 0
+             */
+            premium: number;
+            /**
+             * Realized
+             * @default 0
+             */
+            realized: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
         };
         /** BudgetCreateRequest */
         BudgetCreateRequest: {
@@ -1975,6 +2701,39 @@ export interface components {
             /** Messages */
             messages: components["schemas"]["ChatMessage"][];
         };
+        /** CloseOut */
+        CloseOut: {
+            /** Contracts */
+            contracts: number;
+            /** Cost */
+            cost: number;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry: string;
+            /** Headline */
+            headline: string;
+            /** Kept */
+            kept: number;
+            /** Mark */
+            mark: number;
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "call" | "put";
+            /** Profit Pct */
+            profit_pct: number;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sold At */
+            sold_at: number;
+            /** Strike */
+            strike: number;
+        };
         /** CreatedOut */
         CreatedOut: {
             /** Id */
@@ -2028,6 +2787,17 @@ export interface components {
              * Format: date-time
              */
             week_start: string;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Last Ok At */
+            last_ok_at?: string | null;
+            /** User Agent */
+            user_agent?: string | null;
         };
         /** DividendOut */
         DividendOut: {
@@ -2170,6 +2940,11 @@ export interface components {
              * @default []
              */
             heatmap_values: number[][];
+            /**
+             * Heatmap Vex Values
+             * @default []
+             */
+            heatmap_vex_values: number[][];
             /** Max Call Wall */
             max_call_wall?: number | null;
             /** Max Gex Strike */
@@ -2186,6 +2961,11 @@ export interface components {
              * @default 0
              */
             net_gex: number;
+            /**
+             * Net Vex
+             * @default 0
+             */
+            net_vex: number;
             /**
              * Put Gex By Strike
              * @default []
@@ -2302,6 +3082,185 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** IngestAccount */
+        IngestAccount: {
+            /**
+             * Account
+             * @description Masked label, e.g. "Trading ••8453"
+             */
+            account: string;
+            /** Buying Power */
+            buying_power?: number | null;
+            /** Cash */
+            cash?: number | null;
+            /** Crypto Value */
+            crypto_value?: number | null;
+            /**
+             * Day
+             * @description Trading day (US Eastern); default today
+             */
+            day?: string | null;
+            /** Equity Value */
+            equity_value?: number | null;
+            /** Options Value */
+            options_value?: number | null;
+            /** Total Value */
+            total_value?: number | null;
+        };
+        /** IngestActivity */
+        IngestActivity: {
+            /** Account */
+            account?: string | null;
+            /**
+             * Amount
+             * @description Option fills: cash, + credit / − debit
+             */
+            amount?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Ext Id
+             * @description Stable broker id: option leg id, or a derived key
+             */
+            ext_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "option_fill" | "realized";
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /** Position Effect */
+            position_effect?: ("open" | "close") | null;
+            /** Price */
+            price?: number | null;
+            /** Quantity */
+            quantity?: number | null;
+            /** Realized Gain */
+            realized_gain?: number | null;
+            /** Side */
+            side?: ("buy" | "sell" | "") | null;
+            /** Strategy */
+            strategy?: string | null;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Ts */
+            ts: string;
+        };
+        /** IngestOut */
+        IngestOut: {
+            /**
+             * Accounts
+             * @default 0
+             */
+            accounts: number;
+            /**
+             * Activity New
+             * @default 0
+             */
+            activity_new: number;
+            /**
+             * Activity Total
+             * @default 0
+             */
+            activity_total: number;
+            /** Count */
+            count: number;
+            /** Synced At */
+            synced_at: string;
+        };
+        /** IngestPosition */
+        IngestPosition: {
+            /**
+             * Account
+             * @description Masked label, e.g. "Trading ••8453". Never a full account number.
+             */
+            account?: string | null;
+            /**
+             * Avg Price
+             * @description Per share; option premium per share
+             */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "option";
+            /**
+             * Multiplier
+             * @default 100
+             */
+            multiplier: number;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Option Type */
+            option_type?: ("call" | "put") | null;
+            /**
+             * Quantity
+             * @description Signed: long > 0, short < 0 (shares or contracts)
+             */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** IngestRequest */
+        IngestRequest: {
+            /**
+             * Accounts
+             * @default []
+             */
+            accounts: components["schemas"]["IngestAccount"][];
+            /**
+             * Activity
+             * @default []
+             */
+            activity: components["schemas"]["IngestActivity"][];
+            /** Positions */
+            positions: components["schemas"]["IngestPosition"][];
+            /**
+             * Source
+             * @default robinhood
+             * @constant
+             */
+            source: "robinhood";
+            /** Username */
+            username: string;
+        };
+        /** IvOut */
+        IvOut: {
+            /** Atm Iv */
+            atm_iv?: number | null;
+            /**
+             * Cooling
+             * @default false
+             */
+            cooling: boolean;
+            /** Hv10 */
+            hv10?: number | null;
+            /** Hv20 */
+            hv20?: number | null;
+            /** Hv60 */
+            hv60?: number | null;
+            /** Iv High */
+            iv_high?: number | null;
+            /** Iv Open */
+            iv_open?: number | null;
+            /** Iv Roc 15M */
+            iv_roc_15m?: number | null;
+            /** Iv Roc Day */
+            iv_roc_day?: number | null;
+            /**
+             * Spike
+             * @default false
+             */
+            spike: boolean;
+        };
         /** LedgerEntryOut */
         LedgerEntryOut: {
             /** Created At */
@@ -2341,6 +3300,51 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** LegOut */
+        LegOut: {
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Delta */
+            delta: number;
+            /** Dte */
+            dte?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Gamma */
+            gamma: number;
+            /** Iv */
+            iv?: number | null;
+            /** Kind */
+            kind: string;
+            /**
+             * Mark
+             * @description Live mid per share (options)
+             */
+            mark?: number | null;
+            /** Otype */
+            otype?: string | null;
+            /** Position Delta */
+            position_delta: number;
+            /** Position Gamma */
+            position_gamma: number;
+            /** Quantity */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+        };
+        /** LevelsOut */
+        LevelsOut: {
+            /** Call Wall */
+            call_wall?: number | null;
+            /** King */
+            king?: number | null;
+            /** Net Gex */
+            net_gex?: number | null;
+            /** Put Wall */
+            put_wall?: number | null;
+            /** Zero Gamma */
+            zero_gamma?: number | null;
+        };
         /** LiveQuoteOut */
         LiveQuoteOut: {
             /** Error */
@@ -2379,6 +3383,48 @@ export interface components {
             title: string;
             /** Url */
             url?: string | null;
+        };
+        /** NotifyPrefs */
+        NotifyPrefs: {
+            /**
+             * Buy Stock
+             * @default true
+             */
+            buy_stock: boolean;
+            /**
+             * Buyback
+             * @description A short option has given up most of its premium
+             * @default true
+             */
+            buyback: boolean;
+            /**
+             * Expiring Itm
+             * @description A short option is in the money with ≤ 1 day left
+             * @default false
+             */
+            expiring_itm: boolean;
+            /**
+             * Iv Spike
+             * @description ATM IV spikes on a holding
+             * @default false
+             */
+            iv_spike: boolean;
+            /**
+             * Sell Call
+             * @default true
+             */
+            sell_call: boolean;
+            /**
+             * Sell Put
+             * @default true
+             */
+            sell_put: boolean;
+            /**
+             * Symbols
+             * @description Only these symbols; empty = every holding
+             * @default []
+             */
+            symbols: string[];
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -2755,19 +3801,60 @@ export interface components {
             current_price?: number | null;
             /** Error */
             error?: string | null;
+            /** Source */
+            source?: string | null;
             /** Symbol */
             symbol: string;
         };
-        /** QuoteOut */
+        /** PushConfigOut */
+        PushConfigOut: {
+            /**
+             * Enabled
+             * @description Push is configured on the server (VAPID keys set)
+             */
+            enabled: boolean;
+            /**
+             * Public Key
+             * @description VAPID public key, base64url; pass to pushManager.subscribe
+             */
+            public_key?: string | null;
+        };
+        /**
+         * QuoteOut
+         * @description Outside the regular session, prev_close / change / change_pct describe the last regular session's move
+         *     (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight).
+         */
         QuoteOut: {
             /** Change */
             change?: number | null;
             /** Change Pct */
             change_pct?: number | null;
+            /**
+             * Ext Change
+             * @description price − regular_close outside the regular session; null during it
+             */
+            ext_change?: number | null;
+            /** Ext Change Pct */
+            ext_change_pct?: number | null;
             /** Prev Close */
             prev_close?: number | null;
             /** Price */
             price?: number | null;
+            /**
+             * Regular Close
+             * @description Close of the last completed regular session
+             */
+            regular_close?: number | null;
+            /**
+             * Regular Close Date
+             * @description YYYY-MM-DD of regular_close
+             */
+            regular_close_date?: string | null;
+            /**
+             * Session
+             * @description US equity session (ET) when quoted; null for Yahoo-served or crypto quotes
+             */
+            session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Symbol */
             symbol: string;
         };
@@ -2808,6 +3895,100 @@ export interface components {
             symbol?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ReportIngest */
+        ReportIngest: {
+            /**
+             * Day
+             * @description Date the report is for; default: today in US Eastern
+             */
+            day?: string | null;
+            /** Html */
+            html: string;
+            /**
+             * Slug
+             * @description "morning", "evening", "weekend"
+             */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+            /** Username */
+            username: string;
+        };
+        /** ReportMeta */
+        ReportMeta: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /** Html */
+            html: string;
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ReportSummary
+         * @description The latest page of one report, plus every day it has a page for (newest first).
+         */
+        ReportSummary: {
+            /**
+             * Day
+             * @description YYYY-MM-DD the report is for (US Eastern)
+             */
+            day: string;
+            /**
+             * Days
+             * @default []
+             */
+            days: string[];
+            /** Published At */
+            published_at: string;
+            /**
+             * Size
+             * @description Characters of HTML
+             */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
         };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
@@ -3017,6 +4198,71 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /** SubscriptionIn */
+        SubscriptionIn: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["SubscriptionKeys"];
+        };
+        /** SubscriptionKeys */
+        SubscriptionKeys: {
+            /** Auth */
+            auth: string;
+            /** P256Dh */
+            p256dh: string;
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
+            /**
+             * Contracts
+             * @default 0
+             */
+            contracts: number;
+            /** Credit */
+            credit?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Headline */
+            headline: string;
+            /** Locked Gain */
+            locked_gain?: number | null;
+            /** Net Delta After */
+            net_delta_after?: number | null;
+            /**
+             * New Avg
+             * @description BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned
+             */
+            new_avg?: number | null;
+            /** Option Delta */
+            option_delta?: number | null;
+            /** Otype */
+            otype?: string | null;
+            /** Premium */
+            premium?: number | null;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /**
+             * Shares
+             * @description BUY_STOCK: shares to buy
+             * @default 0
+             */
+            shares: number;
+            /** Strike */
+            strike?: number | null;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
             /** Active */
@@ -3044,6 +4290,22 @@ export interface components {
             updated_holdings?: number | null;
         } & {
             [key: string]: unknown;
+        };
+        /** TestOut */
+        TestOut: {
+            /** Devices */
+            devices: number;
+            /**
+             * Devices Out
+             * @default []
+             */
+            devices_out: components["schemas"]["DeviceOut"][];
+            /** Failed */
+            failed: number;
+            /** Removed */
+            removed: number;
+            /** Sent */
+            sent: number;
         };
         /** TickerSearchResult */
         TickerSearchResult: {
@@ -3080,6 +4342,35 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /** UnitOut */
+        UnitOut: {
+            /**
+             * Contracts
+             * @default 0
+             */
+            contracts: number;
+            /** Delta */
+            delta?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "covered" | "uncovered" | "puts" | "other";
+            /** Label */
+            label: string;
+            /** Per Lot */
+            per_lot?: number | null;
+            /**
+             * Shares
+             * @default 0
+             */
+            shares: number;
+        };
+        /** UnsubscribeIn */
+        UnsubscribeIn: {
+            /** Endpoint */
+            endpoint: string;
         };
         /** UnusualRow */
         UnusualRow: {
@@ -3392,6 +4683,44 @@ export interface components {
             acct_val_3?: number | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** BrokerAccountOut */
+        optionflow__modules__hedge__schemas__BrokerAccountOut: {
+            /** Account */
+            account: string;
+            /** Buying Power */
+            buying_power?: number | null;
+            /** Cash */
+            cash?: number | null;
+            /** Change */
+            change?: number | null;
+            /** Crypto Value */
+            crypto_value?: number | null;
+            /** Day */
+            day?: string | null;
+            /** Equity Value */
+            equity_value?: number | null;
+            /** Options Value */
+            options_value?: number | null;
+            /** Prev Total */
+            prev_total?: number | null;
+            /** Total Value */
+            total_value?: number | null;
+        };
+        /** BrokerAccountOut */
+        optionflow__modules__portfolio__schemas__BrokerAccountOut: {
+            /** Color */
+            color?: string | null;
+            /** Id */
+            id?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;
@@ -3835,9 +5164,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["AuthRefreshRequest"];
+                "application/json": components["schemas"]["AuthRefreshRequest"] | null;
             };
         };
         responses: {
@@ -3932,6 +5261,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    broker_activity_api_v1_broker_activity_get: {
+        parameters: {
+            query?: {
+                account?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerActivityOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    broker_history_api_v1_broker_history_get: {
+        parameters: {
+            query?: {
+                account?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerHistoryPoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    broker_income_api_v1_broker_income_get: {
+        parameters: {
+            query?: {
+                account?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerIncomeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    broker_portfolio_api_v1_broker_portfolio_get: {
+        parameters: {
+            query?: {
+                /** @description Masked account label; all if empty */
+                account?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerPortfolioOut"];
                 };
             };
             /** @description Validation Error */
@@ -4616,6 +6072,115 @@ export interface operations {
             };
         };
     };
+    books_api_v1_hedge_books_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BooksOut"];
+                };
+            };
+        };
+    };
+    ingest_api_v1_hedge_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hedge-ingest-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    positions_api_v1_hedge_positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerPositionOut"][];
+                };
+            };
+        };
+    };
+    stream_api_v1_hedge_stream_get: {
+        parameters: {
+            query?: {
+                /** @description Seconds between updates */
+                interval?: number;
+                /** @description Stop after this many events (0 = until the client leaves) */
+                limit?: number;
+                /** @description For EventSource, which can't send headers */
+                access_token?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_account_holding_api_v1_holdings__holding_id__delete: {
         parameters: {
             query?: never;
@@ -4748,6 +6313,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_config_api_v1_notify_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigOut"];
+                };
+            };
+        };
+    };
+    devices_api_v1_notify_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    get_prefs_api_v1_notify_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+        };
+    };
+    put_prefs_api_v1_notify_prefs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotifyPrefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotifyPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subscribe_api_v1_notify_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_api_v1_notify_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestOut"];
+                };
+            };
+        };
+    };
+    unsubscribe_api_v1_notify_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -5043,7 +6787,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"][];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"][];
                 };
             };
         };
@@ -5067,7 +6811,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"];
                 };
             };
             /** @description Validation Error */
@@ -5133,7 +6877,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrokerAccountOut"];
+                    "application/json": components["schemas"]["optionflow__modules__portfolio__schemas__BrokerAccountOut"];
                 };
             };
             /** @description Validation Error */
@@ -6018,6 +7762,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveQuoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSummary"][];
+                };
+            };
+        };
+    };
+    ingest_api_v1_reports_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hedge-ingest-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIngest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__slug__get: {
+        parameters: {
+            query?: {
+                /** @description Default: the latest day */
+                day?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */

@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from cachetools import TTLCache
 
 from optionflow.core import errors
-from optionflow.providers.market_data import bars_from_history, get_market_data
+from optionflow.providers.market_data import QUOTE_FIELDS, bars_from_history, get_market_data
 
 # Bounded TTL caches (maxsize caps memory; ttl in seconds)
 _search_cache: TTLCache = TTLCache(maxsize=256, ttl=60)
@@ -41,9 +41,39 @@ def search(query: str, limit: int = 8) -> List[Dict[str, Any]]:
     return _search_cache[key][:limit]
 
 
+def _live(md: Any, syms: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Real-time quotes in one request when the provider has them (Public.com), else {}."""
+    fn = getattr(md, "quotes_batch", None)
+    if not callable(fn):
+        return {}
+    try:
+        return fn(syms) or {}
+    except Exception:
+        return {}
+
+
 def quotes(symbols: str) -> List[Dict[str, Any]]:
     md = get_market_data()
-    return [md.quote(s) for s in _symbols(symbols, 25)]
+    syms = _symbols(symbols, 25)
+    live = _live(md, syms)
+    out = []
+    for s in syms:
+        q = live.get(s)
+        out.append({k: q.get(k) for k in QUOTE_FIELDS} | {"symbol": s} if q is not None else md.quote(s))
+    return out
+
+
+_PRICE_FIELDS = QUOTE_FIELDS
+
+
+def _overlay(row: Dict[str, Any], q: Dict[str, Any]) -> Dict[str, Any]:
+    """Cached fundamentals + live price fields (and volume / relative volume when Public has them)."""
+    row = dict(row) | {k: q.get(k) for k in _PRICE_FIELDS} | {"error": None}   # a live price beats a Yahoo error
+    if q.get("volume"):
+        row["volume"] = q["volume"]
+        if row.get("avg_volume"):
+            row["rel_volume"] = round(q["volume"] / row["avg_volume"], 2)
+    return row
 
 
 def watchlist_rows(symbols: str) -> List[Dict[str, Any]]:
@@ -59,7 +89,9 @@ def watchlist_rows(symbols: str) -> List[Dict[str, Any]]:
         return row
 
     with ThreadPoolExecutor(max_workers=min(len(syms), 16)) as pool:
-        return list(pool.map(_one, syms))
+        rows = list(pool.map(_one, syms))
+    live = _live(get_market_data(), syms)        # fundamentals cache for 5 min; prices stay live
+    return [_overlay(r, live[s]) if s in live else r for s, r in zip(syms, rows)]
 
 
 def stock_info(symbol: str) -> Dict[str, Any]:
@@ -74,6 +106,9 @@ def stock_info(symbol: str) -> Dict[str, Any]:
 
 def live_quote(symbol: str) -> Dict[str, Any]:
     sym = symbol.strip().upper()
+    live = _live(get_market_data(), [sym]).get(sym)
+    if live is not None:                          # real-time: skip the 60 s price cache
+        return {"symbol": sym, "price": round(live["price"], 4), "from_cache": False}
     if sym in _price_cache:
         return {"symbol": sym, "price": _price_cache[sym], "from_cache": True}
     try:
@@ -97,4 +132,5 @@ def price_history(symbol: str, period: str = "6mo", interval: str = "1d") -> Dic
     if df.empty:
         return {"symbol": sym, "bars": [], "current_price": None, "error": f"No data for {sym}"}
     bars = bars_from_history(df, intraday=iv not in _DAILY_OR_LONGER)
-    return {"symbol": sym, "bars": bars, "current_price": bars[-1]["close"] if bars else None, "error": None}
+    return {"symbol": sym, "bars": bars, "current_price": bars[-1]["close"] if bars else None, "error": None,
+            "source": df.attrs.get("source")}

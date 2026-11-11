@@ -3,19 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown } from "lucide-react";
+import { CountBadge, useBuybackCount } from "@/lib/live";
+import { LogOut, Menu, X, Sun, Moon, ShieldCheck, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { usePrivacy } from "@/lib/privacy";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 
-const NAV = [
+const NAV: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/dashboard",    label: "Dashboard" },
   { href: "/options-flow", label: "Flow" },
+  { href: "/hedge",        label: "Hedge" },
   { href: "/portfolio",    label: "Portfolio" },
-  { href: "/unusual",      label: "Unusual" },
-  { href: "/markets",      label: "Markets" },
   { href: "/catalyst",     label: "Catalyst" },
   { href: "/settings",     label: "Settings" },
-  { href: "/admin/users",  label: "Users", adminOnly: true },
 ];
 
 export function Logo({ href = "/dashboard" }: { href?: string }) {
@@ -45,10 +45,25 @@ function ThemeButton() {
   );
 }
 
+function PrivacyButton() {
+  const [hidden, toggle] = usePrivacy();
+  return (
+    <button
+      onClick={toggle}
+      aria-pressed={hidden}
+      title={hidden ? "Show account values" : "Hide account values"}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground aria-pressed:text-accent"
+    >
+      {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
+    </button>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const { user, logout, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const buybacks = useBuybackCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -81,12 +96,13 @@ export default function Navbar() {
               )}
             >
               {label}
+              {href === "/hedge" && <CountBadge n={buybacks} className="ml-1.5 align-[2px]" />}
             </Link>
           ))}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <ThemeButton />
+          <PrivacyButton /><ThemeButton />
 
           <div className="relative hidden md:block" ref={menuRef}>
             <button
@@ -141,6 +157,7 @@ export default function Navbar() {
                 )}
               >
                 {label}
+                {href === "/hedge" && <CountBadge n={buybacks} className="ml-2 align-[2px]" />}
               </Link>
             ))}
           </nav>

@@ -1,9 +1,9 @@
 """optionflow/modules/market/schemas.py — quotes, search, company data and price history."""
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Num = Optional[float]
 
@@ -16,11 +16,19 @@ class TickerSearchResult(BaseModel):
 
 
 class QuoteOut(BaseModel):
+    """Outside the regular session, prev_close / change / change_pct describe the last regular session's move
+    (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight)."""
     symbol: str
     price: Num = None
     prev_close: Num = None
     change: Num = None
     change_pct: Num = None
+    session: Optional[Literal["pre", "regular", "post", "overnight", "closed"]] = Field(
+        None, description="US equity session (ET) when quoted; null for Yahoo-served or crypto quotes")
+    regular_close: Num = Field(None, description="Close of the last completed regular session")
+    regular_close_date: Optional[str] = Field(None, description="YYYY-MM-DD of regular_close")
+    ext_change: Num = Field(None, description="price − regular_close outside the regular session; null during it")
+    ext_change_pct: Num = None
 
 
 class LiveQuoteOut(BaseModel):
@@ -125,3 +133,4 @@ class PriceHistoryOut(BaseModel):
     bars: List[PriceBar] = []
     current_price: Num = None
     error: Optional[str] = None
+    source: Optional[str] = None      # provider that served the bars: "public" or "yfinance"

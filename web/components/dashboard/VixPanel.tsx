@@ -197,8 +197,8 @@ export default function VixPanel({
               minTickGap={48}
             />
             <YAxis domain={["auto", "auto"]} tickLine={false} axisLine={false} tick={tick} tickFormatter={(v: number) => v.toFixed(0)} width={32} />
-            <ReferenceLine y={20} stroke="rgba(245,158,11,0.55)" strokeDasharray="3 3" />
-            <ReferenceLine y={30} stroke="rgba(220,38,38,0.55)" strokeDasharray="3 3" />
+            <ReferenceLine y={20} stroke={chart.warn} strokeOpacity={0.55} strokeDasharray="3 3" />
+            <ReferenceLine y={30} stroke={chart.loss} strokeOpacity={0.55} strokeDasharray="3 3" />
             <Tooltip
               cursor={{ stroke: chart.border, strokeDasharray: "3 3" }}
               content={
@@ -221,7 +221,7 @@ export default function VixPanel({
           options={DAY_RANGES.map((d) => ({ value: String(d), label: `${d}D` }))}
         />
         <div className="flex items-center gap-3 font-mono text-[11px] text-foreground/50">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-amber-500" />20 elevated</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-warn" />20 elevated</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-loss" />30 high</span>
         </div>
       </div>

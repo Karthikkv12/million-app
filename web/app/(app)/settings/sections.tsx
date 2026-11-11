@@ -65,7 +65,7 @@ const EVENT_META: Record<string, { label: string; icon: typeof LogIn; tone: "neu
 const TONE = {
   neutral: "text-foreground/55 bg-foreground/[0.05]",
   good:    "text-gain bg-gain/10",
-  warn:    "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+  warn:    "text-warn bg-warn/10",
   bad:     "text-loss bg-loss/10",
 };
 
@@ -182,7 +182,7 @@ function PasswordField({ id, label, value, onChange, autoComplete }: {
 }) {
   const [show, setShow] = useState(false);
   return (
-    <div className="grid gap-1.5">
+    <div className="grid grid-cols-1 gap-1.5">
       <label htmlFor={id} className="text-[13px] font-medium text-foreground/80">{label}</label>
       <div className="relative">
         <input
@@ -245,17 +245,17 @@ export function PasswordSection() {
             {RULES.map((_, i) => (
               <div key={i} className={clsx(
                 "h-1 rounded-full transition-colors",
-                i < passed ? (requiredOk ? "bg-gain" : "bg-amber-500") : "bg-foreground/10",
+                i < passed ? (requiredOk ? "bg-gain" : "bg-warn") : "bg-foreground/10",
               )} />
             ))}
           </div>
-          <ul className="grid gap-1.5">
+          <ul className="grid grid-cols-1 gap-1.5">
             {RULES.map((r) => {
               const ok = r.test(next);
               return (
                 <li key={r.label} className={clsx("flex items-center gap-2 text-[13px]", ok ? "text-foreground" : "text-foreground/50")}>
                   <span className={clsx("flex h-4 w-4 items-center justify-center rounded-full border",
-                    ok ? "border-gain bg-gain text-white" : "border-[var(--border-strong)]")}>
+                    ok ? "border-gain bg-gain text-on-tone" : "border-[var(--border-strong)]")}>
                     {ok && <Check size={10} strokeWidth={3} />}
                   </span>
                   {r.label}
@@ -306,7 +306,7 @@ export function DevicesSection() {
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-foreground/70">Sign out of every device, including this one?</span>
             <button className="btn-ghost h-8 px-3" onClick={() => setConfirmAll(false)}>Cancel</button>
-            <button className="btn h-8 bg-red-600 px-3 text-white hover:bg-red-700" onClick={() => all.mutate()} disabled={all.isPending}>
+            <button className="btn h-8 bg-loss px-3 text-on-tone hover:bg-loss/85" onClick={() => all.mutate()} disabled={all.isPending}>
               Sign out all
             </button>
           </div>

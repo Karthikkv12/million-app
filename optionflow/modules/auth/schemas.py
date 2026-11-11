@@ -38,7 +38,8 @@ class AuthChangePasswordRequest(BaseModel):
 
 
 class AuthRefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=1)
+    # Browsers send nothing here: the refresh token travels in the HttpOnly cookie.
+    refresh_token: Optional[str] = None
 
 
 class AuthLogoutRequest(BaseModel):

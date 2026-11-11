@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Enum, Float,
-    ForeignKey, Index, Integer, String, Text,
+    ForeignKey, Index, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base
 import enum
@@ -460,3 +460,104 @@ class GexSnapshot(Base):
     profile    = Column(Text, nullable=False, default="[]")  # JSON [[strike, net_gex], …] near spot
 
 Index("idx_gex_snap_sym_ts", GexSnapshot.symbol, GexSnapshot.ts)
+
+
+class BrokerPosition(Base):
+    """Positions synced from a broker (Robinhood) for the hedge module.
+
+    Replaced wholesale per (user, source) on each sync; never edited by hand.
+    quantity is signed: long > 0, short < 0 (shares for stock, contracts for options).
+    avg_price is per share (option premium per share, always >= 0).
+    """
+    __tablename__ = "broker_positions"
+    id          = Column(Integer, primary_key=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source      = Column(String, nullable=False, default="robinhood")
+    account     = Column(String, nullable=True)                 # masked label, e.g. "Trading ••8453"
+    symbol      = Column(String, nullable=False, index=True)
+    kind        = Column(String, nullable=False)                # "stock" | "option"
+    quantity    = Column(Float, nullable=False)
+    avg_price   = Column(Float, nullable=True)
+    option_type = Column(String, nullable=True)                 # "call" | "put"
+    strike      = Column(Float, nullable=True)
+    expiry      = Column(String, nullable=True)                 # YYYY-MM-DD
+    multiplier  = Column(Float, nullable=False, default=100.0)
+    opened_at   = Column(String, nullable=True)                 # ISO UTC
+    synced_at   = Column(String, nullable=False)                # ISO UTC
+
+
+class BrokerAccountSnapshot(Base):
+    """One row per (user, account, day) from the broker sync: account value history for the Portfolio page."""
+    __tablename__ = "broker_account_snapshots"
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source       = Column(String, nullable=False, default="robinhood")
+    account      = Column(String, nullable=False)                 # masked label
+    day          = Column(String, nullable=False)                 # YYYY-MM-DD (US Eastern trading day)
+    total_value  = Column(Float, nullable=True)
+    equity_value = Column(Float, nullable=True)
+    options_value = Column(Float, nullable=True)
+    crypto_value = Column(Float, nullable=True)
+    cash         = Column(Float, nullable=True)
+    buying_power = Column(Float, nullable=True)
+    synced_at    = Column(String, nullable=False)
+
+Index("ux_broker_snap_user_acct_day", BrokerAccountSnapshot.user_id, BrokerAccountSnapshot.source,
+      BrokerAccountSnapshot.account, BrokerAccountSnapshot.day, unique=True)
+
+
+class BrokerActivity(Base):
+    """Broker history, upserted by (user, source, ext_id): option fills and realized (closing) trades."""
+    __tablename__ = "broker_activity"
+    id              = Column(Integer, primary_key=True)
+    user_id         = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source          = Column(String, nullable=False, default="robinhood")
+    ext_id          = Column(String, nullable=False)              # broker id (order leg id / derived key)
+    account         = Column(String, nullable=True)
+    kind            = Column(String, nullable=False)              # "option_fill" | "realized"
+    ts              = Column(String, nullable=False, index=True)  # ISO UTC
+    symbol          = Column(String, nullable=False, index=True)
+    side            = Column(String, nullable=True)               # buy | sell
+    position_effect = Column(String, nullable=True)               # open | close (option fills)
+    option_type     = Column(String, nullable=True)
+    strike          = Column(Float, nullable=True)
+    expiry          = Column(String, nullable=True)
+    quantity        = Column(Float, nullable=True)
+    price           = Column(Float, nullable=True)                # per share
+    amount          = Column(Float, nullable=True)                # option fills: cash, + credit / − debit
+    realized_gain   = Column(Float, nullable=True)                # realized trades
+    strategy        = Column(String, nullable=True)               # e.g. short_call (opening/closing strategy)
+
+Index("ux_broker_activity_ext", BrokerActivity.user_id, BrokerActivity.source, BrokerActivity.ext_id, unique=True)
+
+
+
+class PushSubscription(Base):
+    """A browser's Web Push subscription (notify module). One row per device; the endpoint is the push
+    service URL the browser gave us, p256dh / auth its encryption keys (base64url). Deleted when the push
+    service answers 404 / 410."""
+    __tablename__ = "push_subscriptions"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint   = Column(String, nullable=False, unique=True)
+    p256dh     = Column(String, nullable=False)
+    auth       = Column(String, nullable=False)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)                 # ISO UTC
+    last_ok_at = Column(String, nullable=True)                  # last delivery the push service accepted
+    prefs      = Column(Text, nullable=True)                    # JSON: which alerts / symbols (notify.service.DEFAULT_PREFS)
+
+
+class Report(Base):
+    """A daily report page (morning / evening / weekend …) pushed by a scheduled task (hedge.reports).
+    One row per (user, slug, day): a push replaces that day's page and earlier days are kept."""
+    __tablename__ = "reports"
+    __table_args__ = (UniqueConstraint("user_id", "slug", "day", name="uq_reports_user_slug_day"),)
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    slug         = Column(String, nullable=False)                # "morning", "evening", "weekend"
+    day          = Column(String, nullable=False)                # YYYY-MM-DD the report is for (US Eastern)
+    title        = Column(String, nullable=False)
+    html         = Column(Text, nullable=False)                  # the whole page; shown in a sandboxed frame
+    source_url   = Column(String, nullable=True)                 # the artifact it mirrors
+    published_at = Column(String, nullable=False)                # ISO UTC

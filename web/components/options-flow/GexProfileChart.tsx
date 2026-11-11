@@ -41,9 +41,9 @@ export function GexProfileChart({ data }: Props) {
   const rows = all.slice(lo, lo + N).reverse(); // highest strike at top, like a price ladder
 
   return (
-    <div className="border-b border-[var(--border)] px-4 py-4">
+    <div className="border-b border-[var(--border)] px-5 py-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">GEX profile</h3>
+        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">Gamma by strike</h3>
         <Legend items={[{ label: "Puts", color: c.loss }, { label: "Calls", color: c.gain }, { label: "Spot", color: c.accent, dashed: true }]} />
       </div>
       <ResponsiveContainer width="100%" height={Math.max(260, rows.length * 16)}>

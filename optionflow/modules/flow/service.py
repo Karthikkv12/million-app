@@ -67,6 +67,8 @@ def get_gex(symbol: str, max_age: float = GEX_CACHE_TTL) -> GEXResult:
 
 def clear_cache() -> None:
     _gex_cache.clear()
+    with _snapshot_lock:
+        _last_snapshot.clear()
 
 
 def gex_payload(result: GEXResult) -> Dict[str, Any]:
@@ -80,11 +82,13 @@ def gex_payload(result: GEXResult) -> Dict[str, Any]:
         "heatmap_expiries": result.heatmap_expiries,
         "heatmap_strikes": result.heatmap_strikes,
         "heatmap_values": result.heatmap_values,
+        "heatmap_vex_values": result.heatmap_vex_values,
         "zero_gamma": result.zero_gamma,
         "max_call_wall": result.max_call_wall,
         "max_put_wall": result.max_put_wall,
         "max_gex_strike": result.max_gex_strike,
         "net_gex": result.net_gex,
+        "net_vex": result.net_vex,
         "call_premium": result.call_premium,
         "put_premium": result.put_premium,
         "net_flow": result.net_flow,
@@ -103,12 +107,23 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+_last_snapshot: Dict[str, str] = {}
+_snapshot_lock = threading.Lock()
+
+
 def record_snapshot(result: GEXResult) -> None:
-    """Store the premium/flow totals of a GEX result. Never raises."""
+    """Store the premium/flow totals of a GEX result, at most once per symbol per second. Never raises.
+    (Concurrent refreshes — the poller and a page — used to write the same second 2–3 times; T-41.)"""
+    ts = now_iso()
+    sym = (result.symbol or "").upper()
+    with _snapshot_lock:
+        if _last_snapshot.get(sym) == ts:
+            return
+        _last_snapshot[sym] = ts
     try:
         repo.add_snapshot(
             symbol=result.symbol,
-            ts=now_iso(),
+            ts=ts,
             price=round(result.spot, 2),
             call_prem=round(result.call_premium, 0),
             put_prem=round(result.put_premium, 0),
@@ -120,6 +135,37 @@ def record_snapshot(result: GEXResult) -> None:
         logger.error("record_snapshot failed for %s: %s", result.symbol, exc)
 
 
+def _parse_ts(ts: str) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def drop_estimates_where_live(rows: List[tuple]) -> List[tuple]:
+    """Drop backfill estimates (workers.backfill) on any US-Eastern day that has live snapshots.
+
+    Backfill rows sit on bar boundaries (second 0); live snapshots carry the poll's own second. A day with any
+    live row shows only live rows, so the two series never interleave (T-41: NVDA's 00:00 ET daily-bar estimate,
+    ~$29B calls, became 11-09's "since start" baseline against live totals of ~$3.9B). A live row that happens to
+    land on second 0 of such a day is dropped too, which costs one point."""
+    from optionflow.workers.backfill import ET, is_bar_boundary
+    live_days = set()
+    for row in rows:
+        t = _parse_ts(row[0])
+        if t is not None and not is_bar_boundary(t):
+            live_days.add(t.astimezone(ET).date())
+    if not live_days:
+        return rows
+    out = []
+    for row in rows:
+        t = _parse_ts(row[0])
+        if t is not None and is_bar_boundary(t) and t.astimezone(ET).date() in live_days:
+            continue
+        out.append(row)
+    return out
+
+
 def net_flow_history(symbol: str, days: int = 1, bucket_minutes: int = 0) -> List[Dict[str, Any]]:
     """Snapshots for the last `days` (1–30), optionally bucketed by N minutes (last value wins)."""
     days = max(1, min(days, 30))
@@ -129,6 +175,7 @@ def net_flow_history(symbol: str, days: int = 1, bucket_minutes: int = 0) -> Lis
         cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"),
         cutoff.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
     )
+    rows = drop_estimates_where_live(rows)
     if not rows:
         return []
     if bucket_minutes and bucket_minutes > 0:

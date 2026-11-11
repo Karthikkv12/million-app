@@ -1,9 +1,11 @@
 """logic/catalyst.py — upcoming catalysts and context for one stock.
 
-Pulls from Yahoo Finance (via yfinance): earnings date and estimates,
-dividends, earnings history, analyst actions and targets, volume and short
-interest, 52-week range, headlines, and the options-implied move into the
-next earnings. Every section is fetched independently, so one failing source
+Price, change, today's volume and the option chain behind the implied move come
+through the market-data provider (Public.com real-time first, Yahoo fallback).
+Yahoo Finance (via the provider's raw_ticker) supplies what Public has no
+equivalent for: earnings date and estimates, dividends, earnings history,
+analyst actions and targets, average volume and short interest, 52-week range
+and headlines. Every section is fetched independently, so one failing source
 only blanks that section. Results are cached per symbol for 10 minutes.
 
 Pure helpers (expected_move, build_signals, days_until) take plain values so
@@ -54,7 +56,8 @@ def expected_move(spot: Optional[float], call_mid: Optional[float], put_mid: Opt
 
 
 def _mid(row: Any) -> Optional[float]:
-    bid, ask, last = _f(row.get("bid")), _f(row.get("ask")), _f(row.get("lastPrice"))
+    last = _f(row.get("last")) if row.get("last") is not None else _f(row.get("lastPrice"))
+    bid, ask = _f(row.get("bid")), _f(row.get("ask"))
     if bid and ask and ask >= bid:
         return (bid + ask) / 2
     return last
@@ -126,12 +129,14 @@ def _section(name: str, fn, default=None):
 
 def _fetch(symbol: str) -> Dict[str, Any]:
     from optionflow.providers.market_data import get_market_data
-    # TODO(provider): this module reads Yahoo's ticker object directly; a non-Yahoo
-    # provider would need a catalysts() method on the interface instead.
-    t = get_market_data().raw_ticker(symbol)
+    # Yahoo's ticker object is read directly only for the catalyst-only fields
+    # (earnings, analysts, dividends, news, short interest); prices and chains use the provider.
+    md = get_market_data()
+    t = md.raw_ticker(symbol)
     info: Dict[str, Any] = _section("info", lambda: t.info or {}, {}) or {}
-    spot = _f(info.get("currentPrice")) or _f(info.get("regularMarketPrice"))
-    prev = _f(info.get("previousClose")) or _f(info.get("regularMarketPreviousClose"))
+    live = _section("live quote", lambda: _live_quote(md, symbol), {}) or {}
+    spot = _f(live.get("price")) or _f(info.get("currentPrice")) or _f(info.get("regularMarketPrice"))
+    prev = _f(live.get("prev_close")) or _f(info.get("previousClose")) or _f(info.get("regularMarketPreviousClose"))
     cal: Dict[str, Any] = _section("calendar", lambda: t.calendar or {}, {}) or {}
 
     # Earnings
@@ -177,7 +182,9 @@ def _fetch(symbol: str) -> Dict[str, Any]:
 
     # Expected move: first expiry on/after earnings (within 60 days), else nearest
     def _em():
-        exps = list(t.options or [])
+        exps = list(md.option_expiries(symbol))
+        today = date.today()
+        exps = [x for x in exps if date.fromisoformat(x) >= today]
         if not exps or not spot:
             return None
         chosen = exps[0]
@@ -185,8 +192,10 @@ def _fetch(symbol: str) -> Dict[str, Any]:
             later = [x for x in exps if date.fromisoformat(x) >= e_date]
             if later:
                 chosen = later[0]
-        ch = t.option_chain(chosen)
-        calls, puts = ch.calls, ch.puts
+        rows = md.option_contracts(symbol, expiries=[chosen]).rows
+        calls, puts = rows[rows["otype"] == "call"], rows[rows["otype"] == "put"]
+        if calls.empty:
+            return None
         k = min(calls["strike"], key=lambda s: abs(s - spot))
         c_row = calls[calls["strike"] == k].iloc[0]
         p_rows = puts[puts["strike"] == k]
@@ -231,7 +240,8 @@ def _fetch(symbol: str) -> Dict[str, Any]:
     }
 
     # Volume / positioning / range
-    vol_today, vol_avg = _f(info.get("regularMarketVolume")), _f(info.get("averageVolume"))
+    vol_today = _f(live.get("volume")) or _f(info.get("regularMarketVolume"))
+    vol_avg = _f(info.get("averageVolume"))
     short = _f(info.get("shortPercentOfFloat"))
     volume = {
         "today": vol_today, "average": vol_avg,
@@ -269,10 +279,20 @@ def _fetch(symbol: str) -> Dict[str, Any]:
         "range": rng,
         "news": news,
         "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": "Yahoo Finance (delayed)",
+        "source": ("Public.com (real-time prices); Yahoo Finance for earnings, analysts and news"
+                   if live else "Yahoo Finance (delayed)"),
     }
     payload["signals"] = build_signals(payload)
     return payload
+
+
+def _live_quote(md: Any, symbol: str) -> Dict[str, Any]:
+    """Real-time {price, prev_close, volume} from the provider's batched quotes (Public.com),
+    or {} when the provider has none for this symbol (Yahoo's info fields are used instead)."""
+    batch = getattr(md, "quotes_batch", None)
+    if batch is None:
+        return {}
+    return batch([symbol]).get(symbol.strip().upper()) or {}
 
 
 def get_catalysts(symbol: str) -> Dict[str, Any]:

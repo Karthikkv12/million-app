@@ -59,7 +59,7 @@ function BrandPanel() {
           Your desk is ready. <span className="text-white/45">Sign in to read today's positioning.</span>
         </h2>
         <ul className="mt-8 grid gap-3 text-[15px] text-white/75">
-          {["Every strike × expiry on one board", "King node, flip and walls marked for you", "Sector heatmaps and volatility next door"].map((t) => (
+          {["Every strike × expiry on one board", "King node, flip and walls marked for you", "Your Robinhood book, hedged to delta targets"].map((t) => (
             <li key={t} className="flex items-center gap-2.5"><Check size={16} className="text-gain" />{t}</li>
           ))}
         </ul>
@@ -186,7 +186,7 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
-                {capsLock && <p className="text-[13px] text-amber-600 dark:text-amber-400">Caps Lock is on.</p>}
+                {capsLock && <p className="text-[13px] text-warn">Caps Lock is on.</p>}
               </div>
 
               {error && (

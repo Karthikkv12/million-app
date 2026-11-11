@@ -1,52 +1,48 @@
 "use client";
-/** LevelsStrip — the at-a-glance row: spot, regime, flip, call wall, put wall. */
+/** LevelsStrip — desk style: big spot, regime tag, then flip · call wall · put wall · king · net exposure. */
 import type { GexResult } from "@/lib/api";
 import { fmtGex } from "@/lib/gex";
-import { Pill } from "@/components/ui";
+import { clsx } from "clsx";
+import { Tag } from "@/components/desk";
 
 function pct(level: number | null | undefined, spot: number): string {
   if (level == null || !spot) return "";
   const d = ((level - spot) / spot) * 100;
   return `${d >= 0 ? "+" : ""}${d.toFixed(1)}%`;
 }
+const money = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(v % 1 === 0 ? 0 : 2));
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+function Fig({ label, value, sub, tone, className }: { label: string; value: string; sub?: string; tone?: string; className?: string }) {
   return (
-    <div className="min-w-0 px-3 py-2">
-      <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">{label}</div>
-      <div className={`truncate font-mono text-[15px] font-medium leading-tight tabular-nums ${tone ?? "text-foreground"}`}>{value}</div>
-      {sub && <div className="font-mono text-[11px] tabular-nums text-foreground/50">{sub}</div>}
+    <div className={clsx("min-w-0 px-3 py-0.5 first:pl-0", className)}>
+      <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-foreground/45">{label}</p>
+      <p className={clsx("truncate font-mono text-[15px] font-medium tabular-nums leading-tight", tone ?? "text-foreground")}>{value}</p>
+      {sub && <p className="font-mono text-[10.5px] tabular-nums text-foreground/45">{sub}</p>}
     </div>
   );
 }
 
-export function LevelsStrip({ data }: { data: GexResult }) {
-  const { spot, zero_gamma, max_call_wall, max_put_wall, net_gex } = data;
+export function LevelsStrip({ data, metric = "gex" }: { data: GexResult; metric?: "gex" | "vex" }) {
+  const { spot, zero_gamma, max_call_wall, max_put_wall, max_gex_strike, net_gex } = data;
   const longGamma = (net_gex ?? 0) >= 0;
   const aboveFlip = zero_gamma != null ? spot >= zero_gamma : null;
-  const money = (v: number | null | undefined) => (v == null ? "—" : `$${v.toFixed(v % 1 === 0 ? 0 : 2)}`);
-
   return (
-    <div className="border-b border-[var(--border)]">
-      <div className="flex items-center justify-between gap-3 px-3 pt-2.5">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <span className="font-mono text-2xl font-medium tracking-tight tabular-nums text-foreground">${spot.toFixed(2)}</span>
-          {aboveFlip != null && (
-            <span className="truncate text-[13px] text-foreground/55">
-              {aboveFlip ? "above" : "below"} flip
-            </span>
-          )}
-        </div>
-        <span title={longGamma ? "Dealers net long gamma: tends to dampen moves" : "Dealers net short gamma: tends to amplify moves"}>
-          <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">
-            {longGamma ? "+GEX · Pinned" : "−GEX · Volatile"} {fmtGex(net_gex)}
-          </Pill>
+    <div className="px-4 pb-3 pt-1">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-mono text-[30px] font-medium leading-none tracking-[-0.03em] tabular-nums text-foreground">{spot.toFixed(2)}</span>
+        {aboveFlip != null && <span className="text-[12.5px] text-foreground/55">{aboveFlip ? "above" : "below"} the flip</span>}
+        <span className="ml-auto" title={longGamma ? "Dealers net long gamma: tends to dampen moves" : "Dealers net short gamma: tends to amplify moves"}>
+          <Tag tone={longGamma ? "gain" : "warn"}>{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Tag>
         </span>
       </div>
-      <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
-        <Stat label="Flip" value={money(zero_gamma)} sub={pct(zero_gamma, spot)} tone="text-accent" />
-        <Stat label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-gain" />
-        <Stat label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-loss" />
+      <div className="mt-3 grid grid-cols-3 divide-x divide-[var(--border)] sm:grid-cols-5">
+        <Fig label="Flip" value={money(zero_gamma)} sub={pct(zero_gamma, spot)} tone="text-accent" />
+        <Fig label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-gain" />
+        <Fig label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-loss" />
+        <Fig className="hidden sm:block" label="★ King" value={money(max_gex_strike)} sub={pct(max_gex_strike, spot)} tone="text-[#b45309] dark:text-[#fde725]" />
+        {metric === "vex"
+          ? <Fig className="hidden sm:block" label="Net VEX" value={fmtGex(data.net_vex)} sub="per 1 vol pt" tone={(data.net_vex ?? 0) >= 0 ? "text-gain" : "text-loss"} />
+          : <Fig className="hidden sm:block" label="Net GEX" value={fmtGex(net_gex)} sub="per 1% move" tone={longGamma ? "text-gain" : "text-loss"} />}
       </div>
     </div>
   );

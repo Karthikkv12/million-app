@@ -1,15 +1,20 @@
 "use client";
 /**
- * GexHeatmap — the Flow board: strike × expiry gamma exposure.
+ * GexHeatmap — the Flow board: strike × expiry gamma (GEX) or vanna (VEX)
+ * exposure. `metric` picks which grid the backend sent is shown.
  *
  * Rows are strikes (descending), columns are expiries, plus a leading "All"
  * column summing the displayed expiries. Every expiry cell shares one colour
  * scale so expiries compare directly. The largest |GEX| cell is the King node.
+ * Your book (owner, 2026-11-09), only on symbols you hold: SC / SP (sold) and BC / BP (bought) badges in the cell
+ * of every option you hold (any expiry shown), a dashed SC? / SP? for the Hedge desk's suggested trade, and an AVG line at the
+ * strike nearest your average cost. Strikes or expiries outside the board still show in the strike column.
  * The board scrolls inside its own frame (sticky header + strike axis) and
  * exposes centerOnSpot / centerOnKing through a ref.
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { GexResult } from "@/lib/api";
+import { okBooks, useLiveBooks } from "@/lib/live";
 
 // ── Palettes ─────────────────────────────────────────────────────────────────
 type RGB = [number, number, number];
@@ -52,6 +57,10 @@ export interface HeatOpts {
   dimSmall: boolean;
 }
 export const DEFAULT_HEAT_OPTS: HeatOpts = { palette: "heat", showPct: false, dimSmall: false };
+
+/** Which exposure a board shows. */
+export type Metric = "gex" | "vex";
+export const METRIC_UNIT: Record<Metric, string> = { gex: "per 1% move", vex: "per 1 vol pt" };
 
 const ramp = (stops: RGB[], t: number): RGB => {
   const x = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
@@ -113,20 +122,26 @@ export interface BoardHandle {
 
 interface Props {
   data: GexResult;
+  /** "gex" (default): gamma exposure. "vex": vanna exposure. */
+  metric?: Metric;
   nStrikes: number;
   opts: HeatOpts;
   /** CSS max-height of the scrolling board */
   maxHeight: string;
 }
 
-export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, nStrikes, opts, maxHeight }, ref) {
-  const { spot, heatmap_strikes, heatmap_expiries, heatmap_values } = data;
+export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, metric = "gex", nStrikes, opts, maxHeight }, ref) {
+  const { spot, heatmap_strikes, heatmap_expiries } = data;
+  const heatmap_values = metric === "vex" ? data.heatmap_vex_values : data.heatmap_values;
+  const isGex = metric === "gex";
   const boxRef = useRef<HTMLDivElement>(null);
+  const live = useLiveBooks();
+  const book = okBooks(live.data).find((b) => b.symbol === data.symbol?.toUpperCase());
 
   const model = useMemo(() => {
     const allStrikes = heatmap_strikes ?? [];
     const expiries = heatmap_expiries ?? [];
-    if (!allStrikes.length || !expiries.length) return null;
+    if (!allStrikes.length || !expiries.length || !heatmap_values?.length) return null;
 
     const byStrike = new Map<number, number[]>();
     allStrikes.forEach((s, si) => byStrike.set(s, expiries.map((_, ei) => heatmap_values?.[ei]?.[si] ?? 0)));
@@ -176,43 +191,99 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   // Centre on spot whenever the ticker or window changes
   const centeredFor = useRef("");
   useEffect(() => {
-    const key = `${data.symbol}:${nStrikes}`;
+    const key = `${data.symbol}:${metric}:${nStrikes}`;
     if (model && centeredFor.current !== key) {
       centeredFor.current = key;
       requestAnimationFrame(() => centerOn(spotStrike, undefined, false));
     }
-  }, [data.symbol, nStrikes, model, spotStrike, centerOn]);
+  }, [data.symbol, metric, nStrikes, model, spotStrike, centerOn]);
 
   if (!model) {
-    return <p className="px-4 py-16 text-center text-sm text-foreground/55">No options data for this ticker.</p>;
+    return (
+      <p className="px-4 py-16 text-center text-sm text-foreground/55">
+        {!isGex && !data.heatmap_vex_values ? "VEX isn't available from the server yet." : "No options data for this ticker."}
+      </p>
+    );
   }
 
   const { strikes, rows, expiries, vmax, vmaxTotal, king, colTotals } = model;
+  const mine = book;
+  const half = (strikes.length > 1 ? Math.abs(strikes[0] - strikes[1]) : 1) / 2;
+  const onBoard = (k: number | null | undefined) => (k == null ? null : (() => { const n = nearest(strikes, k); return n != null && Math.abs(n - k) <= half + 1e-9 ? n : null; })());
+  const avgStrike = mine?.avg_cost && (mine.shares ?? 0) > 0 ? onBoard(mine.avg_cost) : null;
+  type Pos = { kind: "SC" | "SP" | "BC" | "BP"; n: number; strike: number; expiry: string; suggested?: boolean };
+  const positions: Pos[] = [
+    ...(mine?.legs ?? []).filter((l) => l.kind === "option" && l.quantity !== 0 && l.strike != null && l.expiry)
+      .map((l) => ({
+        kind: (l.quantity < 0 ? (l.otype === "call" ? "SC" : "SP") : (l.otype === "call" ? "BC" : "BP")) as Pos["kind"],
+        n: Math.abs(l.quantity), strike: l.strike!, expiry: l.expiry!,
+      })),
+    ...(mine?.suggestion && (mine.suggestion.action === "SELL_CALL" || mine.suggestion.action === "SELL_PUT") && mine.suggestion.strike != null && mine.suggestion.expiry
+      ? [{ kind: (mine.suggestion.action === "SELL_CALL" ? "SC" : "SP") as Pos["kind"], n: mine.suggestion.contracts, strike: mine.suggestion.strike, expiry: mine.suggestion.expiry, suggested: true }] : []),
+  ];
+  const inCell = new Map<string, Pos[]>();              // "strike|expiry" on the board
+  const inRow = new Map<number, Pos[]>();               // strike on the board, expiry not shown
+  for (const ps of positions) {
+    const k = onBoard(ps.strike);
+    if (k == null) continue;
+    if (expiries.includes(ps.expiry)) inCell.set(`${k}|${ps.expiry}`, [...(inCell.get(`${k}|${ps.expiry}`) ?? []), ps]);
+    else inRow.set(k, [...(inRow.get(k) ?? []), ps]);
+  }
+  const offBoard = positions.filter((ps) => onBoard(ps.strike) == null);
+  const isCall = (k: Pos["kind"]) => k === "SC" || k === "BC";
+  const posTitle = (ps: Pos) =>
+    `${ps.suggested ? "Suggested: sell" : ps.kind[0] === "S" ? "You sold" : "You bought"} ${ps.n} ${ps.strike}${isCall(ps.kind) ? "C" : "P"} ${ps.expiry}`;
+  const Badge = ({ ps }: { ps: Pos }) => (
+    <span title={posTitle(ps)} className={`inline-flex items-center rounded-[3px] px-1 text-[8.5px] font-semibold leading-[14px] tracking-[0.06em] ${
+      ps.suggested
+        ? "border border-dashed border-current bg-[var(--background)] " + (isCall(ps.kind) ? "text-accent" : "text-gain")
+        : ps.kind === "SC" ? "bg-accent text-white"
+        : ps.kind === "SP" ? "bg-gain text-on-tone"
+        : "border-[1.5px] border-current bg-[var(--background)] " + (ps.kind === "BC" ? "text-accent" : "text-gain")}`}>
+      {ps.kind}{ps.suggested ? "?" : ""}{ps.n > 1 ? `×${ps.n}` : ""}
+    </span>
+  );
+  const avgLine = "inset 0 2px 0 rgb(var(--accent-rgb) / 0.9)";
   const step = strikes.length > 1 ? Math.abs(strikes[0] - strikes[1]) : 0;
   const zg = data.zero_gamma;
-  const flip = zg != null && zg <= strikes[0] + step / 2 && zg >= strikes[strikes.length - 1] - step / 2 ? nearest(strikes, zg) : null;
+  const flip = isGex && zg != null && zg <= strikes[0] + step / 2 && zg >= strikes[strikes.length - 1] - step / 2 ? nearest(strikes, zg) : null;
 
   const label = (v: number, max: number) =>
     opts.showPct && max ? (v ? `${Math.round((v / max) * 100)}%` : "0%") : fmtMoney(v);
   const faded = (v: number) => opts.dimSmall && vmax > 0 && Math.abs(v) < 0.1 * vmax;
 
   return (
-    <div ref={boxRef} className="relative overflow-auto bg-[#0b0c10]" style={{ maxHeight }}>
+    <>
+      {mine && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--border)] px-3 py-1.5 font-mono text-[10.5px] text-foreground/55">
+          <span className="text-foreground/75">Your {mine.symbol}:</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "" }} />sold call</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SP", n: 1, strike: 0, expiry: "" }} />sold put</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "BC", n: 1, strike: 0, expiry: "" }} />bought call</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "BP", n: 1, strike: 0, expiry: "" }} />bought put</span>
+          <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "", suggested: true }} />suggested</span>
+          <span className="inline-flex items-center gap-1"><span className="rounded-[3px] border border-accent/60 px-1 text-[8.5px] font-semibold leading-[14px] text-accent">AVG</span>your average</span>
+          {(offBoard.length > 0 || (mine.avg_cost && avgStrike == null && (mine.shares ?? 0) > 0)) && <span className="text-foreground/40">· off this board:</span>}
+          {mine.avg_cost && avgStrike == null && (mine.shares ?? 0) > 0 && <span className="text-accent">AVG {mine.avg_cost.toFixed(2)}</span>}
+          {offBoard.map((ps, i) => <span key={i} className="inline-flex items-center gap-1"><Badge ps={ps} />{ps.strike} {ps.expiry.slice(5)}</span>)}
+        </div>
+      )}
+    <div ref={boxRef} className="relative overflow-auto bg-[var(--background)]" style={{ maxHeight }}>
       <table className="w-full border-separate border-spacing-0 font-mono text-[11px] tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-white/10 bg-[#0b0c10] py-2 pl-3 pr-2 text-left text-[10px] font-medium text-white/50">
+            <th className="sticky left-0 top-0 z-30 min-w-[132px] border-b border-[var(--border-strong)] bg-[var(--background)] py-2 pl-3 pr-2 shadow-[1px_0_0_var(--border-strong)] text-left text-[10px] font-medium text-foreground/45">
               Strike
             </th>
-            <th className="sticky top-0 z-20 min-w-[84px] border-b border-l border-white/10 bg-[#0b0c10] px-2 py-1.5 text-right">
-              <div className="text-[10px] font-medium text-white/80">All</div>
-              <div className="text-[9px] text-white/40">{expiries.length} exp</div>
+            <th className="sticky top-0 z-20 min-w-[84px] border-b border-l border-[var(--background)] bg-[var(--background)] px-2 py-1.5 text-right">
+              <div className="text-[10px] font-medium text-foreground/80">All</div>
+              <div className="text-[9px] text-foreground/40">{expiries.length} exp</div>
             </th>
             {expiries.map((exp, ci) => (
-              <th key={exp} className="sticky top-0 z-20 min-w-[84px] border-b border-l border-white/10 bg-[#0b0c10] px-2 py-1.5 text-right">
-                <div className="whitespace-nowrap text-[10px] font-medium text-white/80">{exp}</div>
+              <th key={exp} className="sticky top-0 z-20 min-w-[84px] border-b border-l border-[var(--background)] bg-[var(--background)] px-2 py-1.5 text-right">
+                <div className="whitespace-nowrap text-[10px] font-medium text-foreground/80">{exp}</div>
                 <div className="flex justify-end gap-1.5 text-[9px]">
-                  <span className="text-white/40">{dte(exp)}</span>
+                  <span className="text-foreground/40">{dte(exp)}</span>
                   <span className={colTotals[ci] >= 0 ? "text-gain/80" : "text-violet-300/80"}>{fmtMoney(colTotals[ci])}</span>
                 </div>
               </th>
@@ -224,27 +295,31 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
             const isSpot = strike === spotStrike;
             const isKingRow = king?.strike === strike;
             const all = cellColor(total, vmaxTotal, opts.palette);
-            const spotLine = isSpot ? "inset 0 -2px 0 rgba(255,255,255,0.9)" : undefined;
+            const spotLine = [isSpot ? "inset 0 -2px 0 rgb(var(--foreground-rgb) / 0.9)" : null, strike === avgStrike ? avgLine : null].filter(Boolean).join(", ") || undefined;
             return (
               <tr key={strike} data-strike={strike}>
-                <td className={`sticky left-0 z-10 border-b border-white/[0.06] py-[5px] pl-3 pr-2 ${isSpot ? "bg-[#16181f]" : "bg-[#0b0c10]"}`}>
+                <td className={`sticky left-0 z-10 border-b border-[var(--border)] py-[5px] pl-3 pr-2 shadow-[1px_0_0_var(--border-strong)] ${isSpot ? "bg-[color-mix(in_srgb,rgb(var(--foreground-rgb))_8%,var(--background))]" : "bg-[var(--background)]"}`}>
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <span className={isSpot ? "font-medium text-white" : "text-white/70"}>{fmtStrike(strike)}</span>
+                    <span className={isSpot ? "font-medium text-foreground" : "text-foreground/65"}>{fmtStrike(strike)}</span>
                     {isSpot && (
-                      <span className="rounded-[5px] bg-white px-1.5 text-[9.5px] font-medium leading-[16px] text-black">▸ {spot.toFixed(2)}</span>
+                      <span className="rounded-[3px] bg-foreground px-1.5 text-[9.5px] font-medium leading-[16px] text-[var(--background)]">▸ {spot.toFixed(2)}</span>
                     )}
                     {isKingRow && (
-                      <span className="rounded-full border border-amber-300/60 bg-amber-300/15 px-1.5 text-[8.5px] font-medium uppercase leading-[15px] tracking-[0.14em] text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
+                      <span className="rounded-full border border-amber-300/60 bg-amber-300/15 px-1.5 text-[8.5px] font-medium uppercase leading-[15px] tracking-[0.14em] text-amber-700 dark:text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
                         ★ King
                       </span>
                     )}
-                    {strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
-                    {strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
+                    {isGex && strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
+                    {isGex && strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
                     {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
+                    {strike === avgStrike && (
+                      <span title={`Your average cost ${mine!.avg_cost!.toFixed(2)}`} className="rounded-[3px] border border-accent/60 px-1 text-[8.5px] font-semibold leading-[14px] tracking-[0.06em] text-accent">AVG {mine!.avg_cost!.toFixed(2)}</span>
+                    )}
+                    {(inRow.get(strike) ?? []).map((ps, i) => <span key={i} className="inline-flex items-center gap-0.5"><Badge ps={ps} /><span className="text-[8.5px] text-foreground/45">{ps.expiry.slice(5)}</span></span>)}
                   </div>
                 </td>
                 <td
-                  className="border-b border-l border-white/[0.06] px-2 py-[5px] text-right font-medium"
+                  className="border-b border-l border-[var(--background)] px-2 py-[5px] text-right font-medium"
                   style={{ background: all.bg, color: all.fg, boxShadow: spotLine }}
                 >
                   {label(total, vmaxTotal)}
@@ -255,8 +330,8 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                   return (
                     <td
                       key={ci}
-                      title={`${fmtStrike(strike)} · ${expiries[ci]} · ${fmtMoney(v)} per 1% move`}
-                      className={`border-b border-l border-white/[0.06] px-2 py-[5px] text-right ${isKing ? "relative z-[5] font-medium" : ""}`}
+                      title={[`${fmtStrike(strike)} · ${expiries[ci]} · ${metric.toUpperCase()} ${fmtMoney(v)} ${METRIC_UNIT[metric]}`, ...(inCell.get(`${strike}|${expiries[ci]}`) ?? []).map(posTitle)].join("\n")}
+                      className={`border-b border-l border-[var(--background)] px-2 py-[5px] text-right ${isKing ? "relative z-[5] font-medium" : ""}`}
                       style={{
                         background: c.bg,
                         color: c.fg,
@@ -266,6 +341,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                           : spotLine,
                       }}
                     >
+                      {(inCell.get(`${strike}|${expiries[ci]}`) ?? []).map((ps, i) => <span key={i} className="mr-1 align-middle"><Badge ps={ps} /></span>)}
                       {isKing && <span className="mr-1">★</span>}
                       {label(v, vmax)}
                     </td>
@@ -277,5 +353,6 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
         </tbody>
       </table>
     </div>
+    </>
   );
 });

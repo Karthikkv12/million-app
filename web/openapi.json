@@ -908,14 +908,17 @@
    "AuthRefreshRequest": {
     "properties": {
      "refresh_token": {
-      "minLength": 1,
-      "title": "Refresh Token",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refresh Token"
      }
     },
-    "required": [
-     "refresh_token"
-    ],
     "title": "AuthRefreshRequest",
     "type": "object"
    },
@@ -1054,6 +1057,383 @@
     "title": "AuthSignupRequest",
     "type": "object"
    },
+   "BookOut": {
+    "properties": {
+     "accounts": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Accounts",
+      "type": "array"
+     },
+     "avg_cost": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Cost"
+     },
+     "beta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "1-year beta of daily returns vs SPY",
+      "title": "Beta"
+     },
+     "chain_source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chain Source"
+     },
+     "closes": {
+      "default": [],
+      "description": "Short options worth buying back now (most of the premium captured)",
+      "items": {
+       "$ref": "#/components/schemas/CloseOut"
+      },
+      "title": "Closes",
+      "type": "array"
+     },
+     "day_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change"
+     },
+     "day_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day High"
+     },
+     "dollar_gamma_1pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dollar Gamma 1Pct"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "spot \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
+     },
+     "gap": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gap"
+     },
+     "iv": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/IvOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "iv_hv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Hv"
+     },
+     "legs": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LegOut"
+      },
+      "title": "Legs",
+      "type": "array"
+     },
+     "levels": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LevelsOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "lots": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lots"
+     },
+     "net_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Delta"
+     },
+     "net_gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Gamma"
+     },
+     "prev_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Yesterday's close in the regular session; outside it, the close before the last regular session (so day_change = that session's move)",
+      "title": "Prev Close"
+     },
+     "regime": {
+      "anyOf": [
+       {
+        "enum": [
+         "bull",
+         "high-vol"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regime"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
+     },
+     "shares": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Shares"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "suggestion": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SuggestionOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "target_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Delta"
+     },
+     "units": {
+      "default": [],
+      "description": "Covered (shares + their short calls), uncovered shares, short puts",
+      "items": {
+       "$ref": "#/components/schemas/UnitOut"
+      },
+      "title": "Units",
+      "type": "array"
+     },
+     "weekly_expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weekly Expiry"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "BookOut",
+    "type": "object"
+   },
+   "BooksOut": {
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "books": {
+      "items": {
+       "$ref": "#/components/schemas/BookOut"
+      },
+      "title": "Books",
+      "type": "array"
+     },
+     "synced_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Synced At"
+     }
+    },
+    "required": [
+     "as_of",
+     "books"
+    ],
+    "title": "BooksOut",
+    "type": "object"
+   },
    "BrokerAccountCreateRequest": {
     "properties": {
      "color": {
@@ -1082,68 +1462,6 @@
      "name"
     ],
     "title": "BrokerAccountCreateRequest",
-    "type": "object"
-   },
-   "BrokerAccountOut": {
-    "additionalProperties": true,
-    "properties": {
-     "color": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Color"
-     },
-     "id": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Id"
-     },
-     "is_active": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Is Active"
-     },
-     "name": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Name"
-     },
-     "sort_order": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Sort Order"
-     }
-    },
-    "title": "BrokerAccountOut",
     "type": "object"
    },
    "BrokerAccountUpdateRequest": {
@@ -1194,6 +1512,927 @@
      }
     },
     "title": "BrokerAccountUpdateRequest",
+    "type": "object"
+   },
+   "BrokerActivityOut": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account"
+     },
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Option fills: cash, + credit / \u2212 debit",
+      "title": "Amount"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "ext_id": {
+      "description": "Stable broker id: option leg id, or a derived key",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Ext Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "option_fill",
+       "realized"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "option_type": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Type"
+     },
+     "position_effect": {
+      "anyOf": [
+       {
+        "enum": [
+         "open",
+         "close"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Effect"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "realized_gain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Realized Gain"
+     },
+     "side": {
+      "anyOf": [
+       {
+        "enum": [
+         "buy",
+         "sell",
+         ""
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Side"
+     },
+     "strategy": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strategy"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "ts": {
+      "title": "Ts",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ext_id",
+     "kind",
+     "ts",
+     "symbol",
+     "id"
+    ],
+    "title": "BrokerActivityOut",
+    "type": "object"
+   },
+   "BrokerHistoryPoint": {
+    "properties": {
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "day": {
+      "title": "Day",
+      "type": "string"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     }
+    },
+    "required": [
+     "day"
+    ],
+    "title": "BrokerHistoryPoint",
+    "type": "object"
+   },
+   "BrokerHoldingOut": {
+    "properties": {
+     "accounts": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Accounts",
+      "type": "array"
+     },
+     "avg_cost": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Cost"
+     },
+     "cost_basis": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost Basis"
+     },
+     "covered_pct": {
+      "default": 0,
+      "title": "Covered Pct",
+      "type": "number"
+     },
+     "day_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Fraction. Outside the regular session: that last session's move",
+      "title": "Day Change Pct"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Percent since regular_close, outside the regular session",
+      "title": "Ext Change Pct"
+     },
+     "market_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Market Value"
+     },
+     "prev_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prev Close"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regular Close"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session"
+     },
+     "shares": {
+      "title": "Shares",
+      "type": "number"
+     },
+     "short_calls": {
+      "default": 0,
+      "title": "Short Calls",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "unrealized": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized"
+     },
+     "unrealized_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized Pct"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight"
+     }
+    },
+    "required": [
+     "symbol",
+     "shares"
+    ],
+    "title": "BrokerHoldingOut",
+    "type": "object"
+   },
+   "BrokerIncomeBucket": {
+    "properties": {
+     "bought_back": {
+      "default": 0.0,
+      "title": "Bought Back",
+      "type": "number"
+     },
+     "collected": {
+      "default": 0.0,
+      "title": "Collected",
+      "type": "number"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     },
+     "premium": {
+      "default": 0.0,
+      "title": "Premium",
+      "type": "number"
+     },
+     "realized": {
+      "default": 0.0,
+      "title": "Realized",
+      "type": "number"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     },
+     "wins": {
+      "default": 0,
+      "title": "Wins",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "period"
+    ],
+    "title": "BrokerIncomeBucket",
+    "type": "object"
+   },
+   "BrokerIncomeOut": {
+    "properties": {
+     "bought_back_total": {
+      "default": 0.0,
+      "title": "Bought Back Total",
+      "type": "number"
+     },
+     "by_symbol": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerSymbolIncome"
+      },
+      "title": "By Symbol",
+      "type": "array"
+     },
+     "collected_total": {
+      "default": 0.0,
+      "title": "Collected Total",
+      "type": "number"
+     },
+     "monthly": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerIncomeBucket"
+      },
+      "title": "Monthly",
+      "type": "array"
+     },
+     "premium_total": {
+      "default": 0.0,
+      "title": "Premium Total",
+      "type": "number"
+     },
+     "realized_total": {
+      "default": 0.0,
+      "title": "Realized Total",
+      "type": "number"
+     },
+     "since": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Since"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     },
+     "weekly": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerIncomeBucket"
+      },
+      "title": "Weekly",
+      "type": "array"
+     },
+     "win_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Win Rate"
+     }
+    },
+    "required": [
+     "weekly",
+     "monthly",
+     "by_symbol"
+    ],
+    "title": "BrokerIncomeOut",
+    "type": "object"
+   },
+   "BrokerOptionOut": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account"
+     },
+     "avg_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Price"
+     },
+     "contracts": {
+      "title": "Contracts",
+      "type": "number"
+     },
+     "distance_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Distance Pct"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "moneyness": {
+      "anyOf": [
+       {
+        "enum": [
+         "ITM",
+         "OTM",
+         "ATM"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Moneyness"
+     },
+     "opened_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opened At"
+     },
+     "option_type": {
+      "title": "Option Type",
+      "type": "string"
+     },
+     "premium": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Premium"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "option_type",
+     "strike",
+     "expiry",
+     "contracts"
+    ],
+    "title": "BrokerOptionOut",
+    "type": "object"
+   },
+   "BrokerPortfolioOut": {
+    "properties": {
+     "account_filter": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Filter"
+     },
+     "accounts": {
+      "items": {
+       "$ref": "#/components/schemas/optionflow__modules__hedge__schemas__BrokerAccountOut"
+      },
+      "title": "Accounts",
+      "type": "array"
+     },
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "buying_power": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Buying Power"
+     },
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "day_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change"
+     },
+     "holdings": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerHoldingOut"
+      },
+      "title": "Holdings",
+      "type": "array"
+     },
+     "options": {
+      "items": {
+       "$ref": "#/components/schemas/BrokerOptionOut"
+      },
+      "title": "Options",
+      "type": "array"
+     },
+     "stock_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stock Value"
+     },
+     "synced_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Synced At"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     },
+     "unrealized": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unrealized"
+     }
+    },
+    "required": [
+     "as_of",
+     "accounts",
+     "holdings",
+     "options"
+    ],
+    "title": "BrokerPortfolioOut",
+    "type": "object"
+   },
+   "BrokerPositionOut": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Masked label, e.g. \"Trading \u2022\u20228453\". Never a full account number.",
+      "title": "Account"
+     },
+     "avg_price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Per share; option premium per share",
+      "title": "Avg Price"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "stock",
+       "option"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "multiplier": {
+      "default": 100.0,
+      "title": "Multiplier",
+      "type": "number"
+     },
+     "opened_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opened At"
+     },
+     "option_type": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Type"
+     },
+     "quantity": {
+      "description": "Signed: long > 0, short < 0 (shares or contracts)",
+      "title": "Quantity",
+      "type": "number"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "synced_at": {
+      "title": "Synced At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "kind",
+     "quantity",
+     "id",
+     "source",
+     "synced_at"
+    ],
+    "title": "BrokerPositionOut",
+    "type": "object"
+   },
+   "BrokerSymbolIncome": {
+    "properties": {
+     "bought_back": {
+      "default": 0.0,
+      "title": "Bought Back",
+      "type": "number"
+     },
+     "collected": {
+      "default": 0.0,
+      "title": "Collected",
+      "type": "number"
+     },
+     "premium": {
+      "default": 0.0,
+      "title": "Premium",
+      "type": "number"
+     },
+     "realized": {
+      "default": 0.0,
+      "title": "Realized",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "trades": {
+      "default": 0,
+      "title": "Trades",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "BrokerSymbolIncome",
     "type": "object"
    },
    "BudgetCreateRequest": {
@@ -2058,6 +3297,87 @@
     "title": "ChatRequest",
     "type": "object"
    },
+   "CloseOut": {
+    "properties": {
+     "contracts": {
+      "title": "Contracts",
+      "type": "integer"
+     },
+     "cost": {
+      "title": "Cost",
+      "type": "number"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "headline": {
+      "title": "Headline",
+      "type": "string"
+     },
+     "kept": {
+      "title": "Kept",
+      "type": "number"
+     },
+     "mark": {
+      "title": "Mark",
+      "type": "number"
+     },
+     "otype": {
+      "enum": [
+       "call",
+       "put"
+      ],
+      "title": "Otype",
+      "type": "string"
+     },
+     "profit_pct": {
+      "title": "Profit Pct",
+      "type": "number"
+     },
+     "reasons": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "sold_at": {
+      "title": "Sold At",
+      "type": "number"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "otype",
+     "strike",
+     "expiry",
+     "contracts",
+     "sold_at",
+     "mark",
+     "profit_pct",
+     "cost",
+     "kept",
+     "headline"
+    ],
+    "title": "CloseOut",
+    "type": "object"
+   },
    "CreatedOut": {
     "properties": {
      "id": {
@@ -2243,6 +3563,46 @@
      "balance"
     ],
     "title": "CreditCardWeekRequest",
+    "type": "object"
+   },
+   "DeviceOut": {
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "last_ok_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Ok At"
+     },
+     "user_agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Agent"
+     }
+    },
+    "required": [
+     "id",
+     "created_at"
+    ],
+    "title": "DeviceOut",
     "type": "object"
    },
    "DividendOut": {
@@ -2655,6 +4015,17 @@
       "title": "Heatmap Values",
       "type": "array"
      },
+     "heatmap_vex_values": {
+      "default": [],
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Heatmap Vex Values",
+      "type": "array"
+     },
      "max_call_wall": {
       "anyOf": [
        {
@@ -2696,6 +4067,11 @@
      "net_gex": {
       "default": 0.0,
       "title": "Net Gex",
+      "type": "number"
+     },
+     "net_vex": {
+      "default": 0.0,
+      "title": "Net Vex",
       "type": "number"
      },
      "put_gex_by_strike": {
@@ -3071,6 +4447,561 @@
     "title": "IdOut",
     "type": "object"
    },
+   "IngestAccount": {
+    "properties": {
+     "account": {
+      "description": "Masked label, e.g. \"Trading \u2022\u20228453\"",
+      "title": "Account",
+      "type": "string"
+     },
+     "buying_power": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Buying Power"
+     },
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "crypto_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Crypto Value"
+     },
+     "day": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Trading day (US Eastern); default today",
+      "title": "Day"
+     },
+     "equity_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Equity Value"
+     },
+     "options_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Options Value"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     }
+    },
+    "required": [
+     "account"
+    ],
+    "title": "IngestAccount",
+    "type": "object"
+   },
+   "IngestActivity": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account"
+     },
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Option fills: cash, + credit / \u2212 debit",
+      "title": "Amount"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "ext_id": {
+      "description": "Stable broker id: option leg id, or a derived key",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Ext Id",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "option_fill",
+       "realized"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "option_type": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Type"
+     },
+     "position_effect": {
+      "anyOf": [
+       {
+        "enum": [
+         "open",
+         "close"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Effect"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "realized_gain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Realized Gain"
+     },
+     "side": {
+      "anyOf": [
+       {
+        "enum": [
+         "buy",
+         "sell",
+         ""
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Side"
+     },
+     "strategy": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strategy"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "ts": {
+      "title": "Ts",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ext_id",
+     "kind",
+     "ts",
+     "symbol"
+    ],
+    "title": "IngestActivity",
+    "type": "object"
+   },
+   "IngestOut": {
+    "properties": {
+     "accounts": {
+      "default": 0,
+      "title": "Accounts",
+      "type": "integer"
+     },
+     "activity_new": {
+      "default": 0,
+      "title": "Activity New",
+      "type": "integer"
+     },
+     "activity_total": {
+      "default": 0,
+      "title": "Activity Total",
+      "type": "integer"
+     },
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "synced_at": {
+      "title": "Synced At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "count",
+     "synced_at"
+    ],
+    "title": "IngestOut",
+    "type": "object"
+   },
+   "IngestPosition": {
+    "properties": {
+     "account": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Masked label, e.g. \"Trading \u2022\u20228453\". Never a full account number.",
+      "title": "Account"
+     },
+     "avg_price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Per share; option premium per share",
+      "title": "Avg Price"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "kind": {
+      "enum": [
+       "stock",
+       "option"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "multiplier": {
+      "default": 100.0,
+      "title": "Multiplier",
+      "type": "number"
+     },
+     "opened_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opened At"
+     },
+     "option_type": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Type"
+     },
+     "quantity": {
+      "description": "Signed: long > 0, short < 0 (shares or contracts)",
+      "title": "Quantity",
+      "type": "number"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "kind",
+     "quantity"
+    ],
+    "title": "IngestPosition",
+    "type": "object"
+   },
+   "IngestRequest": {
+    "properties": {
+     "accounts": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/IngestAccount"
+      },
+      "maxItems": 50,
+      "title": "Accounts",
+      "type": "array"
+     },
+     "activity": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/IngestActivity"
+      },
+      "maxItems": 20000,
+      "title": "Activity",
+      "type": "array"
+     },
+     "positions": {
+      "items": {
+       "$ref": "#/components/schemas/IngestPosition"
+      },
+      "maxItems": 2000,
+      "title": "Positions",
+      "type": "array"
+     },
+     "source": {
+      "const": "robinhood",
+      "default": "robinhood",
+      "title": "Source",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 64,
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "positions"
+    ],
+    "title": "IngestRequest",
+    "type": "object"
+   },
+   "IvOut": {
+    "properties": {
+     "atm_iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Atm Iv"
+     },
+     "cooling": {
+      "default": false,
+      "title": "Cooling",
+      "type": "boolean"
+     },
+     "hv10": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hv10"
+     },
+     "hv20": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hv20"
+     },
+     "hv60": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hv60"
+     },
+     "iv_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv High"
+     },
+     "iv_open": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Open"
+     },
+     "iv_roc_15m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Roc 15M"
+     },
+     "iv_roc_day": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Roc Day"
+     },
+     "spike": {
+      "default": false,
+      "title": "Spike",
+      "type": "boolean"
+     }
+    },
+    "title": "IvOut",
+    "type": "object"
+   },
    "LedgerEntryOut": {
     "additionalProperties": true,
     "properties": {
@@ -3226,6 +5157,183 @@
      }
     },
     "title": "LedgerLineOut",
+    "type": "object"
+   },
+   "LegOut": {
+    "properties": {
+     "avg_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Price"
+     },
+     "delta": {
+      "title": "Delta",
+      "type": "number"
+     },
+     "dte": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dte"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "gamma": {
+      "title": "Gamma",
+      "type": "number"
+     },
+     "iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "mark": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live mid per share (options)",
+      "title": "Mark"
+     },
+     "otype": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Otype"
+     },
+     "position_delta": {
+      "title": "Position Delta",
+      "type": "number"
+     },
+     "position_gamma": {
+      "title": "Position Gamma",
+      "type": "number"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "number"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     }
+    },
+    "required": [
+     "kind",
+     "quantity",
+     "delta",
+     "gamma",
+     "position_delta",
+     "position_gamma"
+    ],
+    "title": "LegOut",
+    "type": "object"
+   },
+   "LevelsOut": {
+    "properties": {
+     "call_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Wall"
+     },
+     "king": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "King"
+     },
+     "net_gex": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Gex"
+     },
+     "put_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Wall"
+     },
+     "zero_gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zero Gamma"
+     }
+    },
+    "title": "LevelsOut",
     "type": "object"
    },
    "LiveQuoteOut": {
@@ -3400,6 +5508,55 @@
      "title"
     ],
     "title": "NewsItem",
+    "type": "object"
+   },
+   "NotifyPrefs": {
+    "properties": {
+     "buy_stock": {
+      "default": true,
+      "title": "Buy Stock",
+      "type": "boolean"
+     },
+     "buyback": {
+      "default": true,
+      "description": "A short option has given up most of its premium",
+      "title": "Buyback",
+      "type": "boolean"
+     },
+     "expiring_itm": {
+      "default": false,
+      "description": "A short option is in the money with \u2264 1 day left",
+      "title": "Expiring Itm",
+      "type": "boolean"
+     },
+     "iv_spike": {
+      "default": false,
+      "description": "ATM IV spikes on a holding",
+      "title": "Iv Spike",
+      "type": "boolean"
+     },
+     "sell_call": {
+      "default": true,
+      "title": "Sell Call",
+      "type": "boolean"
+     },
+     "sell_put": {
+      "default": true,
+      "title": "Sell Put",
+      "type": "boolean"
+     },
+     "symbols": {
+      "default": [],
+      "description": "Only these symbols; empty = every holding",
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "title": "NotifyPrefs",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -5099,6 +7256,17 @@
       ],
       "title": "Error"
      },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
      "symbol": {
       "title": "Symbol",
       "type": "string"
@@ -5110,7 +7278,34 @@
     "title": "PriceHistoryOut",
     "type": "object"
    },
+   "PushConfigOut": {
+    "properties": {
+     "enabled": {
+      "description": "Push is configured on the server (VAPID keys set)",
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "public_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VAPID public key, base64url; pass to pushManager.subscribe",
+      "title": "Public Key"
+     }
+    },
+    "required": [
+     "enabled"
+    ],
+    "title": "PushConfigOut",
+    "type": "object"
+   },
    "QuoteOut": {
+    "description": "Outside the regular session, prev_close / change / change_pct describe the last regular session's move\n(Robinhood's \"Today\") and ext_change the move since its close (after-hours / overnight).",
     "properties": {
      "change": {
       "anyOf": [
@@ -5134,6 +7329,29 @@
       ],
       "title": "Change Pct"
      },
+     "ext_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "price \u2212 regular_close outside the regular session; null during it",
+      "title": "Ext Change"
+     },
+     "ext_change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ext Change Pct"
+     },
      "prev_close": {
       "anyOf": [
        {
@@ -5155,6 +7373,49 @@
        }
       ],
       "title": "Price"
+     },
+     "regular_close": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close of the last completed regular session",
+      "title": "Regular Close"
+     },
+     "regular_close_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "YYYY-MM-DD of regular_close",
+      "title": "Regular Close Date"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "enum": [
+         "pre",
+         "regular",
+         "post",
+         "overnight",
+         "closed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "US equity session (ET) when quoted; null for Yahoo-served or crypto quotes",
+      "title": "Session"
      },
      "symbol": {
       "title": "Symbol",
@@ -5312,6 +7573,219 @@
      }
     },
     "title": "RecalculatedHolding",
+    "type": "object"
+   },
+   "ReportIngest": {
+    "properties": {
+     "day": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Date the report is for; default: today in US Eastern",
+      "title": "Day"
+     },
+     "html": {
+      "maxLength": 4000000,
+      "minLength": 1,
+      "title": "Html",
+      "type": "string"
+     },
+     "slug": {
+      "description": "\"morning\", \"evening\", \"weekend\"",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 64,
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "slug",
+     "title",
+     "html"
+    ],
+    "title": "ReportIngest",
+    "type": "object"
+   },
+   "ReportMeta": {
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportMeta",
+    "type": "object"
+   },
+   "ReportOut": {
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "html": {
+      "title": "Html",
+      "type": "string"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size",
+     "html"
+    ],
+    "title": "ReportOut",
+    "type": "object"
+   },
+   "ReportSummary": {
+    "description": "The latest page of one report, plus every day it has a page for (newest first).",
+    "properties": {
+     "day": {
+      "description": "YYYY-MM-DD the report is for (US Eastern)",
+      "title": "Day",
+      "type": "string"
+     },
+     "days": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "published_at": {
+      "title": "Published At",
+      "type": "string"
+     },
+     "size": {
+      "description": "Characters of HTML",
+      "title": "Size",
+      "type": "integer"
+     },
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "source_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "day",
+     "title",
+     "published_at",
+     "size"
+    ],
+    "title": "ReportSummary",
     "type": "object"
    },
    "SeedHoldingsOut": {
@@ -6376,6 +8850,198 @@
     "title": "StockInfoOut",
     "type": "object"
    },
+   "SubscriptionIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "pattern": "^https://",
+      "title": "Endpoint",
+      "type": "string"
+     },
+     "keys": {
+      "$ref": "#/components/schemas/SubscriptionKeys"
+     }
+    },
+    "required": [
+     "endpoint",
+     "keys"
+    ],
+    "title": "SubscriptionIn",
+    "type": "object"
+   },
+   "SubscriptionKeys": {
+    "properties": {
+     "auth": {
+      "maxLength": 100,
+      "title": "Auth",
+      "type": "string"
+     },
+     "p256dh": {
+      "maxLength": 200,
+      "title": "P256Dh",
+      "type": "string"
+     }
+    },
+    "required": [
+     "p256dh",
+     "auth"
+    ],
+    "title": "SubscriptionKeys",
+    "type": "object"
+   },
+   "SuggestionOut": {
+    "properties": {
+     "action": {
+      "enum": [
+       "SELL_CALL",
+       "SELL_PUT",
+       "BUY_STOCK",
+       "HOLD",
+       "WAIT",
+       "TRACK"
+      ],
+      "title": "Action",
+      "type": "string"
+     },
+     "contracts": {
+      "default": 0,
+      "title": "Contracts",
+      "type": "integer"
+     },
+     "credit": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credit"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "headline": {
+      "title": "Headline",
+      "type": "string"
+     },
+     "locked_gain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked Gain"
+     },
+     "net_delta_after": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Delta After"
+     },
+     "new_avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned",
+      "title": "New Avg"
+     },
+     "option_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Delta"
+     },
+     "otype": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Otype"
+     },
+     "premium": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Premium"
+     },
+     "reasons": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "shares": {
+      "default": 0,
+      "description": "BUY_STOCK: shares to buy",
+      "title": "Shares",
+      "type": "integer"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     },
+     "warnings": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "action",
+     "headline"
+    ],
+    "title": "SuggestionOut",
+    "type": "object"
+   },
    "SymbolSummaryOut": {
     "additionalProperties": true,
     "properties": {
@@ -6495,6 +9161,42 @@
     "title": "SyncLedgerOut",
     "type": "object"
    },
+   "TestOut": {
+    "properties": {
+     "devices": {
+      "title": "Devices",
+      "type": "integer"
+     },
+     "devices_out": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/DeviceOut"
+      },
+      "title": "Devices Out",
+      "type": "array"
+     },
+     "failed": {
+      "title": "Failed",
+      "type": "integer"
+     },
+     "removed": {
+      "title": "Removed",
+      "type": "integer"
+     },
+     "sent": {
+      "title": "Sent",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "sent",
+     "failed",
+     "removed",
+     "devices"
+    ],
+    "title": "TestOut",
+    "type": "object"
+   },
    "TickerSearchResult": {
     "properties": {
      "exchange": {
@@ -6558,6 +9260,76 @@
      "bias"
     ],
     "title": "TopFlowStrike",
+    "type": "object"
+   },
+   "UnitOut": {
+    "properties": {
+     "contracts": {
+      "default": 0,
+      "title": "Contracts",
+      "type": "number"
+     },
+     "delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta"
+     },
+     "kind": {
+      "enum": [
+       "covered",
+       "uncovered",
+       "puts",
+       "other"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "per_lot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Per Lot"
+     },
+     "shares": {
+      "default": 0,
+      "title": "Shares",
+      "type": "number"
+     }
+    },
+    "required": [
+     "kind",
+     "label"
+    ],
+    "title": "UnitOut",
+    "type": "object"
+   },
+   "UnsubscribeIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 1000,
+      "title": "Endpoint",
+      "type": "string"
+     }
+    },
+    "required": [
+     "endpoint"
+    ],
+    "title": "UnsubscribeIn",
     "type": "object"
    },
    "UnusualRow": {
@@ -7855,6 +10627,180 @@
     },
     "title": "WeekUpdateRequest",
     "type": "object"
+   },
+   "optionflow__modules__hedge__schemas__BrokerAccountOut": {
+    "properties": {
+     "account": {
+      "title": "Account",
+      "type": "string"
+     },
+     "buying_power": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Buying Power"
+     },
+     "cash": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash"
+     },
+     "change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change"
+     },
+     "crypto_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Crypto Value"
+     },
+     "day": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day"
+     },
+     "equity_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Equity Value"
+     },
+     "options_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Options Value"
+     },
+     "prev_total": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prev Total"
+     },
+     "total_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Value"
+     }
+    },
+    "required": [
+     "account"
+    ],
+    "title": "BrokerAccountOut",
+    "type": "object"
+   },
+   "optionflow__modules__portfolio__schemas__BrokerAccountOut": {
+    "additionalProperties": true,
+    "properties": {
+     "color": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Color"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "sort_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sort Order"
+     }
+    },
+    "title": "BrokerAccountOut",
+    "type": "object"
    }
   },
   "securitySchemes": {
@@ -8489,11 +11435,18 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AuthRefreshRequest"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/AuthRefreshRequest"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Req"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {
@@ -8638,6 +11591,260 @@
     "summary": "Signup",
     "tags": [
      "auth"
+    ]
+   }
+  },
+  "/api/v1/broker/activity": {
+   "get": {
+    "description": "Option fills and realized trades, newest first.",
+    "operationId": "broker_activity_api_v1_broker_activity_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "account",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Account"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 200,
+       "maximum": 2000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BrokerActivityOut"
+         },
+         "title": "Response Broker Activity Api V1 Broker Activity Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Broker Activity",
+    "tags": [
+     "broker"
+    ]
+   }
+  },
+  "/api/v1/broker/history": {
+   "get": {
+    "description": "Daily account value (sum of accounts) from each sync.",
+    "operationId": "broker_history_api_v1_broker_history_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "account",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Account"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 365,
+       "maximum": 3650,
+       "minimum": 7,
+       "title": "Days",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BrokerHistoryPoint"
+         },
+         "title": "Response Broker History Api V1 Broker History Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Broker History",
+    "tags": [
+     "broker"
+    ]
+   }
+  },
+  "/api/v1/broker/income": {
+   "get": {
+    "description": "Option premium (net cash from fills) and realized P&L by week, month and symbol.",
+    "operationId": "broker_income_api_v1_broker_income_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "account",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Account"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BrokerIncomeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Broker Income",
+    "tags": [
+     "broker"
+    ]
+   }
+  },
+  "/api/v1/broker/portfolio": {
+   "get": {
+    "description": "Account values, holdings with live prices and unrealized P&L, open options.",
+    "operationId": "broker_portfolio_api_v1_broker_portfolio_get",
+    "parameters": [
+     {
+      "description": "Masked account label; all if empty",
+      "in": "query",
+      "name": "account",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Masked account label; all if empty",
+       "title": "Account"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BrokerPortfolioOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Broker Portfolio",
+    "tags": [
+     "broker"
     ]
    }
   },
@@ -9720,6 +12927,201 @@
     ]
    }
   },
+  "/api/v1/hedge/books": {
+   "get": {
+    "description": "Net delta / gamma, IV vs HV and the delta-neutral suggestion for every holding.",
+    "operationId": "books_api_v1_hedge_books_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BooksOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Books",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/ingest": {
+   "post": {
+    "description": "Daily broker sync. Replaces positions; upserts today's account values and the activity history.\n\nAuth: X-Hedge-Ingest-Token (not a user login).",
+    "operationId": "ingest_api_v1_hedge_ingest_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-hedge-ingest-token",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Hedge-Ingest-Token"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IngestRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IngestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ingest",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/positions": {
+   "get": {
+    "description": "Positions from the last broker sync.",
+    "operationId": "positions_api_v1_hedge_positions_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BrokerPositionOut"
+         },
+         "title": "Response Positions Api V1 Hedge Positions Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Positions",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/stream": {
+   "get": {
+    "description": "Server-Sent Events: a `books` event (same body as GET /hedge/books) every `interval` seconds.",
+    "operationId": "stream_api_v1_hedge_stream_get",
+    "parameters": [
+     {
+      "description": "Seconds between updates",
+      "in": "query",
+      "name": "interval",
+      "required": false,
+      "schema": {
+       "default": 1.0,
+       "description": "Seconds between updates",
+       "maximum": 60.0,
+       "minimum": 1.0,
+       "title": "Interval",
+       "type": "number"
+      }
+     },
+     {
+      "description": "Stop after this many events (0 = until the client leaves)",
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "description": "Stop after this many events (0 = until the client leaves)",
+       "minimum": 0,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "description": "For EventSource, which can't send headers",
+      "in": "query",
+      "name": "access_token",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "For EventSource, which can't send headers",
+       "title": "Access Token"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Stream",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
   "/api/v1/holdings/{holding_id}": {
    "delete": {
     "operationId": "delete_account_holding_api_v1_holdings__holding_id__delete",
@@ -9954,6 +13356,262 @@
     "summary": "Watchlist Quotes",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/notify/config": {
+   "get": {
+    "description": "Whether push is set up on the server, and the key the browser subscribes with.",
+    "operationId": "push_config_api_v1_notify_config_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PushConfigOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Push Config",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/devices": {
+   "get": {
+    "operationId": "devices_api_v1_notify_devices_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Devices Api V1 Notify Devices Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Devices",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/prefs": {
+   "get": {
+    "description": "Which alerts are pushed, and for which symbols (the same on every device).",
+    "operationId": "get_prefs_api_v1_notify_prefs_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Prefs",
+    "tags": [
+     "notify"
+    ]
+   },
+   "put": {
+    "operationId": "put_prefs_api_v1_notify_prefs_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NotifyPrefs"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotifyPrefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Prefs",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/subscriptions": {
+   "post": {
+    "description": "Save this browser's push subscription (from pushManager.subscribe).",
+    "operationId": "subscribe_api_v1_notify_subscriptions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubscriptionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Subscribe Api V1 Notify Subscriptions Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Subscribe",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/test": {
+   "post": {
+    "description": "Send a test notification to every device of the signed-in user.",
+    "operationId": "test_api_v1_notify_test_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Test",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/unsubscribe": {
+   "post": {
+    "operationId": "unsubscribe_api_v1_notify_unsubscribe_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UnsubscribeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response Unsubscribe Api V1 Notify Unsubscribe Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unsubscribe",
+    "tags": [
+     "notify"
     ]
    }
   },
@@ -10393,7 +14051,7 @@
        "application/json": {
         "schema": {
          "items": {
-          "$ref": "#/components/schemas/BrokerAccountOut"
+          "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
          },
          "title": "Response List Broker Accounts Api V1 Portfolio Broker Accounts Get",
          "type": "array"
@@ -10430,7 +14088,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/BrokerAccountOut"
+         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
         }
        }
       },
@@ -10532,7 +14190,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/BrokerAccountOut"
+         "$ref": "#/components/schemas/optionflow__modules__portfolio__schemas__BrokerAccountOut"
         }
        }
       },
@@ -11893,6 +15551,163 @@
     "summary": "Live Quote",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/reports": {
+   "get": {
+    "description": "Each report's latest page (without the HTML) and the days it can be opened for.",
+    "operationId": "list_reports_api_v1_reports_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReportSummary"
+         },
+         "title": "Response List Reports Api V1 Reports Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Reports",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/ingest": {
+   "post": {
+    "description": "Publish one report page for one day (replaces that day's page; other days are kept for a month).\n\nAuth: X-Hedge-Ingest-Token, bound to one user.",
+    "operationId": "ingest_api_v1_reports_ingest_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-hedge-ingest-token",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Hedge-Ingest-Token"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReportIngest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportMeta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ingest",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/{slug}": {
+   "get": {
+    "operationId": "get_report_api_v1_reports__slug__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "slug",
+      "required": true,
+      "schema": {
+       "title": "Slug",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Default: the latest day",
+      "in": "query",
+      "name": "day",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Default: the latest day",
+       "title": "Day"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Report",
+    "tags": [
+     "reports"
     ]
    }
   },

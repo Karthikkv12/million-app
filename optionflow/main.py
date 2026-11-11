@@ -67,6 +67,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if "flow" in modules:
             from optionflow.workers import gex_poller
             gex_poller.start()
+        if "notify" in modules and "hedge" in modules:
+            from optionflow.modules.notify import worker as notify_worker
+            notify_worker.start()        # phone notifications: no-op until PUSH_VAPID_* keys are set
         logger.info("OptionFlow API started — modules: %s", ", ".join(modules))
         yield
 

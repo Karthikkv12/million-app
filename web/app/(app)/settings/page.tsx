@@ -3,10 +3,11 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
-import { SETTINGS_GROUPS, SETTINGS_PAGES } from "./registry";
+import { SETTINGS_GROUPS, visiblePages } from "./registry";
 
 export default function SettingsIndex() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const pages = visiblePages(isAdmin);
   const { theme } = useTheme();
   const summary: Record<string, string | undefined> = {
     profile: user?.username,
@@ -18,12 +19,12 @@ export default function SettingsIndex() {
         <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Account</p>
         <h1 className="text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">Settings</h1>
       </div>
-      <div className="grid gap-8">
-        {SETTINGS_GROUPS.map((g) => (
+      <div className="grid grid-cols-1 gap-8">
+        {SETTINGS_GROUPS.filter((g) => pages.some((p) => p.group === g)).map((g) => (
           <section key={g}>
             <h2 className="eyebrow mb-2 px-1">{g}</h2>
             <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-              {SETTINGS_PAGES.filter((p) => p.group === g).map((p) => (
+              {pages.filter((p) => p.group === g).map((p) => (
                 <li key={p.id}>
                   <Link href={`/settings/${p.id}`} className="flex items-center gap-4 px-4 py-3.5 transition hover:bg-[var(--surface-2)]">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-foreground/70">

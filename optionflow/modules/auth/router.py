@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from optionflow.core import errors
 from optionflow.core.deps import get_current_user, require_admin
+from optionflow.core.settings import get_settings
 from optionflow.modules.auth import service
 from optionflow.modules.auth.schemas import (
     AdminCreateUserRequest, AdminPatchUserRequest, AdminUserOut,
@@ -24,21 +25,71 @@ def _client(request: Request) -> Tuple[Optional[str], Optional[str]]:
     return (str(host) if host else None), request.headers.get("user-agent")
 
 
+# ── Refresh-token cookie ──────────────────────────────────────────────────────
+# Browsers keep the refresh token only in an HttpOnly cookie scoped to /api/v1/auth, so page scripts
+# (and anything injected into the page) can never read it. Browser clients send `X-Token-Transport: cookie`
+# and get no refresh token in the JSON body; other clients (scripts, apps) keep receiving it in the body.
+
+def _wants_cookie_only(request: Request) -> bool:
+    return request.headers.get("x-token-transport", "").strip().lower() == "cookie"
+
+
+def _secure(request: Request) -> bool:
+    forced = get_settings().refresh_cookie_secure
+    if forced is not None:
+        return bool(forced)
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return proto == "https" or request.url.scheme == "https"
+
+
+def _set_cookie(request: Request, response: Response, token: str) -> None:
+    s = get_settings()
+    response.set_cookie(
+        s.refresh_cookie_name, token, max_age=int(s.refresh_token_expires_days) * 86400,
+        path=s.refresh_cookie_path, httponly=True, secure=_secure(request), samesite="strict",
+    )
+
+
+def _clear_cookie(response: Response) -> None:
+    s = get_settings()
+    response.delete_cookie(s.refresh_cookie_name, path=s.refresh_cookie_path, httponly=True, samesite="strict")
+
+
+def _issue(request: Request, response: Response, bundle: dict) -> AuthResponse:
+    """Put a fresh refresh token in the cookie (and, for non-browser clients, the body)."""
+    rt = bundle.get("refresh_token")
+    if rt:
+        _set_cookie(request, response, rt)
+    if _wants_cookie_only(request):
+        bundle = {**bundle, "refresh_token": None}
+    return AuthResponse(**bundle)
+
+
 @router.post("/signup", response_model=AuthResponse)
 def signup(req: AuthSignupRequest) -> AuthResponse:
     raise errors.Forbidden("Registration is not open at this time.")
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(req: AuthLoginRequest, request: Request) -> AuthResponse:
+def login(req: AuthLoginRequest, request: Request, response: Response) -> AuthResponse:
     ip, ua = _client(request)
-    return AuthResponse(**service.login(req.username, req.password, ip=ip, user_agent=ua))
+    return _issue(request, response, service.login(req.username, req.password, ip=ip, user_agent=ua))
 
 
 @router.post("/refresh", response_model=AuthResponse)
-def refresh(req: AuthRefreshRequest, request: Request) -> AuthResponse:
+def refresh(request: Request, response: Response, req: Optional[AuthRefreshRequest] = None) -> AuthResponse:
     ip, ua = _client(request)
-    return AuthResponse(**service.refresh_session(req.refresh_token, ip=ip, user_agent=ua))
+    token = (req.refresh_token if req else None) or request.cookies.get(get_settings().refresh_cookie_name)
+    if not token:
+        raise errors.Unauthorized("Not signed in")
+    try:
+        bundle = service.refresh_session(token, ip=ip, user_agent=ua)
+    except errors.Unauthorized as exc:
+        # A dead cookie is useless: drop it so the browser stops sending it.
+        out = errors._respond(request, exc.status_code, exc.code, exc.message)
+        _clear_cookie(out)
+        return out
+    return _issue(request, response, bundle)
 
 
 @router.get("/me", response_model=AuthMeResponse)
@@ -63,20 +114,25 @@ def revoke_session(session_id: int, user=Depends(get_current_user)) -> StatusOut
 
 
 @router.post("/logout", response_model=StatusOut)
-def logout(req: Optional[AuthLogoutRequest] = None, user=Depends(get_current_user)) -> StatusOut:
-    service.logout(user, refresh_token=req.refresh_token if req else None)
+def logout(request: Request, response: Response, req: Optional[AuthLogoutRequest] = None,
+           user=Depends(get_current_user)) -> StatusOut:
+    token = (req.refresh_token if req else None) or request.cookies.get(get_settings().refresh_cookie_name)
+    service.logout(user, refresh_token=token)
+    _clear_cookie(response)
     return StatusOut()
 
 
 @router.post("/logout-all", response_model=StatusOut)
-def logout_all(user=Depends(get_current_user)) -> StatusOut:
+def logout_all(response: Response, user=Depends(get_current_user)) -> StatusOut:
     service.logout_everywhere(user)
+    _clear_cookie(response)
     return StatusOut()
 
 
 @router.post("/change-password", response_model=AuthResponse)
-def change_password(req: AuthChangePasswordRequest, user=Depends(get_current_user)) -> AuthResponse:
-    return AuthResponse(**service.change_own_password(user, req.current_password, req.new_password))
+def change_password(req: AuthChangePasswordRequest, request: Request, response: Response,
+                    user=Depends(get_current_user)) -> AuthResponse:
+    return _issue(request, response, service.change_own_password(user, req.current_password, req.new_password))
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────

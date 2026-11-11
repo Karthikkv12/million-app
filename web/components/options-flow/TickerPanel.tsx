@@ -1,6 +1,6 @@
 "use client";
 /**
- * TickerPanel — one compact column: search header, key levels, GEX heatmap,
+ * TickerPanel — one compact column: search header, key levels, GEX and/or VEX heatmap,
  * and a Details button that opens every secondary section in a drawer.
  * TickerPanelWithQuery — wraps TickerPanel with its own react-query fetch.
  */
@@ -13,8 +13,9 @@ import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
 import { PanelHeader } from "./PanelHeader";
 import { LevelsStrip } from "./LevelsStrip";
 import { GexHeatmap } from "./GexHeatmap";
-import type { HeatOpts, BoardHandle } from "./GexHeatmap";
+import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
+import { sourceName } from "./SourceBadge";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
 export interface Slot {
@@ -22,10 +23,12 @@ export interface Slot {
   input: string;
   /** Kept for compatibility with saved layouts; no longer used by the UI. */
   expiryFilter: string[] | null;
+  /** Which exposure this ticker's table shows (tab above the table). */
+  metric: Metric;
 }
 
-export function makeSlot(ticker: string): Slot {
-  return { ticker, input: ticker, expiryFilter: null };
+export function makeSlot(ticker: string, metric?: unknown): Slot {
+  return { ticker, input: ticker, expiryFilter: null, metric: metric === "vex" ? "vex" : "gex" };
 }
 
 /** Strike-window sizes (backend sends at most 40 strikes around spot). */
@@ -41,6 +44,7 @@ export interface TickerPanelProps {
   onRemove: () => void;
   onInputChange: (v: string) => void;
   onSelect: (symbol: string) => void;
+  onMetricChange: (metric: Metric) => void;
   data: GexResult | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -52,11 +56,12 @@ export interface TickerPanelProps {
 }
 
 export function TickerPanel({
-  slot, accentColor, nStrikes, heatOpts, canRemove, onRemove, onInputChange, onSelect,
+  slot, accentColor, nStrikes, heatOpts, canRemove, onRemove, onInputChange, onSelect, onMetricChange,
   data, isLoading, isError, errorText, isFetching, onRefresh, dataUpdatedAt,
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const board = useRef<BoardHandle>(null);
+  const metric = slot.metric ?? "gex";
   // Prefer the time the backend computed the result; fall back to when we received it.
   const asOf = data?.as_of ? new Date(data.as_of).getTime() : dataUpdatedAt;
   const lastUpdated = asOf
@@ -66,14 +71,12 @@ export function TickerPanel({
   const shownAt = asOf ? new Date(asOf).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   // Keep showing the last good data with a quiet note instead of a red error box.
   const staleNote = !data || apiError ? null
-    : data.stale ? `Yahoo is rate-limiting; showing data from ${shownAt ?? "earlier"}.`
+    : data.stale ? `${sourceName(data)} is rate-limiting; showing data from ${shownAt ?? "earlier"}.`
     : isError ? `Couldn't refresh; showing data from ${shownAt ?? "earlier"}.`
     : null;
 
   return (
-    <section
-      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm"
-    >
+    <section className="flex min-w-0 flex-col">
       <PanelHeader
         inputValue={slot.input}
         accentColor={accentColor}
@@ -84,6 +87,7 @@ export function TickerPanel({
         onInputChange={onInputChange}
         onSelect={onSelect}
         onRefresh={onRefresh}
+        data={data}
       />
 
       {isLoading && <div className="p-4"><SkeletonStatGrid count={3} /></div>}
@@ -94,22 +98,38 @@ export function TickerPanel({
       {data && !apiError && (
         <>
           {staleNote && (
-            <p role="status" className="flex items-center gap-1.5 border-b border-[var(--border)] bg-amber-500/[0.06] px-3 py-1.5 text-[11px] text-foreground/70">
-              <Clock size={12} className="shrink-0 text-amber-500" /> {staleNote}
+            <p role="status" className="flex items-center gap-1.5 px-4 py-1 text-[11px] text-warn">
+              <Clock size={12} className="shrink-0 text-warn" /> {staleNote}
             </p>
           )}
-          <LevelsStrip data={data} />
-          <div className="flex items-center gap-1 border-b border-[var(--border)] px-3 py-1.5 text-[11px]">
+          <LevelsStrip data={data} metric={metric} />
+          <div className="flex items-center gap-1 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
+            <div role="tablist" aria-label="Exposure" className="mr-3 inline-flex gap-3">
+              {(["gex", "vex"] as const).map((m) => (
+                <button
+                  key={m}
+                  role="tab"
+                  aria-selected={metric === m}
+                  onClick={() => onMetricChange(m)}
+                  title={m === "gex" ? "Gamma exposure, $ per 1% move" : "Vanna exposure, $ per 1 vol point"}
+                  className={`-mb-[7px] border-b-2 pb-[5px] pt-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] transition ${
+                    metric === m ? "border-foreground text-foreground" : "border-transparent text-foreground/45 hover:text-foreground"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
             <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
             <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+            <button
+              onClick={() => setDetailsOpen(true)}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground"
+            >
+              <PanelRight size={12} /> Details
+            </button>
           </div>
-          <GexHeatmap ref={board} data={data} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
-          <button
-            onClick={() => setDetailsOpen(true)}
-            className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-3 py-2.5 text-[11px] font-bold text-foreground/70 transition hover:bg-[var(--surface-2)] hover:text-foreground"
-          >
-            <PanelRight size={13} /> Details: levels, premium &amp; net flow
-          </button>
+          <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
           <DetailsDrawer
             open={detailsOpen}
             onClose={() => setDetailsOpen(false)}

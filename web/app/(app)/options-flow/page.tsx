@@ -2,7 +2,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
-import { Segmented } from "@/components/ui";
 import { Plus, SlidersHorizontal } from "lucide-react";
 import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
@@ -26,7 +25,7 @@ function loadLayout(): PersistedLayout {
     const parsed = JSON.parse(raw) as PersistedLayout;
     const slots = (Array.isArray(parsed.slots) ? parsed.slots : [])
       .filter((s) => typeof s.ticker === "string" && s.ticker.length > 0)
-      .map((s) => makeSlot(s.ticker))
+      .map((s) => makeSlot(s.ticker, s.metric))
       .slice(0, MAX_TICKERS);
     if (!slots.length) return fallback;
     const nStrikes = (STRIKE_OPTIONS as readonly number[]).includes(parsed.nStrikes) ? parsed.nStrikes : DEFAULT_STRIKES;
@@ -44,7 +43,7 @@ function loadLayout(): PersistedLayout {
 
 function saveLayout(slots: Slot[], nStrikes: number, heat: HeatOpts) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker)), nStrikes, heat }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker, s.metric)), nStrikes, heat }));
   } catch { /* storage unavailable */ }
 }
 
@@ -93,75 +92,73 @@ export default function OptionsFlowPage() {
   const gridClass =
     slots.length === 1 ? "grid-cols-1" :
     slots.length === 2 ? "grid-cols-1 lg:grid-cols-2" :
-                         "grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3";
+                         "grid-cols-1 lg:grid-cols-3";
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[var(--background)]">
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="px-4 pb-4 pt-6 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      {/* ── Header + toolbar (desk style) ───────────────────────────────── */}
+      <div className="px-4 pt-5 sm:px-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 pb-4">
           <div className="min-w-0">
-            <p className="eyebrow mb-1.5 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Flow</p>
-            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">Options Flow</h1>
-            <p className="mt-1 text-[13px] text-foreground/55">Gamma exposure by strike and expiry · Yahoo Finance, ~15 min delayed</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Flow</p>
+            <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Dealer exposure board</h1>
+          </div>
+          <p className="max-w-md text-right text-[12.5px] leading-relaxed text-foreground/50">Gamma (GEX) and vanna (VEX) by strike × expiry. ★ marks the king node; tap a ticker&apos;s Details for flow and levels.</p>
+        </div>
+
+        <div className="-mx-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[var(--border-strong)] px-4 py-2 sm:-mx-8 sm:px-8">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Strikes</span>
+            <div role="radiogroup" aria-label="Strikes around spot" className="flex">
+              {STRIKE_OPTIONS.map((n) => (
+                <button key={n} role="radio" aria-checked={nStrikes === n} onClick={() => setNStrikes(n)}
+                  className={`px-2 py-1 font-mono text-[12px] tabular-nums transition ${nStrikes === n ? "text-foreground underline decoration-2 underline-offset-[6px]" : "text-foreground/45 hover:text-foreground"}`}>
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Strikes</span>
-            <Segmented
-              label="Strikes around spot"
-              value={String(nStrikes)}
-              onChange={(v) => setNStrikes(Number(v) as typeof nStrikes)}
-              options={STRIKE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
-            />
+          <button onClick={() => setViewOpen((o) => !o)} aria-expanded={viewOpen}
+            className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/60 md:hidden">
+            <SlidersHorizontal size={13} /> View
+          </button>
 
-            {/* Phones: palette and toggles live behind one "View" button */}
-            <button
-              onClick={() => setViewOpen((o) => !o)}
-              aria-expanded={viewOpen}
-              className="btn-ghost h-8 px-3 text-[12px] md:hidden"
-            >
-              <SlidersHorizontal size={14} /> View
-            </button>
-
-            <div className={`${viewOpen ? "flex" : "hidden"} w-full flex-wrap items-center gap-2 md:flex md:w-auto`}>
+          <div className={`${viewOpen ? "flex" : "hidden"} w-full flex-wrap items-center gap-x-5 gap-y-2 md:flex md:w-auto`}>
+            <label className="flex items-center gap-2">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Colors</span>
               <select
                 value={heat.palette}
                 onChange={(e) => setHeat((h) => ({ ...h, palette: e.target.value as HeatOpts["palette"] }))}
-                className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[12px] font-medium text-foreground"
+                className="bg-transparent py-1 font-mono text-[12px] text-foreground focus:outline-none"
                 aria-label="Heatmap colours"
               >
                 {PALETTES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
-              {([["showPct", "% of king"], ["dimSmall", "Dim small"]] as const).map(([k, lbl]) => (
-                <button
-                  key={k}
-                  onClick={() => setHeat((h) => ({ ...h, [k]: !h[k] }))}
-                  aria-pressed={heat[k]}
-                  className={`h-8 rounded-lg border px-3 text-[12px] font-medium transition ${
-                    heat[k] ? "border-foreground bg-foreground text-[var(--background)]" : "border-[var(--border)] text-foreground/60 hover:text-foreground"
-                  }`}
-                >
-                  {lbl}
-                </button>
-              ))}
-            </div>
-
-            {slots.length < MAX_TICKERS && (
-              <button
-                onClick={addSlot}
-                className="flex h-8 items-center gap-1 rounded-lg border border-dashed border-[var(--border-strong)] px-3 text-[12px] font-medium text-foreground/65 transition hover:border-foreground/40 hover:text-foreground"
-              >
-                <Plus size={13} /> Add ticker
+            </label>
+            {([["showPct", "% of king"], ["dimSmall", "Dim small"]] as const).map(([k, lbl]) => (
+              <button key={k} onClick={() => setHeat((h) => ({ ...h, [k]: !h[k] }))} aria-pressed={heat[k]}
+                className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/60 transition hover:text-foreground">
+                <span className={`relative h-3.5 w-6 rounded-full transition ${heat[k] ? "bg-foreground" : "bg-foreground/20"}`}>
+                  <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-[var(--background)] transition-all ${heat[k] ? "left-3" : "left-0.5"}`} />
+                </span>
+                {lbl}
               </button>
-            )}
+            ))}
           </div>
+
+          {slots.length < MAX_TICKERS && (
+            <button onClick={addSlot}
+              className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+              <Plus size={13} /> Add ticker
+            </button>
+          )}
         </div>
       </div>
 
       {/* ── Ticker columns ──────────────────────────────────────────────── */}
-      <div className="px-4 pb-8 sm:px-6">
-        <div className={`grid gap-4 ${gridClass}`}>
+      <div className="pb-10 pt-2 sm:px-4">
+        <div className={`grid gap-y-8 lg:gap-x-0 ${gridClass} [&>*]:min-w-0 max-lg:[&>*+*]:border-t-2 max-lg:[&>*+*]:border-[var(--border-strong)] max-lg:[&>*+*]:pt-2 lg:[&>*+*]:border-l-2 lg:[&>*+*]:border-[var(--border-strong)] lg:[&>*]:px-3`}>
           {slots.map((slot, i) => (
             <TickerPanelWithQuery
               key={slot.ticker + i}
@@ -172,6 +169,7 @@ export default function OptionsFlowPage() {
               canRemove={slots.length > 1}
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}
+              onMetricChange={(m) => updateSlot(i, { metric: m })}
               onSelect={(sym) => {
                 const t = sym.trim().toUpperCase();
                 if (t) updateSlot(i, { ticker: t, input: t });

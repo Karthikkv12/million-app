@@ -16,7 +16,14 @@ import pandas as pd
 import yfinance as yf
 from cachetools import TTLCache
 
-from optionflow.providers.market_data import CHAIN_COLUMNS, MarketDataRateLimited, OptionChain, RateLimitGate
+from optionflow.providers.market_data import (
+    CHAIN_COLUMNS,
+    CONTRACT_COLUMNS,
+    ContractChain,
+    MarketDataRateLimited,
+    OptionChain,
+    RateLimitGate,
+)
 
 try:
     from yfinance.exceptions import YFRateLimitError
@@ -256,7 +263,9 @@ class YahooMarketData:
         idx = pd.DatetimeIndex(hist.index)
         hist.index = idx.tz_localize("UTC") if idx.tz is None else idx.tz_convert("UTC")
         hist = hist.rename(columns=str.lower)
-        return hist[[c for c in ["open", "high", "low", "close", "volume"] if c in hist.columns]]
+        out = hist[[c for c in ["open", "high", "low", "close", "volume"] if c in hist.columns]].copy()
+        out.attrs["source"] = self.name
+        return out
 
     # ── Company data ──────────────────────────────────────────────────────────
     @_guarded
@@ -384,6 +393,40 @@ class YahooMarketData:
         return _GuardedTicker(yf.Ticker(symbol))
 
     # ── Options ───────────────────────────────────────────────────────────────
+    @_guarded
+    def option_expiries(self, symbol: str) -> List[str]:
+        return sorted(set(yf.Ticker(symbol.upper()).options or []))
+
+    @_guarded
+    def option_contracts(self, symbol: str, expiries: Optional[List[str]] = None,
+                         max_dte: int = MAX_CHAIN_DTE, max_expiries: int = 4) -> ContractChain:
+        """Spot and every quoted contract for `expiries` (or the nearest within max_dte days)."""
+        ticker = yf.Ticker(symbol.upper())
+        spot = _sf(getattr(ticker.fast_info, "last_price", None))
+        if expiries is None:
+            import zoneinfo
+            today = datetime.now(zoneinfo.ZoneInfo("America/New_York")).date()
+            expiries = [e for e in sorted(set(ticker.options or []))
+                        if 0 <= (pd.Timestamp(e).date() - today).days <= max_dte][:max_expiries]
+        rows: List[Dict[str, Any]] = []
+        for exp in expiries:
+            try:
+                ch = ticker.option_chain(exp)
+            except Exception as exc:
+                if _is_rate_limit(exc):
+                    raise
+                continue
+            for otype, df in (("call", ch.calls), ("put", ch.puts)):
+                for r in df.to_dict("records"):
+                    strike = _sf(r.get("strike"))
+                    if not strike:
+                        continue
+                    rows.append({"strike": strike, "expiry": exp, "otype": otype,
+                                 "oi": _si(r.get("openInterest")) or 0, "volume": _si(r.get("volume")) or 0,
+                                 "bid": _sf(r.get("bid")), "ask": _sf(r.get("ask")),
+                                 "last": _sf(r.get("lastPrice")), "iv": _sf(r.get("impliedVolatility"))})
+        return ContractChain(spot, pd.DataFrame(rows, columns=CONTRACT_COLUMNS), self.name)
+
     @_guarded
     def option_chain(self, symbol: str) -> OptionChain:
         """Expiries within MAX_CHAIN_DTE days (at most MAX_CHAIN_EXPIRIES), each chain cached 5 min."""
