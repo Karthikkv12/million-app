@@ -128,9 +128,21 @@ interface Props {
   opts: HeatOpts;
   /** CSS max-height of the scrolling board */
   maxHeight: string;
+  /** Expiry columns to show, in date order (see pickExpiries). Default: the nearest MAX_EXPIRIES. */
+  expiries?: string[];
 }
 
-export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, metric = "gex", nStrikes, opts, maxHeight }, ref) {
+/** At most this many expiry columns per table. */
+export const MAX_EXPIRIES = 6;
+
+/** The columns a table shows: the saved choice that is still on the board (expired dates drop out), in date
+ *  order, at most MAX_EXPIRIES; the nearest MAX_EXPIRIES when there is no choice or none of it is left. */
+export function pickExpiries(available: string[], chosen: string[] | null | undefined): string[] {
+  const keep = (chosen ?? []).filter((e) => available.includes(e));
+  return (keep.length ? available.filter((e) => keep.includes(e)) : available).slice(0, MAX_EXPIRIES);
+}
+
+export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ data, metric = "gex", nStrikes, opts, maxHeight, expiries: shown }, ref) {
   const { spot, heatmap_strikes, heatmap_expiries } = data;
   const heatmap_values = metric === "vex" ? data.heatmap_vex_values : data.heatmap_values;
   const isGex = metric === "gex";
@@ -148,11 +160,13 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
 
   const model = useMemo(() => {
     const allStrikes = heatmap_strikes ?? [];
-    const expiries = heatmap_expiries ?? [];
+    const available = heatmap_expiries ?? [];
+    const expiries = pickExpiries(available, shown);
+    const cols = expiries.map((e) => available.indexOf(e));
     if (!allStrikes.length || !expiries.length || !heatmap_values?.length) return null;
 
     const byStrike = new Map<number, number[]>();
-    allStrikes.forEach((s, si) => byStrike.set(s, expiries.map((_, ei) => heatmap_values?.[ei]?.[si] ?? 0)));
+    allStrikes.forEach((s, si) => byStrike.set(s, cols.map((ei) => heatmap_values?.[ei]?.[si] ?? 0)));
 
     const sorted = [...allStrikes].sort((a, b) => a - b);
     const spotIdx = sorted.indexOf(nearest(sorted, spot) ?? sorted[0]);
@@ -186,7 +200,8 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
     }
     const colTotals = expiries.map((_, ci) => rows.reduce((a, r) => a + (r.vals[ci] ?? 0), 0));
     return { strikes, rows, expiries, vmax, vmaxTotal, king: king as { strike: number; col: number } | null, colTotals };
-  }, [heatmap_strikes, heatmap_expiries, heatmap_values, spot, nStrikes, mustShow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heatmap_strikes, heatmap_expiries, heatmap_values, spot, nStrikes, mustShow, (shown ?? []).join(",")]);
 
   const centerOn = useCallback((strike: number | null | undefined, col?: number, smooth = true) => {
     const box = boxRef.current;
