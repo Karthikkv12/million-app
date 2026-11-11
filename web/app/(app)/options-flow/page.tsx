@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from "react";
 import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { Plus, SlidersHorizontal } from "lucide-react";
-import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
+import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, strikeLabel, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
 
 const MAX_TICKERS = 3;
@@ -113,7 +113,7 @@ export default function OptionsFlowPage() {
               {STRIKE_OPTIONS.map((n) => (
                 <button key={n} role="radio" aria-checked={nStrikes === n} onClick={() => setNStrikes(n)}
                   className={`px-2 py-1 font-mono text-[12px] tabular-nums transition ${nStrikes === n ? "text-foreground underline decoration-2 underline-offset-[6px]" : "text-foreground/45 hover:text-foreground"}`}>
-                  {n}
+                  {strikeLabel(n)}
                 </button>
               ))}
             </div>

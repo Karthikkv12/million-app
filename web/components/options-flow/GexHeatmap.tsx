@@ -138,6 +138,14 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   const live = useLiveBooks();
   const book = okBooks(live.data).find((b) => b.symbol === data.symbol?.toUpperCase());
 
+  // Strikes the board must reach beyond the chosen window: every option leg, the suggestion and
+  // the share average. Joined into a string so the memo below only reruns when they change.
+  const mustShow = [
+    ...(book?.legs ?? []).filter((l) => l.kind === "option" && l.quantity !== 0 && l.strike != null).map((l) => l.strike!),
+    ...(book?.suggestion?.strike != null ? [book.suggestion.strike] : []),
+    ...(book?.avg_cost && (book.shares ?? 0) > 0 ? [book.avg_cost] : []),
+  ].join(",");
+
   const model = useMemo(() => {
     const allStrikes = heatmap_strikes ?? [];
     const expiries = heatmap_expiries ?? [];
@@ -148,10 +156,21 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
 
     const sorted = [...allStrikes].sort((a, b) => a - b);
     const spotIdx = sorted.indexOf(nearest(sorted, spot) ?? sorted[0]);
-    const half = Math.max(1, Math.floor(nStrikes / 2));
-    let lo = Math.max(0, spotIdx - half);
-    const hi = Math.min(sorted.length, lo + nStrikes);
-    lo = Math.max(0, hi - nStrikes);
+    let lo = 0, hi = sorted.length;
+    if (nStrikes > 0) {                                  // 0 = every strike the server sent
+      const half = Math.max(1, Math.floor(nStrikes / 2));
+      lo = Math.max(0, spotIdx - half);
+      hi = Math.min(sorted.length, lo + nStrikes);
+      lo = Math.max(0, hi - nStrikes);
+      // Grow the window so each of your trades lands on the board, not in "off this board".
+      const step = sorted.length > 1 ? Math.min(...sorted.slice(1).map((v, i) => v - sorted[i])) : 1;
+      for (const k of mustShow ? mustShow.split(",").map(Number) : []) {
+        if (!Number.isFinite(k) || k < sorted[0] - step / 2 || k > sorted[sorted.length - 1] + step / 2) continue;
+        const i = sorted.indexOf(nearest(sorted, k) ?? sorted[0]);
+        lo = Math.min(lo, i);
+        hi = Math.max(hi, i + 1);
+      }
+    }
     const strikes = sorted.slice(lo, hi).reverse();
 
     const rows = strikes.map((strike) => {
@@ -167,7 +186,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
     }
     const colTotals = expiries.map((_, ci) => rows.reduce((a, r) => a + (r.vals[ci] ?? 0), 0));
     return { strikes, rows, expiries, vmax, vmaxTotal, king: king as { strike: number; col: number } | null, colTotals };
-  }, [heatmap_strikes, heatmap_expiries, heatmap_values, spot, nStrikes]);
+  }, [heatmap_strikes, heatmap_expiries, heatmap_values, spot, nStrikes, mustShow]);
 
   const centerOn = useCallback((strike: number | null | undefined, col?: number, smooth = true) => {
     const box = boxRef.current;

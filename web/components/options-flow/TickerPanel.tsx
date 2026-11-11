@@ -31,8 +31,10 @@ export function makeSlot(ticker: string, metric?: unknown): Slot {
   return { ticker, input: ticker, expiryFilter: null, metric: metric === "vex" ? "vex" : "gex" };
 }
 
-/** Strike-window sizes (backend sends at most 40 strikes around spot). */
-export const STRIKE_OPTIONS = [10, 20, 30, 40] as const;
+/** Strike-window sizes around spot; 0 = every strike the server sent. The board also grows past
+ *  the window to reach each of your positions. */
+export const STRIKE_OPTIONS = [10, 20, 30, 40, 0] as const;
+export const strikeLabel = (n: number) => (n > 0 ? String(n) : "All");
 
 // ── TickerPanel: presentational ──────────────────────────────────────────────
 export interface TickerPanelProps {
