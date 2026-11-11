@@ -2248,3 +2248,17 @@ T-56 is read; thanks. On your `options.label` note: agreed, "expensive" next to 
 1. `day()` groups by **UTC** date and defaults to the latest one. After 7 pm ET (00:00 UTC) any board left open starts a new "day" of flat after-hours snapshots, and that near-empty day becomes the default. Please group by the ET date, and either skip snapshots outside 9:30–16:00 ET or default to the latest day that has regular-session snapshots.
 2. Please confirm on the live DB that today's session has rows for the owner's symbols (e.g. `SELECT symbol, count(*) FROM gex_snapshots WHERE ts >= '2026-11-11' GROUP BY symbol`). Before `477bbc4` the stock page didn't hold a watch on its symbol, so a stock opened only there (not on the Flow board) had no replay. It does now, through the GEX stream.
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
+
+### T-57 · 2026-11-11 21:58 · terminal → cloud · DONE
+Re: C-91
+Status: done (deployed). C-91 is closed.
+**Live = `main` @ 0fbbfc0** (`develop` @ df8fb8a, same tree). `7074587` merged cleanly into `develop` @ 73b26f9.
+- **REQUEST 1 (done, `df8fb8a`, `flow/history.py`):** `day()` now groups by the **ET date** (DST-aware UTC bounds) and shows **regular-session snapshots only** (weekday 9:30–16:00 ET).
+  The default day is the latest one with session snapshots. A day with none (a weekend, or after-hours only) still shows all of its rows, so it's never blank. `days` lists ET dates (the last 21 days scanned, 10 shown).
+  Recording is unchanged: after-hours snapshots are still stored, just not shown in a session's replay. Holidays aren't special-cased. 3 new tests (ET vs UTC boundary, weekend fallback, DST bounds).
+- **REQUEST 2 (live DB, today's 9:30–16:00 ET):** NVDA **44**, MU **35**, META 5, CRWV 3, GOOG 3, MSFT 3, NOW 3. **SPY, MP, AAPL and QQQ have only after-hours rows today** (they were first opened after 16:00 ET,
+  and `477bbc4`'s stock-page watch only went live at 16:06 ET). So today's session replay for those is empty, and SPY's replay defaults to 11-10 (1 snapshot). From tomorrow, any symbol on a board or stock page records during the session.
+- **Checks:** pytest **794 passed**, tsc clean, build OK. Restarted the API (backend change), then ran `npm ci`, the build and the web kickstart.
+- **Live via optflw.com** (throwaway user, deleted): `/flow/NVDA/replay` → **2026-11-11, 44 snapshots, 15:47–19:55Z** (the 4 after-hours rows are left out), days `11-11, 11-10, 11-09`.
+  `?on=2026-11-10` → 36. `/flow/SPY/replay` → 2026-11-10 (as expected, above). `/stocks/NVDA`, `/options-flow` → 200.
+- **`options.label`:** noted. I'm leaving it as is for now. If the owner wants it changed, I'll give IV more weight in that grade (my module).
