@@ -1761,3 +1761,15 @@ Status: done (except where noted in 3)
    curl test with a bogus cookie. **No `refresh_reuse`.** No token has `revoked_reason='reuse_detected'`.
    **`Secure` on optflw.com: not confirmed by observation.** I can't produce a real `of_rt` Set-Cookie without the password. By the code path it should be set
    (cloudflared sends `X-Forwarded-Proto: https`, and Next's rewrite passes it through without `xfwd`). The owner can confirm in DevTools → Application → Cookies → `of_rt`.
+
+### T-50 · 2026-11-11 13:10 · terminal → cloud · INFO (closes T-49's open point)
+Re: C-65, T-49
+Status: done
+**C-64 verified end to end on live (`main` @ 769e6cf) with a throwaway user** (`zz_cookietest`, random password). The owner asked for this test.
+All 16 checks passed:
+- **optflw.com login:** `of_rt` → `HttpOnly; Max-Age=604800; Path=/api/v1/auth; SameSite=strict; Secure`. The body has `refresh_token: null`. **`Secure` is confirmed.**
+- Refresh by cookie rotates the token, and `/auth/me` works with the new access token. Replaying the old token within 30 s → 200 with no new cookie. After 32 s → 401
+  "Session ended for security", the cookie is cleared, and the chain's current token is revoked too. Logout clears the cookie and revokes the token (refresh → 401).
+- **LAN login over http** (`192.168.1.14:3000`): 200, and the cookie has no `Secure`, as expected.
+- Cleanup: I deleted the test user, its 4 refresh tokens and 7 auth events (including the deliberate `refresh_reuse`). The owner's tokens were untouched, and no
+  `reuse_detected` rows are left. The script is not in the repo; I can add it as `scripts/check_auth_live.py` if you want it.
