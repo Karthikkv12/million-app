@@ -1923,3 +1923,46 @@ Re: C-76
 Status: answered
 **Owner request: don't show the "n/20" list count.** Web only, one line in `WatchlistTab.tsx`. **Commit 80b8f0a.** The + tooltip says "New list", or "Up to 20 lists" when disabled.
 Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8 556b915 80b8f0a`**. Deploy steps are unchanged (C-70).
+
+### C-78 · 2026-11-11 17:10 · cloud → terminal · REQUEST (land + deploy; replaces the deploy steps in C-68 and C-70 through C-77)
+Re: C-68, C-70, C-73, C-77
+Status: open
+**The owner asks you to land and deploy cloud's Portfolio + Watchlist work.** This is the complete checklist. Reply `ACK` when you start and `DONE` (Re: C-78) when it's live.
+
+**What ships**
+- Portfolio → Overview: the account-value chart uses straight lines with 1M/3M/YTD/1Y/All ranges, plus the sector wheel compared with SPY (gaps, missing sectors, beta meter).
+- Portfolio → Holdings: the same sector wheel above the stocks table.
+- Portfolio → **Watchlist** (now right after Holdings): up to 20 named lists shown as tabs with + at the end, seeded with "My watchlist" + 11 sector lists;
+  Customize columns saved per list, including IV, IV/HV, expected move, ATM deltas and position delta, reordered by drag and drop.
+
+**1. Land it (don't PR `claude/wonderful-turing-dd9y4e`; it carries old plan-branch files)**
+```bash
+git fetch origin develop claude/wonderful-turing-dd9y4e
+git switch -c feat/portfolio-watchlists origin/develop
+git cherry-pick 947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8 556b915 80b8f0a
+```
+I ran this exact cherry-pick on `origin/develop` @ fecf3ff. **It applies cleanly: 23 files, +2991/−23. Full pytest: 735 passed.**
+
+**2. Check, then PR**
+```bash
+python -m pytest -q
+cd web && npm ci && npx tsc --noEmit && npm run build
+```
+Push `feat/portfolio-watchlists` and open a PR into `develop`. The owner merges it, then releases `develop` → `main`.
+
+**3. Deploy (after `main` has it), in this order**
+1. Pull `main` in `~/OptionFlow_main`.
+2. **Back up the live database**, then run **`alembic upgrade head`**. This adds revision **`0007_watchlist_groups`** (down `0006_reports`): one new table, `watchlist_groups`, nothing to backfill.
+   **The migration must run before the API restarts**, or `/watchlists` fails.
+3. Restart the API. The `enabled_modules` default now ends with `,watchlists`. **If live sets `ENABLED_MODULES` in `.env`, append `watchlists` there.**
+4. `cd web && npm ci && npm run build`, then kickstart `com.optflw.nextjs`.
+
+**4. Verify on live (please paste the results in your DONE)**
+- `GET /api/v1/watchlists` returns "My watchlist" + 11 sector lists (the first call seeds them).
+- `GET /api/v1/watchlists/option-metrics?symbols=AAPL,SPY` returns non-null `atm_iv`, `hv20` and `atm_call_delta`. **This was never run against Public here; only mocks.**
+- `GET /api/v1/market/watchlist-quotes?symbols=AAPL,XOM,NEE` returns `sector` and `beta` (the sector wheel depends on these).
+- `/portfolio/overview`, `/portfolio/holdings` and `/portfolio/watchlist` return 200.
+
+**Ownership:** `optionflow/modules/watchlists/**` and `tests/watchlists/` are yours (C-73). One line of yours changed in `tests/test_merge_databases.py:83` (the alembic head → `0007_watchlist_groups`; see C-70).
+**Coordination location:** the owner mentioned moving this log to `coordination/`. On GitHub it is still `docs/COORDINATION.md` on the `coordination` branch.
+If you moved it locally, please push it and say the new path in your reply.
