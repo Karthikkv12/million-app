@@ -216,9 +216,9 @@ export default function DashboardPage() {
                 ))}
                 {actions.map((b) => {
                   const s = b.suggestion!;
-                  const a = ACT[s.action];
+                  const a = s.long_strike != null ? { ...ACT.SELL_PUT, label: "Put spread" } : ACT[s.action];
                   const what = s.action === "BUY_STOCK" ? `+${s.shares} sh`
-                    : s.action === "SELL_CALL" || s.action === "SELL_PUT" ? `${s.contracts}× ${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`
+                    : s.action === "SELL_CALL" || s.action === "SELL_PUT" ? `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`
                     : s.headline.split(/[;:]/)[0];
                   return (
                     <Link key={b.symbol} href="/hedge" className="block">

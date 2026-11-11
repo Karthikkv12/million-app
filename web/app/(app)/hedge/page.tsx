@@ -4,15 +4,15 @@
  * Scales (book delta per lot, portfolio beta), then one row per holding that expands in place into
  * the ticket, legs and a price ladder. Rows stack on phones and tablets; no sideways scrolling.
  * Live: the app-wide SSE stream (lib/live.tsx) every second.
- * Playbook (owner, 2026-11-08): only sell calls, sell puts or buy stock. Never buy options.
+ * Actions follow the strategy picked in the Hedge tab bar (GET /strategy; spike wheel by default).
  */
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import { HedgeBook, HedgeSuggestion } from "@/lib/api";
 import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
+import { useStrategy } from "@/components/strategy/useStrategy";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -54,7 +54,11 @@ const perLot = (b: HedgeBook) => (b.lots && b.lots >= 1 ? (b.net_delta ?? 0) / M
 const lotTone = (v: number | null) => (v == null ? "bg-foreground/40" : v >= 0.85 ? "bg-gain" : v >= 0.4 ? "bg-accent" : "bg-warn");
 const betaTone = (v?: number | null) => (v == null ? "text-foreground/40" : v >= 1.5 ? "text-loss" : v >= 1.1 ? "text-warn" : "text-foreground/75");
 const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? s?.headline
-  : s.action === "BUY_STOCK" ? `+${s.shares} sh` : `${s.contracts}× ${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`;
+  : s.action === "BUY_STOCK" ? `+${s.shares} sh`
+  : `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`;
+/** The action's tag; a put with a long leg is a put credit spread. */
+const actionOf = (s?: HedgeSuggestion | null) => !s ? null
+  : s.long_strike != null ? { ...ACTION.SELL_PUT, label: "Put spread" } : ACTION[s.action];
 
 // ── Expanded detail: ticket · legs · ladder ──────────────────────────────────
 function Detail({ b }: { b: HedgeBook }) {
@@ -83,7 +87,10 @@ function Detail({ b }: { b: HedgeBook }) {
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
                 {[
                   ["Credit", usd(Math.abs(s.credit ?? 0), 0)],
-                  ["Mid / sh", usd(s.premium)],
+                  [s.long_strike != null ? "Net credit / sh" : "Mid / sh", usd(s.premium)],
+                  ...(s.long_strike != null ? [["Long put", String(s.long_strike)], ["Max loss", usd(s.max_loss, 0)]] : []),
+                  ...(s.yield_ann != null ? [["Yield / yr", `${Math.round(s.yield_ann * 100)}%`]] : []),
+                  ...(s.collateral != null && s.long_strike == null ? [["Cash secured", usd(s.collateral, 0)]] : []),
                   ["Δ / contract", sd(s.option_delta)],
                   ["Net Δ after", sd(s.net_delta_after)],
                   ...(s.locked_gain != null ? [["If called", big(s.locked_gain)]] : []),
@@ -91,7 +98,7 @@ function Detail({ b }: { b: HedgeBook }) {
                   ["Contracts", String(s.contracts)],
                   ["Expiry", s.expiry ?? "—"],
                 ].map(([k, v]) => (
-                  <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", ["Credit", "Debit", "If called"].includes(k) && "sensitive")}>{v}</dd></div>
+                  <div key={k}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className={clsx("mt-0.5 tabular-nums text-foreground", ["Credit", "Debit", "If called", "Max loss", "Cash secured"].includes(k) && "sensitive")}>{v}</dd></div>
                 ))}
               </dl>
             )}
@@ -234,6 +241,7 @@ function Legend() {
 const INTRO_KEY = "hedge_intro_hidden";
 function HowItWorks() {
   const [hidden, setHidden] = useState(false);
+  const { current } = useStrategy();
   useEffect(() => { try { setHidden(localStorage.getItem(INTRO_KEY) === "1"); } catch { /* storage off */ } }, []);
   const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(INTRO_KEY, v ? "1" : "0"); } catch { /* storage off */ } };
   if (hidden) {
@@ -243,23 +251,21 @@ function HowItWorks() {
       </button>
     );
   }
-  const steps: [string, string][] = [
+  const steps: string[][] = [
     ["Syncs your book", "Your Robinhood stocks and options load automatically: every hour while the market is open, and once more in the evening."],
     ["Measures your risk live", "Every second it prices each option with Black-Scholes and adds it up per stock: your real net delta (100 shares = +1.00) whatever you've sold, plus gamma and beta."],
-    ["Sells into spikes", "When the stock is ≥2% over your average or IV spikes, it suggests an in-the-money call at the strike closest to your average. If called, you sell at or above average plus the premium."],
-    ["Sells puts on pullbacks", "On a red day or a dip off the high, it suggests a put below your average. Assigned on both? You sold above average and bought back below it. It never suggests buying options."],
+    ...(current?.steps ?? []),
   ];
   return (
-    <DeskSection label="How it works" meta={<button onClick={() => set(true)} className="text-accent hover:underline">Hide</button>}>
+    <DeskSection label="How it works" meta={<>{current ? <>Strategy: <span className="text-foreground">{current.name}</span><br /></> : null}<button onClick={() => set(true)} className="text-accent hover:underline">Hide</button></>}>
       <p className="mb-5 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
-        The desk harvests premium around the stocks you hold: calls sold into spikes, puts sold on pullbacks, stock bought to
-        round up odd lots. It keeps the book near +1 per lot rather than delta-neutral, and shows the real delta at all times.
-        It doesn&apos;t place orders.
+        {current?.summary ?? "The desk suggests trades around the stocks you hold."} Change the strategy from the dropdown above;
+        the actions, buy-backs and phone alerts follow it within seconds. It shows the real delta at all times and doesn&apos;t place orders.
       </p>
-      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
+      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
         {steps.map(([t, d], i) => (
           <li key={t} className="border-t border-[var(--border)] pt-3">
-            <p className="font-mono text-[11px] text-accent">0{i + 1}</p>
+            <p className="font-mono text-[11px] text-accent">{String(i + 1).padStart(2, "0")}</p>
             <p className="mt-1 text-[14px] font-medium text-foreground">{t}</p>
             <p className="mt-1 text-[13px] leading-relaxed text-foreground/60">{d}</p>
           </li>
@@ -324,7 +330,7 @@ function Scales({ books }: { books: HedgeBook[] }) {
 // ── One holding ──────────────────────────────────────────────────────────────
 function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle: () => void }) {
   const s = b.suggestion;
-  const a = s ? ACTION[s.action] : null;
+  const a = actionOf(s);
   const per = perLot(b);
   const lots = Math.max(Math.floor(b.lots ?? 0), 1);
   const after = s?.net_delta_after != null && TRADE.has(s.action) ? s.net_delta_after / lots : null;

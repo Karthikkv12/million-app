@@ -155,10 +155,12 @@ def _put_side(ctx, quotes, net, free, puts_on, where, warnings, rules: Rules, na
                               [where, f"Minimum {rules.min_yield:.0%}/yr on the max loss."], warnings=warnings)
         q, n = sp.short, 1
         d_after = net - n * (sp.short.delta - sp.long.delta)
-        s = Suggestion("SELL_PUT", f"Sell 1 {q.strike:g}/{sp.long.strike:g}P spread {q.expiry} for ${sp.credit:.2f} ({sp.yield_ann:.0%}/yr on risk)",
+        s = Suggestion("SELL_PUT", f"Sell 1 {q.strike:g}/{sp.long.strike:g}P spread {q.expiry} for ${sp.credit:.2f} "
+                       f"({sp.credit / sp.max_loss:.0%} on risk)",
                        ["Pulled back." if pulled_back(ctx) else "Rules allow a put now.",
                         f"Sell the {q.strike:g}P (Δ {q.delta:.2f}) and buy the {sp.long.strike:g}P, {q.dte:.0f} days.",
-                        f"Credit ${sp.credit:.2f} on a ${sp.width:g} width; max loss ${sp.max_loss * 100:,.0f}.",
+                        f"Credit ${sp.credit:.2f} on a ${sp.width:g} width; max loss ${sp.max_loss * 100:,.0f}: "
+                        f"{sp.credit / sp.max_loss:.0%} on risk this trade ({sp.yield_ann:.0%}/yr).",
                         f"Close at {rules.take_profit:.0%} of the credit."],
                        q.strike, q.expiry, "put", n, _r(-q.delta), _r(sp.credit, 2), _r(sp.credit * 100, 2),
                        _r(d_after), warnings=warnings)

@@ -291,8 +291,12 @@ def _chain_stage(m: Dict[str, Any], f: Dict[str, Any], rules: Rules, today: date
         reasons.append(f"{m['sma200_gap']:+.1%} vs the 200-day average.")
     reasons.append(f"ATM IV {iv:.0%}" + (f" = {ivhv:.2f}× realized" if ivhv else "")
                    + (f", {pct:.0%} of its 1-year range" if pct is not None else "") + ".")
-    reasons.append(f"{t['headline']}: Δ {t['delta']:.2f}, {t['dte']:.0f} days, {t['yield_ann']:.0%}/yr on "
-                   + ("risk" if t["action"] == "SELL_PUT_SPREAD" else "the shares" if t["action"] == "BUY_WRITE" else "the cash") + ".")
+    if t["action"] == "SELL_PUT_SPREAD":
+        reasons.append(f"{t['headline']}: Δ {t['delta']:.2f}, {t['dte']:.0f} days; max loss ${t['max_loss']:,.0f}, "
+                       f"{t['credit'] / t['max_loss']:.0%} on risk this trade ({t['yield_ann']:.0%}/yr).")
+    else:
+        reasons.append(f"{t['headline']}: Δ {t['delta']:.2f}, {t['dte']:.0f} days, {t['yield_ann']:.0%}/yr on "
+                       + ("the shares" if t["action"] == "BUY_WRITE" else "the cash") + ".")
     if f["skip_earnings"]:
         reasons.append(f"Earnings {earn} (after expiry)." if earn else "No earnings date found before expiry.")
     key = f"{rules.key}:{sym}:{t['strike']:g}" + (f"/{t['long_strike']:g}" if t.get("long_strike") else "") + f":{t['expiry']}"
