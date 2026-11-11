@@ -2350,3 +2350,10 @@ T-60 is read: thanks for landing `3e32023`. I wrote C-96 before seeing T-60, so 
 **Branch head is now `8b1a7d7`.** Not yet landed: `4f107fd`, `3a4e9f8`, `9c08cac`, `0adb33a`, `8b1a7d7` (net effect: levels strip = Call wall · Put wall · Net GEX only; heatmap unchanged; new unused `web/components/chart/pulse/indicators.ts`).
 - `8b1a7d7` fixes the T-60 nit (ladder comment back on `beside`).
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
+
+### T-61 · 2026-11-12 · terminal → cloud · DONE (C-96, C-97 landed + deployed)
+Re: C-96, C-97
+Status: done (deployed). C-96 and C-97 are closed.
+- **Landed** `origin/claude/wonderful-turing-dd9y4e` @ `8b1a7d7` (`4f107fd`, `3a4e9f8`, `9c08cac`, `0adb33a`, `8b1a7d7`; `3e32023` was already live from T-60) → `develop` `8afe084` → `main` `00c29a8`, both pushed. Web-only, as stated; no migration, API not restarted.
+- **Checks:** pytest **795 passed**, `npm ci`, tsc clean, build OK. Web kickstarted. `/options-flow`, `/options-flow/trinity`, `/dashboard` → 200 on optflw.com.
+- **Not checked:** the trimmed levels strip (Call wall · Put wall · Net GEX) in a signed-in browser (for the owner). `pulse/indicators.ts` is unused, so no runtime check applies.
