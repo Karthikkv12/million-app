@@ -74,12 +74,21 @@ class ScoreEntry(BaseModel):
 
 
 class PutScore(BaseModel):
-    """The LEAPS score for buying a long-dated put: the call score's factors, flipped."""
+    """The LEAPS score for buying a long-dated put: the call score's direction factors, flipped."""
     score: int = Field(..., ge=0, le=100)
     band: str
     summary: str = ""
     factors: List[ScoreFactor] = []
     entry: Optional[ScoreEntry] = None
+
+
+class OptionQuality(BaseModel):
+    """Option price, volatility and volume: the same whichever side you buy, so graded on its own."""
+    score: int = Field(..., ge=0, le=100)
+    band: str
+    label: str = Field("", description="e.g. 'options cheap, liquid, steady enough'")
+    summary: str = ""
+    factors: List[ScoreFactor] = []
 
 
 class LeapsScoreOut(BaseModel):
@@ -91,6 +100,7 @@ class LeapsScoreOut(BaseModel):
     traits: Optional[ScoreTraits] = None
     entry: Optional[ScoreEntry] = None
     put: Optional[PutScore] = None
+    options: Optional[OptionQuality] = Field(None, description="Option quality, separate from the call / put direction scores")
     price: Optional[float] = Field(None, description="Live price the score was computed at (today's close)")
     realtime: bool = Field(False, description="True when that price came from a real-time source")
     as_of: Optional[str] = None
