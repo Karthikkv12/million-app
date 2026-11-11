@@ -1,6 +1,6 @@
 """optionflow/workers/gex_poller.py — keep GEX fresh for symbols that open boards are watching.
 
-Every poll_interval() seconds (120, or 30 while Public.com serves chains), recomputes GEX for each watched symbol, which
+Every poll_interval() seconds (120, or 10 while Public.com serves chains), recomputes GEX for each watched symbol, which
 also refreshes the cache, records a flow snapshot and a (throttled) replay snapshot. Runs as a daemon thread
 started by the app's lifespan.
 """
@@ -18,8 +18,9 @@ from optionflow.workers import backfill
 logger = logging.getLogger("optionflow.poller")
 
 POLL_INTERVAL = 120          # seconds; Yahoo data is ~15 min delayed, and every refresh fetches up to 12 chains
-REALTIME_POLL_INTERVAL = 30  # seconds while Public.com (real-time) serves chains: ~13 requests per symbol,
-                             # paced at 8/s, so even 10 watched symbols use well under half of Public's limit
+REALTIME_POLL_INTERVAL = 10  # seconds while Public.com (real-time) serves chains: ~13 requests per symbol at the
+                             # provider's 8/s pacing (~1.6 s/symbol). The sleep comes after each cycle, so with many
+                             # watched symbols the cycle just runs longer; Public is never asked for more than 8/s (C-88)
 
 
 def poll_interval() -> int:
