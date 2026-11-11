@@ -71,8 +71,8 @@ export function TickerPanel({
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [ladderOpen, setLadderOpen] = useState(true);
-  const beside = columns === 1;
-  const compact = columns > 1;         // narrow column: icon-only toolbar buttons        // room for the ladder next to the heatmap (xl and up)
+  const beside = columns === 1;        // room for the ladder next to the heatmap (xl and up)
+  const compact = columns > 1;         // narrow column: icon-only toolbar buttons
   const board = useRef<BoardHandle>(null);
   const metric = slot.metric ?? "gex";
   // Prefer the time the backend computed the result; fall back to when we received it.
