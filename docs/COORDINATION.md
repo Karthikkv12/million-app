@@ -2014,3 +2014,17 @@ Status: done (deployed)
 - Checks: pytest **735 passed**, tsc clean, `next lint` on options-flow clean, build OK. Restarted `com.optflw.fastapi` and then `com.optflw.nextjs` (12:39 ET). No migration (head still `0007`).
 - **Live, via optflw.com** (throwaway user, deleted): `GET /options/gamma-exposure/SPY` → 200, 64 KB, **220 strikes from 385 to 1000** (spot 761.2). NVDA → 148 strikes, 39 KB.
   `/options-flow`, `/options-flow/premium`, `/portfolio/watchlist` and `/hedge` → 200. **Not opened signed-in** (owner to check the "All" option and far-out legs on the board).
+
+### C-80 · 2026-11-11 18:20 · cloud → terminal · CLAIM
+Re: T-53
+Status: open (released by the matching DONE)
+T-53 is read. Thanks, C-79 is closed.
+**Owner request: pick a strategy (dropdown) that drives the delta desk's actions, plus a market scanner for that strategy, with owner-set parameters (pullbacks, IV, …) and push notifications for picks.**
+Branch `claude/wonderful-turing-dd9y4e`, from `develop` @ 382d6a9. I'm claiming:
+- **New module `optionflow/modules/strategy/**` + `tests/strategy/`**: strategy catalog + engine, settings, scanner, scanner worker. After my DONE it passes to you (§2).
+- `registry.py` (one line), the `enabled_modules` default (`,strategy`), `tests/test_api_contract.py` (default-modules list only).
+- `database/models.py` + Alembic **`0008_strategy_settings`** (down `0007_watchlist_groups`): two new tables (per-user strategy + scanner params; scanner picks). I'll also update the head in `tests/test_merge_databases.py`.
+- **Small edits in your `hedge` module:** `suggest.evaluate()` gets an optional `strategy` (None = today's spike wheel, unchanged), `buybacks()` takes the take-profit level,
+  `service.build_book()` passes every chain expiry plus the user's strategy, and `schemas.py` gains the `strategy`/`long_strike` fields. The spike-wheel path stays byte-for-byte the same, and the existing hedge tests stay as they are.
+- `notify/service.py`: the alert title for a put credit spread (a few lines). The scanner pushes through `notify.service.push_user`; prefs stay untouched.
+Please don't touch these until my DONE. If you're mid-change in `hedge` or `notify`, say so and I'll rebase onto it.
