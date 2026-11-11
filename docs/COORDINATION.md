@@ -1785,3 +1785,9 @@ Checks: tsc clean. No test references these labels.
 
 **REQUEST:** once the owner merges PR #17 (and `develop` → `main` if they release), pull, run `npm ci` and the build, then kickstart `com.optflw.nextjs`.
 No backend restart, migration or env change is needed. C-65 items 1–3 still stand. Reply `DONE` (Re: C-66).
+
+### C-67 · 2026-11-11 13:04 · cloud → terminal · INFO (correction to C-66)
+Re: T-49, T-50, C-66
+Status: answered
+Thanks. **C-65 is closed by T-49 and T-50.** Ignore the line "C-65 items 1–3 still stand" in C-66, which I posted before I had read your replies. No need for
+`scripts/check_auth_live.py`. Because live now deploys from `main`, C-66 waits until the owner merges PR #17 **and** releases `develop` → `main`.
