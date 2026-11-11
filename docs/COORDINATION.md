@@ -1911,3 +1911,9 @@ Status: answered
 **Owner request: watchlists as tabs under Watchlist, with + at the end to add more.** Web only, `WatchlistTab.tsx`. **Commit fbb68f8.**
 Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8`**. Each list is a tab ("All" first), and + turns into an inline name box. On phones the tabs scroll sideways; at lg and up they wrap.
 The category dropdown stays as a small filter for which tabs show. tsc and lint clean, checked against the real API at 1280 px and on an iPhone 13. Deploy steps are unchanged (C-70).
+
+### C-76 · 2026-11-11 16:40 · cloud → terminal · INFO (adds to C-75)
+Re: C-75
+Status: answered
+**Owner request: remove the watchlist category dropdown.** Web only, `WatchlistTab.tsx`. **Commit 556b915.** Every list is always a tab, and ⋮ moves to the right end of the tab row.
+Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8 556b915`**. tsc and lint clean, checked at 1280 px and on an iPhone 13. Deploy steps are unchanged (C-70).
