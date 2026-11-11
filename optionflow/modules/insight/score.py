@@ -1,8 +1,13 @@
 """optionflow/modules/insight/score.py — the LEAPS score: 0 (bad) to 100 (extremely good) (pure, no I/O).
 
-"Is this a good moment to buy a long-dated call on this stock?" Ten factors, each scored 0–100 and weighted.
-A long call wants a stock that goes up over years, bought on a pullback inside that uptrend, when implied
-volatility is cheap, in a name that trades enough to get in and out and does not gap its holder to zero.
+"Is this a good moment to buy a long-dated call on this stock?" Ten factors, each scored 0–100 and weighted,
+in two groups:
+
+- DIRECTION (trend, pullback, momentum, growth, resilience, strength, dealers) grades the CALL score; the same
+  factors flipped grade the PUT score. A long call wants a stock that goes up over years, bought on a pullback
+  inside that uptrend; a long put wants the reverse. The two scores therefore point opposite ways.
+- OPTION QUALITY (iv, volatility, liquidity) is the same whichever side you buy: are the options cheap, is the
+  stock tradeable, will it gap the holder to zero. It is its own grade (`options`), not part of call or put.
 
   trend        18  price vs the 200-day average, that average's slope, 50-day over 200-day
   pullback     18  how far under the 52-week high: 10–25% off in an uptrend is the sweet spot; at the high there is
@@ -19,9 +24,8 @@ volatility is cheap, in a name that trades enough to get in and out and does not
 `entry` is the stock price to buy at (entry_plan): now if it has already pulled back, else the dip to wait for,
 or in a downtrend the level it has to reclaim.
 
-`put` is the same score for buying a long-dated PUT: the idea flipped. A stock in a downtrend, bought on a
-bounce off its low, that has not compounded, has fallen hard before and lags the market scores high. Option
-price, volatility and volume count the same way for both sides (you are buying an option either way).
+`put` is the direction score for buying a long-dated PUT: the idea flipped. A stock in a downtrend, bought on a
+bounce off its low, that has not compounded, has fallen hard before and lags the market scores high.
 `put.entry` (put_entry_plan) is the bounce to wait for, or in an uptrend the level it has to break.
 
 A factor with no data is left out and the rest are re-weighted. Bands: 0–19 Avoid, 20–39 Weak, 40–59 Fair,
@@ -38,6 +42,8 @@ WEIGHTS = {"trend": 18, "pullback": 18, "iv": 14, "volatility": 10, "liquidity":
 LABELS = {"trend": "Long-term trend", "pullback": "Pullback", "iv": "Option price (IV)", "volatility": "Volatility",
           "liquidity": "Volume", "momentum": "Momentum", "growth": "Long-run growth", "resilience": "Drawdown history",
           "strength": "Strength vs SPY", "dealers": "Dealer positioning"}
+OPTION_KEYS = ("iv", "volatility", "liquidity")          # option quality: the same for a call or a put
+DIRECTION_KEYS = tuple(k for k in WEIGHTS if k not in OPTION_KEYS)
 MIN_BARS = 60
 
 
@@ -112,7 +118,7 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
     px = [float(c) for c in closes if c and c > 0]
     if len(px) < MIN_BARS:
         return {"score": None, "band": None, "summary": "", "factors": [], "traits": None, "entry": None,
-                "put": None, "error": f"Needs {MIN_BARS} sessions of history; {len(px)} available."}
+                "put": None, "options": None, "error": f"Needs {MIN_BARS} sessions of history; {len(px)} available."}
     last = px[-1]
     f: List[Dict[str, Any]] = []
 
@@ -241,6 +247,8 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
                          "Below the flip with short gamma: dealers amplify the selling." if not above and not long_g else
                          "Mixed dealer positioning."))
 
+    opt = [x for x in f if x["key"] in OPTION_KEYS]
+    f = [x for x in f if x["key"] not in OPTION_KEYS]
     score, summary = _total(f, "LEAPS call")
 
     # ── the put side: the same factors, flipped ──────────────────────────────
@@ -264,7 +272,6 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
         bounce *= 0.6
         b_note = "Well off the low inside an uptrend: a put here fights the rally."
     g.append(_factor("pullback", bounce, f"{_pct(up_off)} from 52-wk low", b_note, "Bounce"))
-    g += [dict(cf[k]) for k in ("iv", "volatility", "liquidity") if k in cf]
     if r6 is not None or r3 is not None:
         m = [lerp(-r, [(-0.30, 0), (0.0, 45), (0.15, 80), (0.40, 100), (1.0, 70)]) for r in (r3, r6) if r is not None]
         mom = sum(m) / len(m)
@@ -306,7 +313,25 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
               "sessions": len(px)}
     entry = entry_plan(last, score, direction, off, high, ma50, ma_long, n_long)
     return {"score": score, "band": band(score), "summary": summary, "factors": f, "traits": traits,
-            "entry": entry, "put": put, "error": None}
+            "entry": entry, "put": put, "options": option_quality(opt), "error": None}
+
+
+def option_quality(opt: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The option-quality grade (iv, volatility, liquidity): the same whichever side you buy. None without data."""
+    if not opt:
+        return None
+    s = int(round(sum(x["score"] * x["weight"] for x in opt) / sum(x["weight"] for x in opt)))
+    by = {x["key"]: x for x in opt}
+    words = []
+    if "iv" in by:
+        words.append("options cheap" if by["iv"]["score"] >= 65 else "options expensive" if by["iv"]["score"] < 40 else "options fairly priced")
+    if "liquidity" in by:
+        words.append("liquid" if by["liquidity"]["score"] >= 60 else "thinly traded")
+    if "volatility" in by:
+        words.append("too volatile" if by["volatility"]["score"] < 40 else "steady enough")
+    label = ", ".join(words)
+    return {"score": s, "band": band(s), "label": label,
+            "summary": f"{band(s)} options to buy: {label}. The same for a call or a put.", "factors": opt}
 
 
 ENTER_SCORE = 50             # at or above this, a stock that has already pulled back is an entry now

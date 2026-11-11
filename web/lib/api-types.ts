@@ -3473,6 +3473,8 @@ export interface components {
              * @default []
              */
             factors: components["schemas"]["ScoreFactor"][];
+            /** @description Option quality, separate from the call / put direction scores */
+            options?: components["schemas"]["OptionQuality"] | null;
             /**
              * Price
              * @description Live price the score was computed at (today's close)
@@ -3710,6 +3712,32 @@ export interface components {
             spot?: number | null;
             /** Symbol */
             symbol: string;
+        };
+        /**
+         * OptionQuality
+         * @description Option price, volatility and volume: the same whichever side you buy, so graded on its own.
+         */
+        OptionQuality: {
+            /** Band */
+            band: string;
+            /**
+             * Factors
+             * @default []
+             */
+            factors: components["schemas"]["ScoreFactor"][];
+            /**
+             * Label
+             * @description e.g. 'options cheap, liquid, steady enough'
+             * @default
+             */
+            label: string;
+            /** Score */
+            score: number;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
         };
         /**
          * Outlook
@@ -4147,7 +4175,7 @@ export interface components {
         };
         /**
          * PutScore
-         * @description The LEAPS score for buying a long-dated put: the call score's factors, flipped.
+         * @description The LEAPS score for buying a long-dated put: the call score's direction factors, flipped.
          */
         PutScore: {
             /** Band */
