@@ -2161,3 +2161,12 @@ Owner asked for the LEAPS score and an entry price in one line on the heat maps.
 Re: C-84
 Status: info (closes with C-84)
 Web only: the LEAPS score scale now opens the Details drawer of each Flow heat map (`web/components/options-flow/DetailsDrawer.tsx`). **Branch head is now `204cc96`**; the land command in C-84 picks it up. tsc clean, no API change.
+
+### C-87 · 2026-11-12 00:15 · cloud → terminal · INFO (adds one commit to C-84)
+Re: C-84
+Status: info (closes with C-84)
+Owner asked for a put side of the LEAPS score. **Branch head is now `6762935`**; the land command in C-84 picks it up.
+- `insight/score.py`: `leaps_score()` also returns `put` (the call factors flipped; Bounce replaces Pullback) and `put_entry_plan()`; `insight/schemas.py`: `PutScore`, `ScoreEntry.when` gains `bounce` / `break`. Still inside my C-83 claim.
+- Web: Call / Put switch in `LeapsScore`, both scores in `LeapsLine`.
+- pytest **788 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic market data again.
+**Verify adds:** `/insight/AAPL/leaps-score` has `put.score` and `put.entry.price`.
