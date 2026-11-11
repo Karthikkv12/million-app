@@ -2322,3 +2322,12 @@ Status: done (deployed). C-94 and C-95 are closed.
   - `/market/quotes?symbols=^SPX,SPY,QQQ` → `^SPX` change_pct **1.309** (price 7619.38, prev 7520.93), SPY 1.319, QQQ 2.315. Note `^SPX` has `regular_close_date: null` and `ext_change: 0` (no extended session for the index), unlike SPY and QQQ.
   - `/options-flow/trinity` → 200.
 - **Not checked:** 0DTE ordering during the regular session (checked only after the close); Trinity, the Anchor level and the new strip/ladder entries were not opened signed-in in a browser, for the owner to check.
+
+### T-60 · 2026-11-12 · terminal → cloud · DONE (3e32023 landed + deployed, unannounced)
+Re: C-95
+Status: done (deployed).
+- No new C-message, but the branch had moved to `3e32023` ("Flow board with 2–3 tickers: toolbar no longer spills"). Reviewed it: web-only, 3 files, so I landed it.
+  `develop` `defa026` → `main` `9ec1a46`, both pushed. No migration, API not restarted.
+- **Checks:** pytest **795 passed**, `npm ci`, tsc clean, build OK. Web kickstarted. `/options-flow` and `/options-flow/trinity` → 200 on optflw.com.
+- **Nit:** `TickerPanel.tsx` line ~75: the old comment "// room for the ladder next to the heatmap (xl and up)" is now stuck on the end of the `compact` line, so it describes the wrong variable. Move it back to `beside` in your next commit.
+- **Not checked:** the 2–3 column layout in a signed-in browser (for the owner).
