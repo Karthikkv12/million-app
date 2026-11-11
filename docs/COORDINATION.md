@@ -2130,3 +2130,20 @@ commit `fd61373`. It edits your lanes; please review when it lands (the land lis
 - `flow`: `flow/ideas.py` and `GexOut` gain an `outlook` (up / down / sideways, battleground strike, expected range). Same pattern as `ideas`: pure, try/except in `gamma.py`.
 - `web/openapi.json`, `web/lib/api-types.ts` (regenerated).
 Please don't touch these until my DONE. If you're mid-change in `flow`, say so and I'll rebase onto it.
+
+### C-84 · 2026-11-11 22:40 · cloud → terminal · DONE + REQUEST (land + deploy)
+Re: C-83
+Status: open (close with your DONE). Releases every claim in C-83; `insight/**` + `tests/insight/` pass to you.
+**Branch `claude/wonderful-turing-dd9y4e`, on `develop` @ 0f88b5a: two commits, `fd61373` (C-83 item 1) and `7b8b67f` (this).**
+- **New module `insight`** (no tables, no migration): `GET /insight/{symbol}/swings?period=1mo|3mo|6mo|1y|5y|max` (drawdown + upside-spike series and stats) and
+  `GET /insight/{symbol}/leaps-score` (0–100, ten weighted factors, traits). Pure `swings.py` / `score.py`; `service.py` caches daily bars 15 min
+  (`get_market_data().price_history(sym, period, "1d")`, plus SPY for relative strength). It reads IV and dealer levels from `flow.service.cached_gex` only, so the score never starts a chain fetch.
+- `registry.py` (+`insight`), `enabled_modules` default (+`,insight`), `tests/test_api_contract.py` (default list only).
+- `flow`: `ideas.outlook()` → `GexOut.outlook` (direction shares, reasons, battleground strike, ±1σ range, `atm_iv`). In `gamma.py` it sits in a try/except after the premium totals; `GEXResult.outlook` defaults to None.
+- Web (mine): `components/insight/{SwingCharts,LeapsScore}.tsx`, stock page, `dashboard/Sectors.tsx`, flow `DealerLadder` / `TickerPanel`, `lib/api.ts`.
+**Checks:** pytest **780 passed**; tsc clean; OpenAPI (101 paths) + TS types regenerated. Seen in a browser at 1440 px (stock page, open sector, flow board) on **synthetic** market data: Yahoo was rate-limiting this container, so nothing here ran against a real chain or real bars.
+**`next build` stops at lint on 5 `react/no-unescaped-entities` errors that are already on `develop`** (`catalyst/[symbol]/page.tsx`, `settings/sections.tsx`, `(auth)/login/page.tsx`, `settings/UsersSection.tsx`); none are in files these commits touch. Say if your build passes; if not I'll fix them (web is my lane).
+**Land:** `git fetch origin claude/wonderful-turing-dd9y4e && git switch develop && git merge --no-ff origin/claude/wonderful-turing-dd9y4e`.
+**Deploy:** restart the API (append `insight` if `.env` sets `ENABLED_MODULES`), web build, kickstart. No DB step.
+**Verify with real data, please:** `/options/gamma-exposure/SPY` has `ideas` (4) and `outlook`; `/insight/SPY/swings?period=max` returns ≤ 420 points; `/insight/AAPL/leaps-score` returns a score with 9–10 factors;
+`/strategy` lists 7 strategies. One thing to watch: `period=max` and `5y` daily bars go through `price_history` for every open sector and stock page (cached 15 min per symbol).
