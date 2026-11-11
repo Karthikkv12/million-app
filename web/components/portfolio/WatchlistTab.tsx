@@ -1,15 +1,16 @@
 "use client";
 /**
  * Watchlists: up to 20 named lists. The first visit seeds "My watchlist" (the old single list)
- * plus one list per sector, each starting with its SPDR ETF. Pick a category (All, Sectors, My lists),
- * then a list. "All symbols" merges every list in the category. Sector narrows the table by the
+ * plus one list per sector, each starting with its SPDR ETF. The list name is a dropdown (like
+ * Robinhood's): pick one list, or a whole category ("All symbols", "All sectors", "All my lists")
+ * which merges its lists. ⋮ holds Edit name / Restore / Delete. Sector narrows the table by the
  * quote's own sector. Quotes come from /market/watchlist-quotes and refresh every minute.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, SkeletonCard } from "@/components/ui";
 import {
@@ -29,10 +30,6 @@ const QUOTE_CAP = 150;                            // /market/watchlist-quotes li
 const pos = (price?: number | null, lo?: number | null, hi?: number | null) =>
   price == null || lo == null || hi == null || hi <= lo ? null : Math.min(1, Math.max(0, (price - lo) / (hi - lo)));
 
-const chip = (on: boolean) => clsx(
-  "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12px] font-medium transition",
-  on ? "border-foreground bg-foreground text-[var(--background)]" : "border-[var(--border)] text-foreground/65 hover:text-foreground",
-);
 
 export function WatchlistTab() {
   const qc = useQueryClient();
@@ -100,7 +97,7 @@ export function WatchlistTab() {
     mutationFn: (name: string) => createWatchlistGroup(name),
     onSuccess: (g) => {
       qc.setQueryData<WatchlistGroups>(KEY, (d) => d && { ...d, lists: [...d.lists, g] });
-      setNewName(null); setErr(null); setCategory((c) => (c === "sector" ? "all" : c)); setSelected(g.id);
+      setNewName(null); setErr(null); setCategory("all"); setSelected(g.id);
     },
     onError: fail,
   });
@@ -160,61 +157,50 @@ export function WatchlistTab() {
   if (groupsQ.isLoading) return <SkeletonCard rows={6} />;
   if (groupsQ.isError) return <p className="py-10 text-center text-[13px] text-loss">Couldn&apos;t load your watchlists. {(groupsQ.error as Error)?.message}</p>;
 
-  const counts = { all: lists.length, sector: lists.filter((g) => g.kind === "sector").length, custom: lists.filter((g) => g.kind === "custom").length };
-  const atLimit = lists.length >= maxLists;
+    const atLimit = lists.length >= maxLists;
 
   return (
     <div className="space-y-4">
-      {/* Category, then the lists in it. */}
-      <div className="space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div role="tablist" aria-label="Category" className="inline-flex rounded-full border border-[var(--border)] p-0.5">
-            {([["all", "All"], ["sector", "Sectors"], ["custom", "My lists"]] as [Category, string][]).map(([c, label]) => (
-              <button key={c} role="tab" aria-selected={category === c} onClick={() => { setCategory(c); setSelected(ALL); }}
-                className={clsx("h-7 rounded-full px-3 text-[12px] font-medium transition",
-                  category === c ? "bg-[var(--surface-2)] text-foreground" : "text-foreground/55 hover:text-foreground")}>
-                {label} <span className="font-mono text-foreground/45">{counts[c]}</span>
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 font-mono text-[11px] text-foreground/50">
-            {sectorListsMissing && (
-              <button onClick={() => restore.mutate()} disabled={restore.isPending || atLimit} title={atLimit ? "At the 20-list limit" : undefined}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-sans text-[12px] text-foreground/60 hover:text-foreground disabled:opacity-40">
-                <RotateCcw size={12} /> Restore sector lists
-              </button>
-            )}
-            <span>{lists.length}/{maxLists} lists</span>
-          </div>
-        </div>
-        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          <div className="flex gap-1.5 sm:flex-wrap">
-            <button onClick={() => setSelected(ALL)} className={chip(selected === ALL)}>
-              All symbols <span className="font-mono opacity-60">{new Set(inCategory.flatMap((g) => g.symbols)).size}</span>
-            </button>
-            {inCategory.map((g) => (
-              <button key={g.id} onClick={() => setSelected(g.id)} className={chip(selected === g.id)}>
-                {g.name} <span className="font-mono opacity-60">{g.symbols.length}</span>
-              </button>
-            ))}
-            {category !== "sector" && (newName == null ? (
-              <button onClick={() => { setNewName(""); setErr(null); }} disabled={atLimit} title={atLimit ? `Up to ${maxLists} lists` : "New list"}
-                className={clsx(chip(false), "border-dashed disabled:opacity-40")}>
-                <Plus size={13} /> New list
-              </button>
-            ) : (
-              <form onSubmit={(e) => { e.preventDefault(); if (newName.trim()) create.mutate(newName.trim()); }}
-                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-foreground/40 pl-3 pr-1">
-                <input autoFocus value={newName} maxLength={40} onChange={(e) => setNewName(e.target.value)} placeholder="List name"
-                  onKeyDown={(e) => e.key === "Escape" && setNewName(null)}
-                  className="w-32 bg-transparent text-[12px] text-foreground outline-none placeholder:text-foreground/40" />
-                <button type="submit" aria-label="Create list" className="rounded-full p-1 text-foreground/70 hover:text-foreground"><Check size={13} /></button>
-                <button type="button" aria-label="Cancel" onClick={() => setNewName(null)} className="rounded-full p-1 text-foreground/50 hover:text-foreground"><X size={13} /></button>
-              </form>
-            ))}
-          </div>
+      {/* Robinhood-style header: the open list's name is the dropdown; ⋮ holds the list actions. */}
+      <div className="flex items-center justify-between gap-3">
+        <ListPicker
+          label={current ? current.name : category === "sector" ? "All sectors" : category === "custom" ? "All my lists" : "All symbols"}
+          lists={lists} selected={selected} category={category}
+          onPick={(cat, id) => { setCategory(cat); setSelected(id); setSector(""); setErr(null); }}
+          onNew={atLimit ? undefined : () => { setNewName(""); setErr(null); }}
+          used={lists.length} max={maxLists}
+        />
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="hidden font-mono text-[11px] text-foreground/45 sm:inline">{lists.length}/{maxLists} lists</span>
+          <button onClick={() => { setNewName(""); setErr(null); }} disabled={atLimit} aria-label="New list" title={atLimit ? `Up to ${maxLists} lists` : "New list"}
+            className="grid h-9 w-9 place-items-center rounded-lg text-foreground/60 transition hover:bg-[var(--surface-2)] hover:text-foreground disabled:opacity-35">
+            <Plus size={17} />
+          </button>
+          <ActionsMenu items={[
+            ...(current ? [{ label: "Edit name", icon: Pencil, onClick: () => setRename(current.name) }] : []),
+            ...(sectorListsMissing ? [{ label: "Restore sector lists", icon: RotateCcw, onClick: () => restore.mutate(), disabled: atLimit }] : []),
+            ...(current ? [{ label: "Delete list", icon: Trash2, danger: true, onClick: () => {
+              if (window.confirm(`Delete the list "${current.name}"? Its ${current.symbols.length} symbols go with it.`)) drop.mutate(current.id);
+            } }] : []),
+          ]} />
         </div>
       </div>
+
+      {(newName != null || (rename != null && current)) && (
+        <form onSubmit={(e) => {
+            e.preventDefault();
+            if (newName != null) { if (newName.trim()) create.mutate(newName.trim()); }
+            else if (current && rename?.trim()) replace.mutate({ id: current.id, body: { name: rename.trim() } });
+          }}
+          className="flex max-w-sm items-center gap-1 rounded-xl border border-foreground/40 py-1 pl-3 pr-1">
+          <input autoFocus maxLength={40} placeholder={newName != null ? "New list name" : "List name"}
+            value={newName ?? rename ?? ""} onChange={(e) => (newName != null ? setNewName(e.target.value) : setRename(e.target.value))}
+            onKeyDown={(e) => { if (e.key === "Escape") { setNewName(null); setRename(null); } }}
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground/40" />
+          <button type="submit" className="h-7 rounded-lg bg-foreground px-3 text-[12px] font-medium text-[var(--background)]">{newName != null ? "Create" : "Save"}</button>
+          <button type="button" aria-label="Cancel" onClick={() => { setNewName(null); setRename(null); }} className="rounded-lg p-1.5 text-foreground/50 hover:text-foreground"><X size={14} /></button>
+        </form>
+      )}
 
       {/* Tools for the open list. */}
       {current && (
@@ -230,25 +216,6 @@ export function WatchlistTab() {
               <Plus size={13} /> Add my {missingHoldings.length} holding{missingHoldings.length === 1 ? "" : "s"}
             </button>
           )}
-          <div className="ml-auto flex items-center gap-1">
-            {rename == null ? (
-              <button onClick={() => setRename(current.name)} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-foreground/60 hover:text-foreground">
-                <Pencil size={13} /> Rename
-              </button>
-            ) : (
-              <form onSubmit={(e) => { e.preventDefault(); if (rename.trim()) replace.mutate({ id: current.id, body: { name: rename.trim() } }); }}
-                className="inline-flex h-9 items-center gap-1 rounded-full border border-foreground/40 pl-3 pr-1">
-                <input autoFocus value={rename} maxLength={40} onChange={(e) => setRename(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setRename(null)}
-                  className="w-36 bg-transparent text-[12px] text-foreground outline-none" />
-                <button type="submit" aria-label="Save name" className="rounded-full p-1 text-foreground/70 hover:text-foreground"><Check size={13} /></button>
-                <button type="button" aria-label="Cancel" onClick={() => setRename(null)} className="rounded-full p-1 text-foreground/50 hover:text-foreground"><X size={13} /></button>
-              </form>
-            )}
-            <button onClick={() => { if (window.confirm(`Delete the list "${current.name}"? Its ${current.symbols.length} symbols go with it.`)) drop.mutate(current.id); }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-foreground/60 hover:text-loss">
-              <Trash2 size={13} /> Delete list
-            </button>
-          </div>
         </div>
       )}
       {err && <p className="text-[12px] text-loss">{err}</p>}
@@ -262,7 +229,7 @@ export function WatchlistTab() {
         </div>
       ) : (
         <Panel padded={false}
-          title={current ? current.name : category === "sector" ? "All sector lists" : category === "custom" ? "All my lists" : "All symbols"}
+          title="Quotes"
           sub={<span>{rows.length}{sector ? ` of ${shown.length}` : ""} symbols · <span className="text-gain">{up} up</span> · <span className="text-loss">{down} down</span>
             {symbols.length > QUOTE_CAP ? ` · first ${QUOTE_CAP} quoted` : ""}{quotes.isFetching ? " · refreshing…" : ""}</span>}
           actions={sectorsInView.length > 1 ? (
@@ -342,6 +309,98 @@ export function WatchlistTab() {
             </table>
           </div>
         </Panel>
+      )}
+    </div>
+  );
+}
+
+/** Close a popover on outside click or Escape. */
+function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: MouseEvent | TouchEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close(); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("mousedown", down);
+    document.addEventListener("touchstart", down);
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", down); document.removeEventListener("touchstart", down); document.removeEventListener("keydown", key); };
+  }, [open, close]);
+  return ref;
+}
+
+const MENU = "absolute z-30 mt-1.5 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]";
+const ITEM = "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-[var(--surface-2)]";
+
+/** The list name as a dropdown: categories first, then every list grouped by Sectors / My lists. */
+function ListPicker({ label, lists, selected, category, onPick, onNew, used, max }: {
+  label: string; lists: WatchlistGroup[]; selected: number; category: Category;
+  onPick: (cat: Category, id: number) => void; onNew?: () => void; used: number; max: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const pick = (cat: Category, id: number) => { onPick(cat, id); setOpen(false); };
+  const uniq = (gs: WatchlistGroup[]) => new Set(gs.flatMap((g) => g.symbols)).size;
+  const sectors = lists.filter((g) => g.kind === "sector");
+  const mine = lists.filter((g) => g.kind === "custom");
+  const row = (key: string, text: string, n: number, on: boolean, go: () => void, strong = false) => (
+    <button key={key} role="option" aria-selected={on} onClick={go}
+      className={clsx(ITEM, on ? "bg-[var(--surface-2)] text-foreground" : "text-foreground/80", strong && "font-medium")}>
+      <span className="w-3.5 shrink-0">{on && <Check size={14} />}</span>
+      <span className="min-w-0 flex-1 truncate">{text}</span>
+      <span className="font-mono text-[11px] text-foreground/45">{n}</span>
+    </button>
+  );
+  const group = (title: string) => <p className="px-2.5 pb-1 pt-2.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">{title}</p>;
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
+        className="flex min-w-0 items-center gap-2 rounded-lg py-1 pr-2 text-left transition hover:opacity-80">
+        <span className="truncate text-[26px] font-semibold leading-tight tracking-[-0.02em] text-foreground">{label}</span>
+        <ChevronsUpDown size={18} className="shrink-0 text-foreground/55" />
+      </button>
+      {open && (
+        <div role="listbox" className={clsx(MENU, "left-0 max-h-[70vh] w-[min(320px,calc(100vw-32px))]")}>
+          {row("all", "All symbols", uniq(lists), selected === ALL && category === "all", () => pick("all", ALL), true)}
+          {row("all-s", "All sectors", uniq(sectors), selected === ALL && category === "sector", () => pick("sector", ALL), true)}
+          {row("all-c", "All my lists", uniq(mine), selected === ALL && category === "custom", () => pick("custom", ALL), true)}
+          {sectors.length > 0 && group("Sectors")}
+          {sectors.map((g) => row(String(g.id), g.name, g.symbols.length, selected === g.id, () => pick("all", g.id)))}
+          {group("My lists")}
+          {mine.map((g) => row(String(g.id), g.name, g.symbols.length, selected === g.id, () => pick("all", g.id)))}
+          <div className="mt-1 border-t border-[var(--border)] pt-1">
+            <button onClick={() => { setOpen(false); onNew?.(); }} disabled={!onNew}
+              className={clsx(ITEM, "text-accent disabled:text-foreground/35")}>
+              <Plus size={14} /> <span className="flex-1">New list</span>
+              <span className="font-mono text-[11px] text-foreground/45">{used}/{max}</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** ⋮ menu for the open list. */
+function ActionsMenu({ items }: { items: { label: string; icon: LucideIcon; onClick: () => void; danger?: boolean; disabled?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  if (!items.length) return null;
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((o) => !o)} aria-label="List actions" aria-haspopup="menu" aria-expanded={open}
+        className="grid h-9 w-9 place-items-center rounded-lg text-foreground/60 transition hover:bg-[var(--surface-2)] hover:text-foreground">
+        <MoreHorizontal size={18} className="rotate-90" />
+      </button>
+      {open && (
+        <div role="menu" className={clsx(MENU, "right-0 w-52")}>
+          {items.map((it) => (
+            <button key={it.label} role="menuitem" disabled={it.disabled} onClick={() => { setOpen(false); it.onClick(); }}
+              className={clsx(ITEM, it.danger ? "text-loss" : "text-foreground/85", "disabled:opacity-40")}>
+              <it.icon size={14} /> {it.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
