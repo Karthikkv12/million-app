@@ -25,7 +25,7 @@ export default function CatalystSearchPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 pt-8 sm:px-8">
-      <PageHeader eyebrow="Research" title="Catalyst" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news." />
+      <PageHeader eyebrow="Research" title="Catalysts" sub="What could move a stock next: earnings, the move options are pricing, analyst changes, dividends, volume and news." />
 
       {/* Search, then quick picks on one full-width line */}
       <TickerSearchInput value={q} onChange={setQ} onSelect={go} placeholder="Search a ticker or company" actionLabel="Check" className="w-full" />

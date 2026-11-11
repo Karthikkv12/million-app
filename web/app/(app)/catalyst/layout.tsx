@@ -6,7 +6,7 @@ import { clsx } from "clsx";
 import { CalendarDays, FileText, Flame, Search } from "lucide-react";
 
 const TABS = [
-  { href: "/catalyst", label: "Stocks", icon: Search, match: (p: string) => !["/catalyst/unusual", "/catalyst/calendar", "/catalyst/reports"].some((x) => p.startsWith(x)) },
+  { href: "/catalyst", label: "Catalysts", icon: Search, match: (p: string) => !["/catalyst/unusual", "/catalyst/calendar", "/catalyst/reports"].some((x) => p.startsWith(x)) },
   { href: "/catalyst/unusual", label: "Unusual activity", icon: Flame, match: (p: string) => p.startsWith("/catalyst/unusual") },
   { href: "/catalyst/calendar", label: "Economic calendar", icon: CalendarDays, match: (p: string) => p.startsWith("/catalyst/calendar") },
   { href: "/catalyst/reports", label: "Reports", icon: FileText, match: (p: string) => p.startsWith("/catalyst/reports") },
@@ -16,7 +16,7 @@ export default function CatalystLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   return (
     <>
-      <nav aria-label="Catalyst" className="border-b border-[var(--border)]">
+      <nav aria-label="Research" className="border-b border-[var(--border)]">
         <div className="mx-auto flex w-full max-w-screen-2xl gap-1 overflow-x-auto px-4 sm:px-6">
           {TABS.map((t) => {
             const on = t.match(pathname);
