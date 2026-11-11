@@ -984,6 +984,13 @@ export type HedgeSuggestion = Schemas["SuggestionOut"];
 export type BrokerPosition = Schemas["BrokerPositionOut"];
 
 export const fetchHedgeBooks = () => api.get<HedgeBooks>("/hedge/books");
+
+// ── Strategy (drives the desk's actions) ─────────────────────────────────────
+export type StrategyState = Schemas["StrategyOut"];
+export type StrategyInfo = Schemas["StrategyInfo"];
+export type StrategyUpdate = Schemas["StrategyUpdate"];
+export const fetchStrategy = () => api.get<StrategyState>("/strategy");
+export const saveStrategy = (body: StrategyUpdate) => api.put<Schemas["StrategySettingsOut"]>("/strategy", body);
 export const fetchBrokerPositions = () => api.get<BrokerPosition[]>("/hedge/positions");
 
 // ── Portfolio, all from the Robinhood sync ───────────────────────────────────

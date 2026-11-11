@@ -204,9 +204,12 @@ def alerts_for(books: Dict[str, Any]) -> List[Dict[str, Any]]:
         act = s.get("action")
         if act in ("SELL_CALL", "SELL_PUT"):
             k = f"{s['strike']:g}{'C' if act == 'SELL_CALL' else 'P'}"
+            what = "Sell call" if act == "SELL_CALL" else "Sell put"
+            if s.get("long_strike"):                      # put credit spread (strategy module)
+                k, what = f"{s['strike']:g}/{s['long_strike']:g}P", "Sell put spread"
             out.append({
                 "key": f"sg:{sym}:{act}:{k}:{s.get('expiry')}", "kind": act.lower(), "symbol": sym,
-                "title": f"{'Sell call' if act == 'SELL_CALL' else 'Sell put'}: {sym} {k} {(s.get('expiry') or '')[5:]}",
+                "title": f"{what}: {sym} {k} {(s.get('expiry') or '')[5:]}",
                 "body": f"{s.get('contracts', 1)}× for ~${abs(s.get('credit') or 0):,.0f}. {(s.get('reasons') or [''])[0]}",
                 "url": "/hedge",
             })

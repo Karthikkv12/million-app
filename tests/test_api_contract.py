@@ -311,7 +311,7 @@ def test_enabled_modules_switch_routes_on_and_off(caplog):
     assert "unknown module 'nonsense'" in caplog.text
 
     default = create_app(Settings(_env_file=None))
-    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst", "unusual", "portfolio", "budget", "hedge", "notify", "watchlists"]
+    assert default.state.enabled_modules == ["auth", "market", "flow", "watchlist", "catalyst", "unusual", "portfolio", "budget", "hedge", "notify", "watchlists", "strategy"]
     assert TestClient(default).get("/api/v1/portfolio/weeks").status_code == 401   # on by default (plan step 7)
     assert "ai" not in default.state.enabled_modules
 

@@ -1614,6 +1614,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy
+         * @description The strategy the desk runs, its rules, and every strategy on offer.
+         */
+        get: operations["get_strategy_api_v1_strategy_get"];
+        /**
+         * Put Strategy
+         * @description Set the strategy (the desk's actions follow within seconds) and/or rule overrides.
+         */
+        put: operations["put_strategy_api_v1_strategy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/unusual": {
         parameters: {
             query?: never;
@@ -2208,6 +2232,11 @@ export interface components {
             shares?: number | null;
             /** Spot */
             spot?: number | null;
+            /**
+             * Strategy
+             * @description Strategy key that produced the suggestion (GET /strategy)
+             */
+            strategy?: string | null;
             suggestion?: components["schemas"]["SuggestionOut"] | null;
             /** Symbol */
             symbol: string;
@@ -4365,6 +4394,78 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /** StrategyInfo */
+        StrategyInfo: {
+            /** Buys Options */
+            buys_options: boolean;
+            /** Defaults */
+            defaults: {
+                [key: string]: unknown;
+            };
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Sides
+             * @description put | call | both: the legs it opens
+             */
+            sides: string;
+            /** Steps */
+            steps: string[][];
+            /** Summary */
+            summary: string;
+        };
+        /** StrategyOut */
+        StrategyOut: {
+            /** Overrides */
+            overrides: {
+                [key: string]: unknown;
+            };
+            /**
+             * Rules
+             * @description Effective rules: the strategy's defaults + overrides
+             */
+            rules: {
+                [key: string]: unknown;
+            };
+            /** Strategies */
+            strategies: components["schemas"]["StrategyInfo"][];
+            /** Strategy */
+            strategy: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** StrategySettingsOut */
+        StrategySettingsOut: {
+            /** Overrides */
+            overrides: {
+                [key: string]: unknown;
+            };
+            /**
+             * Rules
+             * @description Effective rules: the strategy's defaults + overrides
+             */
+            rules: {
+                [key: string]: unknown;
+            };
+            /** Strategy */
+            strategy: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** StrategyUpdate */
+        StrategyUpdate: {
+            /**
+             * Rules
+             * @description Overrides of the strategy's rules; {} = defaults
+             */
+            rules?: {
+                [key: string]: unknown;
+            } | null;
+            /** Strategy */
+            strategy?: string | null;
+        };
         /** SubscriptionIn */
         SubscriptionIn: {
             /** Endpoint */
@@ -4386,6 +4487,11 @@ export interface components {
              */
             action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
             /**
+             * Collateral
+             * @description $ tied up: cash for a put, max loss for a spread
+             */
+            collateral?: number | null;
+            /**
              * Contracts
              * @default 0
              */
@@ -4398,6 +4504,16 @@ export interface components {
             headline: string;
             /** Locked Gain */
             locked_gain?: number | null;
+            /**
+             * Long Strike
+             * @description Put credit spread: the put bought below the short strike
+             */
+            long_strike?: number | null;
+            /**
+             * Max Loss
+             * @description $ max loss (spreads)
+             */
+            max_loss?: number | null;
             /** Net Delta After */
             net_delta_after?: number | null;
             /**
@@ -4429,6 +4545,11 @@ export interface components {
              * @default []
              */
             warnings: string[];
+            /**
+             * Yield Ann
+             * @description Premium ÷ capital at work, annualised (decimal)
+             */
+            yield_ann?: number | null;
         };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
@@ -8185,6 +8306,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockInfoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_api_v1_strategy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyOut"];
+                };
+            };
+        };
+    };
+    put_strategy_api_v1_strategy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategySettingsOut"];
                 };
             };
             /** @description Validation Error */

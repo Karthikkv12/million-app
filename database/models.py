@@ -578,3 +578,15 @@ class WatchlistGroup(Base):
     columns    = Column(Text, nullable=True)                        # JSON array of column ids (web registry); null = default set
     created_at = Column(String, nullable=False)                     # ISO UTC
     updated_at = Column(String, nullable=False)
+
+
+class StrategySetting(Base):
+    """The user's options strategy (strategy module): it drives the hedge desk's actions.
+    `strategy` is a key from strategy.catalog; `rules` the user's overrides of that strategy's rules (JSON object,
+    cleaned by the module; null = the strategy's defaults)."""
+    __tablename__ = "strategy_settings"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    strategy   = Column(String, nullable=False, default="spike_wheel")
+    rules      = Column(Text, nullable=True)
+    updated_at = Column(String, nullable=False)                     # ISO UTC

@@ -310,7 +310,8 @@ def _track_high(sym: str, spot: float) -> float:
 
 
 # ── Books ─────────────────────────────────────────────────────────────────────
-def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: List[str]) -> Dict[str, Any]:
+def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: List[str], rules: Any = None) -> Dict[str, Any]:
+    """`rules`: the owner's strategy (strategy.catalog.Rules); None = the spike wheel."""
     spot = _spot(sym)
     chain = _chain(sym) or {}
     if not spot:
@@ -328,8 +329,9 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
             leg.mark = hit[1] if hit and hit[1] > 0 else None
             leg.dte = _dte(leg.expiry)
     weekly = chain.get("weekly")
-    quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)
-              for (e, k, t), (iv, mid, dte) in rows.items() if e == weekly and iv > bs.MIN_SIGMA]
+    chain_quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)
+                    for (e, k, t), (iv, mid, dte) in rows.items() if iv > bs.MIN_SIGMA]
+    quotes = [q for q in chain_quotes if q.expiry == weekly]
     day = _day_fields(sym, spot)
     prev, day_change = day["prev_close"], day["day_change"]
     ivs = TRACKER.state(sym, day_change)
@@ -337,7 +339,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     gx = _gex(sym)
     ctx = Context(sym, spot, avg_cost, day_change, _track_high(sym, spot), ivs.atm_iv or atm_iv, hv.get("hv20"),
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
-    book = evaluate(ctx, legs, quotes).to_dict()
+    book = evaluate(ctx, legs, quotes, rules, chain_quotes).to_dict()
     book.update({
         "spot": round(spot, 4), **day, "day_high": ctx.day_high,
         "accounts": accounts, "weekly_expiry": weekly, "beta": _beta(sym), "chain_source": chain.get("source"),
@@ -359,14 +361,25 @@ def _clean(x: Any) -> Any:
     return x
 
 
+def _rules_for(user_id: int) -> Any:
+    """The user's strategy rules (strategy module); None (spike wheel) if unset or the module can't answer."""
+    try:
+        from optionflow.modules.strategy import service as strategy
+        return strategy.rules_for_user(user_id)
+    except Exception:
+        logger.exception("strategy rules for user %s failed; using the spike wheel", user_id)
+        return None
+
+
 def books_for(user_id: int) -> Dict[str, Any]:
     positions = list_positions(user_id)
     groups = group_legs(positions)
     prefetch_spots(sorted(groups))
+    rules = _rules_for(user_id)
     books = []
     for sym, g in sorted(groups.items()):
         try:
-            books.append(build_book(sym, g["legs"], g["avg_cost"], g["accounts"]))
+            books.append(build_book(sym, g["legs"], g["avg_cost"], g["accounts"], rules))
         except Exception as e:                         # one bad symbol must not break the page
             logger.exception("hedge book %s failed", sym)
             books.append({"symbol": sym, "error": str(e), "accounts": g["accounts"]})
