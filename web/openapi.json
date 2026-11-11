@@ -1350,6 +1350,18 @@
       ],
       "title": "Spot"
      },
+     "strategy": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Strategy key that produced the suggestion (GET /strategy)",
+      "title": "Strategy"
+     },
      "suggestion": {
       "anyOf": [
        {
@@ -9001,6 +9013,170 @@
     "title": "StockInfoOut",
     "type": "object"
    },
+   "StrategyInfo": {
+    "properties": {
+     "buys_options": {
+      "title": "Buys Options",
+      "type": "boolean"
+     },
+     "defaults": {
+      "additionalProperties": true,
+      "title": "Defaults",
+      "type": "object"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "sides": {
+      "description": "put | call | both: the legs it opens",
+      "title": "Sides",
+      "type": "string"
+     },
+     "steps": {
+      "items": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "title": "Steps",
+      "type": "array"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "name",
+     "summary",
+     "steps",
+     "sides",
+     "buys_options",
+     "defaults"
+    ],
+    "title": "StrategyInfo",
+    "type": "object"
+   },
+   "StrategyOut": {
+    "properties": {
+     "overrides": {
+      "additionalProperties": true,
+      "title": "Overrides",
+      "type": "object"
+     },
+     "rules": {
+      "additionalProperties": true,
+      "description": "Effective rules: the strategy's defaults + overrides",
+      "title": "Rules",
+      "type": "object"
+     },
+     "strategies": {
+      "items": {
+       "$ref": "#/components/schemas/StrategyInfo"
+      },
+      "title": "Strategies",
+      "type": "array"
+     },
+     "strategy": {
+      "title": "Strategy",
+      "type": "string"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "required": [
+     "strategy",
+     "rules",
+     "overrides",
+     "strategies"
+    ],
+    "title": "StrategyOut",
+    "type": "object"
+   },
+   "StrategySettingsOut": {
+    "properties": {
+     "overrides": {
+      "additionalProperties": true,
+      "title": "Overrides",
+      "type": "object"
+     },
+     "rules": {
+      "additionalProperties": true,
+      "description": "Effective rules: the strategy's defaults + overrides",
+      "title": "Rules",
+      "type": "object"
+     },
+     "strategy": {
+      "title": "Strategy",
+      "type": "string"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "required": [
+     "strategy",
+     "rules",
+     "overrides"
+    ],
+    "title": "StrategySettingsOut",
+    "type": "object"
+   },
+   "StrategyUpdate": {
+    "properties": {
+     "rules": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Overrides of the strategy's rules; {} = defaults",
+      "title": "Rules"
+     },
+     "strategy": {
+      "anyOf": [
+       {
+        "maxLength": 40,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strategy"
+     }
+    },
+    "title": "StrategyUpdate",
+    "type": "object"
+   },
    "SubscriptionIn": {
     "properties": {
      "endpoint": {
@@ -9054,6 +9230,18 @@
       "title": "Action",
       "type": "string"
      },
+     "collateral": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "$ tied up: cash for a put, max loss for a spread",
+      "title": "Collateral"
+     },
      "contracts": {
       "default": 0,
       "title": "Contracts",
@@ -9095,6 +9283,30 @@
        }
       ],
       "title": "Locked Gain"
+     },
+     "long_strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Put credit spread: the put bought below the short strike",
+      "title": "Long Strike"
+     },
+     "max_loss": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "$ max loss (spreads)",
+      "title": "Max Loss"
      },
      "net_delta_after": {
       "anyOf": [
@@ -9184,6 +9396,18 @@
       },
       "title": "Warnings",
       "type": "array"
+     },
+     "yield_ann": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Premium \u00f7 capital at work, annualised (decimal)",
+      "title": "Yield Ann"
      }
     },
     "required": [
@@ -16227,6 +16451,78 @@
     "summary": "Stock Info",
     "tags": [
      "market"
+    ]
+   }
+  },
+  "/api/v1/strategy": {
+   "get": {
+    "description": "The strategy the desk runs, its rules, and every strategy on offer.",
+    "operationId": "get_strategy_api_v1_strategy_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StrategyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Strategy",
+    "tags": [
+     "strategy"
+    ]
+   },
+   "put": {
+    "description": "Set the strategy (the desk's actions follow within seconds) and/or rule overrides.",
+    "operationId": "put_strategy_api_v1_strategy_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StrategyUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StrategySettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Strategy",
+    "tags": [
+     "strategy"
     ]
    }
   },

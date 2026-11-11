@@ -119,6 +119,11 @@ class Suggestion:
     shares: int = 0                         # BUY_STOCK: shares to buy
     new_avg: Optional[float] = None         # BUY_STOCK: average cost after the buy; SELL_PUT: if assigned
     warnings: List[str] = field(default_factory=list)
+    # Set by the strategy engine (strategy module); None for the spike wheel.
+    long_strike: Optional[float] = None     # put credit spread: the put bought below the short
+    yield_ann: Optional[float] = None       # premium ÷ capital at work, annualised
+    collateral: Optional[float] = None      # $ tied up: cash for a put, max loss for a spread
+    max_loss: Optional[float] = None        # $ (spreads)
 
 
 @dataclass
@@ -165,6 +170,7 @@ class Book:
     suggestion: Suggestion
     units: List[Unit] = field(default_factory=list)
     closes: List[Close] = field(default_factory=list)
+    strategy: str = "spike_wheel"           # the owner's strategy that produced `suggestion` (strategy module)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -190,7 +196,10 @@ def _r(x: Optional[float], n: int = 3) -> Optional[float]:
 
 
 # ── Engine ────────────────────────────────────────────────────────────────────
-def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote]) -> Book:
+def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
+             chain: Optional[List[Quote]] = None) -> Book:
+    """`strategy`: a strategy.catalog.Rules; None or "spike_wheel" runs the playbook below on `weekly`.
+    Any other strategy picks from `chain` (every expiry the desk has), via strategy.engine."""
     spot = ctx.spot
     greeks(legs, spot)
     shares = sum(l.quantity for l in legs if l.kind == "stock")
@@ -209,12 +218,23 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote]) -> Book:
         q.delta = bs.delta(spot, q.strike, bs.year_fraction(q.dte), q.iv or 0.0, q.otype)
 
     warnings = _gamma_warnings(legs)
-    s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
+    key = getattr(strategy, "key", None) or "spike_wheel"
+    if key == "spike_wheel":
+        s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
+        closes = buybacks(legs)
+    else:
+        from optionflow.modules.strategy.engine import decide
+        quotes = [q for q in (chain if chain is not None else weekly)
+                  if strategy.dte_min <= q.dte <= strategy.dte_max]   # only what the rules can pick
+        for q in quotes:
+            q.delta = bs.delta(spot, q.strike, bs.year_fraction(q.dte), q.iv or 0.0, q.otype)
+        s = decide(ctx, legs, quotes, net, shares, full_lots, warnings, strategy)
+        closes = buybacks(legs, strategy.take_profit, strategy.early_profit)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
-                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), buybacks(legs))
+                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), closes, key)
 
 
-def buybacks(legs: List[Leg]) -> List[Close]:
+def buybacks(legs: List[Leg], take_profit: float = TAKE_PROFIT, early_profit: float = EARLY_PROFIT) -> List[Close]:
     out: List[Close] = []
     for l in legs:
         if l.kind != "option" or l.quantity >= 0 or not l.avg_price or l.mark is None or l.strike is None or not l.expiry:
@@ -223,9 +243,9 @@ def buybacks(legs: List[Leg]) -> List[Close]:
         if l.mark <= LET_EXPIRE_MARK and dte <= LET_EXPIRE_DTE:
             continue                                         # let it expire worthless
         profit = 1.0 - l.mark / l.avg_price
-        if profit >= TAKE_PROFIT:
+        if profit >= take_profit:
             why = f"{profit:.0%} of the premium is in; the last {1 - profit:.0%} isn't worth the risk."
-        elif profit >= EARLY_PROFIT and dte >= EARLY_MIN_DTE:
+        elif profit >= early_profit and dte >= EARLY_MIN_DTE:
             why = f"{profit:.0%} of the premium is in with {dte:.0f} days still to go: take it early."
         else:
             continue

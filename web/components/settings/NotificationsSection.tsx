@@ -12,8 +12,8 @@ import { okBooks, useLiveBooks } from "@/lib/live";
 
 const KINDS: { key: keyof Omit<NotifyPrefs, "symbols">; label: string; desc: string }[] = [
   { key: "buyback", label: "Buy back", desc: "A short option has given up most of its premium (80%, or 50% with 3+ days left)." },
-  { key: "sell_call", label: "Sell call", desc: "A spike: the desk suggests an in-the-money call near your average." },
-  { key: "sell_put", label: "Sell put", desc: "A pullback: the desk suggests a put below your average." },
+  { key: "sell_call", label: "Sell call", desc: "The desk suggests a call under your strategy (Hedge → Strategy)." },
+  { key: "sell_put", label: "Sell put", desc: "The desk suggests a put or a put spread under your strategy." },
   { key: "buy_stock", label: "Buy stock", desc: "An odd lot at or below your average: round it up to 100 shares." },
   { key: "iv_spike", label: "IV spike", desc: "Implied volatility jumps on a stock you hold." },
   { key: "expiring_itm", label: "Expiring in the money", desc: "An option you sold is in the money with a day or less left." },
