@@ -5,7 +5,9 @@
  * (buy call, sell call, buy put, sell put) with their expiry.
  * TradeIdeas — the same four in full: mid, delta, break-even, how each fits the gamma regime, and why that strike.
  */
+import { useState } from "react";
 import { clsx } from "clsx";
+import { ChevronDown } from "lucide-react";
 import type { GexResult } from "@/lib/api";
 import { Ladder } from "@/components/desk";
 
@@ -95,15 +97,36 @@ export function DealerLadder({ data, height = 250, className }: { data: GexResul
 }
 
 /** The four ideas in full: contract, expiry, mid, delta, break-even, fit with the regime, and why that strike. */
-export function TradeIdeas({ data, className }: { data: GexResult; className?: string }) {
+export function TradeIdeas({ data, className, collapsible = false }: {
+  data: GexResult; className?: string;
+  /** Start closed behind a "4 ideas" toggle (pages where the list would make the panel long). */
+  collapsible?: boolean;
+}) {
   const ideas = data.ideas ?? [];
   const longGamma = (data.net_gex ?? 0) >= 0;
+  const [open, setOpen] = useState(!collapsible);
+  const head = (
+    <>
+      <span>Ideas off the levels{collapsible && ideas.length > 0 && <span className="ml-2 text-foreground/35">{ideas.length}</span>}</span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className={longGamma ? "text-gain" : "text-warn"}>{longGamma ? "moves fade" : "moves run"}</span>
+        {collapsible && <ChevronDown size={12} className={clsx("text-foreground/45 transition", open && "rotate-180")} />}
+      </span>
+    </>
+  );
+  const headCls = "mb-1 flex w-full items-baseline justify-between gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45";
+  if (!open) {
+    return (
+      <div className={clsx("min-w-0 px-4 py-3", className)} role="group" aria-label={`${data.symbol} trade ideas`}>
+        <button type="button" onClick={() => setOpen(true)} aria-expanded={false} className={clsx(headCls, "!mb-0 hover:text-foreground")}>{head}</button>
+      </div>
+    );
+  }
   return (
     <div className={clsx("min-w-0 px-4 py-3", className)} role="group" aria-label={`${data.symbol} trade ideas`}>
-      <p className="mb-1 flex items-baseline justify-between gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">
-        <span>Ideas off the levels</span>
-        <span className={longGamma ? "text-gain" : "text-warn"}>{longGamma ? "moves fade" : "moves run"}</span>
-      </p>
+      {collapsible
+        ? <button type="button" onClick={() => setOpen(false)} aria-expanded className={clsx(headCls, "hover:text-foreground")}>{head}</button>
+        : <p className={headCls}>{head}</p>}
       <p className="mb-1 text-[11.5px] leading-snug text-foreground/55">
         {longGamma ? "Long gamma: dealers fade moves, which favours selling premium at the walls."
           : "Short gamma: dealers chase moves, which favours buying on the price's side of the flip."}
