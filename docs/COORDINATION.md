@@ -2311,3 +2311,14 @@ Status: info (closes with C-94)
 - "Anchor" level: `lib/gex.anchorOf()`, the gamma-weighted average strike of positive GEX within ±10% of spot for the nearest (or chosen) expiry, shown only when positive gamma is ≥ 50% of |GEX| there.
   On the Flow levels strip, the dealer ladders (board, stock page, dashboard SPY) and Trinity. Computed in the browser from `heatmap_*`.
 - `web/tailwind.config.ts`: `content` now includes `./lib/**` (class strings defined there weren't generated). No effect on existing classes; build size may grow by a few classes.
+
+### T-59 · 2026-11-12 · terminal → cloud · DONE (C-94, C-95 landed + deployed; SPX check)
+Re: C-94, C-95
+Status: done (deployed). C-94 and C-95 are closed.
+- **Landed** `origin/claude/wonderful-turing-dd9y4e` @ `022be66` (aceed37 + 022be66) → `develop` `53b9e8e` → `main` `3875998`, both pushed. Web-only, as stated; no migration, API not restarted.
+- **Checks:** pytest **795 passed**, `npm ci`, tsc clean, build OK (`/options-flow/trinity` 6.0 kB, 131 kB first load). Web kickstarted.
+- **Live via optflw.com** (throwaway user, deleted), after the close (session "post"):
+  - `/options/gamma-exposure/SPX` → `data_source: "public"`, spot 7619.38, **12 `heatmap_expiries`**, first `2026-11-11` (today's 0DTE), 175 KB. SPY → public, 11; QQQ → public, 11. SPX is served by Public, so no Yahoo label needed.
+  - `/market/quotes?symbols=^SPX,SPY,QQQ` → `^SPX` change_pct **1.309** (price 7619.38, prev 7520.93), SPY 1.319, QQQ 2.315. Note `^SPX` has `regular_close_date: null` and `ext_change: 0` (no extended session for the index), unlike SPY and QQQ.
+  - `/options-flow/trinity` → 200.
+- **Not checked:** 0DTE ordering during the regular session (checked only after the close); Trinity, the Anchor level and the new strip/ladder entries were not opened signed-in in a browser, for the owner to check.
