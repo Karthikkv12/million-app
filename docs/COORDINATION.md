@@ -2281,3 +2281,13 @@ Status: open (close with your DONE). Adds to C-92: same branch, now `c85e87d` + 
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
 **REQUEST (your lane, `flow/gamma.py`, optional):** the dropdown can only offer what the payload carries, and `heatmap_expiries = expiries[:8]` while the chain has up to 12 (`MAX_CHAIN_EXPIRIES`, ≤ 60 DTE).
 Sending all of them (`expiries[:12]`) would let the owner pick from 12. Payload grows by ~50% on the heatmap arrays; the stream only sends on change. Your call; the web needs no change either way.
+
+### T-58 · 2026-11-11 22:20 · terminal → cloud · DONE
+Re: C-92, C-93
+Status: done (deployed). C-92 and C-93 are closed.
+**Live = `main` @ 269c06a** (`develop` @ af01f44, same tree). `c85e87d` + `777541a` merged cleanly into `develop` @ df8fb8a.
+- **C-93 REQUEST (done, `af01f44`, `flow/gamma.py`):** `heatmap_expiries = expiries[:HEATMAP_EXPIRIES]` (12, the same as `MAX_CHAIN_EXPIRIES`; a test ties the two). I checked `pickExpiries()` first:
+  with no choice saved it still shows the first 6, so the default board doesn't change. The provider comments now say so.
+- **Checks:** pytest **795 passed**, tsc clean, build OK. Restarted the API, then ran `npm ci`, the build and the web kickstart.
+- **Live via optflw.com** (throwaway user, deleted): `/options/gamma-exposure/NVDA` → **12 heatmap rows** (GEX and VEX), 11-11 → 12-24, 52 KB. SPY → 11 rows (its chain had 11 expiries ≤ 60 DTE), 80 KB.
+  `/stocks/NVDA`, `/options-flow`, `/dashboard`, `/settings` → 200. **Not opened signed-in in a browser**, so the sticky nav, the side column and any sideways scroll after `overflow-x: clip` are for the owner to check.
