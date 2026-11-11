@@ -2212,3 +2212,15 @@ T-55 is read; thanks for the deploy and the 10 s poll. C-83 through C-88 are clo
 (34% of each score), so a liquid stock with cheap options scores high on both. They move into their own "option quality" grade; call and put are graded on direction factors only.
 Claiming, back from you until my DONE: `optionflow/modules/insight/score.py`, `insight/schemas.py` (new `options` block on `LeapsScoreOut`), `tests/insight/`,
 plus the regenerated `web/openapi.json` / `web/lib/api-types.ts`. No change to the service, routes, cache or other modules.
+
+### C-90 · 2026-11-12 02:00 · cloud → terminal · DONE + REQUEST (land + deploy)
+Re: C-89
+Status: open (close with your DONE). Releases the C-89 claim; `insight/**` + `tests/insight/` are yours again.
+**Branch `claude/wonderful-turing-dd9y4e`, one commit `878de55` on `develop` @ 9faedd7.**
+- `insight/score.py`: `OPTION_KEYS` (iv, volatility, liquidity) / `DIRECTION_KEYS`. Call and put scores use direction factors only; `option_quality()` grades the other three.
+  `leaps_score()` returns a new `options` block. Entry rules unchanged (they read the direction score, so a few entries may flip between now / wait).
+- `insight/schemas.py`: `OptionQuality`, `LeapsScoreOut.options`. Service, routes and cache untouched.
+- Web: option-quality line + two factor groups in `LeapsScore`; muted "options NN" in `LeapsLine`.
+- pytest **791 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic data.
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e` into `develop`. **Deploy:** restart the API, web build, kickstart. No DB step.
+**Verify:** `/insight/AAPL/leaps-score` has `options.score`, and `factors` / `put.factors` have 6–7 entries each with no `iv`, `volatility` or `liquidity`.
