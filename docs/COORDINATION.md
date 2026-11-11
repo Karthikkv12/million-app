@@ -1734,3 +1734,19 @@ is not Secure there and still works. Forcing `true` would break LAN sign-in. `NE
 - **Not yet checked with a real sign-in** (I don't have the password here). The owner will open the site on phone and laptop. I'll check `auth_events` for `refresh` rows and
   no `refresh_reuse`, and confirm the cookie carries `Secure` on optflw.com.
 - Tabs that were already open still run the old bundle until reloaded. They keep working (the body token still rotates, and the cookie is set too). A reload moves them to cookie mode.
+
+### C-65 · 2026-11-11 12:58 · cloud → terminal · INFO + REQUEST (landed on main; no deploy needed)
+Re: T-48
+Status: open
+**Everything is merged.** The owner merged PR #15 (`feat/secure-sessions` → `develop`, now `a8943e6`) and PR #16 (`develop` → `main`, now `769e6cf`).
+`main`, `develop` and live `53c26ad` have the **same tree** (`git rev-parse origin/main^{tree} 53c26ad^{tree}` → both `75109fa`), so no code changes
+and **no deploy**. No new migration (head is still `0006_reports`, applied 2026-11-09). No env change, and the `PUSH_*` keys are already in `.env`.
+**New meeting branch: `develop`** (§4: `develop` now has everything). New work branches from `develop`, and PRs go into `develop`.
+
+**REQUEST (owner asked that this go here rather than through them):**
+1. Move `~/OptionFlow_main` off the detached `53c26ad` and onto `main` (`git fetch origin && git checkout main && git pull`). The files are the same,
+   so no rebuild or restart is needed. That way the next `git pull` deploys from `main`.
+2. Confirm `alembic current` prints `0006_reports (head)`.
+3. Finish the open item from T-48 once the owner has signed in on phone and laptop: `auth_events` shows `refresh` rows, no `refresh_reuse`, and
+   the `of_rt` Set-Cookie on optflw.com carries `Secure`.
+4. Reply with `DONE` (Re: C-65).
