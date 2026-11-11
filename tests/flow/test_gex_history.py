@@ -61,3 +61,41 @@ def test_gex_history_route(db_engine_and_session):
     assert c.get("/api/v1/flow/SPY/replay", headers=h).json()["symbol"] == "SPY"         # path GexReplay.tsx calls
     bad = c.get("/api/v1/gex-history/SPY", params={"on": "11/08"}, headers=h)
     assert bad.status_code == 400 and "YYYY-MM-DD" in bad.json()["error"]["message"]
+
+
+def _snap(ts, spot):
+    from database.models import GexSnapshot
+    from optionflow.core.db import get_session
+    s = get_session()
+    s.add(GexSnapshot(symbol="MP", ts=ts, spot=spot, net_gex=1.0, zero_gamma=None, call_wall=None,
+                      put_wall=None, king=None, profile="[]"))
+    s.commit()
+    s.close()
+
+
+def test_day_groups_by_et_session_not_utc(db_engine_and_session, monkeypatch):
+    """C-91: after 7 pm ET (00:00 UTC) after-hours snapshots must not open a new default 'day'."""
+    monkeypatch.setattr(gex_history, "DAYS_LOOKBACK", 100000)
+    _snap("2026-11-11T14:35:00Z", 10.0)     # 09:35 ET, Wed (session)
+    _snap("2026-11-11T20:55:00Z", 11.0)     # 15:55 ET (session)
+    _snap("2026-11-11T22:00:00Z", 12.0)     # 17:00 ET (after hours, same ET day)
+    _snap("2026-11-12T00:30:00Z", 13.0)     # 19:30 ET Wed, UTC Thursday (after hours)
+    out = gex_history.day("MP")
+    assert out["date"] == "2026-11-11"
+    assert [s["spot"] for s in out["snapshots"]] == [10.0, 11.0]          # regular session only
+    assert out["days"] == ["2026-11-11"]                                   # no UTC 11-12 day
+    _snap("2026-11-12T14:31:00Z", 14.0)     # Thursday open: now the default
+    assert gex_history.day("MP")["date"] == "2026-11-12"
+    assert [s["spot"] for s in gex_history.day("MP", date(2026, 11, 11))["snapshots"]] == [10.0, 11.0]
+
+
+def test_day_without_session_snapshots_shows_all(db_engine_and_session, monkeypatch):
+    monkeypatch.setattr(gex_history, "DAYS_LOOKBACK", 100000)
+    _snap("2026-11-14T16:00:00Z", 20.0)     # Saturday
+    out = gex_history.day("MP")
+    assert out["date"] == "2026-11-14" and [s["spot"] for s in out["snapshots"]] == [20.0]
+
+
+def test_day_bounds_follow_dst():
+    assert gex_history._utc_bounds(date(2026, 7, 1)) == ("2026-07-01T04:00:00Z", "2026-07-02T04:00:00Z")
+    assert gex_history._utc_bounds(date(2026, 12, 1)) == ("2026-12-01T05:00:00Z", "2026-12-02T05:00:00Z")
