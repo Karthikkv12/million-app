@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
 import { useGexStream } from "@/lib/useGexStream";
+import { ANCHOR_TONE, anchorOf } from "@/lib/gex";
 import { rank, reportName, reportWhen } from "@/lib/reports";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
 import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
@@ -315,6 +316,7 @@ export default function DashboardPage() {
                   { label: "call wall", price: g.max_call_wall, tone: "text-gain" },
                   { label: "★ king", price: g.max_gex_strike, tone: "text-[#b45309] dark:text-[#fde725]" },
                   { label: "flip", price: g.zero_gamma, tone: "text-accent" },
+                  { label: "⚓ anchor", price: anchorOf(g)?.price, tone: ANCHOR_TONE },
                   { label: "put wall", price: g.max_put_wall, tone: "text-loss" },
                 ]} /></div>
               </div>

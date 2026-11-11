@@ -1,12 +1,13 @@
 "use client";
-/** Flow shell: Board (dealer exposure by strike) · Premium (one ticker's option premium, full size). */
+/** Flow shell: Board (dealer exposure by strike) · Trinity (SPX / SPY / QQQ, one expiry) · Premium (one ticker's option premium). */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { Grid3x3, LineChart } from "lucide-react";
+import { Columns3, Grid3x3, LineChart } from "lucide-react";
 
 const TABS = [
-  { href: "/options-flow", label: "Board", icon: Grid3x3, match: (p: string) => !p.startsWith("/options-flow/premium") },
+  { href: "/options-flow", label: "Board", icon: Grid3x3, match: (p: string) => p === "/options-flow" },
+  { href: "/options-flow/trinity", label: "Trinity", icon: Columns3, match: (p: string) => p.startsWith("/options-flow/trinity") },
   { href: "/options-flow/premium", label: "Premium", icon: LineChart, match: (p: string) => p.startsWith("/options-flow/premium") },
 ];
 
