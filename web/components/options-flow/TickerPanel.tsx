@@ -71,7 +71,8 @@ export function TickerPanel({
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [ladderOpen, setLadderOpen] = useState(true);
-  const beside = columns === 1;        // room for the ladder next to the heatmap (xl and up)
+  const beside = columns === 1;
+  const compact = columns > 1;         // narrow column: icon-only toolbar buttons        // room for the ladder next to the heatmap (xl and up)
   const board = useRef<BoardHandle>(null);
   const metric = slot.metric ?? "gex";
   // Prefer the time the backend computed the result; fall back to when we received it.
@@ -114,9 +115,11 @@ export function TickerPanel({
               <Clock size={12} className="shrink-0 text-warn" /> {staleNote}
             </p>
           )}
-          <LevelsStrip data={data} metric={metric} />
-          <div className="flex items-center gap-1 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
-            <div role="tablist" aria-label="Exposure" className="mr-3 inline-flex gap-3">
+          <LevelsStrip data={data} metric={metric} compact={compact} />
+          {/* Wraps instead of spilling into the next column; with 2–3 columns the Expiries / Ladder / Details labels
+              collapse to icons (names stay as tooltips and screen-reader text). */}
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
+            <div role="tablist" aria-label="Exposure" className={`inline-flex gap-3 ${compact ? "mr-1" : "mr-3"}`}>
               {(["gex", "vex"] as const).map((m) => (
                 <button
                   key={m}
@@ -136,16 +139,16 @@ export function TickerPanel({
             <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
             <span className="ml-auto" />
             <ExpiryPicker available={data.heatmap_expiries ?? []} chosen={slot.expiryFilter}
-              onChange={(next) => onExpiriesChange?.(next)} />
-            <button onClick={() => setLadderOpen((o) => !o)} aria-pressed={ladderOpen} title="Dealer ladder with buy/sell call and put ideas"
+              onChange={(next) => onExpiriesChange?.(next)} compact={compact} />
+            <button onClick={() => setLadderOpen((o) => !o)} aria-pressed={ladderOpen} title="Dealer ladder with buy/sell call and put ideas" aria-label="Ladder"
               className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground ${ladderOpen ? "text-foreground" : "text-foreground/60"}`}>
-              <Ruler size={12} /> Ladder
+              <Ruler size={12} />{!compact && " Ladder"}
             </button>
             <button
-              onClick={() => setDetailsOpen(true)}
+              onClick={() => setDetailsOpen(true)} title="Details: flow by expiry and strike" aria-label="Details"
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground"
             >
-              <PanelRight size={12} /> Details
+              <PanelRight size={12} />{!compact && " Details"}
             </button>
           </div>
           {/* Alone on a wide screen the ladder and ideas sit beside the heatmap; otherwise the ladder
