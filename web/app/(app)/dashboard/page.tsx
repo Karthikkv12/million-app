@@ -24,6 +24,15 @@ const signed = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+"
 const pct = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(d)}%`);
 const tone = (v?: number | null) => (v == null || v === 0 ? "text-foreground/55" : v > 0 ? "text-gain" : "text-loss");
 
+const ACT: Record<string, { label: string; tone: "accent" | "gain" | "warn" | "neutral"; edge: "accent" | "gain" | "warn" | null }> = {
+  SELL_CALL: { label: "Sell call", tone: "accent", edge: "accent" },
+  SELL_PUT: { label: "Sell put", tone: "gain", edge: "gain" },
+  BUY_STOCK: { label: "Buy stock", tone: "warn", edge: "warn" },
+  WAIT: { label: "Wait", tone: "neutral", edge: null },
+  HOLD: { label: "Hold", tone: "neutral", edge: null },
+  TRACK: { label: "Track", tone: "neutral", edge: null },
+};
+
 type Inst = { symbol: string; label: string; fmt?: (p: number) => string };
 const PULSE: { group: string; items: Inst[] }[] = [
   { group: "Indexes", items: [
@@ -90,6 +99,8 @@ export default function DashboardPage() {
   const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
   const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
   const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
+  const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
+  const actions = books.filter((b) => b.suggestion).sort((x, y) => ORDER.indexOf(x.suggestion!.action) - ORDER.indexOf(y.suggestion!.action));
   const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
   const expiring = (p?.options ?? []).filter((o) => o.dte != null && o.dte <= 7).sort((a, b) => (a.dte ?? 0) - (b.dte ?? 0));
   const movers = [...(p?.holdings ?? [])].filter((h) => h.day_change_pct != null).sort((a, b) => Math.abs(b.day_change_pct ?? 0) - Math.abs(a.day_change_pct ?? 0)).slice(0, 6);
@@ -130,7 +141,7 @@ export default function DashboardPage() {
               {perLot != null && (
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
-                  <Scale min={-0.5} max={1.5} value={perLot} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
+                  <Scale min={-0.5} max={1.5} value={perLot} tips={{ value: `Book now: ${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)} per lot · +1 = stock alone` }} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
                     pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-amber-500"}
                     zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
                     marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
@@ -139,7 +150,7 @@ export default function DashboardPage() {
               {beta != null && (
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
-                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
+                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
                     zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
                     marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
                 </div>
@@ -154,28 +165,39 @@ export default function DashboardPage() {
 
       <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="min-w-0">
-          {/* ── To do ───────────────────────────────────────────────── */}
-          <DeskSection label="To do" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
-            {!signals.length && !spikes.length && !expiring.length ? (
-              <p className="py-2 text-[14px] text-foreground/55">Nothing to place right now. The desk waits for a spike (sell a call) or a pullback (sell a put).</p>
+          {/* ── Actions: one line per holding ───────────────────────── */}
+          <DeskSection label="Actions" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
+            {!actions.length ? (
+              <p className="py-2 text-[14px] text-foreground/55">Your holdings show here after the first Robinhood sync.</p>
             ) : (
               <div className="border-t border-[var(--border)]">
-                {signals.map((b) => {
-                  const act = b.suggestion!.action;
-                  const t = act === "SELL_PUT" ? "gain" : act === "BUY_STOCK" ? "warn" : "accent";
+                {actions.map((b) => {
+                  const s = b.suggestion!;
+                  const a = ACT[s.action];
+                  const what = s.action === "BUY_STOCK" ? `+${s.shares} sh`
+                    : s.action === "SELL_CALL" || s.action === "SELL_PUT" ? `${s.contracts}× ${s.strike}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`
+                    : s.headline.split(/[;:]/)[0];
                   return (
                     <Link key={b.symbol} href="/hedge" className="block">
-                      <DeskRow edge={t}>
-                        <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
-                          <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
-                          <span><Tag tone={t}>{act.replace("_", " ").toLowerCase()}</Tag></span>
-                          <span className="sensitive text-right font-mono text-[13px] tabular-nums text-foreground sm:order-last">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
-                          <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">{b.suggestion!.headline}</span>
+                      <DeskRow edge={a.edge}>
+                        <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
+                          <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                          <span><Tag tone={a.tone}>{a.label}</Tag></span>
+                          <span className={clsx("min-w-0 truncate text-[13px]", a.edge ? "text-foreground" : "text-foreground/50")} title={s.headline}>{what}</span>
+                          <span className="sensitive text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{a.edge && s.credit ? usd(Math.abs(s.credit), 0) : ""}</span>
                         </div>
                       </DeskRow>
                     </Link>
                   );
                 })}
+              </div>
+            )}
+          </DeskSection>
+
+          {/* ── Expiring & alerts ───────────────────────────────────── */}
+          {(spikes.length > 0 || expiring.length > 0) && (
+          <DeskSection label="Expiring" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta="≤7 days · IV spikes">
+              <div className="border-t border-[var(--border)]">
                 {spikes.map((b) => (
                   <DeskRow key={`s-${b.symbol}`} edge="loss">
                     <div className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)]">
@@ -198,8 +220,8 @@ export default function DashboardPage() {
                   </DeskRow>
                 ))}
               </div>
-            )}
           </DeskSection>
+          )}
 
           {/* ── Movers in your holdings ─────────────────────────────── */}
           {movers.length > 0 && (

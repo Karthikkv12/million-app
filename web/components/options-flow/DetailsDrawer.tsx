@@ -230,7 +230,7 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${ticker} details`}>
       <button className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} aria-label="Close details" />
-      <aside className="relative flex h-full w-full max-w-[680px] flex-col border-l border-[var(--border-strong)] bg-[var(--background)]">
+      <aside className="relative flex h-[100dvh] w-full max-w-[680px] flex-col border-l border-[var(--border-strong)] bg-[var(--background)]">
         <header className="flex items-end gap-4 border-b border-[var(--border-strong)] px-5 pt-4">
           <div className="pb-3">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Details</p>
@@ -251,7 +251,7 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
           {tab === "levels" ? (
             <>
               <Read d={data} />

@@ -4,6 +4,7 @@
  * Full-bleed sections divided by hairlines, a left gutter label, big numerals, dense rows,
  * colored left edges for anything that needs action. No rounded boxed panels.
  */
+import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 
 export function DeskPage({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -91,25 +92,87 @@ export function Tag({ tone = "neutral", children, className }: {
   );
 }
 
-/** Horizontal meter with a zero tick, a reference/target tick and an optional "after" marker. */
-export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-full", dot }: {
+export type MeterTips = { value?: string; target?: string; after?: string; zero?: string };
+
+/** Popover state shared by Meter and Scale: one tip at a time, closes on outside tap or after 4 s. */
+function useTip() {
+  const [tip, setTip] = useState<{ key: string; text: string; at: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!tip) return;
+    const t = setTimeout(() => setTip(null), 4000);
+    const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setTip(null); };
+    document.addEventListener("pointerdown", away);
+    return () => { clearTimeout(t); document.removeEventListener("pointerdown", away); };
+  }, [tip]);
+  const show = (key: string, text: string, at: number) => (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();                     // a marker tap must not toggle the row it sits in
+    e.preventDefault();                      // …or follow a link around it (Dashboard scales link to /hedge)
+    setTip((cur) => (cur?.key === key ? null : { key, text, at }));
+  };
+  return { tip, show, ref };
+}
+
+/** A tappable marker: a 24px hit area centred on the visual. */
+function Mark({ at, label, onShow, children, top = "50%" }: {
+  at: number; label: string; onShow: (e: React.MouseEvent | React.KeyboardEvent) => void; children: React.ReactNode; top?: string;
+}) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onShow}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onShow(e); } }}
+      className="absolute z-[1] flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-[left] duration-500 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      style={{ left: `${at}%`, top }}>
+      {children}
+    </button>
+  );
+}
+
+function Bubble({ at, text }: { at: number; text: string }) {
+  return (
+    <span role="status" className={clsx("pointer-events-none absolute bottom-full z-20 mb-1.5 whitespace-nowrap rounded-[4px] bg-foreground px-2 py-1 font-mono text-[11px] text-[var(--background)] shadow-lg",
+      at < 50 ? "-translate-x-3" : "-translate-x-[calc(100%-12px)]")}
+      style={{ left: `${at}%` }}>
+      {text}
+    </span>
+  );
+}
+
+/** Horizontal meter with a zero tick, a reference/target tick and an optional "after" marker. Tap a marker to see what it is. */
+export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-full", dot, tips }: {
   value: number; target?: number | null; after?: number | null; max?: number; min?: number; width?: string;
   /** Dot color class; default: green on target, amber off it. */
   dot?: string;
+  /** Text shown when a marker is tapped; sensible defaults otherwise. */
+  tips?: MeterTips;
 }) {
-  const pos = (x: number) => `${Math.min(100, Math.max(0, ((x - min) / (max - min)) * 100))}%`;
+  const p = (x: number) => Math.min(100, Math.max(0, ((x - min) / (max - min)) * 100));
   const off = target != null && Math.abs(value - target) > 0.15;
-  const zero = parseFloat(pos(0));
-  const from = Math.min(zero, parseFloat(pos(value)));
-  const to = Math.max(zero, parseFloat(pos(value)));
+  const zero = p(0);
+  const from = Math.min(zero, p(value));
+  const to = Math.max(zero, p(value));
+  const f = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}`;
+  const { tip, show, ref } = useTip();
   return (
-    <div className={clsx("relative h-[18px]", width)} aria-label={`value ${value.toFixed(2)}`}>
+    <div ref={ref} className={clsx("relative h-[18px]", width)} aria-label={`value ${value.toFixed(2)}`}>
       <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[var(--border-strong)]" />
       <div className="absolute top-1/2 h-[6px] -translate-y-1/2 rounded-[1px] bg-foreground/15" style={{ left: `${from}%`, width: `${to - from}%` }} />
-      <div className="absolute top-[3px] h-3 w-px bg-foreground/30" style={{ left: `${zero}%` }} />
-      {target != null && <div title={`target ${target.toFixed(2)}`} className="absolute top-0 h-full w-[2px] -translate-x-1/2 bg-accent" style={{ left: pos(target) }} />}
-      {after != null && <div title={`after trade ${after.toFixed(2)}`} className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-accent bg-[var(--background)]" style={{ left: pos(after) }} />}
-      <div className={clsx("absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[var(--background)] transition-[left] duration-500", dot ?? (off ? "bg-amber-500" : "bg-gain"))} style={{ left: pos(value) }} />
+      <Mark at={zero} label="zero" onShow={show("zero", tips?.zero ?? "0 = delta-neutral", zero)}>
+        <span className="h-3 w-px bg-foreground/30" />
+      </Mark>
+      {target != null && (
+        <Mark at={p(target)} label="reference" onShow={show("target", tips?.target ?? `Reference ${f(target)}`, p(target))}>
+          <span className="h-[18px] w-[2px] bg-accent" />
+        </Mark>
+      )}
+      {after != null && (
+        <Mark at={p(after)} label="after the suggested trade" onShow={show("after", tips?.after ?? `After the suggested trade ${f(after)}`, p(after))}>
+          <span className="h-2 w-2 rotate-45 border border-accent bg-[var(--background)]" />
+        </Mark>
+      )}
+      <Mark at={p(value)} label="now" onShow={show("value", tips?.value ?? `Now ${f(value)}`, p(value))}>
+        <span className={clsx("h-3 w-3 rounded-full ring-2 ring-[var(--background)]", dot ?? (off ? "bg-amber-500" : "bg-gain"))} />
+      </Mark>
+      {tip && <Bubble at={tip.at} text={tip.text} />}
     </div>
   );
 }
@@ -160,7 +223,7 @@ export function Ladder({ levels, spot, height = 180 }: {
  * a pin with the value above, and an optional hollow "after" marker. Values outside the range
  * clamp to the edge with an arrow.
  */
-export function Scale({ min, max, value, after, marks, zones, label, pin }: {
+export function Scale({ min, max, value, after, marks, zones, label, pin, tips }: {
   min: number; max: number; value: number | null | undefined; after?: number | null;
   marks: { at: number; label: string; strong?: boolean }[];
   zones?: { from: number; to: number; cls: string; label?: string }[];
@@ -168,11 +231,14 @@ export function Scale({ min, max, value, after, marks, zones, label, pin }: {
   label?: string;
   /** Pin colour class. */
   pin?: string;
+  /** Text shown when the dot / after marker / a tick is tapped. */
+  tips?: { value?: string; after?: string };
 }) {
   const p = (x: number) => Math.min(100, Math.max(0, ((x - min) / (max - min)) * 100));
+  const { tip, show, ref } = useTip();
   const out = value != null && (value < min ? "◂ " : value > max ? " ▸" : "");
   return (
-    <div className="relative mb-2 pb-9 pt-7">
+    <div ref={ref} className="relative mb-2 pb-9 pt-7">
       {value != null && (
         <div className="absolute top-0 -translate-x-1/2 transition-[left] duration-500" style={{ left: `${Math.min(94, Math.max(6, p(value)))}%` }}>
           <span className={clsx("whitespace-nowrap rounded-[3px] px-1.5 py-[1px] font-mono text-[11px] font-medium tabular-nums text-[var(--background)]", pin ?? "bg-foreground")}>
@@ -194,11 +260,16 @@ export function Scale({ min, max, value, after, marks, zones, label, pin }: {
         </div>
       ))}
       {after != null && (
-        <div title="after the suggested trade" className="absolute top-[30px] h-3 w-3 -translate-x-1/2 rotate-45 border-2 border-accent bg-[var(--background)]" style={{ left: `${p(after)}%` }} />
+        <Mark at={p(after)} top="36px" label="after the suggested trades" onShow={show("after", tips?.after ?? `After the suggested trades ${after.toFixed(2)}`, p(after))}>
+          <span className="h-3 w-3 rotate-45 border-2 border-accent bg-[var(--background)]" />
+        </Mark>
       )}
       {value != null && (
-        <div className={clsx("absolute top-[27px] h-4 w-4 -translate-x-1/2 rounded-full ring-[3px] ring-[var(--background)] transition-[left] duration-500", pin ?? "bg-foreground")} style={{ left: `${p(value)}%` }} />
+        <Mark at={p(value)} top="35px" label="now" onShow={show("value", tips?.value ?? `Now ${label ?? value.toFixed(2)}`, p(value))}>
+          <span className={clsx("h-4 w-4 rounded-full ring-[3px] ring-[var(--background)]", pin ?? "bg-foreground")} />
+        </Mark>
       )}
+      {tip && <span className="absolute inset-x-0 top-[34px]"><Bubble at={tip.at} text={tip.text} /></span>}
     </div>
   );
 }

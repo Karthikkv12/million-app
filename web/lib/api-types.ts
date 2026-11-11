@@ -1894,6 +1894,12 @@ export interface components {
             symbol: string;
             /** Target Delta */
             target_delta?: number | null;
+            /**
+             * Units
+             * @description Covered (shares + their short calls), uncovered shares, short puts
+             * @default []
+             */
+            units: components["schemas"]["UnitOut"][];
             /** Weekly Expiry */
             weekly_expiry?: string | null;
         };
@@ -3872,6 +3878,30 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /** UnitOut */
+        UnitOut: {
+            /**
+             * Contracts
+             * @default 0
+             */
+            contracts: number;
+            /** Delta */
+            delta?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "covered" | "uncovered" | "puts" | "other";
+            /** Label */
+            label: string;
+            /** Per Lot */
+            per_lot?: number | null;
+            /**
+             * Shares
+             * @default 0
+             */
+            shares: number;
         };
         /** UnusualRow */
         UnusualRow: {

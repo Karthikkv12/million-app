@@ -103,6 +103,15 @@ class SuggestionOut(BaseModel):
     warnings: List[str] = []
 
 
+class UnitOut(BaseModel):
+    kind: Literal["covered", "uncovered", "puts", "other"]
+    label: str
+    shares: float = 0
+    contracts: float = 0
+    delta: Optional[float] = None
+    per_lot: Optional[float] = None
+
+
 class IvOut(BaseModel):
     atm_iv: Optional[float] = None
     iv_open: Optional[float] = None
@@ -140,6 +149,7 @@ class BookOut(BaseModel):
     iv_hv: Optional[float] = None
     beta: Optional[float] = Field(None, description="1-year beta of daily returns vs SPY")
     legs: List[LegOut] = []
+    units: List[UnitOut] = Field([], description="Covered (shares + their short calls), uncovered shares, short puts")
     suggestion: Optional[SuggestionOut] = None
     spot: Optional[float] = None
     prev_close: Optional[float] = None

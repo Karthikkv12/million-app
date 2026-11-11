@@ -17,6 +17,11 @@ The owner's playbook (2026-11-08): only ever SELL a call, SELL a put, or BUY sto
 5. An odd lot below 100 shares → BUY_STOCK to round it up to a full lot when the price is at/below
    the average (lowers the average, and the lot can then be worked with calls and puts).
 6. Otherwise HOLD (everything worked) or WAIT (with the reason).
+
+Units (owner, 2026-11-08): shares covered by short calls and those calls are ONE unit (300 sh + 3 short calls),
+the rest of the shares are a second unit (500 sh + 3 calls → 300 covered + 200 uncovered), short puts a third.
+Each unit's delta is reported next to the total. A call suggestion covers the whole uncovered unit at once
+(200 sh → 2 calls), and it then joins the covered unit.
 """
 from __future__ import annotations
 
@@ -31,6 +36,8 @@ HIGH_VOL_RATIO = 1.30     # ATM IV / HV20 at or above this = high-vol regime (sh
 BAND = 0.15               # per lot: |net − reference| within this counts as "near +1"
 RISE_TRIGGER = 0.02       # stock ≥ 2% over average cost
 CALL_OTM_SLACK = 0.03     # no ITM strike ≥ average: an ATM/OTM strike within 3% of spot is still OK
+MIN_PUT_YIELD = 0.002     # a put must pay ≥ 0.2% of its strike (and ≥ $0.05/sh), or it isn't worth the cash it ties up
+MIN_PUT_PREMIUM = 0.05
 MIN_DTE, MAX_DTE = 2, 9   # weekly runway; avoid 0–1 DTE gamma traps (protocol §3)
 PUT_PULLBACK = 0.01       # ≥ 1% off the intraday high counts as a pullback
 NEAR_LEVEL = 0.02         # within 2% of the put wall counts as "at support"
@@ -104,6 +111,16 @@ class Suggestion:
 
 
 @dataclass
+class Unit:
+    kind: str                       # "covered" | "uncovered" | "puts" | "other"
+    label: str                      # e.g. "300 sh + 3 short calls"
+    shares: float
+    contracts: float                # signed option contracts in the unit
+    delta: float                    # lots
+    per_lot: Optional[float]        # delta per 100 shares in the unit (None without full lots)
+
+
+@dataclass
 class Book:
     symbol: str
     shares: float
@@ -118,6 +135,7 @@ class Book:
     iv_hv: Optional[float]
     legs: List[Leg]
     suggestion: Suggestion
+    units: List[Unit] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -164,7 +182,35 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote]) -> Book:
     warnings = _gamma_warnings(legs)
     s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
-                _r(target), regime, _r(gap), _r(iv_hv), legs, s)
+                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs))
+
+
+def units(legs: List[Leg]) -> List[Unit]:
+    """Split a holding into covered (shares + their short calls), uncovered shares, short puts, other options."""
+    shares = sum(l.quantity for l in legs if l.kind == "stock")
+    calls = [l for l in legs if l.kind == "option" and l.otype == "call" and l.quantity < 0]
+    puts = [l for l in legs if l.kind == "option" and l.otype == "put" and l.quantity < 0]
+    other = [l for l in legs if l.kind == "option" and l.quantity > 0]
+    n_calls = -sum(l.quantity for l in calls)
+    covered = min(max(shares, 0.0), n_calls * 100.0)
+    out: List[Unit] = []
+    per = lambda d, sh: _r(d / (sh / 100.0)) if sh >= 100 else None          # noqa: E731
+    if calls:
+        d = covered / 100.0 + sum(l.position_delta for l in calls)
+        naked = n_calls * 100.0 - covered
+        label = f"{covered:g} sh + {n_calls:g} short call{'s' * (n_calls != 1)}" + (f" ({naked / 100:g} uncovered)" if naked > 0 else "")
+        out.append(Unit("covered", label, covered, -n_calls, _r(d), per(d, covered)))
+    free = shares - covered
+    if free > 0:
+        out.append(Unit("uncovered", f"{free:g} sh, no call", free, 0, _r(free / 100.0), per(free / 100.0, free)))
+    if puts:
+        n = -sum(l.quantity for l in puts)
+        d = sum(l.position_delta for l in puts)
+        out.append(Unit("puts", f"{n:g} short put{'s' * (n != 1)} ({n * 100:g} sh if assigned)", 0, -n, _r(d), None))
+    if other:
+        n = sum(l.quantity for l in other)
+        out.append(Unit("other", f"{n:g} long option{'s' * (n != 1)}", 0, n, _r(sum(l.position_delta for l in other)), None))
+    return out
 
 
 def _gamma_warnings(legs: List[Leg]) -> List[str]:
@@ -243,6 +289,7 @@ def _sell_call(ctx: Context, weekly: List[Quote], net: float, free: int, rise: f
     n = free
     prem = q.mid or q.bid or 0.0
     reasons = [f"Stock is {rise:+.1%} over your ${avg:,.2f} average." if rise > 0 else "Stock is above your average."]
+    reasons.append(f"Covers the uncovered unit in one go: {n * 100} sh → {n} call{'s' * (n != 1)}; it then joins the covered unit.")
     if ctx.iv_spike:
         reasons.append("ATM IV is spiking on the up-move: premium is inflated, sell it now.")
     reasons.append(f"Strike {q.strike:g} is {'in the money and ' if q.strike <= spot else ''}the closest to your average "
@@ -264,6 +311,12 @@ def _sell_put(ctx: Context, weekly: List[Quote], net: float, n: int, calls_on: i
         return None
     q = max(puts, key=lambda p: p.strike)
     prem = q.mid or q.bid or 0.0
+    floor = max(MIN_PUT_PREMIUM, MIN_PUT_YIELD * q.strike)
+    if prem < floor:
+        return Suggestion("WAIT", f"Put below average pays too little: {q.strike:g}P ${prem:.2f} < ${floor:.2f}",
+                          [f"The highest strike below your ${avg:,.2f} average is {q.strike:g}, {1 - q.strike / spot:.0%} under the price.",
+                           f"It pays ${prem:.2f}/sh; the floor is {MIN_PUT_YIELD:.1%} of the strike (min ${MIN_PUT_PREMIUM:.2f}). "
+                           "Wait for a deeper pullback toward your average."], warnings=warnings)
     reasons = ["Stock has pulled back and IV isn't spiking."]
     reasons.append(f"Strike {q.strike:g} is the highest below your ${avg:,.2f} average: if assigned, the shares come in "
                    f"at {q.strike - prem:,.2f} net of premium, under your average.")
