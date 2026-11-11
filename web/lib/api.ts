@@ -915,6 +915,20 @@ export const syncWatchlist = () =>
     "/watchlist/sync",
   );
 
+// ── Watchlists (named lists, up to 20; seeded one per sector) ─────────────────
+export type WatchlistGroup = Schemas["WatchlistGroupOut"];
+export type WatchlistGroups = Schemas["WatchlistGroupsOut"];
+const wl = (id: number) => `/watchlists/${id}`;
+const sym = (s: string) => encodeURIComponent(s.trim().toUpperCase());
+/** Every list in display order. The first call creates "My watchlist" plus one list per sector. */
+export const fetchWatchlistGroups = () => api.get<WatchlistGroups>("/watchlists");
+export const createWatchlistGroup = (name: string, symbols: string[] = []) => api.post<WatchlistGroup>("/watchlists", { name, symbols });
+export const updateWatchlistGroup = (id: number, body: { name?: string; symbols?: string[] }) => api.patch<WatchlistGroup>(wl(id), body);
+export const deleteWatchlistGroup = (id: number) => api.del<void>(wl(id));
+export const addToWatchlistGroup = (id: number, symbol: string) => api.put<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
+export const removeFromWatchlistGroup = (id: number, symbol: string) => api.del<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
+export const restoreSectorWatchlists = () => api.post<WatchlistGroups>("/watchlists/restore-sectors");
+
 // ── Catalyst ──────────────────────────────────────────────────────────────────
 export interface CatalystSignal { label: string; tone: "good" | "bad" | "warn" | "neutral" }
 // Hand-written until CatalystsOut types its nested sections (coordination C-8).

@@ -30,6 +30,11 @@ def _watchlist() -> List[APIRouter]:
     return [router]
 
 
+def _watchlists() -> List[APIRouter]:
+    from optionflow.modules.watchlists.router import router
+    return [router]
+
+
 def _portfolio() -> List[APIRouter]:
     from optionflow.modules.portfolio.router import accounts_router, router
     return [router, accounts_router]
@@ -71,6 +76,7 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "market": _market,
     "flow": _flow,
     "watchlist": _watchlist,
+    "watchlists": _watchlists,  # named lists (up to 20), seeded one per sector
     "catalyst": _catalyst,
     "unusual": _unusual,
     "ai": _ai,                 # off by default; the chat UI is hidden for now

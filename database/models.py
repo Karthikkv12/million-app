@@ -561,3 +561,18 @@ class Report(Base):
     html         = Column(Text, nullable=False)                  # the whole page; shown in a sandboxed frame
     source_url   = Column(String, nullable=True)                 # the artifact it mirrors
     published_at = Column(String, nullable=False)                # ISO UTC
+
+
+class WatchlistGroup(Base):
+    """A named watchlist (watchlists module). Up to 20 per user. `kind` is "sector" for the lists seeded
+    one per sector, "custom" for the user's own; `symbols` is a JSON array of tickers in display order."""
+    __tablename__ = "watchlist_groups"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name       = Column(String, nullable=False)
+    kind       = Column(String, nullable=False, default="custom")   # custom | sector
+    sector     = Column(String, nullable=True)                      # sector name, for kind="sector"
+    position   = Column(Integer, nullable=False, default=0)
+    symbols    = Column(Text, nullable=False, default="[]")         # JSON array, upper-case tickers
+    created_at = Column(String, nullable=False)                     # ISO UTC
+    updated_at = Column(String, nullable=False)
