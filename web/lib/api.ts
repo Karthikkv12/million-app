@@ -17,44 +17,78 @@ export type Schemas = components["schemas"];
 export type V1Get<P extends keyof paths> =
   paths[P] extends { get: { responses: { 200: { content: { "application/json": infer R } } } } } ? R : never;
 
-// ── token storage (client-side only) ────────────────────────────────────────
+// ── tokens (client-side only) ────────────────────────────────────────────────
+// The access token (15 min) lives only in this tab's memory. The refresh token never reaches page
+// scripts at all: the API keeps it in an HttpOnly, SameSite=Strict cookie scoped to /api/v1/auth, so
+// nothing running in the page (an injected script, a bad extension, a copied localStorage) can steal a
+// long-lived login. A reload gets a new access token from that cookie. Logins end after 7 days.
 
-export function getTokens(): { access: string | null; refresh: string | null } {
-  if (typeof window === "undefined") return { access: null, refresh: null };
-  return {
-    access: localStorage.getItem("of_access"),
-    refresh: localStorage.getItem("of_refresh"),
-  };
+let _access: string | null = null;
+const LEGACY_KEYS = ["of_access", "of_refresh"];   // where tokens used to live; migrated once, then deleted
+/** Tells the API to keep the refresh token in the cookie and leave it out of the JSON body. */
+export const COOKIE_MODE = { "X-Token-Transport": "cookie" } as const;
+
+export function getTokens(): { access: string | null } {
+  return { access: _access };
 }
 
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem("of_access", access);
-  localStorage.setItem("of_refresh", refresh);
+export function setAccessToken(access: string | null) {
+  _access = access;
+}
+
+function dropLegacyTokens() {
+  try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch { /* storage off */ }
 }
 
 export function clearTokens() {
-  localStorage.removeItem("of_access");
-  localStorage.removeItem("of_refresh");
+  _access = null;
+  dropLegacyTokens();
 }
 
-// ── core fetch ───────────────────────────────────────────────────────────────
+/** Access-token claims (no verification: only for showing who is signed in and when it expires). */
+export function tokenClaims(access: string | null): { sub?: string; username?: string; role?: string; exp?: number } | null {
+  if (!access) return null;
+  try { return JSON.parse(atob(access.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch { return null; }
+}
 
-let _refreshing: Promise<boolean> | null = null;
+// ── session refresh ──────────────────────────────────────────────────────────
 
-async function _doRefresh(): Promise<boolean> {
-  const { refresh } = getTokens();
-  if (!refresh) return false;
+let _refreshing: Promise<AuthTokens | null> | null = null;
+
+async function _refreshOnce(): Promise<AuthTokens | null> {
+  // A device signed in before the cookie change still has its token in localStorage: send it once so
+  // the API moves it into the cookie, then delete it from storage.
+  let legacy: string | null = null;
+  try { legacy = typeof window !== "undefined" ? localStorage.getItem("of_refresh") : null; } catch { /* storage off */ }
   try {
     const res = await fetch(`${BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refresh }),
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", ...COOKIE_MODE },
+      body: JSON.stringify(legacy ? { refresh_token: legacy } : {}),
     });
-    if (!res.ok) { clearTokens(); return false; }
-    const data = await res.json();
-    setTokens(data.access_token, data.refresh_token);
-    return true;
-  } catch { clearTokens(); return false; }
+    dropLegacyTokens();
+    if (!res.ok) { _access = null; return null; }
+    const data: AuthTokens = await res.json();
+    _access = data.access_token;
+    return data;
+  } catch { return null; }
+}
+
+/**
+ * Get a new access token from the refresh cookie. Concurrent calls share one request, and tabs take
+ * turns (Web Locks) so two tabs never present the same refresh token: the API treats a replayed
+ * token as theft and signs that login out.
+ */
+export function refreshSession(): Promise<AuthTokens | null> {
+  if (!_refreshing) {
+    const run: Promise<AuthTokens | null> = typeof navigator !== "undefined" && navigator.locks?.request
+      // The DOM typings say Promise<Promise<…>>; the lock's promise resolves with the callback's result.
+      ? (navigator.locks.request("of-refresh", () => _refreshOnce()) as unknown as Promise<AuthTokens | null>)
+      : _refreshOnce();
+    _refreshing = run.finally(() => { _refreshing = null; });
+  }
+  return _refreshing;
 }
 
 /** Plain message from an error body: v1 `{error:{message}}`, legacy `{detail}`, or the raw text. */
@@ -84,9 +118,7 @@ async function apiFetch<T>(
 
   if (res.status === 401 && retry) {
     // coalesce concurrent refresh attempts
-    if (!_refreshing) _refreshing = _doRefresh().finally(() => { _refreshing = null; });
-    const ok = await _refreshing;
-    if (ok) return apiFetch<T>(path, init, false);
+    if (await refreshSession()) return apiFetch<T>(path, init, false);
     clearTokens();
     window.location.href = "/login";
     throw new Error("Session expired");
@@ -118,7 +150,7 @@ export const api = {
 
 export interface AuthTokens {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string | null;   // null for the web: it's in the HttpOnly cookie
   user_id: number;
   username: string;
   role?: string;
@@ -127,7 +159,8 @@ export interface AuthTokens {
 export async function login(username: string, password: string): Promise<AuthTokens> {
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...COOKIE_MODE },
     body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
@@ -135,19 +168,22 @@ export async function login(username: string, password: string): Promise<AuthTok
     throw new Error(err.detail ?? "Login failed");
   }
   const data: AuthTokens = await res.json();
-  setTokens(data.access_token, data.refresh_token);
+  _access = data.access_token;
+  dropLegacyTokens();
   return data;
 }
 
 export async function logout() {
-  try { await api.post("/auth/logout"); } catch { /* best effort */ }
+  // The API revokes this device's refresh token (read from the cookie) and clears the cookie.
+  try { await apiFetch("/auth/logout", { method: "POST", headers: COOKIE_MODE }, false); } catch { /* best effort */ }
   clearTokens();
 }
 
 export async function signup(username: string, password: string): Promise<AuthTokens> {
   const res = await fetch(`${BASE}/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...COOKIE_MODE },
     body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
@@ -155,7 +191,8 @@ export async function signup(username: string, password: string): Promise<AuthTo
     throw new Error(err.detail ?? "Signup failed");
   }
   const data: AuthTokens = await res.json();
-  setTokens(data.access_token, data.refresh_token);
+  _access = data.access_token;
+  dropLegacyTokens();
   return data;
 }
 
@@ -747,8 +784,16 @@ export interface AuthEvent {
 export const fetchAuthSessions = () => api.get<AuthSession[]>("/auth/sessions");
 export const revokeSession = (id: number) => api.post(`/auth/sessions/${id}/revoke`);
 export const fetchAuthEvents = () => api.get<AuthEvent[]>("/auth/events");
-export const changePassword = (currentPassword: string, newPassword: string) =>
-  api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+// Changing the password signs out every other device and this access token; the reply carries the new
+// access token (and the API sets a new refresh cookie), so this device stays signed in.
+export const changePassword = async (currentPassword: string, newPassword: string) => {
+  const data = await apiFetch<AuthTokens>("/auth/change-password", {
+    method: "POST", headers: COOKIE_MODE,
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  _access = data.access_token;
+  return data;
+};
 export const logoutAll = () => api.post("/auth/logout-all");
 
 // ── Cash ─────────────────────────────────────────────────────────────────────

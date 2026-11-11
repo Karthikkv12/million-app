@@ -1969,7 +1969,7 @@ export interface components {
         /** AuthRefreshRequest */
         AuthRefreshRequest: {
             /** Refresh Token */
-            refresh_token: string;
+            refresh_token?: string | null;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -5164,9 +5164,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["AuthRefreshRequest"];
+                "application/json": components["schemas"]["AuthRefreshRequest"] | null;
             };
         };
         responses: {

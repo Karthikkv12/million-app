@@ -32,8 +32,17 @@ class Settings(BaseSettings):
     access_token_expires_minutes: int = 15
 
     # ── Auth: refresh tokens ─────────────────────────────────────────────────
-    refresh_token_expires_days: int = 30
+    # A login lasts at most this long: renewing a refresh token never moves its expiry later.
+    refresh_token_expires_days: int = 7
     refresh_token_pepper: Optional[str] = None  # falls back to jwt_secret
+    # A rotated token presented again within this window is a benign race (two tabs refreshing at once):
+    # it gets an access token but no new refresh token. Later than this, it's treated as theft and the
+    # whole login chain is revoked.
+    refresh_reuse_grace_seconds: int = 30
+    # Browsers get the refresh token only as an HttpOnly cookie (scripts can't read it).
+    refresh_cookie_name: str = "of_rt"
+    refresh_cookie_path: str = "/api/v1/auth"
+    refresh_cookie_secure: Optional[bool] = None  # None = Secure when the request came over HTTPS
 
     # ── Auth: password policy ────────────────────────────────────────────────
     password_min_length: int = 12

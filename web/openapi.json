@@ -908,14 +908,17 @@
    "AuthRefreshRequest": {
     "properties": {
      "refresh_token": {
-      "minLength": 1,
-      "title": "Refresh Token",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refresh Token"
      }
     },
-    "required": [
-     "refresh_token"
-    ],
     "title": "AuthRefreshRequest",
     "type": "object"
    },
@@ -11432,11 +11435,18 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AuthRefreshRequest"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/AuthRefreshRequest"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Req"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {

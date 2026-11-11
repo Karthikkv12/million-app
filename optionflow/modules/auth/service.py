@@ -411,12 +411,45 @@ def validate_refresh_token(*, refresh_token: str) -> int | None:
         session.close()
 
 
+class RefreshReuse(Exception):
+    """A refresh token that was already rotated was presented again: likely stolen. The chain is revoked."""
+
+    def __init__(self, user_id: int):
+        super().__init__("refresh token reuse")
+        self.user_id = int(user_id)
+
+
+def _revoke_chain(session, rt, *, now: datetime, reason: str) -> int:
+    """Revoke every still-active token that descends from `rt` (the rotation chain of one login)."""
+    from database.models import RefreshToken
+    n, seen, nxt = 0, set(), getattr(rt, "replaced_by_token_id", None)
+    while nxt is not None and nxt not in seen:
+        seen.add(nxt)
+        child = session.query(RefreshToken).filter(RefreshToken.id == int(nxt)).first()
+        if child is None:
+            break
+        if getattr(child, "revoked_at", None) is None:
+            child.revoked_at = now
+            child.revoked_reason = reason
+            session.add(child)
+            n += 1
+        nxt = getattr(child, "replaced_by_token_id", None)
+    return n
+
+
 def rotate_refresh_token(
     *,
     refresh_token: str,
     ip: str | None = None,
     user_agent: str | None = None,
-) -> tuple[int, str] | None:
+) -> tuple[int, str | None] | None:
+    """Swap a refresh token for a new one. Returns (user_id, new_token), or None if it isn't valid.
+
+    - The new token keeps the old one's expiry (never later), so a login has a hard end date.
+    - A token rotated less than `refresh_reuse_grace_seconds` ago (two tabs refreshing at once) returns
+      (user_id, None): an access token may be issued, but no new refresh token.
+    - A token rotated earlier than that is being replayed: the whole chain is revoked and RefreshReuse raised.
+    """
     session = get_session()
     try:
         from database.models import RefreshToken
@@ -425,25 +458,41 @@ def rotate_refresh_token(
         rt = session.query(RefreshToken).filter(RefreshToken.token_hash == th).first()
         if not rt:
             return None
-        if getattr(rt, "revoked_at", None) is not None:
-            return None
+        user_id = int(getattr(rt, "user_id"))
+        revoked_at = getattr(rt, "revoked_at", None)
+        if revoked_at is not None:
+            if getattr(rt, "revoked_reason", None) != "rotated":
+                return None
+            grace = int(getattr(get_settings(), "refresh_reuse_grace_seconds", 30))
+            if (now - revoked_at).total_seconds() <= grace and getattr(rt, "expires_at", now) > now:
+                # Only while the login is still alive (its newest token not signed out).
+                tip, seen = rt, set()
+                while getattr(tip, "replaced_by_token_id", None) is not None and tip.id not in seen:
+                    seen.add(tip.id)
+                    tip = session.query(RefreshToken).filter(RefreshToken.id == int(tip.replaced_by_token_id)).first()
+                    if tip is None:
+                        return None
+                return (user_id, None) if getattr(tip, "revoked_at", None) is None else None
+            _revoke_chain(session, rt, now=now, reason="reuse_detected")
+            session.commit()
+            raise RefreshReuse(user_id)
         if getattr(rt, "expires_at", now) <= now:
             return None
 
-        user_id = int(getattr(rt, "user_id"))
         new_raw = f"rt_{secrets.token_urlsafe(32)}"
         ua = (str(user_agent)[:500] if user_agent else None)
         ip_s = (str(ip).strip() if ip else None)
+        cap = (datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None)
         new_rt = RefreshToken(
             user_id=user_id,
             token_hash=_hash_refresh_token(new_raw),
-            created_at=now,
-            created_ip=ip_s,
-            created_user_agent=ua,
+            created_at=getattr(rt, "created_at", None) or now,   # login time: the session list shows when you signed in
+            created_ip=getattr(rt, "created_ip", None),
+            created_user_agent=getattr(rt, "created_user_agent", None),
             last_used_at=now,
             last_used_ip=ip_s,
             last_used_user_agent=ua,
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=_refresh_token_ttl_days())).replace(tzinfo=None),
+            expires_at=min(rt.expires_at, cap),
             revoked_at=None,
             revoked_reason=None,
             replaced_by_token_id=None,
@@ -457,6 +506,8 @@ def rotate_refresh_token(
         session.add(rt)
         session.commit()
         return user_id, new_raw
+    except RefreshReuse:
+        raise
     except Exception:
         session.rollback()
         raise
@@ -731,7 +782,13 @@ def refresh_session(refresh_token: str, *, ip: str | None = None, user_agent: st
     if _limited(is_refresh_rate_limited, ip=ip):
         log_auth_event(event_type="refresh_throttled", success=False, ip=ip, user_agent=user_agent)
         raise _err.RateLimited("Too many refresh attempts. Please try again later.")
-    rotated = rotate_refresh_token(refresh_token=refresh_token, ip=ip, user_agent=user_agent)
+    try:
+        rotated = rotate_refresh_token(refresh_token=refresh_token, ip=ip, user_agent=user_agent)
+    except RefreshReuse as reuse:
+        log_auth_event(event_type="refresh_reuse", success=False, user_id=reuse.user_id, ip=ip, user_agent=user_agent,
+                       detail="an already-used refresh token was presented again; that login was signed out")
+        _logger.warning("Refresh token reuse for user %s from %s: login chain revoked", reuse.user_id, ip)
+        raise _err.Unauthorized("Session ended for security. Please sign in again.")
     if not rotated:
         log_auth_event(event_type="refresh", success=False, ip=ip, user_agent=user_agent, detail="invalid refresh token")
         raise _err.Unauthorized("Invalid refresh token")
