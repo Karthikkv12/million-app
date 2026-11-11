@@ -5086,6 +5086,16 @@
       "title": "Factors",
       "type": "array"
      },
+     "put": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PutScore"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "score": {
       "anyOf": [
        {
@@ -5095,7 +5105,7 @@
         "type": "null"
        }
       ],
-      "description": "0 (bad) to 100 (extremely good); None without enough history",
+      "description": "Long call: 0 (bad) to 100 (extremely good); None without enough history",
       "title": "Score"
      },
      "summary": {
@@ -7677,6 +7687,50 @@
     "title": "PushConfigOut",
     "type": "object"
    },
+   "PutScore": {
+    "description": "The LEAPS score for buying a long-dated put: the call score's factors, flipped.",
+    "properties": {
+     "band": {
+      "title": "Band",
+      "type": "string"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreEntry"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "factors": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ScoreFactor"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "integer"
+     },
+     "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+     }
+    },
+    "required": [
+     "score",
+     "band"
+    ],
+    "title": "PutScore",
+    "type": "object"
+   },
    "QuoteOut": {
     "description": "Outside the regular session, prev_close / change / change_pct describe the last regular session's move\n(Robinhood's \"Today\") and ext_change the move since its close (after-hours / overnight).",
     "properties": {
@@ -8162,7 +8216,7 @@
     "type": "object"
    },
    "ScoreEntry": {
-    "description": "The stock price at which to buy the long call (score.entry_plan).",
+    "description": "The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).",
     "properties": {
      "distance": {
       "description": "price vs the last close (decimal; 0 for now)",
@@ -8178,11 +8232,13 @@
       "type": "number"
      },
      "when": {
-      "description": "now | wait for a dip to price | wait for a close back above price",
+      "description": "now | call: wait for a dip to price / a close back above price | put: wait for a bounce to price / a close back below price",
       "enum": [
        "now",
        "pullback",
-       "reclaim"
+       "reclaim",
+       "bounce",
+       "break"
       ],
       "title": "When",
       "type": "string"

@@ -62,20 +62,32 @@ class ScoreTraits(BaseModel):
 
 
 class ScoreEntry(BaseModel):
-    """The stock price at which to buy the long call (score.entry_plan)."""
+    """The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan)."""
     price: float
-    when: Literal["now", "pullback", "reclaim"] = Field(..., description="now | wait for a dip to price | wait for a close back above price")
+    when: Literal["now", "pullback", "reclaim", "bounce", "break"] = Field(
+        ..., description="now | call: wait for a dip to price / a close back above price | "
+                         "put: wait for a bounce to price / a close back below price")
     distance: float = Field(..., description="price vs the last close (decimal; 0 for now)")
     note: str
 
 
+class PutScore(BaseModel):
+    """The LEAPS score for buying a long-dated put: the call score's factors, flipped."""
+    score: int = Field(..., ge=0, le=100)
+    band: str
+    summary: str = ""
+    factors: List[ScoreFactor] = []
+    entry: Optional[ScoreEntry] = None
+
+
 class LeapsScoreOut(BaseModel):
     symbol: str
-    score: Optional[int] = Field(None, description="0 (bad) to 100 (extremely good); None without enough history")
+    score: Optional[int] = Field(None, description="Long call: 0 (bad) to 100 (extremely good); None without enough history")
     band: Optional[str] = Field(None, description="Avoid | Weak | Fair | Good | Excellent")
     summary: str = ""
     factors: List[ScoreFactor] = []
     traits: Optional[ScoreTraits] = None
     entry: Optional[ScoreEntry] = None
+    put: Optional[PutScore] = None
     as_of: Optional[str] = None
     error: Optional[str] = None

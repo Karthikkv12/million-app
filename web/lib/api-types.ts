@@ -3473,9 +3473,10 @@ export interface components {
              * @default []
              */
             factors: components["schemas"]["ScoreFactor"][];
+            put?: components["schemas"]["PutScore"] | null;
             /**
              * Score
-             * @description 0 (bad) to 100 (extremely good); None without enough history
+             * @description Long call: 0 (bad) to 100 (extremely good); None without enough history
              */
             score?: number | null;
             /**
@@ -4134,6 +4135,27 @@ export interface components {
             public_key?: string | null;
         };
         /**
+         * PutScore
+         * @description The LEAPS score for buying a long-dated put: the call score's factors, flipped.
+         */
+        PutScore: {
+            /** Band */
+            band: string;
+            entry?: components["schemas"]["ScoreEntry"] | null;
+            /**
+             * Factors
+             * @default []
+             */
+            factors: components["schemas"]["ScoreFactor"][];
+            /** Score */
+            score: number;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /**
          * QuoteOut
          * @description Outside the regular session, prev_close / change / change_pct describe the last regular session's move
          *     (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight).
@@ -4306,7 +4328,7 @@ export interface components {
         };
         /**
          * ScoreEntry
-         * @description The stock price at which to buy the long call (score.entry_plan).
+         * @description The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).
          */
         ScoreEntry: {
             /**
@@ -4320,10 +4342,10 @@ export interface components {
             price: number;
             /**
              * When
-             * @description now | wait for a dip to price | wait for a close back above price
+             * @description now | call: wait for a dip to price / a close back above price | put: wait for a bounce to price / a close back below price
              * @enum {string}
              */
-            when: "now" | "pullback" | "reclaim";
+            when: "now" | "pullback" | "reclaim" | "bounce" | "break";
         };
         /** ScoreFactor */
         ScoreFactor: {

@@ -168,3 +168,39 @@ def test_score_carries_the_entry():
     out = sc.leaps_score(path(1000, drift=0.0008, wobble=0.004))
     assert out["entry"]["when"] == "pullback" and out["entry"]["price"] < path(1000, drift=0.0008, wobble=0.004)[-1]
     assert sc.leaps_score(path(30))["entry"] is None
+
+
+# ── the put side ──────────────────────────────────────────────────────────────
+def test_put_score_is_the_call_idea_flipped():
+    down = sc.leaps_score(path(1000, drift=-0.0012, wobble=0.03), [5e6] * 1000, spy_closes=path(1000, drift=0.0004))
+    up = sc.leaps_score(path(1000, drift=0.0010, wobble=0.012), [5e6] * 1000, spy_closes=path(1000, drift=0.0003))
+    assert down["put"]["score"] > down["score"] and up["put"]["score"] < up["score"]
+    assert down["put"]["score"] >= 60 and up["put"]["score"] < 45
+    pf, cf = by_key(down["put"]), by_key(down)
+    assert set(pf) == set(cf) and pf["pullback"]["label"] == "Bounce" and "52-wk low" in pf["pullback"]["value"]
+    assert pf["trend"]["score"] == 100 - cf["trend"]["score"] and pf["growth"]["score"] == 100 - cf["growth"]["score"]
+    assert [pf[k]["score"] for k in ("volatility", "liquidity")] == [cf[k]["score"] for k in ("volatility", "liquidity")]
+    assert "LEAPS put" in down["put"]["summary"] and "LEAPS call" in down["summary"]
+    assert "fights" in by_key(up["put"])["trend"]["note"]
+
+
+def test_put_dealers_flip_and_short_history_has_no_put():
+    px = path(400, drift=-0.001)
+    out = sc.leaps_score(px, net_gex=-1e9, zero_gamma=px[-1] * 1.05)
+    assert by_key(out["put"])["dealers"]["score"] == 80 and by_key(out)["dealers"]["score"] == 25
+    assert sc.leaps_score(path(30))["put"] is None
+
+
+def test_put_entry_rules_mirror_the_call():
+    e = sc.put_entry_plan(115.0, 70, "down", 0.15, 100.0, 110.0, 125.0)
+    assert (e["price"], e["when"]) == (115.0, "now") and "15% off" in e["note"]
+    e = sc.put_entry_plan(101.0, 70, "down", 0.01, 100.0, 106.0, 120.0)        # 50-day avg is a real bounce, under low +10%
+    assert (e["price"], e["when"]) == (106.0, "bounce") and e["distance"] > 0
+    e = sc.put_entry_plan(101.0, 70, "down", 0.01, 100.0, 101.5, 120.0)        # too close: 10% above the low
+    assert (e["price"], e["when"]) == (110.0, "bounce")
+    e = sc.put_entry_plan(140.0, 25, "up", 0.40, 100.0, 134.0, 122.0)          # uptrend: has to break the long average
+    assert (e["price"], e["when"]) == (122.0, "break") and e["distance"] < 0 and "200-day" in e["note"]
+    e = sc.put_entry_plan(115.0, 40, "sideways", 0.15, 100.0, 112.0, 120.0)    # weak: the long average overhead
+    assert (e["price"], e["when"]) == (120.0, "bounce")
+    e = sc.put_entry_plan(130.0, 40, "sideways", 0.30, 100.0, 125.0, 120.0)
+    assert (e["price"], e["when"]) == (120.0, "break")

@@ -19,6 +19,11 @@ volatility is cheap, in a name that trades enough to get in and out and does not
 `entry` is the stock price to buy at (entry_plan): now if it has already pulled back, else the dip to wait for,
 or in a downtrend the level it has to reclaim.
 
+`put` is the same score for buying a long-dated PUT: the idea flipped. A stock in a downtrend, bought on a
+bounce off its low, that has not compounded, has fallen hard before and lags the market scores high. Option
+price, volatility and volume count the same way for both sides (you are buying an option either way).
+`put.entry` (put_entry_plan) is the bounce to wait for, or in an uptrend the level it has to break.
+
 A factor with no data is left out and the rest are re-weighted. Bands: 0–19 Avoid, 20–39 Weak, 40–59 Fair,
 60–79 Good, 80–100 Excellent.
 """
@@ -81,9 +86,23 @@ def _pct(x: float, d: int = 0) -> str:
     return f"{x * 100:+.{d}f}%"
 
 
-def _factor(key: str, score: float, value: str, note: str) -> Dict[str, Any]:
-    return {"key": key, "label": LABELS[key], "score": int(round(min(100.0, max(0.0, score)))),
+def _factor(key: str, score: float, value: str, note: str, label: Optional[str] = None) -> Dict[str, Any]:
+    return {"key": key, "label": label or LABELS[key], "score": int(round(min(100.0, max(0.0, score)))),
             "weight": WEIGHTS[key], "value": value, "note": note}
+
+
+def _total(f: List[Dict[str, Any]], what: str) -> Tuple[int, str]:
+    """(weighted score, one-line summary) for a list of factors."""
+    score = int(round(sum(x["score"] * x["weight"] for x in f) / sum(x["weight"] for x in f)))
+    ranked = sorted(f, key=lambda x: (x["score"] - 50) * x["weight"])
+    weak = [x["label"].lower() for x in ranked[:2] if x["score"] < 45]
+    strong = [x["label"].lower() for x in reversed(ranked[-2:]) if x["score"] >= 65]
+    summary = f"{band(score)} for a {what}."
+    if strong:
+        summary += f" Helped by {' and '.join(strong)}."
+    if weak:
+        summary += f" Held back by {' and '.join(weak)}."
+    return score, summary
 
 
 def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[float]]] = None, *,
@@ -93,7 +112,7 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
     px = [float(c) for c in closes if c and c > 0]
     if len(px) < MIN_BARS:
         return {"score": None, "band": None, "summary": "", "factors": [], "traits": None, "entry": None,
-                "error": f"Needs {MIN_BARS} sessions of history; {len(px)} available."}
+                "put": None, "error": f"Needs {MIN_BARS} sessions of history; {len(px)} available."}
     last = px[-1]
     f: List[Dict[str, Any]] = []
 
@@ -222,16 +241,63 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
                          "Below the flip with short gamma: dealers amplify the selling." if not above and not long_g else
                          "Mixed dealer positioning."))
 
-    total_w = sum(x["weight"] for x in f)
-    score = int(round(sum(x["score"] * x["weight"] for x in f) / total_w))
-    ranked = sorted(f, key=lambda x: (x["score"] - 50) * x["weight"])
-    weak = [x["label"].lower() for x in ranked[:2] if x["score"] < 45]
-    strong = [x["label"].lower() for x in reversed(ranked[-2:]) if x["score"] >= 65]
-    summary = band(score) + " for a LEAPS."
-    if strong:
-        summary += f" Helped by {' and '.join(strong)}."
-    if weak:
-        summary += f" Held back by {' and '.join(weak)}."
+    score, summary = _total(f, "LEAPS call")
+
+    # ── the put side: the same factors, flipped ──────────────────────────────
+    cf = {x["key"]: x for x in f}
+    g: List[Dict[str, Any]] = []
+    g.append(_factor("trend", 100 - cf["trend"]["score"], cf["trend"]["value"],
+                     {"down": "Downtrend: below a falling long-term average.", "up": "Uptrend: a put fights the long-term trend.",
+                      "sideways": "No clear long-term trend."}[direction]))
+    low = min(px[-252:])
+    up_off = last / low - 1.0
+    bounce = lerp(up_off, [(0.0, 45), (0.05, 65), (0.12, 95), (0.20, 100), (0.30, 75), (0.45, 35), (0.65, 10)])
+    if up_off < 0.03:
+        b_note = "At the 52-week low: no bounce to buy the put on."
+    elif up_off < 0.08:
+        b_note = "A small bounce off the low."
+    elif up_off < 0.30:
+        b_note = "Bounced off the low: a better price for the put."
+    else:
+        b_note = "Far above the low: the put needs a long fall."
+    if direction == "up" and up_off > 0.08:
+        bounce *= 0.6
+        b_note = "Well off the low inside an uptrend: a put here fights the rally."
+    g.append(_factor("pullback", bounce, f"{_pct(up_off)} from 52-wk low", b_note, "Bounce"))
+    g += [dict(cf[k]) for k in ("iv", "volatility", "liquidity") if k in cf]
+    if r6 is not None or r3 is not None:
+        m = [lerp(-r, [(-0.30, 0), (0.0, 45), (0.15, 80), (0.40, 100), (1.0, 70)]) for r in (r3, r6) if r is not None]
+        mom = sum(m) / len(m)
+        note = "Falling over the last 3–6 months." if mom >= 60 else "Flat over the last 3–6 months." if mom >= 35 else "Rising over the last 3–6 months."
+        if r14 is not None and r14 < 25:
+            mom, note = mom - 15, note + f" Oversold (RSI {r14:.0f}): due a bounce."
+        elif r14 is not None and r14 > 70 and direction != "up":
+            mom, note = mom + 10, note + f" Overbought (RSI {r14:.0f}) without an uptrend."
+        g.append(_factor("momentum", mom, cf["momentum"]["value"], note))
+    if "growth" in cf:
+        v = 100 - cf["growth"]["score"]
+        g.append(_factor("growth", v, cf["growth"]["value"],
+                         "Has not grown over the years." if v >= 60 else "Modest long-run growth." if v >= 30 else
+                         "Compounds well over the years: time works against a put."))
+    v = 100 - cf["resilience"]["score"]
+    g.append(_factor("resilience", v, cf["resilience"]["value"],
+                     "Has fallen hard before." if v >= 60 else "Has had deep drawdowns." if v >= 30 else
+                     "Drawdowns have been shallow and recovered."))
+    if "strength" in cf:
+        v = 100 - cf["strength"]["score"]
+        g.append(_factor("strength", v, cf["strength"]["value"],
+                         "Lagging the market." if v > 58 else "Beating the market." if v < 42 else "In line with the market."))
+    if net_gex is not None and zero_gamma:
+        above, long_g = last >= zero_gamma, net_gex >= 0
+        g.append(_factor("dealers", {(False, False): 80, (False, True): 60, (True, False): 45, (True, True): 25}[(above, long_g)],
+                         cf["dealers"]["value"],
+                         "Below the flip with short gamma: dealers amplify the selling." if not above and not long_g else
+                         "Above the flip with long gamma: dealers buy the dips." if above and long_g else
+                         "Mixed dealer positioning."))
+    p_score, p_summary = _total(g, "LEAPS put")
+    put = {"score": p_score, "band": band(p_score), "summary": p_summary, "factors": g,
+           "entry": put_entry_plan(last, p_score, direction, up_off, low, ma50, ma_long, n_long)}
+
     day_vol = (atm_iv or hv20 or vol or 0.0) / math.sqrt(252.0)
     traits = {"trend": direction, "state": state, "volatility": vol_tag, "volume": vol_tag2,
               "off_high": round(off, 4), "rsi": round(r14, 1) if r14 is not None else None,
@@ -240,7 +306,7 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
               "sessions": len(px)}
     entry = entry_plan(last, score, direction, off, high, ma50, ma_long, n_long)
     return {"score": score, "band": band(score), "summary": summary, "factors": f, "traits": traits,
-            "entry": entry, "error": None}
+            "entry": entry, "put": put, "error": None}
 
 
 ENTER_SCORE = 50             # at or above this, a stock that has already pulled back is an entry now
@@ -278,3 +344,30 @@ def entry_plan(last: float, score: int, direction: str, off: float, high: float,
 
 def _entry(last: float, price: float, when: str, note: str) -> Dict[str, Any]:
     return {"price": round(price, 2), "when": when, "distance": round(price / last - 1.0, 4), "note": note}
+
+
+def put_entry_plan(last: float, score: int, direction: str, up_off: float, low: float, ma50: float, ma_long: float,
+                   n_long: int = 200) -> Dict[str, Any]:
+    """entry_plan flipped, for buying the long put: {price, when, distance, note}.
+
+    when = "now"     already bounced (≥ PULLBACK off the 52-week low), trend not up, score ≥ ENTER_SCORE
+           "bounce"  wait for a rally: the 50-day average if it is a real bounce above the price, else DIP_TARGET
+                     above the 52-week low; a weak score waits for the long-term average overhead instead
+           "break"   uptrend: wait for a close back below the long-term average (the price is below today's)
+    """
+    avg = f"{n_long}-day average"
+    if direction == "up":
+        level = min(ma_long, ma50)
+        if level < last:
+            which = avg if level == ma_long else "50-day average"
+            return _entry(last, level, "break", f"Uptrend: wait for a close back below the {which}.")
+    if up_off >= PULLBACK and direction != "up" and score >= ENTER_SCORE:
+        return _entry(last, last, "now", f"Already {up_off:.0%} off the 52-week low with the downtrend intact: enter around here.")
+    if up_off < PULLBACK:
+        rally = low * (1.0 + DIP_TARGET)
+        if ma50 >= last * (1.0 + NEAR) and ma50 <= rally:
+            return _entry(last, ma50, "bounce", "Near the low: wait for a bounce to the 50-day average.")
+        return _entry(last, rally, "bounce", f"Near the low: wait for a bounce {DIP_TARGET:.0%} above the 52-week low.")
+    if ma_long > last:
+        return _entry(last, ma_long, "bounce", f"Weak score: wait for the {avg} overhead, where sellers step in.")
+    return _entry(last, min(ma_long, ma50), "break", f"Weak score: wait for a close back below the {avg}.")

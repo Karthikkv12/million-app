@@ -2,7 +2,8 @@
 /**
  * LeapsScore — the 0–100 LEAPS score on a banded scale (Avoid · Weak · Fair · Good · Excellent), how the stock
  * trades (trend, pullback state, volatility, volume, typical move), and the factors behind the number.
- * LeapsLine — the one-line version for the heat maps: score and entry price only.
+ * Two sides: buying a long call, and buying a long put (the same factors flipped); a Call / Put switch picks one.
+ * LeapsLine — the one-line version for the heat maps: both scores and the entry price of the stronger side.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -35,14 +36,46 @@ function Chip({ k, v, cls }: { k: string; v: string; cls?: string }) {
   );
 }
 
+type Side = "call" | "put";
+type SideView = { score: number; band: string; summary: string; factors: Score["factors"]; entry?: Score["entry"] };
+
+/** The call or put half of a score, in one shape (null when there is no score). */
+function sideOf(d: Score | undefined, side: Side): SideView | null {
+  if (!d || d.score == null) return null;
+  if (side === "put") return d.put ? { ...d.put, summary: d.put.summary ?? "", factors: d.put.factors ?? [] } : null;
+  return { score: d.score, band: d.band ?? "", summary: d.summary ?? "", factors: d.factors ?? [], entry: d.entry };
+}
+/** The side worth acting on: the higher score (the call on a tie). */
+const better = (d: Score | undefined): Side => (d?.put && d.score != null && d.put.score > d.score ? "put" : "call");
+
+const ENTER: Record<string, string> = { now: "Enter now, around ", pullback: "Enter at ", bounce: "Enter at ", reclaim: "Enter above ", break: "Enter below " };
+
 export function LeapsScore({ symbol, compact = false, className }: { symbol: string; compact?: boolean; className?: string }) {
-  const { data, isLoading, isError } = useLeapsScore(symbol);
+  const { data: raw, isLoading, isError } = useLeapsScore(symbol);
   const [open, setOpen] = useState(!compact);
-  const t = data?.traits;
+  const [picked, setPicked] = useState<Side | null>(null);
+  const side: Side = picked ?? better(raw);
+  const view = sideOf(raw, side);
+  const data = view ? { ...view, error: raw?.error } : null;
+  const t = raw?.traits;
   return (
     <div className={clsx("min-w-0", className)} role="group" aria-label={`${symbol} LEAPS score`}>
       <div className="flex items-baseline justify-between gap-3">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</p>
+        <div className="flex items-baseline gap-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</p>
+          {raw?.put && raw.score != null && (
+            <div role="tablist" aria-label="Call or put" className="flex gap-2.5">
+              {(["call", "put"] as const).map((sd) => (
+                <button key={sd} role="tab" aria-selected={side === sd} onClick={() => setPicked(sd)}
+                  title={sd === "call" ? "Buying a long-dated call" : "Buying a long-dated put (the idea flipped)"}
+                  className={clsx("border-b-2 pb-0.5 font-mono text-[11px] uppercase tracking-[0.12em] tabular-nums transition",
+                    side === sd ? "border-foreground text-foreground" : "border-transparent text-foreground/45 hover:text-foreground")}>
+                  {sd} <span className={tone(sd === "call" ? raw.score! : raw.put!.score)}>{sd === "call" ? raw.score : raw.put!.score}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {data?.score != null && (
           <p className="font-mono tabular-nums">
             <span className={clsx("text-[26px] font-medium leading-none tracking-[-0.03em]", tone(data.score))}>{data.score}</span>
@@ -52,19 +85,18 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
         )}
       </div>
       {isLoading ? <div className="skeleton mt-3 h-16" />
-        : isError || !data || data.score == null ? <p className="mt-2 text-[12.5px] text-foreground/50">{data?.error ?? "No score right now."}</p>
+        : isError || !data || data.score == null ? <p className="mt-2 text-[12.5px] text-foreground/50">{raw?.error ?? "No score right now."}</p>
         : (
           <>
             <div className="mt-2">
               <Scale min={0} max={100} value={data.score} label={String(data.score)} pin={pin(data.score)} zones={ZONES} marks={MARKS}
-                tips={{ value: `${data.score} of 100: ${data.band}. 0 is bad, 100 is extremely good.` }} />
+                tips={{ value: `${data.score} of 100 for buying a long ${side}: ${data.band}. 0 is bad, 100 is extremely good.` }} />
             </div>
             <p className="text-[12.5px] leading-snug text-foreground/70">{data.summary}</p>
             {data.entry && (
               <p className="mt-1.5 border-l-[3px] border-accent pl-2 text-[12.5px] leading-snug text-foreground/80">
                 <span className="font-mono font-medium tabular-nums text-foreground">
-                  {data.entry.when === "now" ? "Enter now, around " : data.entry.when === "pullback" ? "Enter at " : "Enter above "}
-                  ${data.entry.price.toFixed(2)}
+                  {ENTER[data.entry.when]}${data.entry.price.toFixed(2)}
                 </span>{" "}{data.entry.note}
               </p>
             )}
@@ -111,22 +143,36 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
 
 const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** One line for the heat maps: the score, and the stock price at which to buy the long call. No scale, no factors. */
+/** One line for the heat maps: call and put scores, and the stock price at which to buy the stronger side. No scale, no factors. */
 export function LeapsLine({ symbol, className }: { symbol: string; className?: string }) {
   const { data, isLoading } = useLeapsScore(symbol);
   if (isLoading) return <p className={clsx("font-mono text-[11.5px] text-foreground/35", className)}>LEAPS score …</p>;
   if (!data || data.score == null) return null;
-  const e = data.entry;
+  const side = better(data);
+  const e = sideOf(data, side)?.entry;
   const away = e && e.when !== "now" ? ` (${e.distance > 0 ? "+" : ""}${(e.distance * 100).toFixed(1)}%)` : "";
+  const price = e ? <b className="font-medium text-foreground">{usd(e.price)}</b> : null;
   return (
     <p className={clsx("flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-mono text-[12px] tabular-nums", className)} title={e?.note}>
       <span className="text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</span>
-      <span className={clsx("text-[15px] font-medium", tone(data.score))}>{data.score}</span>
+      <span className={clsx(side !== "call" && "opacity-60")}>
+        <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">call</span>
+        <span className={clsx("text-[15px] font-medium", tone(data.score))}>{data.score}</span>
+      </span>
+      {data.put && (
+        <span className={clsx(side !== "put" && "opacity-60")}>
+          <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">put</span>
+          <span className={clsx("text-[15px] font-medium", tone(data.put.score))}>{data.put.score}</span>
+        </span>
+      )}
       {e && (
         <span className="text-foreground/75">
-          {e.when === "now" ? <>Buy a LEAPS call now, around <b className="font-medium text-foreground">{usd(e.price)}</b></>
-            : e.when === "pullback" ? <>Buy a LEAPS call when {symbol} is at <b className="font-medium text-foreground">{usd(e.price)}</b><span className="text-foreground/45">{away}</span></>
-            : <>Buy a LEAPS call when {symbol} closes back above <b className="font-medium text-foreground">{usd(e.price)}</b><span className="text-foreground/45">{away}</span></>}
+          Buy a LEAPS {side}{" "}
+          {e.when === "now" ? <>now, around {price}</>
+            : e.when === "reclaim" ? <>when {symbol} closes back above {price}</>
+            : e.when === "break" ? <>when {symbol} closes back below {price}</>
+            : <>when {symbol} is at {price}</>}
+          <span className="text-foreground/45">{away}</span>
         </span>
       )}
     </p>
