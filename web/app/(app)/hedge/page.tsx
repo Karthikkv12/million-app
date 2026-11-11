@@ -6,7 +6,7 @@
  * Live: the app-wide SSE stream (lib/live.tsx) every second.
  * Playbook (owner, 2026-11-08): only sell calls, sell puts or buy stock. Never buy options.
  */
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
@@ -385,6 +385,7 @@ export default function HedgePage() {
   const live = useLive();
   const { data, isLoading, error } = useLiveBooks();
   const [open, setOpen] = useState<string | null>(null);
+  const autoOpened = useRef(false);
   const books = (data?.books ?? []).filter((b) => !b.error);
   const errored = (data?.books ?? []).filter((b) => b.error);
   const signals = books.filter((b) => b.suggestion && TRADE.has(b.suggestion.action));
@@ -394,7 +395,15 @@ export default function HedgePage() {
   const dollarGamma = books.reduce((a, b) => a + (b.dollar_gamma_1pct ?? 0), 0);
   const sorted = [...signals, ...books.filter((b) => !signals.includes(b))];
 
-  useEffect(() => { if (!open && (buybacks[0]?.b ?? signals[0])) setOpen((buybacks[0]?.b ?? signals[0]).symbol); }, [open, signals, buybacks]);
+  // Auto-expand the top actionable row once on first load only — never again, so every row
+  // (including that one) can be collapsed and stays collapsed across live refreshes.
+  useEffect(() => {
+    if (autoOpened.current) return;
+    const first = buybacks[0]?.b ?? signals[0];
+    if (!first) return;
+    autoOpened.current = true;
+    setOpen((cur) => cur ?? first.symbol);
+  }, [signals, buybacks]);
 
   return (
     <DeskPage>
