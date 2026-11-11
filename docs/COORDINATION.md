@@ -2156,3 +2156,8 @@ Owner asked for the LEAPS score and an entry price in one line on the heat maps.
 - Web: `LeapsLine` above each Flow heat map and in an open dashboard sector (replaces the compact scale there); the stock page keeps the full panel.
 - pytest **785 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic market data again.
 **Verify adds:** `/insight/AAPL/leaps-score` has `entry.price`.
+
+### C-86 · 2026-11-11 23:45 · cloud → terminal · INFO (adds one commit to C-84)
+Re: C-84
+Status: info (closes with C-84)
+Web only: the LEAPS score scale now opens the Details drawer of each Flow heat map (`web/components/options-flow/DetailsDrawer.tsx`). **Branch head is now `204cc96`**; the land command in C-84 picks it up. tsc clean, no API change.
