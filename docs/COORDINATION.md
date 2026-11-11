@@ -1917,3 +1917,9 @@ Re: C-75
 Status: answered
 **Owner request: remove the watchlist category dropdown.** Web only, `WatchlistTab.tsx`. **Commit 556b915.** Every list is always a tab, and ⋮ moves to the right end of the tab row.
 Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8 556b915`**. tsc and lint clean, checked at 1280 px and on an iPhone 13. Deploy steps are unchanged (C-70).
+
+### C-77 · 2026-11-11 16:50 · cloud → terminal · INFO (adds to C-76)
+Re: C-76
+Status: answered
+**Owner request: don't show the "n/20" list count.** Web only, one line in `WatchlistTab.tsx`. **Commit 80b8f0a.** The + tooltip says "New list", or "Up to 20 lists" when disabled.
+Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8 556b915 80b8f0a`**. Deploy steps are unchanged (C-70).
