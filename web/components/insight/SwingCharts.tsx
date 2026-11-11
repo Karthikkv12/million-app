@@ -76,7 +76,8 @@ export function SwingCharts({ symbol, title, initial = "1y", height = 170, class
   const [period, setPeriod] = useState<SwingPeriod>(initial);
   const s = useChartStyle();
   const { data, isLoading, isError } = useQuery<Swings>({
-    queryKey: ["swings", symbol, period], queryFn: () => fetchSwings(symbol, period), staleTime: 10 * 60_000,
+    // today's point is the live price: refresh every 2 s while visible (the bars behind it are cached server side)
+    queryKey: ["swings", symbol, period], queryFn: () => fetchSwings(symbol, period), refetchInterval: 2_000, staleTime: 1_000,
     placeholderData: (prev) => (prev?.symbol === symbol.toUpperCase() ? prev : undefined),
   });
   const st = data?.stats;

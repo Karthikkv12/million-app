@@ -3473,7 +3473,18 @@ export interface components {
              * @default []
              */
             factors: components["schemas"]["ScoreFactor"][];
+            /**
+             * Price
+             * @description Live price the score was computed at (today's close)
+             */
+            price?: number | null;
             put?: components["schemas"]["PutScore"] | null;
+            /**
+             * Realtime
+             * @description True when that price came from a real-time source
+             * @default false
+             */
+            realtime: boolean;
             /**
              * Score
              * @description Long call: 0 (bad) to 100 (extremely good); None without enough history
@@ -4833,6 +4844,17 @@ export interface components {
              * @default []
              */
             points: components["schemas"]["SwingPoint"][];
+            /**
+             * Price
+             * @description Live price used as today's close
+             */
+            price?: number | null;
+            /**
+             * Realtime
+             * @description True when that price came from a real-time source
+             * @default false
+             */
+            realtime: boolean;
             /** Source */
             source?: string | null;
             stats?: components["schemas"]["SwingStats"] | null;

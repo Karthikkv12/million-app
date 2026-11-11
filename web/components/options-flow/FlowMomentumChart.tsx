@@ -68,8 +68,9 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
   const { data: all = [], isLoading } = useQuery<FlowSnapshot[]>({
     queryKey: ["netFlowHistory", symbol, days],
     queryFn: () => fetchNetFlowHistory(symbol, days),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    // a snapshot is written on each GEX refresh (30 s on real-time chains): poll at 10 s to show it promptly
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 
   // No snapshots in the window (weekend, before the open)? Widen to the last session automatically.

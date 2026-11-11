@@ -31,7 +31,7 @@ function SectorSwings({ symbol, label }: { symbol: string; label: string }) {
 }
 
 export function Sectors() {
-  const { data: q } = useQuotes(SYMBOLS, 15_000);
+  const { data: q } = useQuotes(SYMBOLS);          // 5 s, like the rest of the dashboard
   const [open, setOpen] = useState<string | null>(null);
 
   const rows = useMemo(() => {

@@ -183,7 +183,7 @@ export function TickerPanelWithQuery(props: TickerPanelWithQueryProps) {
     queryFn: () => fetchGex(props.slot.ticker),
     staleTime: 60_000,
     // Yahoo data is ~15 min delayed; the stream pushes changes, polling is only a fallback.
-    refetchInterval: live ? false : 120_000,
+    refetchInterval: live ? false : 30_000,
     refetchIntervalInBackground: false,
   });
 

@@ -37,6 +37,8 @@ class SwingsOut(BaseModel):
     points: List[SwingPoint] = []
     stats: Optional[SwingStats] = None
     source: Optional[str] = None
+    price: Optional[float] = Field(None, description="Live price used as today's close")
+    realtime: bool = Field(False, description="True when that price came from a real-time source")
     error: Optional[str] = None
 
 
@@ -89,5 +91,7 @@ class LeapsScoreOut(BaseModel):
     traits: Optional[ScoreTraits] = None
     entry: Optional[ScoreEntry] = None
     put: Optional[PutScore] = None
+    price: Optional[float] = Field(None, description="Live price the score was computed at (today's close)")
+    realtime: bool = Field(False, description="True when that price came from a real-time source")
     as_of: Optional[str] = None
     error: Optional[str] = None

@@ -5086,6 +5086,18 @@
       "title": "Factors",
       "type": "array"
      },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live price the score was computed at (today's close)",
+      "title": "Price"
+     },
      "put": {
       "anyOf": [
        {
@@ -5095,6 +5107,12 @@
         "type": "null"
        }
       ]
+     },
+     "realtime": {
+      "default": false,
+      "description": "True when that price came from a real-time source",
+      "title": "Realtime",
+      "type": "boolean"
      },
      "score": {
       "anyOf": [
@@ -9991,6 +10009,24 @@
       },
       "title": "Points",
       "type": "array"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live price used as today's close",
+      "title": "Price"
+     },
+     "realtime": {
+      "default": false,
+      "description": "True when that price came from a real-time source",
+      "title": "Realtime",
+      "type": "boolean"
      },
      "source": {
       "anyOf": [

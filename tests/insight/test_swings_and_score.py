@@ -90,12 +90,21 @@ class FakeMD:
     def __init__(self):
         self.calls = []
 
+    live = {}
+
+    def quotes_batch(self, symbols):
+        return {s: {"price": self.live[s]} for s in symbols if s in self.live}
+
+    def last_price(self, symbol):
+        return None
+
     def price_history(self, symbol, period, interval):
         self.calls.append((symbol, period))
         if symbol == "NOPE":
             return pd.DataFrame()
         n = {"1mo": 21, "1y": 252, "5y": 1260, "max": 3000}.get(period, 126)
-        df = pd.DataFrame({"close": path(n), "volume": [1e6] * n}, index=pd.bdate_range("2015-01-05", periods=n))
+        full = path(3000)                                    # one history: every period is its tail
+        df = pd.DataFrame({"close": full[-n:], "volume": [1e6] * n}, index=pd.bdate_range("2015-01-05", periods=3000)[-n:])
         df.attrs["source"] = "public"
         return df
 
@@ -127,6 +136,39 @@ def test_service_score_uses_spy_and_survives_a_dead_provider(md, monkeypatch):
     service.clear_cache()
     monkeypatch.setattr(md, "price_history", lambda *a: (_ for _ in ()).throw(RuntimeError("rate limited")))
     assert service.leaps_score("abc") == {"symbol": "ABC", "score": None, "band": None, "error": "rate limited"}
+
+
+def test_score_and_swings_move_with_the_live_price(md, monkeypatch):
+    base = service.leaps_score("ABC")
+    assert base["realtime"] is False and base["price"] == pytest.approx(path(3000)[-1], rel=1e-4)
+    md.live = {"ABC": base["price"] * 0.85}                      # a 15% drop, live
+    t = [0.0]
+    monkeypatch.setattr(service.time, "monotonic", lambda: t[0])
+    service.clear_cache()
+    t[0] = 1000.0
+    live = service.leaps_score("ABC")
+    assert live["realtime"] is True and live["price"] == pytest.approx(base["price"] * 0.85, rel=1e-4)
+    assert live["traits"]["off_high"] < base["traits"]["off_high"] and live["score"] != base["score"]
+    sw_live = service.swings("ABC", "1y")
+    assert sw_live["realtime"] is True and sw_live["stats"]["current_drawdown"] < -0.14
+    md.live = {"ABC": base["price"]}                             # within LIVE_TTL: still the cached live price
+    assert service.leaps_score("ABC")["price"] == live["price"]
+    t[0] += service.LIVE_TTL + 0.01                              # after it: the new price
+    assert service.leaps_score("ABC")["price"] == pytest.approx(base["price"], rel=1e-4)
+
+
+def test_with_live_replaces_today_appends_a_new_session_and_keeps_weekends():
+    from datetime import datetime, timezone
+    bars = [{"date": "2026-11-10", "close": 100.0, "volume": 5}, {"date": "2026-11-11", "close": 101.0, "volume": 6}]
+    wed = datetime(2026, 11, 11, 18, 0, tzinfo=timezone.utc)
+    thu = datetime(2026, 11, 12, 15, 0, tzinfo=timezone.utc)
+    sat = datetime(2026, 11, 14, 15, 0, tzinfo=timezone.utc)
+    assert service.with_live(bars, 103.0, wed)[-1] == {"date": "2026-11-11", "close": 103.0, "volume": 6}
+    assert len(service.with_live(bars, 103.0, wed)) == 2
+    out = service.with_live(bars, 103.0, thu)
+    assert len(out) == 3 and out[-1]["date"] == "2026-11-12" and out[-1]["close"] == 103.0
+    assert len(service.with_live(bars, 103.0, sat)) == 2                    # weekend: no new session
+    assert service.with_live(bars, None, thu) is bars
 
 
 def test_api_needs_login_and_validates_the_period(md):

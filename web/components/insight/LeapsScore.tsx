@@ -11,6 +11,11 @@ import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import { fetchLeapsScore, LeapsScore as Score } from "@/lib/api";
 import { Scale } from "@/components/desk";
+import { Tick } from "@/lib/live";
+
+/** The score is recomputed on the live price on every request (~2 ms server side): ask once a second while the
+ *  tab is visible, the same pace as the live quotes. Components showing one symbol share one request. */
+export const SCORE_REFRESH_MS = 1_000;
 
 const ZONES = [
   { from: 0, to: 20, cls: "bg-loss/70", label: "Avoid" }, { from: 20, to: 40, cls: "bg-loss/35", label: "Weak" },
@@ -24,7 +29,23 @@ const pin = (v: number) => (v >= 60 ? "bg-gain" : v >= 40 ? "bg-warn" : "bg-loss
 const pct = (v?: number | null) => (v == null ? null : `${(v * 100).toFixed(1)}%`);
 
 export function useLeapsScore(symbol: string, enabled = true) {
-  return useQuery<Score>({ queryKey: ["leaps-score", symbol], queryFn: () => fetchLeapsScore(symbol), staleTime: 10 * 60_000, enabled });
+  return useQuery<Score>({
+    queryKey: ["leaps-score", symbol], queryFn: () => fetchLeapsScore(symbol), enabled,
+    refetchInterval: SCORE_REFRESH_MS, staleTime: SCORE_REFRESH_MS / 2,
+    placeholderData: (prev) => (prev?.symbol === symbol.toUpperCase() ? prev : undefined),
+  });
+}
+
+/** "live $681.40": the price the score was computed at, flashing when it moves. */
+function LivePrice({ d }: { d?: Score }) {
+  if (d?.price == null) return null;
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[10.5px] tabular-nums text-foreground/45"
+      title={d.realtime ? "Recomputed every second on the real-time price" : "Recomputed on a delayed price"}>
+      <span className={clsx("h-1.5 w-1.5 rounded-full", d.realtime ? "animate-pulse bg-gain" : "bg-foreground/30")} />
+      {d.realtime ? "live" : "delayed"} <Tick value={d.price}>${d.price.toFixed(2)}</Tick>
+    </span>
+  );
 }
 
 function Chip({ k, v, cls }: { k: string; v: string; cls?: string }) {
@@ -63,6 +84,7 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</p>
+          <LivePrice d={raw} />
           {raw?.put && raw.score != null && (
             <div role="tablist" aria-label="Call or put" className="flex gap-2.5">
               {(["call", "put"] as const).map((sd) => (
@@ -78,7 +100,7 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
         </div>
         {data?.score != null && (
           <p className="font-mono tabular-nums">
-            <span className={clsx("text-[26px] font-medium leading-none tracking-[-0.03em]", tone(data.score))}>{data.score}</span>
+            <Tick value={data.score} className={clsx("text-[26px] font-medium leading-none tracking-[-0.03em]", tone(data.score))}>{data.score}</Tick>
             <span className="ml-1 text-[11px] text-foreground/40">/ 100</span>
             <span className={clsx("ml-2 text-[11px] font-medium uppercase tracking-[0.12em]", tone(data.score))}>{data.band}</span>
           </p>
@@ -155,14 +177,15 @@ export function LeapsLine({ symbol, className }: { symbol: string; className?: s
   return (
     <p className={clsx("flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-mono text-[12px] tabular-nums", className)} title={e?.note}>
       <span className="text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</span>
+      <LivePrice d={data} />
       <span className={clsx(side !== "call" && "opacity-60")}>
         <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">call</span>
-        <span className={clsx("text-[15px] font-medium", tone(data.score))}>{data.score}</span>
+        <Tick value={data.score} className={clsx("text-[15px] font-medium", tone(data.score))}>{data.score}</Tick>
       </span>
       {data.put && (
         <span className={clsx(side !== "put" && "opacity-60")}>
           <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">put</span>
-          <span className={clsx("text-[15px] font-medium", tone(data.put.score))}>{data.put.score}</span>
+          <Tick value={data.put.score} className={clsx("text-[15px] font-medium", tone(data.put.score))}>{data.put.score}</Tick>
         </span>
       )}
       {e && (

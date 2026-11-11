@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ChevronLeft, Zap } from "lucide-react";
 import { fetchGex, GexResult } from "@/lib/api";
+import { useGexStream } from "@/lib/useGexStream";
 import TradingChart from "@/components/chart/TradingChart";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill } from "@/components/ui";
@@ -28,11 +29,12 @@ export default function StockPage() {
   const [q, setQ] = useState("");
   const [showLevels, setShowLevels] = useState(true);
 
+  const gexLive = useGexStream(sym);
   const { data: gex, isLoading: gexLoading } = useQuery<GexResult>({
     queryKey: ["gex", sym],
     queryFn: () => fetchGex(sym),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchInterval: gexLive ? false : 30_000,
   });
 
   const levels = useMemo(() => (gex && !gex.error && showLevels ? {
