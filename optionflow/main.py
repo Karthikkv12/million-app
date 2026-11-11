@@ -70,6 +70,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if "notify" in modules and "hedge" in modules:
             from optionflow.modules.notify import worker as notify_worker
             notify_worker.start()        # phone notifications: no-op until PUSH_VAPID_* keys are set
+        if "strategy" in modules and "notify" in modules:
+            from optionflow.modules.strategy import worker as scanner_worker
+            scanner_worker.start()       # market scanner for users who turned its notifications on
         logger.info("OptionFlow API started — modules: %s", ", ".join(modules))
         yield
 

@@ -61,6 +61,11 @@ def _hedge() -> List[APIRouter]:
     return [router, stream_router, broker_router, reports_router]
 
 
+def _strategy() -> List[APIRouter]:
+    from optionflow.modules.strategy.router import router
+    return [router]
+
+
 def _ai() -> List[APIRouter]:
     from optionflow.modules.ai.router import router
     return [router]
@@ -84,4 +89,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "budget": _budget,
     "hedge": _hedge,
     "notify": _notify,          # phone notifications (Web Push) for the hedge desk
+    "strategy": _strategy,      # the owner's options strategy (drives hedge actions) + market scanner
 }

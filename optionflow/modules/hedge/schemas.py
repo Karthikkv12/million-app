@@ -102,6 +102,10 @@ class SuggestionOut(BaseModel):
     shares: int = Field(0, description="BUY_STOCK: shares to buy")
     new_avg: Optional[float] = Field(None, description="BUY_STOCK: average after the buy; SELL_PUT: net cost if assigned")
     warnings: List[str] = []
+    long_strike: Optional[float] = Field(None, description="Put credit spread: the put bought below the short strike")
+    yield_ann: Optional[float] = Field(None, description="Premium ÷ capital at work, annualised (decimal)")
+    collateral: Optional[float] = Field(None, description="$ tied up: cash for a put, max loss for a spread")
+    max_loss: Optional[float] = Field(None, description="$ max loss (spreads)")
 
 
 class CloseOut(BaseModel):
@@ -168,6 +172,7 @@ class BookOut(BaseModel):
     units: List[UnitOut] = Field([], description="Covered (shares + their short calls), uncovered shares, short puts")
     suggestion: Optional[SuggestionOut] = None
     closes: List[CloseOut] = Field([], description="Short options worth buying back now (most of the premium captured)")
+    strategy: Optional[str] = Field(None, description="Strategy key that produced the suggestion (GET /strategy)")
     spot: Optional[float] = None
     prev_close: Optional[float] = Field(None, description="Yesterday's close in the regular session; outside it, the close "
                                         "before the last regular session (so day_change = that session's move)")

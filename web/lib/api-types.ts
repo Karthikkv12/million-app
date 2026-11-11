@@ -1614,6 +1614,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy
+         * @description The strategy the desk runs, its rules, the scanner filters, and every strategy on offer.
+         */
+        get: operations["get_strategy_api_v1_strategy_get"];
+        /**
+         * Put Strategy
+         * @description Set the strategy (the desk's actions follow within seconds), rule overrides, scanner filters, notifications.
+         */
+        put: operations["put_strategy_api_v1_strategy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy/picks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Picks
+         * @description Every pick the scanner stored, newest first (one per contract per day).
+         */
+        get: operations["picks_api_v1_strategy_picks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest Scan
+         * @description The last scan (manual or background) since the server started; empty before the first.
+         */
+        get: operations["latest_scan_api_v1_strategy_scan_get"];
+        put?: never;
+        /**
+         * Run Scan
+         * @description Scan the market now with the saved strategy and filters (30–90 s the first time; bars are cached).
+         */
+        post: operations["run_scan_api_v1_strategy_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/unusual": {
         parameters: {
             query?: never;
@@ -2208,6 +2276,11 @@ export interface components {
             shares?: number | null;
             /** Spot */
             spot?: number | null;
+            /**
+             * Strategy
+             * @description Strategy key that produced the suggestion (GET /strategy)
+             */
+            strategy?: string | null;
             suggestion?: components["schemas"]["SuggestionOut"] | null;
             /** Symbol */
             symbol: string;
@@ -3593,6 +3666,11 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** PicksOut */
+        PicksOut: {
+            /** Picks */
+            picks: components["schemas"]["ScanRow"][];
+        };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
             /** Cash */
@@ -4157,6 +4235,125 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ScanOut */
+        ScanOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Chains
+             * @default 0
+             */
+            chains: number;
+            /**
+             * New
+             * @default []
+             */
+            new: string[];
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["ScanRow"][];
+            /**
+             * Running
+             * @default false
+             */
+            running: boolean;
+            /**
+             * Screened
+             * @default 0
+             */
+            screened: number;
+            /** Seconds */
+            seconds?: number | null;
+            /**
+             * Skipped
+             * @default {}
+             */
+            skipped: {
+                [key: string]: number;
+            };
+            /** Strategy */
+            strategy?: string | null;
+            /** Strategy Name */
+            strategy_name?: string | null;
+            /**
+             * Universe
+             * @default 0
+             */
+            universe: number;
+        };
+        /** ScanRow */
+        ScanRow: {
+            /**
+             * Action
+             * @description SELL_PUT | SELL_PUT_SPREAD | BUY_WRITE
+             */
+            action: string;
+            /** Collateral */
+            collateral?: number | null;
+            /** Credit */
+            credit: number;
+            /** Day Change */
+            day_change?: number | null;
+            /** Delta */
+            delta: number;
+            /** Dte */
+            dte: number;
+            /** Earnings */
+            earnings?: string | null;
+            /** Expiry */
+            expiry: string;
+            /** Found At */
+            found_at?: string | null;
+            /** Headline */
+            headline: string;
+            /** Hv20 */
+            hv20?: number | null;
+            /** Iv */
+            iv?: number | null;
+            /** Iv Hv */
+            iv_hv?: number | null;
+            /** Iv Pctile */
+            iv_pctile?: number | null;
+            /** Key */
+            key: string;
+            /** Long Strike */
+            long_strike?: number | null;
+            /** Max Loss */
+            max_loss?: number | null;
+            /** Notified */
+            notified?: boolean | null;
+            /** Oi */
+            oi: number;
+            /** Premium */
+            premium: number;
+            /** Pullback */
+            pullback: number;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Rsi */
+            rsi?: number | null;
+            /** Score */
+            score: number;
+            /** Sma200 Gap */
+            sma200_gap?: number | null;
+            /** Spot */
+            spot: number;
+            /** Spread Pct */
+            spread_pct?: number | null;
+            /** Strategy */
+            strategy: string;
+            /** Strike */
+            strike: number;
+            /** Symbol */
+            symbol: string;
+            /** Yield Ann */
+            yield_ann?: number | null;
+        };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
             /**
@@ -4365,6 +4562,120 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /** StrategyInfo */
+        StrategyInfo: {
+            /** Buys Options */
+            buys_options: boolean;
+            /** Defaults */
+            defaults: {
+                [key: string]: unknown;
+            };
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Scanner
+             * @description What the scanner looks for with this strategy
+             */
+            scanner: string;
+            /**
+             * Sides
+             * @description put | call | both: the legs it opens
+             */
+            sides: string;
+            /** Steps */
+            steps: string[][];
+            /** Summary */
+            summary: string;
+        };
+        /** StrategyOut */
+        StrategyOut: {
+            /** Filters Default */
+            filters_default: {
+                [key: string]: unknown;
+            };
+            /**
+             * Notify
+             * @description Push new scanner picks to every device
+             */
+            notify: boolean;
+            /** Overrides */
+            overrides: {
+                [key: string]: unknown;
+            };
+            /**
+             * Rules
+             * @description Effective rules: the strategy's defaults + overrides
+             */
+            rules: {
+                [key: string]: unknown;
+            };
+            /**
+             * Scanner
+             * @description Scanner filters
+             */
+            scanner: {
+                [key: string]: unknown;
+            };
+            /** Strategies */
+            strategies: components["schemas"]["StrategyInfo"][];
+            /** Strategy */
+            strategy: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** StrategySettingsOut */
+        StrategySettingsOut: {
+            /**
+             * Notify
+             * @description Push new scanner picks to every device
+             */
+            notify: boolean;
+            /** Overrides */
+            overrides: {
+                [key: string]: unknown;
+            };
+            /**
+             * Rules
+             * @description Effective rules: the strategy's defaults + overrides
+             */
+            rules: {
+                [key: string]: unknown;
+            };
+            /**
+             * Scanner
+             * @description Scanner filters
+             */
+            scanner: {
+                [key: string]: unknown;
+            };
+            /** Strategy */
+            strategy: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** StrategyUpdate */
+        StrategyUpdate: {
+            /** Notify */
+            notify?: boolean | null;
+            /**
+             * Rules
+             * @description Overrides of the strategy's rules; {} = defaults
+             */
+            rules?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Scanner
+             * @description Scanner filters; {} = defaults
+             */
+            scanner?: {
+                [key: string]: unknown;
+            } | null;
+            /** Strategy */
+            strategy?: string | null;
+        };
         /** SubscriptionIn */
         SubscriptionIn: {
             /** Endpoint */
@@ -4386,6 +4697,11 @@ export interface components {
              */
             action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
             /**
+             * Collateral
+             * @description $ tied up: cash for a put, max loss for a spread
+             */
+            collateral?: number | null;
+            /**
              * Contracts
              * @default 0
              */
@@ -4398,6 +4714,16 @@ export interface components {
             headline: string;
             /** Locked Gain */
             locked_gain?: number | null;
+            /**
+             * Long Strike
+             * @description Put credit spread: the put bought below the short strike
+             */
+            long_strike?: number | null;
+            /**
+             * Max Loss
+             * @description $ max loss (spreads)
+             */
+            max_loss?: number | null;
             /** Net Delta After */
             net_delta_after?: number | null;
             /**
@@ -4429,6 +4755,11 @@ export interface components {
              * @default []
              */
             warnings: string[];
+            /**
+             * Yield Ann
+             * @description Premium ÷ capital at work, annualised (decimal)
+             */
+            yield_ann?: number | null;
         };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
@@ -8194,6 +8525,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_api_v1_strategy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyOut"];
+                };
+            };
+        };
+    };
+    put_strategy_api_v1_strategy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategySettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    picks_api_v1_strategy_picks_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PicksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_scan_api_v1_strategy_scan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanOut"];
+                };
+            };
+        };
+    };
+    run_scan_api_v1_strategy_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanOut"];
                 };
             };
         };
