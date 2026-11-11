@@ -1695,6 +1695,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lists
+         * @description Every list in display order. The first call creates "My watchlist" plus one list per sector.
+         */
+        get: operations["get_lists_api_v1_watchlists_get"];
+        put?: never;
+        /**
+         * Create List
+         * @description New list (409 at the 20-list limit or on a duplicate name).
+         */
+        post: operations["create_list_api_v1_watchlists_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlists/option-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Option Metrics
+         * @description ATM IV, IV change today, HV20, IV/HV, weekly expected move and ATM deltas, for the option columns.
+         */
+        get: operations["option_metrics_api_v1_watchlists_option_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlists/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder */
+        post: operations["reorder_api_v1_watchlists_order_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlists/restore-sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Sectors
+         * @description Put back any deleted sector list, while there is room under 20.
+         */
+        post: operations["restore_sectors_api_v1_watchlists_restore_sectors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlists/{list_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete List */
+        delete: operations["delete_list_api_v1_watchlists__list_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update List
+         * @description Rename, replace the symbols, and/or replace the columns (each in order).
+         */
+        patch: operations["update_list_api_v1_watchlists__list_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/watchlists/{list_id}/symbols/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add Symbol */
+        put: operations["add_symbol_api_v1_watchlists__list_id__symbols__symbol__put"];
+        post?: never;
+        /** Remove Symbol */
+        delete: operations["remove_symbol_api_v1_watchlists__list_id__symbols__symbol__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3426,6 +3546,53 @@ export interface components {
              */
             symbols: string[];
         };
+        /** OptionMetricsOut */
+        OptionMetricsOut: {
+            /** Atm Call Delta */
+            atm_call_delta?: number | null;
+            /**
+             * Atm Iv
+             * @description ATM implied vol of the weekly expiry, fraction (0.42 = 42%)
+             */
+            atm_iv?: number | null;
+            /** Atm Put Delta */
+            atm_put_delta?: number | null;
+            /** Dte */
+            dte?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Expected Move
+             * @description ± $ to that expiry: spot × IV × √(dte/365)
+             */
+            expected_move?: number | null;
+            /** Expected Move Pct */
+            expected_move_pct?: number | null;
+            /**
+             * Expiry
+             * @description The weekly expiry used
+             */
+            expiry?: string | null;
+            /**
+             * Hv20
+             * @description 20-day historical vol, annualised fraction
+             */
+            hv20?: number | null;
+            /**
+             * Iv Change Day
+             * @description ATM IV now vs the first reading today, fraction
+             */
+            iv_change_day?: number | null;
+            /**
+             * Iv Hv
+             * @description atm_iv / hv20
+             */
+            iv_hv?: number | null;
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
             /** Cash */
@@ -4483,6 +4650,53 @@ export interface components {
              */
             symbols: string[];
         };
+        /** WatchlistCreateIn */
+        WatchlistCreateIn: {
+            /** Name */
+            name: string;
+            /** Symbols */
+            symbols?: string[];
+        };
+        /** WatchlistGroupOut */
+        WatchlistGroupOut: {
+            /**
+             * Columns
+             * @description Column ids the user picked for this list, in order; null = the default set
+             */
+            columns?: string[] | null;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @description "sector" = seeded one per sector; "custom" = made by the user
+             * @enum {string}
+             */
+            kind: "custom" | "sector";
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Sector
+             * @description Sector name (Yahoo naming) for kind='sector'
+             */
+            sector?: string | null;
+            /** Symbols */
+            symbols: string[];
+            /** Updated At */
+            updated_at: string;
+        };
+        /** WatchlistGroupsOut */
+        WatchlistGroupsOut: {
+            /** Lists */
+            lists: components["schemas"]["WatchlistGroupOut"][];
+            /** Max Lists */
+            max_lists: number;
+            /** Max Symbols */
+            max_symbols: number;
+        };
         /** WatchlistItemOut */
         WatchlistItemOut: {
             /** Added At */
@@ -4501,6 +4715,14 @@ export interface components {
             symbol: string;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** WatchlistOrderIn */
+        WatchlistOrderIn: {
+            /**
+             * Ids
+             * @description List ids in the new display order
+             */
+            ids: number[];
         };
         /** WatchlistRowOut */
         WatchlistRowOut: {
@@ -4567,6 +4789,21 @@ export interface components {
             positions_synced: number;
             /** Total Added */
             total_added: number;
+        };
+        /** WatchlistUpdateIn */
+        WatchlistUpdateIn: {
+            /**
+             * Columns
+             * @description Replaces the column set (and its order); [] = reset to default
+             */
+            columns?: string[] | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Symbols
+             * @description Replaces the list (and its order)
+             */
+            symbols?: string[] | null;
         };
         /** WatchlistUpsertRequest */
         WatchlistUpsertRequest: {
@@ -8087,6 +8324,272 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lists_api_v1_watchlists_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsOut"];
+                };
+            };
+        };
+    };
+    create_list_api_v1_watchlists_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    option_metrics_api_v1_watchlists_option_metrics_get: {
+        parameters: {
+            query: {
+                /** @description Comma-separated, up to 40 */
+                symbols: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionMetricsOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_api_v1_watchlists_order_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_sectors_api_v1_watchlists_restore_sectors_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsOut"];
+                };
+            };
+        };
+    };
+    delete_list_api_v1_watchlists__list_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_list_api_v1_watchlists__list_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_symbol_api_v1_watchlists__list_id__symbols__symbol__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: number;
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_symbol_api_v1_watchlists__list_id__symbols__symbol__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: number;
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupOut"];
+                };
             };
             /** @description Validation Error */
             422: {
