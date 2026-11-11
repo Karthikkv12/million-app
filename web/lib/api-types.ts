@@ -725,6 +725,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/insight/{symbol}/leaps-score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leaps Score
+         * @description 0–100: how good a moment it is to buy a long-dated call on this stock, with the factors behind it.
+         */
+        get: operations["leaps_score_api_v1_insight__symbol__leaps_score_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insight/{symbol}/swings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Swings
+         * @description Drawdown (below the range's high) and upside spike (above the rolling low) for each session of the range.
+         */
+        get: operations["swings_api_v1_insight__symbol__swings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ledger/cash-balance": {
         parameters: {
             query?: never;
@@ -3094,6 +3134,11 @@ export interface components {
              * @default []
              */
             heatmap_vex_values: number[][];
+            /**
+             * Ideas
+             * @default []
+             */
+            ideas: components["schemas"]["TradeIdea"][];
             /** Max Call Wall */
             max_call_wall?: number | null;
             /** Max Gex Strike */
@@ -3115,6 +3160,7 @@ export interface components {
              * @default 0
              */
             net_vex: number;
+            outlook?: components["schemas"]["Outlook"] | null;
             /**
              * Put Gex By Strike
              * @default []
@@ -3410,6 +3456,49 @@ export interface components {
              */
             spike: boolean;
         };
+        /** LeapsScoreOut */
+        LeapsScoreOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Band
+             * @description Avoid | Weak | Fair | Good | Excellent
+             */
+            band?: string | null;
+            entry?: components["schemas"]["ScoreEntry"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Factors
+             * @default []
+             */
+            factors: components["schemas"]["ScoreFactor"][];
+            /**
+             * Price
+             * @description Live price the score was computed at (today's close)
+             */
+            price?: number | null;
+            put?: components["schemas"]["PutScore"] | null;
+            /**
+             * Realtime
+             * @description True when that price came from a real-time source
+             * @default false
+             */
+            realtime: boolean;
+            /**
+             * Score
+             * @description Long call: 0 (bad) to 100 (extremely good); None without enough history
+             */
+            score?: number | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Symbol */
+            symbol: string;
+            traits?: components["schemas"]["ScoreTraits"] | null;
+        };
         /** LedgerEntryOut */
         LedgerEntryOut: {
             /** Created At */
@@ -3621,6 +3710,47 @@ export interface components {
             spot?: number | null;
             /** Symbol */
             symbol: string;
+        };
+        /**
+         * Outlook
+         * @description A read of the dealer map (flow.ideas.outlook): not a forecast.
+         */
+        Outlook: {
+            /** Atm Iv */
+            atm_iv?: number | null;
+            /**
+             * Battleground
+             * @description Strike near the price where call and put gamma are both large
+             */
+            battleground?: number | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "sideways";
+            /** Down */
+            down: number;
+            /** Expected Dte */
+            expected_dte?: number | null;
+            /** Expected High */
+            expected_high?: number | null;
+            /**
+             * Expected Low
+             * @description Price − 1σ to the expiry nearest 30 days (ATM IV)
+             */
+            expected_low?: number | null;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sideways */
+            sideways: number;
+            /**
+             * Up
+             * @description Share of 100; up + down + sideways = 100
+             */
+            up: number;
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -4016,6 +4146,27 @@ export interface components {
             public_key?: string | null;
         };
         /**
+         * PutScore
+         * @description The LEAPS score for buying a long-dated put: the call score's factors, flipped.
+         */
+        PutScore: {
+            /** Band */
+            band: string;
+            entry?: components["schemas"]["ScoreEntry"] | null;
+            /**
+             * Factors
+             * @default []
+             */
+            factors: components["schemas"]["ScoreFactor"][];
+            /** Score */
+            score: number;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /**
          * QuoteOut
          * @description Outside the regular session, prev_close / change / change_pct describe the last regular session's move
          *     (Robinhood's "Today") and ext_change the move since its close (after-hours / overnight).
@@ -4185,6 +4336,78 @@ export interface components {
             source_url?: string | null;
             /** Title */
             title: string;
+        };
+        /**
+         * ScoreEntry
+         * @description The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).
+         */
+        ScoreEntry: {
+            /**
+             * Distance
+             * @description price vs the last close (decimal; 0 for now)
+             */
+            distance: number;
+            /** Note */
+            note: string;
+            /** Price */
+            price: number;
+            /**
+             * When
+             * @description now | call: wait for a dip to price / a close back above price | put: wait for a bounce to price / a close back below price
+             * @enum {string}
+             */
+            when: "now" | "pullback" | "reclaim" | "bounce" | "break";
+        };
+        /** ScoreFactor */
+        ScoreFactor: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Score */
+            score: number;
+            /** Value */
+            value: string;
+            /** Weight */
+            weight: number;
+        };
+        /** ScoreTraits */
+        ScoreTraits: {
+            /**
+             * Daily Move
+             * @description Typical one-day move (1σ, decimal)
+             */
+            daily_move?: number | null;
+            /** Monthly Move */
+            monthly_move?: number | null;
+            /** Off High */
+            off_high: number;
+            /** Rsi */
+            rsi?: number | null;
+            /** Sessions */
+            sessions: number;
+            /**
+             * State
+             * @description at the high | small dip | pulled back | deep drawdown
+             */
+            state: string;
+            /**
+             * Trend
+             * @enum {string}
+             */
+            trend: "up" | "down" | "sideways";
+            /**
+             * Volatility
+             * @description calm | normal | volatile | super volatile
+             */
+            volatility?: string | null;
+            /**
+             * Volume
+             * @description low | normal | high, vs its own 90 days
+             */
+            volume?: string | null;
         };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
@@ -4485,10 +4708,10 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
+            action: "SELL_CALL" | "SELL_PUT" | "BUY_CALL" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
             /**
              * Collateral
-             * @description $ tied up: cash for a put, max loss for a spread
+             * @description $ tied up: cash for a put, max loss for a spread, the debit of a long call
              */
             collateral?: number | null;
             /**
@@ -4511,7 +4734,7 @@ export interface components {
             long_strike?: number | null;
             /**
              * Max Loss
-             * @description $ max loss (spreads)
+             * @description $ max loss (spreads, long calls)
              */
             max_loss?: number | null;
             /** Net Delta After */
@@ -4550,6 +4773,93 @@ export interface components {
              * @description Premium ÷ capital at work, annualised (decimal)
              */
             yield_ann?: number | null;
+        };
+        /** SwingPoint */
+        SwingPoint: {
+            /** Close */
+            close: number;
+            /** Date */
+            date: string;
+            /**
+             * Drawdown
+             * @description Close vs the highest close so far in the range (≤ 0, decimal)
+             */
+            drawdown: number;
+            /**
+             * Spike
+             * @description Close vs the lowest close of the last `lookback` sessions (≥ 0, decimal)
+             */
+            spike: number;
+        };
+        /** SwingStats */
+        SwingStats: {
+            /** Avg Drawdown */
+            avg_drawdown: number;
+            /** Current Drawdown */
+            current_drawdown: number;
+            /** Current Spike */
+            current_spike: number;
+            /** First Date */
+            first_date: string;
+            /** Last Date */
+            last_date: string;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Max Drawdown Date */
+            max_drawdown_date: string;
+            /** Max Spike */
+            max_spike: number;
+            /** Max Spike Date */
+            max_spike_date: string;
+            /**
+             * Near High Share
+             * @description Share of sessions within 5% of the high
+             */
+            near_high_share: number;
+            /** Peak Date */
+            peak_date: string;
+            /** Sessions */
+            sessions: number;
+            /** Sessions Since Peak */
+            sessions_since_peak: number;
+            /**
+             * Spike Percentile
+             * @description Share of sessions whose spike was at or below today's
+             */
+            spike_percentile: number;
+        };
+        /** SwingsOut */
+        SwingsOut: {
+            /** Error */
+            error?: string | null;
+            /**
+             * Lookback
+             * @description Sessions in the rolling low the spike is measured from
+             */
+            lookback: number;
+            /** Period */
+            period: string;
+            /**
+             * Points
+             * @default []
+             */
+            points: components["schemas"]["SwingPoint"][];
+            /**
+             * Price
+             * @description Live price used as today's close
+             */
+            price?: number | null;
+            /**
+             * Realtime
+             * @description True when that price came from a real-time source
+             * @default false
+             */
+            realtime: boolean;
+            /** Source */
+            source?: string | null;
+            stats?: components["schemas"]["SwingStats"] | null;
+            /** Symbol */
+            symbol: string;
         };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
@@ -4630,6 +4940,53 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /**
+         * TradeIdea
+         * @description One contract suggested from the dealer levels (flow.ideas).
+         */
+        TradeIdea: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "BUY_CALL" | "SELL_CALL" | "BUY_PUT" | "SELL_PUT";
+            /** Breakeven */
+            breakeven: number;
+            /**
+             * Delta
+             * @description Of one long option
+             */
+            delta: number;
+            /** Dte */
+            dte: number;
+            /** Expiry */
+            expiry: string;
+            /**
+             * Fit
+             * @description How it sits with the gamma regime
+             * @enum {string}
+             */
+            fit: "favored" | "neutral" | "against";
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "call" | "put";
+            /**
+             * Premium
+             * @description Mid, per share
+             */
+            premium: number;
+            /** Reason */
+            reason: string;
+            /** Strike */
+            strike: number;
+            /**
+             * Target
+             * @description Buys: the level the idea aims at
+             */
+            target?: number | null;
         };
         /** UnitOut */
         UnitOut: {
@@ -6557,6 +6914,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leaps_score_api_v1_insight__symbol__leaps_score_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeapsScoreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    swings_api_v1_insight__symbol__swings_get: {
+        parameters: {
+            query?: {
+                period?: "1mo" | "3mo" | "6mo" | "1y" | "5y" | "max";
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwingsOut"];
                 };
             };
             /** @description Validation Error */

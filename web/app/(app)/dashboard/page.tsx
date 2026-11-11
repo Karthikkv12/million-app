@@ -13,6 +13,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { useGexStream } from "@/lib/useGexStream";
 import { rank, reportName, reportWhen } from "@/lib/reports";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
 import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
@@ -28,6 +29,7 @@ const tone = (v?: number | null) => (v == null || v === 0 ? "text-foreground/55"
 const ACT: Record<string, { label: string; tone: "accent" | "gain" | "warn" | "neutral"; edge: "accent" | "gain" | "warn" | null }> = {
   SELL_CALL: { label: "Sell call", tone: "accent", edge: "accent" },
   SELL_PUT: { label: "Sell put", tone: "gain", edge: "gain" },
+  BUY_CALL: { label: "Buy call", tone: "warn", edge: "warn" },
   BUY_STOCK: { label: "Buy stock", tone: "warn", edge: "warn" },
   WAIT: { label: "Wait", tone: "neutral", edge: null },
   HOLD: { label: "Hold", tone: "neutral", edge: null },
@@ -97,7 +99,8 @@ export default function DashboardPage() {
   const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
   const reports = useQuery({ queryKey: ["reports"], queryFn: fetchReports, refetchInterval: 5 * 60_000 });
   const hedge = useLiveBooks();
-  const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: 60_000 });
+  const spyLive = useGexStream("SPY");
+  const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: spyLive ? false : 30_000 });
 
   const p = useLivePortfolio(pf.data);
   const week = inc.data?.weekly.at(-1);
@@ -109,8 +112,8 @@ export default function DashboardPage() {
   const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
   const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
   const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
-  const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
-  const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
+  const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK"].includes(b.suggestion.action));
+  const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
   const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
   const actions = books.filter((b) => b.suggestion).sort((x, y) => ORDER.indexOf(x.suggestion!.action) - ORDER.indexOf(y.suggestion!.action));
   const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
@@ -218,7 +221,7 @@ export default function DashboardPage() {
                   const s = b.suggestion!;
                   const a = s.long_strike != null ? { ...ACT.SELL_PUT, label: "Put spread" } : ACT[s.action];
                   const what = s.action === "BUY_STOCK" ? `+${s.shares} sh`
-                    : s.action === "SELL_CALL" || s.action === "SELL_PUT" ? `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`
+                    : s.action === "SELL_CALL" || s.action === "SELL_PUT" || s.action === "BUY_CALL" ? `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.action === "BUY_CALL" ? s.expiry : s.expiry?.slice(5)}`
                     : s.headline.split(/[;:]/)[0];
                   return (
                     <Link key={b.symbol} href="/hedge" className="block">

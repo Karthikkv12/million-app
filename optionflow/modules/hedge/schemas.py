@@ -87,7 +87,7 @@ class LegOut(BaseModel):
 
 
 class SuggestionOut(BaseModel):
-    action: Literal["SELL_CALL", "SELL_PUT", "BUY_STOCK", "HOLD", "WAIT", "TRACK"]
+    action: Literal["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK", "HOLD", "WAIT", "TRACK"]
     headline: str
     reasons: List[str] = []
     strike: Optional[float] = None
@@ -104,8 +104,8 @@ class SuggestionOut(BaseModel):
     warnings: List[str] = []
     long_strike: Optional[float] = Field(None, description="Put credit spread: the put bought below the short strike")
     yield_ann: Optional[float] = Field(None, description="Premium ÷ capital at work, annualised (decimal)")
-    collateral: Optional[float] = Field(None, description="$ tied up: cash for a put, max loss for a spread")
-    max_loss: Optional[float] = Field(None, description="$ max loss (spreads)")
+    collateral: Optional[float] = Field(None, description="$ tied up: cash for a put, max loss for a spread, the debit of a long call")
+    max_loss: Optional[float] = Field(None, description="$ max loss (spreads, long calls)")
 
 
 class CloseOut(BaseModel):

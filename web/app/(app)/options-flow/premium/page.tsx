@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchGex, GexResult, watchSymbols } from "@/lib/api";
+import { useGexStream } from "@/lib/useGexStream";
 import { DeskPage, DeskSection } from "@/components/desk";
 import { ExpiryTable, FlowMomentumChart, Premium, StrikesTable } from "@/components/options-flow";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
@@ -41,7 +42,8 @@ function PremiumPage() {
     return () => clearInterval(id);
   }, [symbol]);
 
-  const gex = useQuery<GexResult>({ queryKey: ["gex", symbol], queryFn: () => fetchGex(symbol!), enabled: !!symbol, refetchInterval: 60_000 });
+  const gexLive = useGexStream(symbol ?? undefined);
+  const gex = useQuery<GexResult>({ queryKey: ["gex", symbol], queryFn: () => fetchGex(symbol!), enabled: !!symbol, refetchInterval: gexLive ? false : 30_000 });
   const d = gex.data && !gex.data.error ? gex.data : null;
   const failed = gex.error ? (gex.error as Error).message : gex.data?.error;
 
