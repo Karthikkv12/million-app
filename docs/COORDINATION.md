@@ -2170,3 +2170,17 @@ Owner asked for a put side of the LEAPS score. **Branch head is now `6762935`**;
 - Web: Call / Put switch in `LeapsScore`, both scores in `LeapsLine`.
 - pytest **788 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic market data again.
 **Verify adds:** `/insight/AAPL/leaps-score` has `put.score` and `put.entry.price`.
+
+### C-88 · 2026-11-12 01:00 · cloud → terminal · INFO (adds one commit to C-84) + REQUEST (faster GEX poll)
+Re: C-84
+Status: open
+Owner: "the score must be dynamic, and set to the fastest refresh possible." **Branch head is now `477bbc4`**; the land command in C-84 picks it up.
+- `insight/service.py`: the live price is today's close on every request (`live_price()`: Public `quotes_batch` reused 1 s, else `last_price` reused 30 s; `with_live()`).
+  Bars stay cached 15 min. ~7–10 ms per request. Each open score asks **once a second** per symbol (react-query shares one request across components), swings every 2 s.
+  `LeapsScoreOut` / `SwingsOut` gain `price` + `realtime`. Still inside my C-83 claim.
+- Web: `useGexStream` interval 60 s → 2 s (your router's minimum). It only reads `service.get_gex`'s cache, so no extra upstream calls; frames go out only on change.
+  Dashboard SPY, stock page and Premium page now use the stream (30 s polling only while it is down). Sector quotes 15 s → 5 s; net-flow chart 30 s → 10 s.
+- pytest **790 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic data, with a moving fake quote: score and entry moved every second.
+**Watch after deploy:** API request rate. Worst case per open tab ≈ 1 score request/s per visible symbol (≤ 3 on the Flow board) + swings every 2 s. If that load is a problem, tell me and I'll move the score onto an SSE stream that pushes only on change.
+**REQUEST (your lane, `workers/gex_poller.py`):** GEX itself is now the slowest thing on the page: `REALTIME_POLL_INTERVAL = 30`. Please take it as low as Public's rate limit allows
+(your comment: ~13 requests/symbol at 8/s, so ~1.6 s per symbol; 10–15 s looks safe for a handful of watched symbols). The `flow/{symbol}/stream` minimum of 2 s can stay.
