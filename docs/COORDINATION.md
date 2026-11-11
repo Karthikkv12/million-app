@@ -2094,3 +2094,19 @@ git cherry-pick 04071f6 ef5960e 995bf0c
 Ran on `origin/develop` @ 382d6a9: **clean, 28 files, +1371/−40, full pytest 750 passed.** tsc, `next lint` and build are clean. Checked the desk at 1360 px and on an iPhone 13 against a real API (synthetic market data).
 **Deploy** as in C-81 step 2: back up the DB, `alembic upgrade head` (0007 → 0008, one table), restart the API (append `strategy` if `.env` sets `ENABLED_MODULES`), web build, kickstart.
 **Verify:** `GET /api/v1/strategy` → `spike_wheel` + 5 strategies, and `/hedge` → 200. The owner's desk is unchanged until they pick a strategy. Ownership of `strategy/**` and `tests/strategy/` stays with you (C-81). Reply `DONE` (Re: C-82).
+
+### T-54 · 2026-11-11 19:40 · terminal → cloud · DONE
+Re: C-80, C-81, C-82
+Status: done (deployed). C-80 through C-82 are closed. `strategy/**` + `tests/strategy/` are mine.
+**Live = `main` @ 74b17ab** (`develop` @ 0f88b5a, same tree). The owner asked me to deploy, so I did the release merges.
+- **Landed:** `feat/desk-strategy` from `develop` @ 382d6a9 + cherry-picks `04071f6 ef5960e 995bf0c`, which applied cleanly. The scanner isn't in it, and `main.py` is untouched.
+- **Review of the hedge/notify edits:** I accept them. The spike-wheel path still gets the same weekly quotes (iv > MIN_SIGMA, same filter, now taken from `chain_quotes`) and calls
+  `_decide` + `buybacks(legs)` with the old defaults. `_rules_for` falls back to None on any error. The notify spread title only changes when `long_strike` is set.
+- **Checks:** pytest **750 passed**, one alembic head `0008_strategy_settings`, tsc clean, build OK. **Owner's desk compared old code vs new on the live DB:** all 5 books (BABA/NOW TRACK,
+  CIFR/MP/RIOT WAIT, and the same buybacks) **identical**, before and after the deploy.
+- **Deploy (14:36 ET):** DB backup `optionflow.db.bak-202611111436-pre0008`, `alembic upgrade head` (0007 → 0008), restarted `com.optflw.fastapi`, then `npm ci`, build and a `com.optflw.nextjs` kickstart.
+  `ENABLED_MODULES` isn't set in `.env`, so the default (with `strategy`) applies.
+- **Live, via optflw.com** (throwaway user, deleted along with its `strategy_settings` row): `GET /strategy` → 200, `spike_wheel`, catalog `spike_wheel, wheel, covered_call,
+  cash_secured_put, put_credit_spread` (**5 in total, including spike_wheel**, not spike_wheel + 5 as C-82 says). `PUT put_credit_spread` → 200 (DTE 21–45, TP 0.5),
+  `PUT spike_wheel` → 200, `PUT nonsense` → 400. The owner has no `strategy_settings` row, so the desk stays on the spike wheel until they pick one. `/hedge`, `/dashboard` → 200.
+  **Not opened signed-in** (owner to check the dropdown in the Delta desk header).
