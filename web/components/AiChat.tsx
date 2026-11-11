@@ -54,18 +54,20 @@ export default function AiChat() {
     abortRef.current = ctrl;
 
     try {
-      const res = await fetch("/api/ai/chat", {
+      const res = await fetch("/api/v1/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(access ? { Authorization: `Bearer ${access}` } : {}),
+        },
         signal: ctrl.signal,
-        body: JSON.stringify({
-          messages: newMessages,
-          accessToken: access,
-        }),
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        // Backend error shape: {"error": {"code", "message"}} (older: {"detail": ...})
+        const body = await res.json().catch(() => ({}));
+        const err = { error: body?.error?.message ?? body?.detail ?? (res.status === 404 ? "The AI assistant is turned off on this server." : "Request failed") };
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1] = {
@@ -224,7 +226,7 @@ export default function AiChat() {
           ))}
 
           {error && (
-            <div className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-xl border border-red-200 dark:border-red-800">
+            <div className="text-xs text-loss bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-xl border border-red-200 dark:border-red-800">
               {error}
             </div>
           )}
@@ -249,7 +251,7 @@ export default function AiChat() {
             {streaming ? (
               <button
                 onClick={handleStop}
-                className="shrink-0 w-8 h-8 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center transition"
+                className="shrink-0 w-8 h-8 rounded-full bg-loss hover:bg-loss flex items-center justify-center transition"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
                   <rect x="1" y="1" width="8" height="8" rx="1" />

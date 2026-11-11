@@ -1,92 +1,288 @@
 "use client";
+/**
+ * Dashboard — the morning desk (owner, 2026-11-08: no cards, more usable, US only).
+ * Tape · your book · what to do (hedge signals, expiring options) · SPY dealer map ·
+ * movers in your holdings · US market pulse · sectors (the old Markets page). The economic calendar lives on /catalyst.
+ */
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { clsx } from "clsx";
+import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { ArrowRight } from "lucide-react";
-import { PageHeader, SectionLabel } from "@/components/ui";
-import MarketCards from "@/components/dashboard/MarketCards";
-import VixPanel from "@/components/dashboard/VixPanel";
-import EconomicCalendar from "@/components/dashboard/EconomicCalendar";
+import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
+import { bookBeta, dayPnl, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
+import { SourceBadge } from "@/components/options-flow/SourceBadge";
+import { Quote, useQuotes } from "@/components/dashboard/quotes";
+import { Sectors } from "@/components/dashboard/Sectors";
 
-const QUICK = [
-  { href: "/options-flow", label: "GEX Flow",    sub: "Gamma exposure data",  color: "from-purple-500 to-purple-700" },
-  { href: "/trades",       label: "Trades",      sub: "View all positions",   color: "from-blue-500 to-blue-700" },
-  { href: "/accounts",     label: "Accounts",    sub: "Manage portfolios",    color: "from-emerald-500 to-emerald-700" },
-  { href: "/budget",       label: "Budget",      sub: "Track expenses",       color: "from-orange-500 to-orange-600" },
+const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
+const signed = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${usd(v, d)}`);
+const pct = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(d)}%`);
+const tone = (v?: number | null) => (v == null || v === 0 ? "text-foreground/55" : v > 0 ? "text-gain" : "text-loss");
+
+type Inst = { symbol: string; label: string; fmt?: (p: number) => string };
+const PULSE: { group: string; items: Inst[] }[] = [
+  { group: "Indexes", items: [
+    { symbol: "SPY", label: "S&P 500" }, { symbol: "QQQ", label: "Nasdaq 100" }, { symbol: "IWM", label: "Russell 2000" }, { symbol: "DIA", label: "Dow 30" },
+  ] },
+  { group: "Futures", items: [
+    { symbol: "ES=F", label: "ES" }, { symbol: "NQ=F", label: "NQ" }, { symbol: "RTY=F", label: "RTY" },
+  ] },
+  { group: "Vol · rates · dollar", items: [
+    { symbol: "^VIX", label: "VIX", fmt: (p) => p.toFixed(2) }, { symbol: "^TNX", label: "10Y yield", fmt: (p) => `${p.toFixed(3)}%` },
+    { symbol: "DX-Y.NYB", label: "Dollar index", fmt: (p) => p.toFixed(2) },
+  ] },
+  { group: "Commodities · crypto", items: [
+    { symbol: "GC=F", label: "Gold" }, { symbol: "CL=F", label: "WTI crude" }, { symbol: "NG=F", label: "Nat gas" }, { symbol: "BTC-USD", label: "Bitcoin" },
+  ] },
 ];
+const TAPE = ["SPY", "QQQ", "IWM", "^VIX", "^TNX", "DX-Y.NYB", "GC=F", "CL=F", "BTC-USD"];
+const ALL = Array.from(new Set([...TAPE, ...PULSE.flatMap((g) => g.items.map((i) => i.symbol))]));
+const LABEL: Record<string, Inst> = Object.fromEntries(PULSE.flatMap((g) => g.items).map((i) => [i.symbol, i]));
+const fmtPx = (sym: string, p: number) => LABEL[sym]?.fmt?.(p) ?? p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const chg = (q?: Quote) => (q?.change_pct != null ? q.change_pct / 100 : null);
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+function Tape({ quotes }: { quotes?: Record<string, Quote> }) {
+  return (
+    <div className="-mx-4 overflow-x-auto border-y border-[var(--border-strong)] sm:-mx-8">
+      <div className="flex min-w-max divide-x divide-[var(--border)] px-4 sm:px-8">
+        {TAPE.map((s) => {
+          const q = quotes?.[s];
+          return (
+            <Link key={s} href={`/stocks/${encodeURIComponent(s)}`}
+              className="flex items-baseline gap-2 px-4 py-2.5 font-mono text-[12.5px] tabular-nums first:pl-0 hover:bg-foreground/[0.03]">
+              <span className="text-foreground/50">{LABEL[s]?.label ?? s}</span>
+              <span className="text-foreground">{q?.price != null ? fmtPx(s, q.price) : "—"}</span>
+              <span className={tone(chg(q))}>{pct(chg(q))}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [lookupQuery, setLookupQuery] = useState("");
+  const [q, setQ] = useState("");
+  const quotes = useQuotes(ALL);
+  const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
+  const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
+  const hedge = useLiveBooks();
+  const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: 60_000 });
 
-  const handleLookup = (e: React.FormEvent) => {
-    e.preventDefault();
-    const t = lookupQuery.trim().toUpperCase();
-    if (t) router.push(`/stocks/${t}`);
-  };
+  const p = useLivePortfolio(pf.data);
+  const week = inc.data?.weekly.at(-1);
+  const books = okBooks(hedge.data);
+  const today = dayPnl(books);
+  const { beta } = bookBeta(books);
+  const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
+  const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
+  const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
+  const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_STOCK"].includes(b.suggestion.action));
+  const spikes = books.filter((b) => b.iv?.spike && !signals.includes(b));
+  const expiring = (p?.options ?? []).filter((o) => o.dte != null && o.dte <= 7).sort((a, b) => (a.dte ?? 0) - (b.dte ?? 0));
+  const movers = [...(p?.holdings ?? [])].filter((h) => h.day_change_pct != null).sort((a, b) => Math.abs(b.day_change_pct ?? 0) - Math.abs(a.day_change_pct ?? 0)).slice(0, 6);
+  const g = spy.data && !spy.data.error ? spy.data : null;
+  const longGamma = (g?.net_gex ?? 0) >= 0;
+  const hasBook = !!p && (p.accounts.length > 0 || p.holdings.length > 0);
 
   return (
-    <div className="p-4 sm:p-6 w-full overflow-x-hidden">
-
-      <PageHeader
-        title={user?.username ? `Hey, ${user.username} 👋` : "Dashboard"}
-        sub="Your portfolio at a glance."
-      />
-
-      {/* ── Slim stock search bar ── */}
-      <div className="mb-6">
-        <TickerSearchInput
-          value={lookupQuery}
-          onChange={setLookupQuery}
-          onSelect={(sym) => {
-            setLookupQuery(sym);
-            router.push(`/stocks/${encodeURIComponent(sym.trim().toUpperCase())}`);
-          }}
-          placeholder="Search ticker or company — AAPL, Apple, Nifty…"
-          actionLabel="View"
-          className="w-full max-w-xl"
-        />
+    <DeskPage>
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-4">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">{greeting()}{user?.username ? `, ${user.username.split(".")[0]}` : ""}</h1>
+        </div>
+        <TickerSearchInput value={q} onChange={setQ} onSelect={(s) => router.push(`/stocks/${encodeURIComponent(s.trim().toUpperCase())}`)}
+          placeholder="Ticker or company" actionLabel="Open" className="w-full sm:w-80" />
       </div>
 
-      {/* Market ticker cards */}
-      <MarketCards />
+      <Tape quotes={quotes.data} />
 
-      {/* ── VIX ── */}
-      <div className="mb-6 sm:mb-8">
-        <p className="text-[11px] font-bold text-foreground uppercase tracking-widest mb-3">Volatility</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <VixPanel />
-          <VixPanel
-            symbol="%5EINDIAVIX"
-            title="India VIX"
-            sublabel="NSE India Volatility Index"
-            gradId="indiaVixGrad"
-          />
+      {/* ── Your book ─────────────────────────────────────────────────── */}
+      <div className="py-6">
+        {hasBook ? (
+          <>
+          <DeskFigures>
+            {today && (
+              <DeskFigure sensitive size="lg" label="Today · live" value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
+                sub={<>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
+            )}
+            <DeskFigure sensitive size="lg" label="Account value" value={usd(p!.total_value, 0)}
+              sub={<span className={tone(p!.day_change)}>{signed(p!.day_change, 0)} at last sync</span>} />
+            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={p!.unrealized != null ? Math.round(p!.unrealized) : null}>{signed(p!.unrealized, 0)}</Tick>} tone={tone(p!.unrealized)} sub={<>stocks <Tick value={p!.stock_value != null ? Math.round(p!.stock_value) : null}>{usd(p!.stock_value, 0)}</Tick></>} />
+            <DeskFigure sensitive size="lg" label="Premium · this week" value={signed(week?.collected ?? 0, 0)} tone="text-gain" sub={`net ${signed(week?.premium ?? 0, 0)}`} />
+            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`buying power ${usd(p!.buying_power, 0)}`} />
+          </DeskFigures>
+          {(perLot != null || beta != null) && (
+            <Link href="/hedge" className="mt-5 grid gap-x-12 gap-y-2 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
+              {perLot != null && (
+                <div className="min-w-0">
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
+                  <Scale min={-0.5} max={1.5} value={perLot} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
+                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-amber-500"}
+                    zones={[{ from: -0.5, to: 0.4, cls: "bg-amber-500/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
+                    marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
+                </div>
+              )}
+              {beta != null && (
+                <div className="min-w-0">
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
+                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-amber-500" : "bg-gain"}
+                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-amber-500/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
+                    marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
+                </div>
+              )}
+            </Link>
+          )}
+          </>
+        ) : (
+          <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the first Robinhood sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
+        )}
+      </div>
+
+      <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          {/* ── To do ───────────────────────────────────────────────── */}
+          <DeskSection label="To do" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta={<Link href="/hedge" className="text-accent">Hedge desk →</Link>}>
+            {!signals.length && !spikes.length && !expiring.length ? (
+              <p className="py-2 text-[14px] text-foreground/55">Nothing to place right now. The desk waits for a spike (sell a call) or a pullback (sell a put).</p>
+            ) : (
+              <div className="border-t border-[var(--border)]">
+                {signals.map((b) => {
+                  const act = b.suggestion!.action;
+                  const t = act === "SELL_PUT" ? "gain" : act === "BUY_STOCK" ? "warn" : "accent";
+                  return (
+                    <Link key={b.symbol} href="/hedge" className="block">
+                      <DeskRow edge={t}>
+                        <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
+                          <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
+                          <span><Tag tone={t}>{act.replace("_", " ").toLowerCase()}</Tag></span>
+                          <span className="sensitive text-right font-mono text-[13px] tabular-nums text-foreground sm:order-last">{usd(Math.abs(b.suggestion!.credit ?? 0), 0)}</span>
+                          <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">{b.suggestion!.headline}</span>
+                        </div>
+                      </DeskRow>
+                    </Link>
+                  );
+                })}
+                {spikes.map((b) => (
+                  <DeskRow key={`s-${b.symbol}`} edge="loss">
+                    <div className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)]">
+                      <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
+                      <span><Tag tone="loss">IV spike</Tag></span>
+                      <span className="col-span-2 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">ATM IV {pct(b.iv?.iv_roc_day, 0)} today. Premium is rich: a call near your average.</span>
+                    </div>
+                  </DeskRow>
+                ))}
+                {expiring.map((o, i) => (
+                  <DeskRow key={`e-${i}`} edge={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : null}>
+                    <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
+                      <span className="font-mono text-[14px] font-semibold text-foreground">{o.symbol}</span>
+                      <span><Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag></span>
+                      <span className={clsx("sensitive text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
+                      <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">
+                        {o.contracts < 0 ? "Short" : "Long"} {Math.abs(o.contracts)} {o.strike}{o.option_type === "call" ? "C" : "P"} · {o.expiry.slice(5)} · spot <Tick value={o.spot}>{usd(o.spot)}</Tick>
+                      </span>
+                    </div>
+                  </DeskRow>
+                ))}
+              </div>
+            )}
+          </DeskSection>
+
+          {/* ── Movers in your holdings ─────────────────────────────── */}
+          {movers.length > 0 && (
+            <DeskSection label="Your movers" className="lg:grid-cols-[120px_minmax(0,1fr)]" meta="today, live price">
+              <div className="border-t border-[var(--border)]">
+                {movers.map((h) => {
+                  const w = Math.min(100, Math.abs(h.day_change_pct ?? 0) * 100 * 12);
+                  return (
+                    <Link key={h.symbol} href={`/stocks/${h.symbol}`} className="block">
+                      <DeskRow>
+                        <div className="grid grid-cols-[52px_minmax(0,1fr)_76px_70px] items-center gap-3 py-2.5 pl-4 pr-3 font-mono text-[13px] tabular-nums">
+                          <span className="font-semibold text-foreground">{h.symbol}</span>
+                          <div className="relative h-[6px] bg-foreground/[0.05]">
+                            <div className={clsx("absolute inset-y-0 left-0", (h.day_change_pct ?? 0) >= 0 ? "bg-gain/70" : "bg-loss/70")} style={{ width: `${w}%` }} />
+                          </div>
+                          <span className="text-right text-foreground"><Tick value={h.price}>{usd(h.price)}</Tick></span>
+                          <span className={clsx("text-right", tone(h.day_change_pct))}>{pct(h.day_change_pct)}</span>
+                        </div>
+                      </DeskRow>
+                    </Link>
+                  );
+                })}
+              </div>
+            </DeskSection>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          {/* ── SPY dealer map ──────────────────────────────────────── */}
+          <DeskSection label="SPY dealers" className="lg:grid-cols-1" meta={g ? <span className="inline-flex items-center gap-2"><SourceBadge data={g} /><Link href="/options-flow?ticker=SPY" className="text-accent">Flow board →</Link></span> : undefined}>
+            {g ? (
+              <div className="grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div>
+                  <Tag tone={longGamma ? "gain" : "warn"}>{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Tag>
+                  <p className="mt-3 text-[13.5px] leading-relaxed text-foreground/70">
+                    {longGamma
+                      ? "Dealers are long gamma: they sell rallies and buy dips, so moves tend to fade toward the king."
+                      : "Dealers are short gamma: they chase moves, so ranges widen and trends run."}
+                    {g.zero_gamma != null && <> Price is <b className="font-medium text-foreground">{g.spot >= g.zero_gamma ? "above" : "below"}</b> the flip at {g.zero_gamma.toFixed(2)}.</>}
+                  </p>
+                </div>
+                <div className="min-w-0 sm:min-w-[220px]"><Ladder spot={g.spot} height={170} levels={[
+                  { label: "call wall", price: g.max_call_wall, tone: "text-gain" },
+                  { label: "★ king", price: g.max_gex_strike, tone: "text-[#b45309] dark:text-[#fde725]" },
+                  { label: "flip", price: g.zero_gamma, tone: "text-accent" },
+                  { label: "put wall", price: g.max_put_wall, tone: "text-loss" },
+                ]} /></div>
+              </div>
+            ) : <p className="text-[13px] text-foreground/50">{spy.isLoading ? "Loading SPY levels…" : "SPY levels unavailable right now."}</p>}
+          </DeskSection>
+
+          {/* ── Market pulse (US) ───────────────────────────────────── */}
+          <DeskSection label="Market pulse" className="lg:grid-cols-1" meta="US · live">
+            <div className="grid grid-cols-1 gap-5">
+              {PULSE.map((grp) => (
+                <div key={grp.group}>
+                  <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/40">{grp.group}</p>
+                  {grp.items.map((it) => {
+                    const qt = quotes.data?.[it.symbol];
+                    return (
+                      <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
+                        <span className="truncate font-sans text-[13px] text-foreground/75">{it.label}</span>
+                        <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
+                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </DeskSection>
         </div>
       </div>
 
-      {/* ── Economic Calendar ── */}
-      <EconomicCalendar />
+      <DeskSection id="sectors" label="Sectors" meta={<>Ranked by today&apos;s move.<br />Tap a sector for its stocks, sized by market cap.</>}>
+        <Sectors />
+      </DeskSection>
 
-      {/* Quick actions */}
-      <SectionLabel>Quick Actions</SectionLabel>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        {QUICK.map(({ href, label, sub, color }) => (
-          <Link key={href} href={href}
-            className="relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white group hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-sm">
-            <div className={`absolute inset-0 bg-gradient-to-br ${color}`} />
-            <div className="relative">
-              <p className="font-bold text-sm sm:text-base">{label}</p>
-              <p className="text-[11px] text-white/70 mt-0.5">{sub}</p>
-              <ArrowRight size={14} className="mt-3 opacity-70 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+      <nav className="mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-strong)] pt-5 font-mono text-[12px] uppercase tracking-[0.14em]">
+        {[["/options-flow", "Flow"], ["/hedge", "Hedge"], ["/portfolio", "Portfolio"], ["/catalyst", "Catalyst"], ["/catalyst/unusual", "Unusual activity"], ["/catalyst/calendar", "Economic calendar"]].map(([href, l]) => (
+          <Link key={href} href={href} className="inline-flex items-center gap-1 text-foreground/60 hover:text-foreground">{l}<ArrowUpRight size={12} /></Link>
         ))}
-      </div>
-
-    </div>
+      </nav>
+    </DeskPage>
   );
 }

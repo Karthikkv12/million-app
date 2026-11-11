@@ -5,9 +5,17 @@
  * - Auto-refreshes the token on 401 responses
  */
 
-// Use the Next.js /api rewrite proxy so requests stay same-origin (HTTPS on tunnel, HTTP locally).
-// Set NEXT_PUBLIC_API_URL to override (e.g. for production deployment).
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+// Versioned API through the Next.js rewrite (same-origin: HTTPS on the tunnel, HTTP locally).
+// Set NEXT_PUBLIC_API_URL to override (e.g. a phone app or a separate API host).
+export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+
+// ── Generated types (web/lib/api-types.ts, from the backend's OpenAPI) ──────────
+// Regenerate after any API change: `python scripts/export_openapi.py && npm run gen:api`.
+import type { components, paths } from "./api-types";
+export type Schemas = components["schemas"];
+/** JSON body of a 200 GET response, e.g. `V1Get<"/api/v1/catalyst/{symbol}">`. */
+export type V1Get<P extends keyof paths> =
+  paths[P] extends { get: { responses: { 200: { content: { "application/json": infer R } } } } } ? R : never;
 
 // ── token storage (client-side only) ────────────────────────────────────────
 
@@ -49,6 +57,17 @@ async function _doRefresh(): Promise<boolean> {
   } catch { clearTokens(); return false; }
 }
 
+/** Plain message from an error body: v1 `{error:{message}}`, legacy `{detail}`, or the raw text. */
+function errorMessage(text: string): string {
+  try {
+    const body = JSON.parse(text);
+    const msg = body?.error?.message ?? body?.detail;
+    if (typeof msg === "string") return msg;
+    if (Array.isArray(msg)) return msg.map((m) => m?.msg ?? String(m)).join("; ");   // 422 validation list
+  } catch { /* not JSON */ }
+  return text;
+}
+
 async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -75,7 +94,7 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new Error(errorMessage(text) || `HTTP ${res.status}`);
   }
   // 204 No Content
   if (res.status === 204) return undefined as T;
@@ -157,32 +176,8 @@ export interface TopFlowStrike {
   bias: "call" | "put";
 }
 
-export interface GexResult {
-  symbol: string;
-  spot: number;
-  expiries: string[];
-  strikes: number[];
-  gex_by_strike: Record<string, number>;
-  call_gex_by_strike: Record<string, number>;
-  put_gex_by_strike: Record<string, number>;
-  heatmap_expiries: string[];
-  heatmap_strikes: number[];
-  heatmap_values: number[][];
-  zero_gamma: number | null;
-  max_call_wall: number | null;
-  max_put_wall: number | null;
-  max_gex_strike: number | null;
-  net_gex: number | null;
-  // net flow
-  call_premium: number;
-  put_premium: number;
-  net_flow: number;
-  total_volume: number;
-  flow_by_expiry: FlowByExpiry[];
-  top_flow_strikes: TopFlowStrike[];
-  data_source: "tradier" | "yfinance";
-  error: string | null;
-}
+/** Generated from the backend schema (GexOut), including the VEX grid. */
+export type GexResult = Schemas["GexOut"];
 
 export const fetchGex = (symbol: string) =>
   api.get<GexResult>(`/options/gamma-exposure/${symbol.toUpperCase()}`);
@@ -658,24 +653,6 @@ export interface PremiumDashboard {
 export const fetchPremiumDashboard = () =>
   api.get<PremiumDashboard>("/portfolio/premium-dashboard");
 
-// ── Orders ───────────────────────────────────────────────────────────────────
-
-export interface Order {
-  id: number;
-  symbol: string;
-  instrument: string;
-  action: string;
-  strategy?: string;
-  quantity: number;
-  limit_price?: number;
-  status: string;
-  created_at: string;
-  filled_at?: string;
-  filled_price?: number;
-}
-
-export const fetchOrders = () => api.get<Order[]>("/orders");
-
 // ── Accounts ─────────────────────────────────────────────────────────────────
 
 export interface Account {
@@ -772,6 +749,7 @@ export const revokeSession = (id: number) => api.post(`/auth/sessions/${id}/revo
 export const fetchAuthEvents = () => api.get<AuthEvent[]>("/auth/events");
 export const changePassword = (currentPassword: string, newPassword: string) =>
   api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+export const logoutAll = () => api.post("/auth/logout-all");
 
 // ── Cash ─────────────────────────────────────────────────────────────────────
 
@@ -793,7 +771,7 @@ export const adminListUsers = () => api.get<AdminUser[]>("/admin/users");
 export const adminCreateUser = (username: string, password: string, role: "admin" | "user") =>
   api.post<AdminUser>("/admin/users", { username, password, role });
 
-export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean }) =>
+export const adminPatchUser = (user_id: number, patch: { role?: string; is_active?: boolean; password?: string }) =>
   api.patch<AdminUser>(`/admin/users/${user_id}`, patch);
 
 export const adminDeleteUser = async (user_id: number): Promise<void> => {
@@ -891,3 +869,77 @@ export const syncWatchlist = () =>
   api.post<{ positions_synced: number; holdings_synced: number; total_added: number }>(
     "/watchlist/sync",
   );
+
+// ── Catalyst ──────────────────────────────────────────────────────────────────
+export interface CatalystSignal { label: string; tone: "good" | "bad" | "warn" | "neutral" }
+// Hand-written until CatalystsOut types its nested sections (coordination C-8).
+export interface Catalysts {
+  symbol: string; name: string; price: number | null; change_pct: number | null;
+  earnings: { date: string | null; days_until: number | null; timing: string | null;
+    eps_avg: number | null; eps_low: number | null; eps_high: number | null;
+    revenue_avg: number | null; revenue_low: number | null; revenue_high: number | null };
+  dividend: { ex_date: string | null; ex_days_until: number | null; pay_date: string | null; rate: number | null; yield_pct: number | null };
+  expected_move: { dollars: number; pct: number; low: number; high: number; expiry: string; strike: number; covers_earnings: boolean } | null;
+  earnings_history: { date: string; estimate: number | null; reported: number; surprise_pct: number | null }[];
+  analysts: {
+    rating: string | null;
+    consensus: { strongBuy: number; buy: number; hold: number; sell: number; strongSell: number } | null;
+    targets: { low: number | null; mean: number | null; median: number | null; high: number | null };
+    upside_pct: number | null;
+    actions: { date: string; firm: string; action: string; from: string | null; to: string | null; target: number | null; prior_target: number | null }[];
+  };
+  volume: { today: number | null; average: number | null; relative: number | null; short_pct_float: number | null; short_ratio: number | null; beta: number | null };
+  range: { high: number | null; low: number | null; position_pct: number | null };
+  news: { title: string; publisher: string | null; url: string | null; published: string | number | null }[];
+  signals: CatalystSignal[];
+  as_of: string; source: string;
+}
+export const fetchCatalysts = (symbol: string) => api.get<Catalysts>(`/catalyst/${encodeURIComponent(symbol)}`);
+
+// ── Unusual options activity ─────────────────────────────────────────────────
+export interface UnusualRow {
+  symbol: string; type: "call" | "put"; strike: number; expiry: string; dte: number;
+  spot: number | null; otm_pct: number | null; last: number | null; bid: number | null; ask: number | null;
+  side: "ask" | "bid" | "mid" | "unknown"; volume: number; open_interest: number; vol_oi: number | null;
+  iv_pct: number | null; premium: number; score: number;
+}
+export interface UnusualScan { rows: UnusualRow[]; count: number; symbols: string[]; call_premium: number; put_premium: number; as_of: string; source: string }
+export const fetchUnusual = (opts: { symbols?: string[]; minPremium?: number; type?: "all" | "call" | "put" } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.symbols?.length) q.set("symbols", opts.symbols.join(","));
+  if (opts.minPremium) q.set("min_premium", String(opts.minPremium));
+  if (opts.type && opts.type !== "all") q.set("type", opts.type);
+  const qs = q.toString();
+  return api.get<UnusualScan>(`/unusual${qs ? `?${qs}` : ""}`);
+};
+
+// ── Hedge desk (delta-neutral indicator for held positions) ──────────────────
+export type HedgeBooks = Schemas["BooksOut"];
+export type HedgeBook = Schemas["BookOut"];
+export type HedgeLeg = Schemas["LegOut"];
+export type HedgeSuggestion = Schemas["SuggestionOut"];
+export type BrokerPosition = Schemas["BrokerPositionOut"];
+
+export const fetchHedgeBooks = () => api.get<HedgeBooks>("/hedge/books");
+export const fetchBrokerPositions = () => api.get<BrokerPosition[]>("/hedge/positions");
+
+// ── Portfolio, all from the Robinhood sync ───────────────────────────────────
+export type BrokerPortfolio = Schemas["BrokerPortfolioOut"];
+export type BrokerHolding = Schemas["BrokerHoldingOut"];
+export type BrokerOption = Schemas["BrokerOptionOut"];
+export type BrokerHistoryPoint = Schemas["BrokerHistoryPoint"];
+export type BrokerIncome = Schemas["BrokerIncomeOut"];
+export type BrokerActivity = Schemas["BrokerActivityOut"];
+
+const acctQ = (account?: string | null, extra: Record<string, string> = {}) => {
+  const q = new URLSearchParams(extra);
+  if (account) q.set("account", account);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+};
+export const fetchBrokerPortfolio = (account?: string | null) => api.get<BrokerPortfolio>(`/broker/portfolio${acctQ(account)}`);
+export const fetchBrokerHistory = (account?: string | null, days = 365) =>
+  api.get<BrokerHistoryPoint[]>(`/broker/history${acctQ(account, { days: String(days) })}`);
+export const fetchBrokerIncome = (account?: string | null) => api.get<BrokerIncome>(`/broker/income${acctQ(account)}`);
+export const fetchBrokerActivity = (account?: string | null, limit = 300) =>
+  api.get<BrokerActivity[]>(`/broker/activity${acctQ(account, { limit: String(limit) })}`);

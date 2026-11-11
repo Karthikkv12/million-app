@@ -12,6 +12,9 @@ const Ctx = createContext<ThemeCtx>({ theme: "dark", toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
+  // Don't write anything until the saved choice has been read; otherwise the
+  // initial "dark" overwrites a saved "light" (and React dev mode runs effects twice).
+  const [hydrated, setHydrated] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -25,10 +28,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setTheme(prefersDark ? "dark" : "light");
       }
     } catch {}
+    setHydrated(true);
   }, []);
 
   // Apply / remove the `dark` class on <html> whenever theme changes
   useEffect(() => {
+    if (!hydrated) return;
     const root = document.documentElement;
     if (theme === "dark") {
       root.classList.add("dark");
@@ -36,7 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.remove("dark");
     }
     try { localStorage.setItem("of-theme", theme); } catch {}
-  }, [theme]);
+  }, [theme, hydrated]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 

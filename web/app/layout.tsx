@@ -1,22 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+const sans = DM_Sans({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+const mono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
+
+// Apply the saved / OS theme before first paint to avoid a light→dark flash
+const THEME_BOOT = `try{var t=localStorage.getItem("of-theme");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "OptionFlow",
-  description: "Options Flow & Trading Analytics",
+  description: "Dealer positioning, gamma exposure and options flow",
 };
 
 export const viewport: Viewport = {
@@ -33,9 +28,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${sans.variable} ${mono.variable} font-sans antialiased`}
         style={{ margin: 0 }}
       >
         <Providers>

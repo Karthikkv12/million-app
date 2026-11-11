@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Zap, BarChart2, Globe, PiggyBank } from "lucide-react";
+import { LayoutDashboard, Zap, Settings, Briefcase, Scale } from "lucide-react";
 import { clsx } from "clsx";
 
 const TABS = [
   { href: "/dashboard",    label: "Home",    icon: LayoutDashboard },
   { href: "/options-flow", label: "Flow",    icon: Zap             },
-  { href: "/markets",      label: "Markets", icon: Globe           },
-  { href: "/trades",       label: "Portfolio", icon: BarChart2       },
-  { href: "/budget",       label: "Budget",  icon: PiggyBank       },
+  { href: "/hedge",        label: "Hedge",   icon: Scale           },
+  { href: "/portfolio",    label: "Portfolio", icon: Briefcase     },
+  { href: "/settings",     label: "Settings", icon: Settings       },
 ];
 
 export default function BottomNav() {
@@ -53,7 +53,7 @@ export default function BottomNav() {
         hidden ? "translate-y-full" : "translate-y-0",
       )}
     >
-      <div className="mx-3 mb-3 rounded-2xl glass border border-[var(--border)] shadow-xl shadow-black/10 overflow-hidden">
+      <div className="mx-3 mb-3 rounded-2xl glass border shadow-[var(--shadow-float)] overflow-hidden">
         <div className="flex items-stretch">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
@@ -62,30 +62,16 @@ export default function BottomNav() {
                 key={href}
                 href={href}
                 className={clsx(
-                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[9px] font-bold uppercase tracking-wide transition-all relative",
+                  "flex-1 flex flex-col items-center justify-center gap-1 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] transition-all relative",
                   active
                     ? "text-foreground"
                     : "text-foreground/50 hover:text-foreground",
                 )}
               >
                 {active && (
-                  <span className="absolute inset-0 bg-[var(--foreground)]/5 rounded-2xl" />
+                  <span className="absolute inset-1 bg-foreground/[0.07] rounded-xl" />
                 )}
-                {Icon === Zap ? (
-                  <svg
-                    width={20} height={20}
-                    viewBox="0 0 24 24"
-                    fill="#F59E0B"
-                    className="drop-shadow-[0_0_4px_rgba(245,158,11,0.6)]"
-                  >
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
-                ) : (
-                  <Icon
-                    size={20}
-                    strokeWidth={active ? 2.5 : 1.8}
-                  />
-                )}
+                <Icon size={19} strokeWidth={active ? 2.2 : 1.7} />
                 {label}
               </Link>
             );

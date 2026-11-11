@@ -6,10 +6,10 @@ Also cross-checks ledger rows vs actual OptionPosition data.
 import sys
 sys.path.insert(0, ".")
 
-from logic.services import _portfolio_session
+from optionflow.core.db import get_session
 from database.models import StockHolding, PremiumLedger, OptionPosition, OptionPositionStatus
 
-sess = _portfolio_session()
+sess = get_session()
 
 REALIZED_STATUSES = {
     OptionPositionStatus.CLOSED,

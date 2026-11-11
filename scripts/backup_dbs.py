@@ -23,6 +23,7 @@ KEEP_WEEKLY  = 4    # keep last 4 weekly backups (Sundays)
 KEEP_MONTHLY = 12   # keep last 12 monthly backups (1st of month)
 
 DB_FILES = [
+    "optionflow.db",   # the one database (plan step 5); the five below until the switch-over
     "users.db",
     "trades.db",
     "portfolio.db",

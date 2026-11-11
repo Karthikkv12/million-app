@@ -16,6 +16,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchStockHistory } from "@/lib/api";
+import { useTheme } from "@/lib/theme";
 import { RefreshCw, CandlestickChart, LineChart, Eye, EyeOff } from "lucide-react";
 
 // ── Period config ──────────────────────────────────────────────────────────────
@@ -68,9 +69,10 @@ function fmtVol(v?: number | null) {
 // ── Props ──────────────────────────────────────────────────────────────────────
 interface GexLevels {
   spot?: number;
-  callWall?: number;
-  putWall?: number;
-  zeroGamma?: number;
+  callWall?: number | null;
+  putWall?: number | null;
+  zeroGamma?: number | null;
+  kingNode?: number | null;
 }
 
 interface Props {
@@ -82,6 +84,7 @@ interface Props {
 
 export default function TradingChart({ symbol, earningsDate, gexLevels, initialPeriod = "1D" }: Props) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chartRef    = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,11 +124,12 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       await import("lightweight-charts");
 
     const el = chartContainerRef.current;
-    const isDark = document.documentElement.classList.contains("dark");
-    const bg   = isDark ? "#0d0d0d" : "#ffffff";
-    const grid = isDark ? "#1e1e1e" : "#f0f0f0";
-    const text = isDark ? "#9ca3af" : "#6b7280";
-    const border = isDark ? "#2a2a2a" : "#e5e7eb";
+    const isDark = theme === "dark";
+    const bg   = isDark ? "#141a22" : "#ffffff";
+    const grid = isDark ? "rgba(148,163,184,0.08)" : "rgba(14,15,18,0.05)";
+    const text = isDark ? "rgba(203,213,225,0.6)" : "rgba(14,15,18,0.5)";
+    const border = isDark ? "rgba(148,163,184,0.16)" : "rgba(14,15,18,0.1)";
+    const accent = isDark ? "#7aa2ff" : "#2f5bea";
 
     // Destroy old chart
     if (chartRef.current) {
@@ -136,7 +140,7 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
     const chart = createChart(el, {
       width:  el.clientWidth,
       height: 420,
-      layout: { background: { color: bg }, textColor: text, fontFamily: "monospace" },
+      layout: { background: { color: bg }, textColor: text, fontFamily: "DM Mono, ui-monospace, monospace", fontSize: 11 },
       grid:   { vertLines: { color: grid }, horzLines: { color: grid } },
       crosshair: { mode: 1 },
       rightPriceScale: { borderColor: border, scaleMargins: { top: 0.1, bottom: 0.3 } },
@@ -156,8 +160,8 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
     const first = closes[0];
     const last  = closes[closes.length - 1];
     const up    = last >= first;
-    const upCol = "#22c55e";
-    const dnCol = "#ef4444";
+    const upCol = isDark ? "#3fb37f" : "#15803d";
+    const dnCol = isDark ? "#e55d5d" : "#dc2626";
 
     if (chartType === "candle") {
       const cs = chart.addSeries(CandlestickSeries, {
@@ -207,7 +211,7 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
           return {
             time:  toChartTime(b.date),
             value: b.volume!,
-            color: b.close >= prev ? "#22c55e40" : "#ef444440",
+            color: b.close >= prev ? upCol + "40" : dnCol + "40",
           };
         })
     );
@@ -232,9 +236,9 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       return s;
     };
 
-    sma20Ref.current  = addSMA(20,  "#3b82f6");  // blue
-    sma50Ref.current  = addSMA(50,  "#f59e0b");  // amber
-    sma200Ref.current = addSMA(200, "#a855f7");  // purple
+    sma20Ref.current  = addSMA(20,  isDark ? "rgba(122,162,255,0.7)" : "rgba(47,91,234,0.6)");
+    sma50Ref.current  = addSMA(50,  isDark ? "rgba(203,213,225,0.55)" : "rgba(14,15,18,0.4)");
+    sma200Ref.current = addSMA(200, isDark ? "rgba(255,159,90,0.7)" : "rgba(242,113,28,0.6)");
 
     // Apply visibility
     sma20Ref.current?.applyOptions({ visible: showSMA.s20 });
@@ -274,9 +278,10 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
     // ── GEX levels as price lines ─────────────────────────────────────────
     if (gexLevels && seriesRef.current) {
       const levels = [
-        { price: gexLevels.callWall,   color: "#22c55e", title: "Call Wall" },
-        { price: gexLevels.putWall,    color: "#ef4444", title: "Put Wall" },
-        { price: gexLevels.zeroGamma,  color: "#f59e0b", title: "Zero γ" },
+        { price: gexLevels.callWall,   color: upCol,  title: "Call wall", style: 2 },
+        { price: gexLevels.putWall,    color: dnCol,  title: "Put wall",  style: 2 },
+        { price: gexLevels.zeroGamma,  color: accent, title: "Flip",      style: 1 },
+        { price: gexLevels.kingNode,   color: isDark ? "#fde725" : "#b45309", title: "King", style: 0 },
       ];
       for (const lv of levels) {
         if (lv.price != null) {
@@ -284,8 +289,8 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
             seriesRef.current.createPriceLine({
               price:     lv.price,
               color:     lv.color,
-              lineWidth: 1,
-              lineStyle: 1,
+              lineWidth: lv.title === "King" ? 2 : 1,
+              lineStyle: lv.style,
               axisLabelVisible: true,
               title:     lv.title,
             });
@@ -334,7 +339,7 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
 
     return () => { ro.disconnect(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bars, chartType, isIntraday, earningsDate, gexLevels]);
+  }, [bars, chartType, isIntraday, earningsDate, gexLevels, theme]);
 
   useEffect(() => {
     buildChart();
@@ -364,11 +369,11 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
           <span className="text-sm font-black text-foreground">{symbol}</span>
           {last && (
             <>
-              <span className={`text-sm font-black tabular-nums ${liveUp ? "text-emerald-500" : "text-red-500"}`}>
+              <span className={`text-sm font-black tabular-nums ${liveUp ? "text-gain" : "text-loss"}`}>
                 {fmt$(last.close)}
               </span>
               {changePct != null && (
-                <span className={`text-[11px] font-bold tabular-nums ${liveUp ? "text-emerald-500" : "text-red-500"}`}>
+                <span className={`text-[11px] font-bold tabular-nums ${liveUp ? "text-gain" : "text-loss"}`}>
                   {liveUp ? "▲" : "▼"} {Math.abs(changePct).toFixed(2)}%
                 </span>
               )}
@@ -405,7 +410,7 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
           {/* SMA toggles */}
           {[
             { key: "s20" as const,  label: "SMA20",  color: "text-blue-400" },
-            { key: "s50" as const,  label: "SMA50",  color: "text-amber-400" },
+            { key: "s50" as const,  label: "SMA50",  color: "text-foreground/60" },
             { key: "s200" as const, label: "SMA200", color: "text-purple-400" },
           ].map(({ key, label, color }) => (
             <button
@@ -434,12 +439,12 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       <div className="flex flex-wrap items-center gap-3 px-4 py-1.5 bg-[var(--surface)] border-b border-[var(--border)]/50 text-[10px] font-mono">
         {legend.time && <span className="text-foreground/50">{legend.time}</span>}
         {legend.open  != null && <span className="text-foreground/70">O <span className="text-foreground font-bold">{fmt$(legend.open)}</span></span>}
-        {legend.high  != null && <span className="text-emerald-400">H <span className="font-bold">{fmt$(legend.high)}</span></span>}
-        {legend.low   != null && <span className="text-red-400">L <span className="font-bold">{fmt$(legend.low)}</span></span>}
+        {legend.high  != null && <span className="text-gain">H <span className="font-bold">{fmt$(legend.high)}</span></span>}
+        {legend.low   != null && <span className="text-loss">L <span className="font-bold">{fmt$(legend.low)}</span></span>}
         {legend.close != null && <span className="text-foreground">C <span className="font-bold">{fmt$(legend.close)}</span></span>}
         {legend.volume != null && <span className="text-foreground/50">Vol <span className="text-foreground font-bold">{fmtVol(legend.volume)}</span></span>}
         {showSMA.s20  && legend.sma20  != null && <span className="text-blue-400">SMA20 <span className="font-bold">{fmt$(legend.sma20)}</span></span>}
-        {showSMA.s50  && legend.sma50  != null && <span className="text-amber-400">SMA50 <span className="font-bold">{fmt$(legend.sma50)}</span></span>}
+        {showSMA.s50  && legend.sma50  != null && <span className="text-foreground/60">SMA50 <span className="font-bold">{fmt$(legend.sma50)}</span></span>}
         {showSMA.s200 && legend.sma200 != null && <span className="text-purple-400">SMA200 <span className="font-bold">{fmt$(legend.sma200)}</span></span>}
       </div>
 
@@ -459,9 +464,9 @@ export default function TradingChart({ symbol, earningsDate, gexLevels, initialP
       {/* ── GEX levels legend ── */}
       {gexLevels && (gexLevels.callWall || gexLevels.putWall || gexLevels.zeroGamma) && (
         <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-t border-[var(--border)] bg-[var(--surface-2)] text-[10px]">
-          {gexLevels.callWall  && <span className="text-emerald-400 font-bold">── Call Wall {fmt$(gexLevels.callWall)}</span>}
-          {gexLevels.putWall   && <span className="text-red-400 font-bold">── Put Wall {fmt$(gexLevels.putWall)}</span>}
-          {gexLevels.zeroGamma && <span className="text-amber-400 font-bold">── Zero γ {fmt$(gexLevels.zeroGamma)}</span>}
+          {gexLevels.callWall  && <span className="text-gain font-medium">── Call wall {fmt$(gexLevels.callWall)}</span>}
+          {gexLevels.putWall   && <span className="text-loss font-medium">── Put wall {fmt$(gexLevels.putWall)}</span>}
+          {gexLevels.zeroGamma && <span className="text-accent font-medium">── Flip {fmt$(gexLevels.zeroGamma)}</span>}
           {earningsDate && (
             <span className="text-amber-400 font-bold">
               ▲ Earnings {new Date(earningsDate * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

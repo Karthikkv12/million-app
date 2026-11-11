@@ -57,7 +57,7 @@ To restart: `launchctl unload ~/Library/LaunchAgents/com.optflw.X.plist && launc
 | Field | Value |
 |-------|-------|
 | Username | `karthik.kv12` |
-| Password | `Karthik@123456` |
+| Password | *(not stored here: ask the owner)* |
 | Role | `admin` |
 
 ---
@@ -91,12 +91,32 @@ from database.models import (
 
 ## Backend Architecture (`backend_api/`)
 
+**Core (`optionflow/core/`)** — plan step 2:
+```
+optionflow/core/
+  settings.py   # get_settings(): every setting (JWT, password policy, rate limits, CORS, DB, ENABLED_MODULES); reads env, then .env
+  db.py         # engines + sessions per domain (get_users_session …), init_db(), use_engine() test hook
+  deps.py       # FastAPI Depends: get_current_user, require_admin
+```
+Never call `os.getenv` in app code — add a field to `Settings` instead.
+
+**API layout (plan step 4):** `optionflow/main.py` (`create_app()`) mounts each module in `ENABLED_MODULES`
+(default `auth,market,flow,watchlist`; also `portfolio`, `budget`: fully migrated, off by default) at **`/api/v1/...`** and at the legacy path.
+Modules live in `optionflow/modules/<name>/` (`router.py` HTTP only → `service.py` plain functions → typed `schemas.py`).
+Services raise `optionflow.core.errors` (`NotFound`, `Conflict`, …). Errors on `/api/v1` are `{"error": {"code", "message"}}`;
+legacy paths keep `{"detail": …}`. Market data only via `optionflow.providers.get_market_data()`.
+**One database** (step 5): `optionflow.db` (or `DATABASE_URL`), 37 enforced foreign keys, Alembic baseline
+`0001_baseline`. Merge legacy files with `scripts/merge_databases.py`. **Step 6**: AI chat at `/api/v1/ai/chat`
+(module `ai`, off by default), SSE at `/api/v1/flow/{symbol}/stream`, catalyst module, TS types in
+`web/lib/api-types.ts` (regenerate with `scripts/export_openapi.py` + `npm run gen:api`).
+Two sessions share this repo — read `docs/COORDINATION.md` before starting work.
+`backend_api/main.py` is a one-line entry-point alias for existing launchd configs.
+
 ```
 backend_api/
-  main.py          # thin app factory — CORS, middleware, lifespan, health, /health (all 5 DBs)
+  main.py          # thin app factory — CORS, middleware, lifespan, /health (all 5 DBs)
   state.py         # shared GEX cache, background poller, flow-DB helpers
   utils.py         # df_records() — single canonical dict serialiser
-  deps.py          # FastAPI Depends: get_current_user, require_admin
   schemas/         # Pydantic v2 models — split by domain
     __init__.py    # re-exports everything (backward compat)
     auth.py        # auth schemas
@@ -122,13 +142,12 @@ logic/
   portfolio.py          # option positions, weekly portfolio, premium ledger
   holdings.py           # stock holding helpers
   gamma.py              # GEX calculations (core product)
-  services.py           # thin re-export shim (backward compat)
   premium_ledger.py     # premium ledger helpers
 ```
 
 **Rules:**
 - Every new route goes in the correct router file, NOT in main.py
-- Use `df_records()` from `backend_api.utils` — never duplicate it
+- Response models live in each module's `schemas.py`; datetimes are serialized as ISO strings by the `Str` type
 - Always use `logger = logging.getLogger("optionflow.<module>")` — no `print()` for errors
 - Response models: always declare `response_model=` on every route
 - Use `model_validate(dict)` (Pydantic v2) not manual `Foo(field=dict["field"], ...)`
@@ -195,13 +214,13 @@ Daily cron at midnight backs up all 6 DB files to `OptionFlow_main/backups/`.
 # Run all tests (except GEX integration test)
 source .venv/bin/activate && python -m pytest tests/ -q --ignore=tests/test_api_gex.py
 
-# All tests should pass: currently 428 passing, 0 failing
+# All tests should pass: currently 474 passing, 0 failing
 ```
 
-**Conftest pattern:** `tests/conftest.py` provides `db_engine_and_session` fixture.
-- Creates a single `StaticPool` in-memory SQLite engine
-- Creates all tables from all 5 Bases
-- Monkeypatches all `get_*_engine` and `get_*_session` on both `database.models` and `logic.services`
+**Conftest pattern:** `tests/conftest.py`
+- `test_settings` (session, autouse): test settings that ignore your `.env`; environment variables still apply
+- `settings_override(**changes)`: change settings for one test, e.g. `settings_override(login_rate_limit_max_failures=3)`
+- `db_engine_and_session`: one `StaticPool` in-memory SQLite engine with all 5 Bases' tables, routed to every domain via `optionflow.core.db.use_engine` (no monkeypatching)
 
 ---
 
@@ -263,7 +282,7 @@ These are the highest-impact features in priority order:
 4. **Node.js** is at a custom path: `/Users/karthikkondajjividyaranya/bin/node-v20.11.1-darwin-arm64/bin/`. Always set `PATH` before running npm/node commands.
 5. **`.next` cache corruption** — if the frontend returns 500, `rm -rf web/.next` and restart.
 6. **Zoom locked on iOS/iPadOS** — `maximumScale=1, userScalable=no` is intentional (app-like feel).
-7. **schemas is a package, not a file** — `backend_api/schemas/` is a directory with `__init__.py`. Import from `backend_api.schemas` as before; do NOT create a new `schemas.py` file.
+7. **Schemas live per module** — `optionflow/modules/<name>/schemas.py` (the old `backend_api/schemas/` package is gone). Import from `backend_api.schemas` as before; do NOT create a new `schemas.py` file.
 8. **brokers/ folder is gone** — broker abstraction and order system removed in v2.4.0. Do not re-add.
 9. **Holdings soft-delete** — `delete_holding()` in `logic/holdings.py` soft-closes lots that have HoldingEvent history (sets status=CLOSED, shares=0) instead of hard-deleting. Only hard-deletes fresh lots with zero event history. Use the "↻ Re-enter" button in HoldingsTab to reactivate a closed lot.
 10. **adj_basis = f(avg_cost)** — `_recalculate_adj_basis` uses PremiumLedger rows as primary source; falls back to summing `basis_delta` from HoldingEvents. This means editing avg_cost on any holding (active or closed) correctly recomputes adj_basis.
@@ -281,7 +300,7 @@ curl -s http://localhost:8000/health
 # Login and test an endpoint
 TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"karthik.kv12","password":"Karthik@123456"}' \
+  -d "{\"username\":\"karthik.kv12\",\"password\":\"$OPTIONFLOW_PASSWORD\"}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 curl -s http://localhost:8000/budget -H "Authorization: Bearer $TOKEN"
 

@@ -25,16 +25,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# ── Force a test JWT secret so tokens are predictable ────────────────────────
-os.environ.setdefault("JWT_SECRET", "test-secret-do-not-use-in-prod")
-os.environ.setdefault("JWT_AUDIENCE", "optionflow-app")
-os.environ.setdefault("JWT_ISSUER",   "optionflow-api")
-
 from backend_api.main import app
-from backend_api.security import create_access_token
+from optionflow.core.security import create_access_token
 from database import models as dbmodels
-import logic.services as services
-import logic.gamma as gmod
+from optionflow.modules.auth import service as auth_services
+from optionflow.core import db as core_db
+from conftest import make_memory_engine
+from optionflow.modules.flow import service as flow_service
 
 
 # ---------------------------------------------------------------------------
@@ -49,35 +46,17 @@ def db():
     connection — without this, each new SQLAlchemy connection gets a fresh
     empty :memory: DB and the tables don't exist.
     """
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Session = sessionmaker(bind=engine)
-    # Create all domain tables on the shared in-memory engine
-    for base in (
-        dbmodels.UsersBase,
-        dbmodels.TradesBase,
-        dbmodels.PortfolioBase,
-        dbmodels.BudgetBase,
-        dbmodels.MarketsBase,
-    ):
-        base.metadata.create_all(engine)
-    # Patch services to use this engine
-    original_engine  = services.engine
-    original_session = services.Session
-    services.engine  = engine
-    services.Session = Session
-    yield engine, Session
-    services.engine  = original_engine
-    services.Session = original_session
+    engine = make_memory_engine()
+    core_db.use_engine(engine)
+    yield engine, sessionmaker(bind=engine)
+    core_db.use_engine(None)
+    engine.dispose()
 
 
 @pytest.fixture(scope="module")
 def auth_token(db):
     """Create a test user and return a valid JWT."""
-    uid = services.create_user("api_test_user", "GoodPassword99!")
+    uid = auth_services.create_user("api_test_user", "GoodPassword99!")
     token = create_access_token(subject=str(uid), extra={"username": "api_test_user", "role": "user"})
     return token
 
@@ -90,11 +69,8 @@ def client(db):
 
 @pytest.fixture(autouse=True)
 def mock_gex(monkeypatch):
-    """Patch the GEX engine so no yfinance calls are made during API tests.
-    compute_gamma_exposure is imported inside the endpoint function, so we
-    patch it at the source module (logic.gamma) rather than backend_api.main.
-    """
-    from logic.gamma import GEXResult
+    """Replace the GEX computation so API tests make no market-data calls."""
+    from optionflow.modules.flow.gamma import GEXResult
 
     def _fake_compute(symbol: str) -> GEXResult:
         spot = 500.0
@@ -129,10 +105,10 @@ def mock_gex(monkeypatch):
             error=None,
         )
 
-    # compute_gamma_exposure is imported inside the endpoint via
-    # `from logic.gamma import compute_gamma_exposure`, so patch at the source.
-    monkeypatch.setattr(gmod, "compute_gamma_exposure", _fake_compute)
-    monkeypatch.setattr("backend_api.main._gex_cache", {})
+    # The flow service calls compute_gamma_exposure; replace it and start each
+    # test with an empty cache.
+    monkeypatch.setattr(flow_service, "compute_gamma_exposure", _fake_compute)
+    flow_service.clear_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +212,7 @@ class TestGexResponseSchema:
 
     def test_data_source_field_valid(self, client, auth_token):
         data = self._get(client, auth_token)
-        assert data["data_source"] in ("yfinance", "tradier")
+        assert data["data_source"] == "yfinance"
 
 
 # ---------------------------------------------------------------------------

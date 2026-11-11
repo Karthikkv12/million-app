@@ -10,9 +10,11 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis, XAxis,
+  AreaChart, Area, ResponsiveContainer, Tooltip, ReferenceLine, YAxis, XAxis, CartesianGrid,
 } from "recharts";
 import { api } from "@/lib/api";
+import { Panel, Pill, Change, Segmented, useChartColors } from "@/components/ui";
+import { ChartTooltip } from "@/components/chart/kit";
 
 interface Bar { date: string; close: number; }
 
@@ -36,12 +38,12 @@ const RANGE_CFG: Record<DayRange, { period: string; interval: string; intraday: 
   30: { period: "1mo", interval: "1d",  intraday: false },
 };
 
-function vixRegime(v: number): { label: string; color: string; bg: string } {
-  if (v < 15) return { label: "Low",      color: "text-green-500",  bg: "bg-green-500/10 border border-green-500/25"   };
-  if (v < 20) return { label: "Normal",   color: "text-blue-500",   bg: "bg-blue-500/10 border border-blue-500/25"    };
-  if (v < 30) return { label: "Elevated", color: "text-yellow-500", bg: "bg-yellow-500/10 border border-yellow-500/25" };
-  if (v < 40) return { label: "High",     color: "text-orange-500", bg: "bg-orange-500/10 border border-orange-500/25" };
-  return               { label: "Extreme", color: "text-red-500",    bg: "bg-red-500/10 border border-red-500/25"      };
+function vixRegime(v: number): { label: string; tone: "good" | "neutral" | "warn" | "bad" } {
+  if (v < 15) return { label: "Low",      tone: "good" };
+  if (v < 20) return { label: "Normal",   tone: "neutral" };
+  if (v < 30) return { label: "Elevated", tone: "warn" };
+  if (v < 40) return { label: "High",     tone: "bad" };
+  return               { label: "Extreme", tone: "bad" };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +139,7 @@ export default function VixPanel({
     return () => clearInterval(id);
   }, [symbol, days]);
 
+  const chart = useChartColors();
   const current   = bars.length ? bars[bars.length - 1].close : null;
   const prev      = bars.length > 1 ? bars[bars.length - 2].close : null;
   const change    = current != null && prev != null ? current - prev : null;
@@ -144,137 +147,84 @@ export default function VixPanel({
   const up        = (change ?? 0) >= 0;
   const regime    = current != null ? vixRegime(current) : null;
 
-  const strokeColor = current == null ? "#6b7280"
-    : current < 15 ? "#22c55e"
-    : current < 20 ? "#3b82f6"
-    : current < 30 ? "#eab308"
-    : current < 40 ? "#f97316"
-    : "#ef4444";
+  const tick = { fontSize: 11, fill: chart.muted };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest">{title}</p>
-          <p className="text-[10px] text-foreground/70/70 mt-0.5">{sublabel}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {days === 1 && !loading && !error && (
-            <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE
-            </span>
-          )}
-          {regime && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${regime.bg} ${regime.color}`}>
-              {regime.label}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Current value */}
+    <Panel
+      title={title}
+      sub={sublabel}
+      actions={
+        <>
+          {days === 1 && !loading && !error && <Pill tone="good" dot>Live</Pill>}
+          {regime && <Pill tone={regime.tone}>{regime.label}</Pill>}
+        </>
+      }
+    >
       {loading ? (
-        <div className="space-y-2 mb-3">
+        <div className="mb-3 space-y-2">
           <div className="skeleton h-8 w-24 rounded-lg" />
           <div className="skeleton h-4 w-16 rounded-lg" />
         </div>
       ) : error || current == null ? (
-        <p className="text-2xl font-black text-foreground/70 mb-3">—</p>
+        <p className="mb-3 font-mono text-2xl text-foreground/50">—</p>
       ) : (
-        <div className="mb-3">
-          <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
-            {current.toFixed(2)}
-          </p>
-          {change != null && changePct != null && (
-            <p className={`text-xs font-bold mt-1 tabular-nums ${up ? "text-green-500" : "text-red-500"}`}>
-              {up ? "▲" : "▼"} {Math.abs(change).toFixed(2)} ({up ? "+" : ""}{changePct.toFixed(2)}%)
-            </p>
-          )}
-          <p className="text-[9px] text-foreground/70 mt-0.5">{bars.length} bars · {cfg.interval} interval</p>
+        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="font-mono text-3xl font-medium leading-none tracking-tight tabular-nums text-foreground">{current.toFixed(2)}</p>
+          {change != null && changePct != null && <Change value={change} pct={changePct} />}
         </div>
       )}
 
-      {/* Sparkline */}
       {!loading && bars.length > 1 && (
-        <ResponsiveContainer width="100%" height={140}>
-          <AreaChart data={bars} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
+        <ResponsiveContainer width="100%" height={150}>
+          <AreaChart data={bars} margin={{ top: 6, right: 4, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke={chart.grid} vertical={false} />
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.25} />
-                <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
+                <stop offset="0%" stopColor={chart.accent} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={chart.accent} stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
               dataKey="date"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 9, fill: "#9ca3af" }}
+              tick={tick}
               tickFormatter={(v: string) => {
-                if (!cfg.intraday) {
-                  const d = new Date(v);
-                  return `${d.getMonth() + 1}/${d.getDate()}`;
-                }
-                try {
-                  return new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                } catch { return v; }
+                if (!cfg.intraday) { const d = new Date(v); return `${d.getMonth() + 1}/${d.getDate()}`; }
+                try { return new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return v; }
               }}
               interval="preserveStartEnd"
-              minTickGap={40}
+              minTickGap={48}
             />
-            <YAxis
-              domain={["auto", "auto"]}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 9, fill: "#9ca3af" }}
-              tickFormatter={(v: number) => v.toFixed(0)}
-              width={28}
+            <YAxis domain={["auto", "auto"]} tickLine={false} axisLine={false} tick={tick} tickFormatter={(v: number) => v.toFixed(0)} width={32} />
+            <ReferenceLine y={20} stroke="rgba(245,158,11,0.55)" strokeDasharray="3 3" />
+            <ReferenceLine y={30} stroke="rgba(220,38,38,0.55)" strokeDasharray="3 3" />
+            <Tooltip
+              cursor={{ stroke: chart.border, strokeDasharray: "3 3" }}
+              content={
+                <ChartTooltip
+                  title={(l) => { try { return cfg.intraday ? new Date(String(l)).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : new Date(String(l)).toLocaleDateString([], { month: "short", day: "numeric" }); } catch { return String(l); } }}
+                  format={(p) => [{ label: title, value: Number(p[0].value).toFixed(2), color: chart.accent }]}
+                />
+              }
             />
-            <ReferenceLine y={20} stroke="#eab30844" strokeDasharray="3 3" />
-            <ReferenceLine y={30} stroke="#f9731644" strokeDasharray="3 3" />
-            <Tooltip content={<CustomTooltip intraday={cfg.intraday} />} />
-            <Area
-              type="monotone"
-              dataKey="close"
-              stroke={strokeColor}
-              strokeWidth={2}
-              fill={`url(#${gradId})`}
-              dot={false}
-              isAnimationActive={false}
-            />
+            <Area type="monotone" dataKey="close" stroke={chart.accent} strokeWidth={1.75} fill={`url(#${gradId})`} dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       )}
 
-      {/* Day-range pills + reference legend */}
-      <div className="flex items-center justify-between mt-3">
-        {/* Pills */}
-        <div className="flex items-center gap-1">
-          {DAY_RANGES.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition ${
-                days === d
-                  ? "bg-white/15 text-white"
-                  : "text-foreground/70 hover:text-foreground hover:bg-white/10"
-              }`}
-            >
-              {d}D
-            </button>
-          ))}
-        </div>
-        {/* Reference lines legend */}
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[9px] text-yellow-500/80">
-            <span className="inline-block w-4 border-t border-dashed border-yellow-400" />20
-          </span>
-          <span className="flex items-center gap-1 text-[9px] text-orange-500/80">
-            <span className="inline-block w-4 border-t border-dashed border-orange-400" />30
-          </span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <Segmented
+          label={`${title} range`}
+          value={String(days)}
+          onChange={(v) => setDays(Number(v) as DayRange)}
+          options={DAY_RANGES.map((d) => ({ value: String(d), label: `${d}D` }))}
+        />
+        <div className="flex items-center gap-3 font-mono text-[11px] text-foreground/50">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-amber-500" />20 elevated</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t border-dashed border-loss" />30 high</span>
         </div>
       </div>
-    </div>
+    </Panel>
   );
 }

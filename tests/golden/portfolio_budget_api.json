@@ -1,0 +1,1564 @@
+[
+ {
+  "body": {
+   "account_value": null,
+   "acct_label_1": null,
+   "acct_label_2": null,
+   "acct_label_3": null,
+   "acct_val_1": null,
+   "acct_val_2": null,
+   "acct_val_3": null,
+   "completed_at": null,
+   "id": 1,
+   "is_complete": false,
+   "label": "Week of Nov 06, 2026",
+   "notes": null,
+   "week_end": "2026-11-06T23:59:59",
+   "week_start": "2026-11-02T00:00:00"
+  },
+  "status": 200,
+  "step": "POST /portfolio/weeks"
+ },
+ {
+  "body": [
+   {
+    "account_value": null,
+    "acct_label_1": null,
+    "acct_label_2": null,
+    "acct_label_3": null,
+    "acct_val_1": null,
+    "acct_val_2": null,
+    "acct_val_3": null,
+    "completed_at": null,
+    "id": 1,
+    "is_complete": false,
+    "label": "Week of Nov 06, 2026",
+    "notes": null,
+    "week_end": "2026-11-06T23:59:59",
+    "week_start": "2026-11-02T00:00:00"
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/weeks"
+ },
+ {
+  "body": {
+   "account_value": null,
+   "acct_label_1": null,
+   "acct_label_2": null,
+   "acct_label_3": null,
+   "acct_val_1": null,
+   "acct_val_2": null,
+   "acct_val_3": null,
+   "completed_at": null,
+   "id": 1,
+   "is_complete": false,
+   "label": "Week of Nov 06, 2026",
+   "notes": null,
+   "week_end": "2026-11-06T23:59:59",
+   "week_start": "2026-11-02T00:00:00"
+  },
+  "status": 200,
+  "step": "GET /portfolio/weeks/1"
+ },
+ {
+  "body": {
+   "detail": "Week not found"
+  },
+  "status": 404,
+  "step": "GET /portfolio/weeks/9999"
+ },
+ {
+  "body": {
+   "account_value": 30000.0,
+   "acct_label_1": "IBKR",
+   "acct_label_2": null,
+   "acct_label_3": null,
+   "acct_val_1": 30000.0,
+   "acct_val_2": null,
+   "acct_val_3": null,
+   "completed_at": null,
+   "id": 1,
+   "is_complete": false,
+   "label": "Week of Nov 06, 2026",
+   "notes": "week one",
+   "week_end": "2026-11-06T23:59:59",
+   "week_start": "2026-11-02T00:00:00"
+  },
+  "status": 200,
+  "step": "PATCH /portfolio/weeks/1"
+ },
+ {
+  "body": {
+   "detail": "Week not found"
+  },
+  "status": 404,
+  "step": "PATCH /portfolio/weeks/9999"
+ },
+ {
+  "body": {
+   "acquired_date": null,
+   "adjusted_cost_basis": 15000.0,
+   "basis_reduction": 0.0,
+   "basis_reduction_stored": 0.0,
+   "called_away": false,
+   "company_name": "Apple",
+   "cost_basis": 15000.0,
+   "created_at": "<time>",
+   "downside_basis": 15000.0,
+   "id": 1,
+   "last_assignment_date": null,
+   "last_assignment_type": null,
+   "live_adj_basis": 15000.0,
+   "notes": null,
+   "realized_gain": null,
+   "realized_premium": 0,
+   "shares": 100.0,
+   "status": "ACTIVE",
+   "symbol": "AAPL",
+   "total_adjusted_cost": 1500000.0,
+   "total_original_cost": 1500000.0,
+   "total_premium_sold": 0,
+   "unrealized_premium": 0,
+   "updated_at": "<time>",
+   "upside_basis": null
+  },
+  "status": 200,
+  "step": "POST /portfolio/holdings"
+ },
+ {
+  "body": {
+   "detail": [
+    {
+     "ctx": {
+      "min_length": 1
+     },
+     "input": "",
+     "loc": [
+      "body",
+      "symbol"
+     ],
+     "msg": "String should have at least 1 character",
+     "type": "string_too_short"
+    }
+   ]
+  },
+  "status": 422,
+  "step": "POST holdings invalid"
+ },
+ {
+  "body": {
+   "buy_date": null,
+   "carried_from_id": null,
+   "contracts": 1,
+   "expiry_date": "2026-11-07T00:00:00",
+   "extrinsic_value": 2.5,
+   "holding_id": 1,
+   "id": 1,
+   "intrinsic_value": 0.0,
+   "is_roll": false,
+   "margin": null,
+   "moneyness": "OTM",
+   "net_premium": 2.5,
+   "notes": null,
+   "option_type": "CALL",
+   "premium_in": 2.5,
+   "premium_out": null,
+   "rolled_to_id": null,
+   "sold_date": "2026-11-03T00:00:00",
+   "spot_price": 155.0,
+   "status": "ACTIVE",
+   "strike": 160.0,
+   "symbol": "AAPL",
+   "total_premium": 250.0,
+   "week_id": 1
+  },
+  "status": 200,
+  "step": "POST /portfolio/weeks/1/positions"
+ },
+ {
+  "body": {
+   "buy_date": null,
+   "carried_from_id": null,
+   "contracts": 2,
+   "expiry_date": "2026-11-07T00:00:00",
+   "extrinsic_value": null,
+   "holding_id": null,
+   "id": 2,
+   "intrinsic_value": null,
+   "is_roll": false,
+   "margin": null,
+   "moneyness": null,
+   "net_premium": 3.0,
+   "notes": null,
+   "option_type": "PUT",
+   "premium_in": 3.0,
+   "premium_out": null,
+   "rolled_to_id": null,
+   "sold_date": "2026-11-03T00:00:00",
+   "spot_price": null,
+   "status": "ACTIVE",
+   "strike": 400.0,
+   "symbol": "MSFT",
+   "total_premium": 600.0,
+   "week_id": 1
+  },
+  "status": 200,
+  "step": "POST /portfolio/weeks/1/positions"
+ },
+ {
+  "body": {
+   "detail": "Week not found"
+  },
+  "status": 400,
+  "step": "POST /portfolio/weeks/9999/positions"
+ },
+ {
+  "body": [
+   {
+    "buy_date": null,
+    "carried_from_id": null,
+    "contracts": 1,
+    "expiry_date": "2026-11-07T00:00:00",
+    "extrinsic_value": 2.5,
+    "holding_id": 1,
+    "id": 1,
+    "intrinsic_value": 0.0,
+    "is_roll": false,
+    "margin": null,
+    "moneyness": "OTM",
+    "net_premium": 2.5,
+    "notes": null,
+    "option_type": "CALL",
+    "premium_in": 2.5,
+    "premium_out": null,
+    "rolled_to_id": null,
+    "sold_date": "2026-11-03T00:00:00",
+    "spot_price": 155.0,
+    "status": "ACTIVE",
+    "strike": 160.0,
+    "symbol": "AAPL",
+    "total_premium": 250.0,
+    "week_id": 1
+   },
+   {
+    "buy_date": null,
+    "carried_from_id": null,
+    "contracts": 2,
+    "expiry_date": "2026-11-07T00:00:00",
+    "extrinsic_value": null,
+    "holding_id": null,
+    "id": 2,
+    "intrinsic_value": null,
+    "is_roll": false,
+    "margin": null,
+    "moneyness": null,
+    "net_premium": 3.0,
+    "notes": null,
+    "option_type": "PUT",
+    "premium_in": 3.0,
+    "premium_out": null,
+    "rolled_to_id": null,
+    "sold_date": "2026-11-03T00:00:00",
+    "spot_price": null,
+    "status": "ACTIVE",
+    "strike": 400.0,
+    "symbol": "MSFT",
+    "total_premium": 600.0,
+    "week_id": 1
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/weeks/1/positions"
+ },
+ {
+  "body": [
+   {
+    "buy_date": null,
+    "carried_from_id": null,
+    "contracts": 1,
+    "expiry_date": "2026-11-07T00:00:00",
+    "extrinsic_value": 2.5,
+    "holding_id": 1,
+    "id": 1,
+    "intrinsic_value": 0.0,
+    "is_roll": false,
+    "margin": null,
+    "moneyness": "OTM",
+    "net_premium": 2.5,
+    "notes": null,
+    "option_type": "CALL",
+    "premium_in": 2.5,
+    "premium_out": null,
+    "rolled_to_id": null,
+    "sold_date": "2026-11-03T00:00:00",
+    "spot_price": 155.0,
+    "status": "ACTIVE",
+    "strike": 160.0,
+    "symbol": "AAPL",
+    "total_premium": 250.0,
+    "week_id": 1
+   },
+   {
+    "buy_date": null,
+    "carried_from_id": null,
+    "contracts": 2,
+    "expiry_date": "2026-11-07T00:00:00",
+    "extrinsic_value": null,
+    "holding_id": null,
+    "id": 2,
+    "intrinsic_value": null,
+    "is_roll": false,
+    "margin": null,
+    "moneyness": null,
+    "net_premium": 3.0,
+    "notes": null,
+    "option_type": "PUT",
+    "premium_in": 3.0,
+    "premium_out": null,
+    "rolled_to_id": null,
+    "sold_date": "2026-11-03T00:00:00",
+    "spot_price": null,
+    "status": "ACTIVE",
+    "strike": 400.0,
+    "symbol": "MSFT",
+    "total_premium": 600.0,
+    "week_id": 1
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/positions"
+ },
+ {
+  "body": {
+   "buy_date": null,
+   "carried_from_id": null,
+   "contracts": 1,
+   "expiry_date": "2026-11-07T00:00:00",
+   "extrinsic_value": 2.5,
+   "holding_id": 1,
+   "id": 1,
+   "intrinsic_value": 0.0,
+   "is_roll": false,
+   "margin": null,
+   "moneyness": "OTM",
+   "net_premium": 3.0,
+   "notes": null,
+   "option_type": "CALL",
+   "premium_in": 2.5,
+   "premium_out": 0.5,
+   "rolled_to_id": null,
+   "sold_date": "2026-11-03T00:00:00",
+   "spot_price": 155.0,
+   "status": "CLOSED",
+   "strike": 160.0,
+   "symbol": "AAPL",
+   "total_premium": 300.0,
+   "week_id": 1
+  },
+  "status": 200,
+  "step": "PATCH /portfolio/positions/1"
+ },
+ {
+  "body": {
+   "detail": "Position not found"
+  },
+  "status": 404,
+  "step": "PATCH /portfolio/positions/9999"
+ },
+ {
+  "body": {
+   "acquisition_price": 400.0,
+   "additional_buys": [],
+   "covered_calls": [],
+   "downside_basis": 397.0,
+   "downside_breakeven": 397.0,
+   "id": 1,
+   "net_option_premium": 600.0,
+   "notes": null,
+   "position_id": 2,
+   "shares_acquired": 200,
+   "symbol": "MSFT",
+   "total_cost": 80000.0,
+   "total_shares": 200,
+   "upside_basis": 400.0,
+   "upside_breakeven": 400.0,
+   "weighted_avg_cost": 400.0
+  },
+  "status": 200,
+  "step": "POST /portfolio/positions/2/assign"
+ },
+ {
+  "body": {
+   "acquisition_price": 400.0,
+   "additional_buys": [],
+   "covered_calls": [],
+   "downside_basis": 397.0,
+   "downside_breakeven": 397.0,
+   "id": 1,
+   "net_option_premium": 600.0,
+   "notes": null,
+   "position_id": 2,
+   "shares_acquired": 200,
+   "symbol": "MSFT",
+   "total_cost": 80000.0,
+   "total_shares": 200,
+   "upside_basis": 400.0,
+   "upside_breakeven": 400.0,
+   "weighted_avg_cost": 400.0
+  },
+  "status": 200,
+  "step": "GET /portfolio/positions/2/assignment"
+ },
+ {
+  "body": {
+   "detail": "No assignment found"
+  },
+  "status": 404,
+  "step": "GET /portfolio/positions/1/assignment"
+ },
+ {
+  "body": {
+   "acquisition_price": 400.0,
+   "additional_buys": [],
+   "covered_calls": [],
+   "downside_basis": 397.0,
+   "downside_breakeven": 397.0,
+   "id": 1,
+   "net_option_premium": 600.0,
+   "notes": "assigned",
+   "position_id": 2,
+   "shares_acquired": 200,
+   "symbol": "MSFT",
+   "total_cost": 80000.0,
+   "total_shares": 200,
+   "upside_basis": 400.0,
+   "upside_breakeven": 400.0,
+   "weighted_avg_cost": 400.0
+  },
+  "status": 200,
+  "step": "PATCH /portfolio/assignments/1"
+ },
+ {
+  "body": {
+   "detail": "Assignment not found"
+  },
+  "status": 404,
+  "step": "PATCH /portfolio/assignments/9999"
+ },
+ {
+  "body": {
+   "active_positions": 0,
+   "assigned_positions": 1,
+   "best_week": null,
+   "cap_gains_tax_rate": 0.22,
+   "complete_weeks": 0,
+   "estimated_tax": 198.0,
+   "monthly_account_values": {},
+   "monthly_premium": {
+    "2026-01": 0.0,
+    "2026-02": 0.0,
+    "2026-03": 0.0,
+    "2026-04": 0.0,
+    "2026-05": 0.0,
+    "2026-06": 0.0,
+    "2026-07": 0.0,
+    "2026-08": 0.0,
+    "2026-09": 0.0,
+    "2026-10": 0.0,
+    "2026-11": 900.0
+   },
+   "realized_pnl": 900.0,
+   "total_premium_collected": 850.0,
+   "total_weeks": 1,
+   "weeks_breakdown": [
+    {
+     "account_value": 30000.0,
+     "acct_label_1": "IBKR",
+     "acct_label_2": null,
+     "acct_label_3": null,
+     "acct_val_1": 30000.0,
+     "acct_val_2": null,
+     "acct_val_3": null,
+     "id": 1,
+     "is_complete": false,
+     "position_count": 2,
+     "premium": 900.0,
+     "realized_pnl": 300.0,
+     "week_end": "2026-11-06",
+     "week_start": "2026-11-02"
+    }
+   ],
+   "win_rate": 0.0,
+   "worst_week": null
+  },
+  "status": 200,
+  "step": "GET /portfolio/summary"
+ },
+ {
+  "body": [
+   {
+    "active": 0,
+    "assigned": 0,
+    "closed": 1,
+    "expired": 0,
+    "realized_pnl": 300.0,
+    "symbol": "AAPL",
+    "total_premium": 250.0
+   },
+   {
+    "active": 0,
+    "assigned": 1,
+    "closed": 0,
+    "expired": 0,
+    "realized_pnl": 600.0,
+    "symbol": "MSFT",
+    "total_premium": 600.0
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/symbols"
+ },
+ {
+  "body": {
+   "created": [
+    {
+     "acquired_date": null,
+     "adjusted_cost_basis": 400.0,
+     "basis_reduction": 0.0,
+     "basis_reduction_stored": 0.0,
+     "called_away": false,
+     "company_name": null,
+     "cost_basis": 400.0,
+     "created_at": "<time>",
+     "downside_basis": 400.0,
+     "id": 2,
+     "last_assignment_date": null,
+     "last_assignment_type": null,
+     "live_adj_basis": 400.0,
+     "notes": null,
+     "realized_gain": null,
+     "realized_premium": 0,
+     "shares": 200.0,
+     "status": "ACTIVE",
+     "symbol": "MSFT",
+     "total_adjusted_cost": 80000.0,
+     "total_original_cost": 80000.0,
+     "total_premium_sold": 0,
+     "unrealized_premium": 0,
+     "updated_at": "<time>",
+     "upside_basis": null
+    }
+   ],
+   "linked": 1
+  },
+  "status": 200,
+  "step": "POST /portfolio/holdings/seed-from-positions"
+ },
+ {
+  "body": {
+   "holdings": [
+    {
+     "corrected": false,
+     "cost_basis": 15000.0,
+     "id": 1,
+     "new_adj": 14997.0,
+     "old_adj": 14997.0,
+     "symbol": "AAPL"
+    },
+    {
+     "corrected": false,
+     "cost_basis": 400.0,
+     "id": 2,
+     "new_adj": 400.0,
+     "old_adj": 400.0,
+     "symbol": "MSFT"
+    }
+   ],
+   "updated": 0
+  },
+  "status": 200,
+  "step": "POST /portfolio/holdings/recalculate"
+ },
+ {
+  "body": {
+   "synced_rows": 2,
+   "updated_holdings": 1
+  },
+  "status": 200,
+  "step": "POST /portfolio/holdings/sync-ledger"
+ },
+ {
+  "body": [
+   {
+    "acquired_date": null,
+    "adjusted_cost_basis": 14997.0,
+    "basis_reduction": 300.0,
+    "basis_reduction_stored": 300.0,
+    "called_away": false,
+    "company_name": "Apple",
+    "cost_basis": 15000.0,
+    "created_at": "<time>",
+    "downside_basis": 14997.0,
+    "id": 1,
+    "last_assignment_date": null,
+    "last_assignment_type": null,
+    "live_adj_basis": 14997.0,
+    "notes": null,
+    "realized_gain": null,
+    "realized_premium": 300.0,
+    "shares": 100.0,
+    "status": "ACTIVE",
+    "symbol": "AAPL",
+    "total_adjusted_cost": 1499700.0,
+    "total_original_cost": 1500000.0,
+    "total_premium_sold": 250.0,
+    "unrealized_premium": 0.0,
+    "updated_at": "<time>",
+    "upside_basis": null
+   },
+   {
+    "acquired_date": null,
+    "adjusted_cost_basis": 397.0,
+    "basis_reduction": 600.0,
+    "basis_reduction_stored": 600.0,
+    "called_away": false,
+    "company_name": null,
+    "cost_basis": 400.0,
+    "created_at": "<time>",
+    "downside_basis": 397.0,
+    "id": 2,
+    "last_assignment_date": null,
+    "last_assignment_type": null,
+    "live_adj_basis": 397.0,
+    "notes": null,
+    "realized_gain": null,
+    "realized_premium": 600.0,
+    "shares": 200.0,
+    "status": "ACTIVE",
+    "symbol": "MSFT",
+    "total_adjusted_cost": 79400.0,
+    "total_original_cost": 80000.0,
+    "total_premium_sold": 600.0,
+    "unrealized_premium": 0.0,
+    "updated_at": "<time>",
+    "upside_basis": null
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/holdings"
+ },
+ {
+  "body": {
+   "acquired_date": null,
+   "adjusted_cost_basis": 14997.0,
+   "basis_reduction": 300.0,
+   "basis_reduction_stored": 300.0,
+   "called_away": false,
+   "company_name": "Apple",
+   "cost_basis": 15000.0,
+   "created_at": "<time>",
+   "downside_basis": 14997.0,
+   "id": 1,
+   "last_assignment_date": null,
+   "last_assignment_type": null,
+   "live_adj_basis": 14997.0,
+   "notes": "core position",
+   "realized_gain": null,
+   "realized_premium": 300.0,
+   "shares": 100.0,
+   "status": "ACTIVE",
+   "symbol": "AAPL",
+   "total_adjusted_cost": 1499700.0,
+   "total_original_cost": 1500000.0,
+   "total_premium_sold": 250.0,
+   "unrealized_premium": 0.0,
+   "updated_at": "<time>",
+   "upside_basis": null
+  },
+  "status": 200,
+  "step": "PATCH /portfolio/holdings/1"
+ },
+ {
+  "body": {
+   "detail": "Holding not found"
+  },
+  "status": 404,
+  "step": "PATCH /portfolio/holdings/9999"
+ },
+ {
+  "body": [
+   {
+    "basis_delta": -3.0,
+    "created_at": "<time>",
+    "description": "AAPL CC $160.0 x1 closed \u2014 net $300.00 realized, basis $15000.0000 \u2192 $14997.0000/share",
+    "event_type": "CC_EXPIRED",
+    "holding_id": 1,
+    "id": 1,
+    "position_id": 1,
+    "realized_gain": null,
+    "shares_delta": 0.0
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/holdings/1/events"
+ },
+ {
+  "body": {
+   "by_symbol": [
+    {
+     "adj_at_exit": 397.0,
+     "adj_basis_db": 397.0,
+     "adj_basis_stored": 397.0,
+     "cost_basis": 400.0,
+     "holding_id": 2,
+     "live_adj_basis": 397.0,
+     "positions": 1,
+     "realized_per_share": 3.0,
+     "realized_premium": 600.0,
+     "rows": [
+      {
+       "contracts": 2,
+       "created_at": "<time>",
+       "expiry_date": "2026-11-07T00:00:00",
+       "holding_id": 2,
+       "id": 2,
+       "option_type": "PUT",
+       "position_id": 2,
+       "premium_sold": 600.0,
+       "realized_premium": 600.0,
+       "status": "ASSIGNED",
+       "strike": 400.0,
+       "symbol": "MSFT",
+       "unrealized_premium": 0.0,
+       "updated_at": "<time>",
+       "week_id": 1
+      }
+     ],
+     "shares": 200.0,
+     "symbol": "MSFT",
+     "total_premium_sold": 600.0,
+     "unrealized_per_share": 0.0,
+     "unrealized_premium": 0.0
+    },
+    {
+     "adj_at_exit": 14997.0,
+     "adj_basis_db": 14997.0,
+     "adj_basis_stored": 14997.0,
+     "cost_basis": 15000.0,
+     "holding_id": 1,
+     "live_adj_basis": 14997.0,
+     "positions": 1,
+     "realized_per_share": 3.0,
+     "realized_premium": 300.0,
+     "rows": [
+      {
+       "contracts": 1,
+       "created_at": "<time>",
+       "expiry_date": "2026-11-07T00:00:00",
+       "holding_id": 1,
+       "id": 1,
+       "option_type": "CALL",
+       "position_id": 1,
+       "premium_sold": 250.0,
+       "realized_premium": 300.0,
+       "status": "CLOSED",
+       "strike": 160.0,
+       "symbol": "AAPL",
+       "unrealized_premium": 0.0,
+       "updated_at": "<time>",
+       "week_id": 1
+      }
+     ],
+     "shares": 100.0,
+     "symbol": "AAPL",
+     "total_premium_sold": 250.0,
+     "unrealized_per_share": 0.0,
+     "unrealized_premium": 0.0
+    }
+   ],
+   "by_week": [
+    {
+     "realized_premium": 900.0,
+     "symbols": [
+      {
+       "realized": 300.0,
+       "sold": 250.0,
+       "symbol": "AAPL",
+       "unrealized": 0.0
+      },
+      {
+       "realized": 600.0,
+       "sold": 600.0,
+       "symbol": "MSFT",
+       "unrealized": 0.0
+      }
+     ],
+     "total_premium_sold": 850.0,
+     "unrealized_premium": 0.0,
+     "week_id": 1,
+     "week_label": "Nov 06, 2026"
+    }
+   ],
+   "grand_total": {
+    "realized_premium": 900.0,
+    "total_premium_sold": 850.0,
+    "unrealized_premium": 0.0
+   }
+  },
+  "status": 200,
+  "step": "GET /portfolio/premium-dashboard"
+ },
+ {
+  "body": {
+   "holding_id": 1,
+   "realized_premium": 300.0,
+   "rows": [
+    {
+     "contracts": 1,
+     "created_at": "<time>",
+     "expiry_date": "2026-11-07T00:00:00",
+     "holding_id": 1,
+     "id": 1,
+     "option_type": "CALL",
+     "position_id": 1,
+     "premium_sold": 250.0,
+     "realized_premium": 300.0,
+     "status": "CLOSED",
+     "strike": 160.0,
+     "symbol": "AAPL",
+     "unrealized_premium": 0.0,
+     "updated_at": "<time>",
+     "week_id": 1
+    }
+   ],
+   "total_premium_sold": 250.0,
+   "unrealized_premium": 0.0
+  },
+  "status": 200,
+  "step": "GET /portfolio/holdings/1/premium-ledger"
+ },
+ {
+  "body": {
+   "account_value": 51000.0,
+   "acct_label_1": "IBKR",
+   "acct_label_2": null,
+   "acct_label_3": null,
+   "acct_val_1": 30000.0,
+   "acct_val_2": null,
+   "acct_val_3": null,
+   "completed_at": "<time>",
+   "id": 1,
+   "is_complete": true,
+   "label": "Week of Nov 06, 2026",
+   "notes": "week one",
+   "week_end": "2026-11-06T23:59:59",
+   "week_start": "2026-11-02T00:00:00"
+  },
+  "status": 200,
+  "step": "POST /portfolio/weeks/1/complete"
+ },
+ {
+  "body": {
+   "account_value": 51000.0,
+   "acct_label_1": "IBKR",
+   "acct_label_2": null,
+   "acct_label_3": null,
+   "acct_val_1": 30000.0,
+   "acct_val_2": null,
+   "acct_val_3": null,
+   "completed_at": null,
+   "id": 1,
+   "is_complete": false,
+   "label": "Week of Nov 06, 2026",
+   "notes": "week one",
+   "week_end": "2026-11-06T23:59:59",
+   "week_start": "2026-11-02T00:00:00"
+  },
+  "status": 200,
+  "step": "POST /portfolio/weeks/1/reopen"
+ },
+ {
+  "body": {
+   "detail": "Week not found"
+  },
+  "status": 404,
+  "step": "POST /portfolio/weeks/9999/reopen"
+ },
+ {
+  "body": {
+   "detail": "Week not found"
+  },
+  "status": 400,
+  "step": "POST /portfolio/weeks/9999/complete"
+ },
+ {
+  "body": {
+   "cash": 1000.0,
+   "created_at": "<time>",
+   "id": 1,
+   "notes": null,
+   "options_value": null,
+   "realized_pnl": 250.0,
+   "snapshot_date": "2026-11-06T00:00:00",
+   "stock_value": null,
+   "total_value": 51000.0,
+   "unrealized_pnl": null
+  },
+  "status": 200,
+  "step": "POST /portfolio/value-history"
+ },
+ {
+  "body": [
+   {
+    "cash": 1000.0,
+    "created_at": "<time>",
+    "id": 1,
+    "notes": null,
+    "options_value": null,
+    "realized_pnl": 250.0,
+    "snapshot_date": "2026-11-06T00:00:00",
+    "stock_value": null,
+    "total_value": 51000.0,
+    "unrealized_pnl": null
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/value-history"
+ },
+ {
+  "body": {
+   "color": "#123456",
+   "id": 1,
+   "is_active": true,
+   "name": "IBKR",
+   "sort_order": 1
+  },
+  "status": 200,
+  "step": "POST /portfolio/broker-accounts"
+ },
+ {
+  "body": [
+   {
+    "color": "#123456",
+    "id": 1,
+    "is_active": true,
+    "name": "IBKR",
+    "sort_order": 1
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/broker-accounts"
+ },
+ {
+  "body": {
+   "color": "#123456",
+   "id": 1,
+   "is_active": true,
+   "name": "IBKR Pro",
+   "sort_order": 1
+  },
+  "status": 200,
+  "step": "PATCH /portfolio/broker-accounts/1"
+ },
+ {
+  "body": {
+   "detail": "Account not found"
+  },
+  "status": 404,
+  "step": "PATCH /portfolio/broker-accounts/9999"
+ },
+ {
+  "body": {
+   "account_id": 1,
+   "balance": 1234.5,
+   "week_date": "2026-11-06"
+  },
+  "status": 200,
+  "step": "PUT /portfolio/account-balances"
+ },
+ {
+  "body": {
+   "detail": [
+    {
+     "input": {
+      "week_date": "2026-11-06"
+     },
+     "loc": [
+      "body",
+      "account_id"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    },
+    {
+     "input": {
+      "week_date": "2026-11-06"
+     },
+     "loc": [
+      "body",
+      "balance"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    }
+   ]
+  },
+  "status": 422,
+  "step": "PUT account-balances missing"
+ },
+ {
+  "body": [
+   2026
+  ],
+  "status": 200,
+  "step": "GET /portfolio/account-balances/years"
+ },
+ {
+  "body": [
+   {
+    "account_id": 1,
+    "balance": 1234.5,
+    "week_date": "2026-11-06"
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/account-balances"
+ },
+ {
+  "body": [
+   {
+    "account_id": 1,
+    "balance": 1234.5,
+    "week_date": "2026-11-06"
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/account-balances/all"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /portfolio/account-balances/1/2026-11-06"
+ },
+ {
+  "body": {
+   "amount": 1000.0,
+   "created_at": "<time>",
+   "id": 1,
+   "note": "deposit",
+   "week_date": "2026-11-06"
+  },
+  "status": 200,
+  "step": "PUT /portfolio/cash-deposits"
+ },
+ {
+  "body": {
+   "amount": 1500.0,
+   "created_at": "<time>",
+   "id": 1,
+   "note": "edited",
+   "week_date": "2026-11-06"
+  },
+  "status": 200,
+  "step": "PUT /portfolio/cash-deposits"
+ },
+ {
+  "body": {
+   "detail": [
+    {
+     "input": {
+      "amount": 5
+     },
+     "loc": [
+      "body",
+      "week_date"
+     ],
+     "msg": "Field required",
+     "type": "missing"
+    }
+   ]
+  },
+  "status": 422,
+  "step": "PUT cash-deposits missing"
+ },
+ {
+  "body": [
+   {
+    "amount": 1500.0,
+    "created_at": "<time>",
+    "id": 1,
+    "note": "edited",
+    "week_date": "2026-11-06"
+   }
+  ],
+  "status": 200,
+  "step": "GET /portfolio/cash-deposits"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /portfolio/cash-deposits/1"
+ },
+ {
+  "body": {
+   "detail": "Cash deposit 9999 not found"
+  },
+  "status": 404,
+  "step": "DELETE /portfolio/cash-deposits/9999"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /portfolio/broker-accounts/1"
+ },
+ {
+  "body": {
+   "detail": "Account not found"
+  },
+  "status": 404,
+  "step": "DELETE /portfolio/broker-accounts/9999"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /portfolio/positions/1"
+ },
+ {
+  "body": {
+   "detail": "Position not found"
+  },
+  "status": 404,
+  "step": "DELETE /portfolio/positions/9999"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /portfolio/holdings/1"
+ },
+ {
+  "body": {
+   "detail": "Holding not found"
+  },
+  "status": 404,
+  "step": "DELETE /portfolio/holdings/9999"
+ },
+ {
+  "body": {
+   "broker": "IBKR",
+   "created_at": null,
+   "currency": "USD",
+   "id": 1,
+   "name": "Main"
+  },
+  "status": 200,
+  "step": "POST /accounts"
+ },
+ {
+  "body": [
+   {
+    "broker": "IBKR",
+    "created_at": "<time>",
+    "currency": "USD",
+    "id": 1,
+    "name": "Main"
+   }
+  ],
+  "status": 200,
+  "step": "GET /accounts"
+ },
+ {
+  "body": {
+   "account_id": 1,
+   "avg_cost": 500.0,
+   "id": 3,
+   "quantity": 10.0,
+   "symbol": "SPY",
+   "updated_at": "<time>"
+  },
+  "status": 200,
+  "step": "PUT /accounts/1/holdings"
+ },
+ {
+  "body": [
+   {
+    "account_id": 1,
+    "avg_cost": 500.0,
+    "id": 3,
+    "quantity": 10.0,
+    "symbol": "SPY",
+    "updated_at": "<time>"
+   }
+  ],
+  "status": 200,
+  "step": "GET /accounts/1/holdings"
+ },
+ {
+  "body": {
+   "detail": "account not found"
+  },
+  "status": 404,
+  "step": "GET /accounts/9999/holdings"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /holdings/3"
+ },
+ {
+  "body": {
+   "detail": "Holding not found"
+  },
+  "status": 404,
+  "step": "DELETE holdings again"
+ },
+ {
+  "body": {
+   "id": 1,
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "POST /cash"
+ },
+ {
+  "body": {
+   "id": 2,
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "POST /cash"
+ },
+ {
+  "body": [
+   {
+    "action": "WITHDRAW",
+    "amount": 200.0,
+    "date": "2026-11-03T00:00:00",
+    "id": 2,
+    "notes": null
+   },
+   {
+    "action": "DEPOSIT",
+    "amount": 1000.0,
+    "date": "2026-11-02T00:00:00",
+    "id": 1,
+    "notes": "pay"
+   }
+  ],
+  "status": 200,
+  "step": "GET /cash"
+ },
+ {
+  "body": {
+   "balance": 800.0,
+   "currency": "USD"
+  },
+  "status": 200,
+  "step": "GET /cash/balance"
+ },
+ {
+  "body": {
+   "action": "DEPOSIT",
+   "amount": 1500.0,
+   "date": "2026-11-02T00:00:00",
+   "id": 1,
+   "notes": "pay"
+  },
+  "status": 200,
+  "step": "PATCH /cash/1"
+ },
+ {
+  "body": {
+   "detail": "Cash entry not found"
+  },
+  "status": 404,
+  "step": "PATCH /cash/9999"
+ },
+ {
+  "body": {
+   "balance": 800.0,
+   "currency": "USD"
+  },
+  "status": 200,
+  "step": "GET /ledger/cash-balance"
+ },
+ {
+  "body": [
+   {
+    "created_at": "<time>",
+    "description": null,
+    "effective_at": "<time>",
+    "entry_type": "CASH_WITHDRAW",
+    "id": 2,
+    "idempotency_key": "cash_flow:2",
+    "lines": [
+     {
+      "account": "Owner Equity",
+      "account_type": "EQUITY",
+      "amount": 200.0,
+      "currency": "USD"
+     },
+     {
+      "account": "Cash (USD)",
+      "account_type": "ASSET",
+      "amount": -200.0,
+      "currency": "USD"
+     }
+    ],
+    "source_id": 2,
+    "source_type": "cash_flow"
+   },
+   {
+    "created_at": "<time>",
+    "description": "pay",
+    "effective_at": "<time>",
+    "entry_type": "CASH_DEPOSIT",
+    "id": 1,
+    "idempotency_key": "cash_flow:1",
+    "lines": [
+     {
+      "account": "Cash (USD)",
+      "account_type": "ASSET",
+      "amount": 1000.0,
+      "currency": "USD"
+     },
+     {
+      "account": "Owner Equity",
+      "account_type": "EQUITY",
+      "amount": -1000.0,
+      "currency": "USD"
+     }
+    ],
+    "source_id": 1,
+    "source_type": "cash_flow"
+   }
+  ],
+  "status": 200,
+  "step": "GET /ledger/entries"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /cash/1"
+ },
+ {
+  "body": {
+   "detail": "Cash entry not found"
+  },
+  "status": 404,
+  "step": "DELETE /cash/9999"
+ },
+ {
+  "body": {
+   "id": 1,
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "POST /budget"
+ },
+ {
+  "body": {
+   "id": 2,
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "POST /budget"
+ },
+ {
+  "body": {
+   "detail": [
+    {
+     "ctx": {
+      "expected": "'INCOME', 'EXPENSE' or 'ASSET'"
+     },
+     "input": "BOGUS",
+     "loc": [
+      "body",
+      "type"
+     ],
+     "msg": "Input should be 'INCOME', 'EXPENSE' or 'ASSET'",
+     "type": "literal_error"
+    }
+   ]
+  },
+  "status": 422,
+  "step": "POST budget invalid type"
+ },
+ {
+  "body": [
+   {
+    "active_until": null,
+    "amount": 1500.0,
+    "category": "Rent",
+    "date": "2026-11-01T00:00:00",
+    "description": "rent",
+    "entry_type": "RECURRING",
+    "id": 1,
+    "merchant": "Landlord",
+    "recurrence": "MONTHLY",
+    "type": "EXPENSE"
+   },
+   {
+    "active_until": null,
+    "amount": 6000.0,
+    "category": "Salary",
+    "date": "2026-11-01T00:00:00",
+    "description": "pay",
+    "entry_type": "FLOATING",
+    "id": 2,
+    "merchant": null,
+    "recurrence": null,
+    "type": "INCOME"
+   }
+  ],
+  "status": 200,
+  "step": "GET /budget"
+ },
+ {
+  "body": {
+   "by_category": {
+    "Rent": 1500.0,
+    "Salary": 6000.0
+   },
+   "by_type": {
+    "EXPENSE": 1500.0,
+    "INCOME": 6000.0
+   },
+   "entry_count": 2,
+   "net": 4500.0,
+   "total_expense": 1500.0,
+   "total_income": 6000.0
+  },
+  "status": 200,
+  "step": "GET /budget/summary"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "PATCH /budget/1"
+ },
+ {
+  "body": {
+   "id": 1
+  },
+  "status": 200,
+  "step": "POST /budget-overrides"
+ },
+ {
+  "body": [
+   {
+    "amount": 1600.0,
+    "budget_id": 1,
+    "description": null,
+    "id": 1,
+    "month_key": "2026-12"
+   }
+  ],
+  "status": 200,
+  "step": "GET /budget-overrides"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /budget-overrides/1"
+ },
+ {
+  "body": {
+   "id": 1,
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "POST /credit-card/weeks"
+ },
+ {
+  "body": [
+   {
+    "balance": 500.0,
+    "card_name": "Amex",
+    "created_at": "<time>",
+    "id": 1,
+    "note": null,
+    "paid_amount": null,
+    "squared_off": false,
+    "updated_at": "<time>",
+    "week_start": "2026-11-02T00:00:00"
+   }
+  ],
+  "status": 200,
+  "step": "GET /credit-card/weeks"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "PATCH /credit-card/weeks/1"
+ },
+ {
+  "body": [
+   {
+    "balance": 450.0,
+    "card_name": "Amex",
+    "created_at": "<time>",
+    "id": 1,
+    "note": null,
+    "paid_amount": 450.0,
+    "squared_off": true,
+    "updated_at": "<time>",
+    "week_start": "2026-11-02T00:00:00"
+   }
+  ],
+  "status": 200,
+  "step": "GET credit-card/weeks after patch"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /credit-card/weeks/1"
+ },
+ {
+  "body": {
+   "status": "ok"
+  },
+  "status": 200,
+  "step": "DELETE /budget/1"
+ },
+ {
+  "body": [
+   {
+    "active_until": null,
+    "amount": 6000.0,
+    "category": "Salary",
+    "date": "2026-11-01T00:00:00",
+    "description": "pay",
+    "entry_type": "FLOATING",
+    "id": 2,
+    "merchant": null,
+    "recurrence": null,
+    "type": "INCOME"
+   }
+  ],
+  "status": 200,
+  "step": "GET budget after delete"
+ }
+]

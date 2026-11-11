@@ -31,7 +31,7 @@ COPY alembic/         ./alembic/
 COPY alembic.ini      .
 COPY backend_api/     ./backend_api/
 COPY database/        ./database/
-COPY logic/           ./logic/
+COPY optionflow/      ./optionflow/
 
 # Non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
@@ -45,7 +45,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Start the app (workers=2 is safe for Fargate 0.5 vCPU; bump to 4 for 1 vCPU)
-CMD ["uvicorn", "backend_api.main:app", \
+CMD ["uvicorn", "optionflow.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--workers", "2", \

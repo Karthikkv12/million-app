@@ -18,7 +18,7 @@ export default function AppError({
       <h2 className="text-xl font-semibold">Something went wrong</h2>
       <p className="text-sm text-muted-foreground">{error.message}</p>
       <button
-        className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+        className="btn-primary h-10"
         onClick={() => reset()}
       >
         Try again

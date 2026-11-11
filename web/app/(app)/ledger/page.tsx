@@ -18,8 +18,8 @@ interface LedgerEntry {
 
 const fetchLedger = (limit = 200) => api.get<LedgerEntry[]>(`/ledger/entries?limit=${limit}`);
 const SIDE_CLS: Record<string, string> = {
-  debit:  "text-red-500 font-bold",
-  credit: "text-green-500 font-bold",
+  debit:  "text-loss font-bold",
+  credit: "text-gain font-bold",
 };
 const fmt = (v: number) => "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
@@ -44,7 +44,7 @@ export default function LedgerPage() {
         action={<RefreshButton onRefresh={refetch} isRefreshing={isFetching} />}
       />
 
-      {isError && <p className="text-sm text-red-400 mb-4">Failed to load ledger entries.</p>}
+      {isError && <p className="text-sm text-loss mb-4">Failed to load ledger entries.</p>}
 
       {/* Account balances */}
       {isLoading ? (
@@ -61,11 +61,11 @@ export default function LedgerPage() {
               return (
                 <div key={acct} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 card-hover">
                   <div className="text-[11px] text-foreground/70 font-semibold uppercase tracking-wide mb-1 truncate">{acct}</div>
-                  <div className={`text-xl font-black ${net >= 0 ? "text-green-500" : "text-red-500"}`}>{fmt(net)}</div>
+                  <div className={`text-xl font-black ${net >= 0 ? "text-gain" : "text-loss"}`}>{fmt(net)}</div>
                   <div className="flex gap-2 mt-1.5 text-[10px]">
-                    <span className="text-red-400">Dr {fmt(debit)}</span>
+                    <span className="text-loss">Dr {fmt(debit)}</span>
                     <span className="text-foreground/70">·</span>
-                    <span className="text-green-400">Cr {fmt(credit)}</span>
+                    <span className="text-gain">Cr {fmt(credit)}</span>
                   </div>
                 </div>
               );
