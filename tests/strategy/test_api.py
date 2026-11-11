@@ -36,7 +36,7 @@ def test_needs_login(client):
 def test_defaults_then_set_strategy_and_rules(client):
     h = _login(client)
     body = client.get("/api/v1/strategy", headers=h).json()
-    assert body["strategy"] == "spike_wheel" and len(body["strategies"]) == 5
+    assert body["strategy"] == "spike_wheel" and len(body["strategies"]) == 7
     r = client.put("/api/v1/strategy", headers=h, json={"strategy": "wheel", "rules": {"delta_max": 0.3, "dte_min": 30}}).json()
     assert r["strategy"] == "wheel" and r["rules"]["delta_max"] == 0.3 and r["rules"]["dte_min"] == 30
     assert r["overrides"] == {"delta_max": 0.3, "dte_min": 30}

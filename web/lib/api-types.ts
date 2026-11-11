@@ -3094,6 +3094,11 @@ export interface components {
              * @default []
              */
             heatmap_vex_values: number[][];
+            /**
+             * Ideas
+             * @default []
+             */
+            ideas: components["schemas"]["TradeIdea"][];
             /** Max Call Wall */
             max_call_wall?: number | null;
             /** Max Gex Strike */
@@ -4485,10 +4490,10 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "SELL_CALL" | "SELL_PUT" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
+            action: "SELL_CALL" | "SELL_PUT" | "BUY_CALL" | "BUY_STOCK" | "HOLD" | "WAIT" | "TRACK";
             /**
              * Collateral
-             * @description $ tied up: cash for a put, max loss for a spread
+             * @description $ tied up: cash for a put, max loss for a spread, the debit of a long call
              */
             collateral?: number | null;
             /**
@@ -4511,7 +4516,7 @@ export interface components {
             long_strike?: number | null;
             /**
              * Max Loss
-             * @description $ max loss (spreads)
+             * @description $ max loss (spreads, long calls)
              */
             max_loss?: number | null;
             /** Net Delta After */
@@ -4630,6 +4635,53 @@ export interface components {
             put_prem: number;
             /** Strike */
             strike: number;
+        };
+        /**
+         * TradeIdea
+         * @description One contract suggested from the dealer levels (flow.ideas).
+         */
+        TradeIdea: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "BUY_CALL" | "SELL_CALL" | "BUY_PUT" | "SELL_PUT";
+            /** Breakeven */
+            breakeven: number;
+            /**
+             * Delta
+             * @description Of one long option
+             */
+            delta: number;
+            /** Dte */
+            dte: number;
+            /** Expiry */
+            expiry: string;
+            /**
+             * Fit
+             * @description How it sits with the gamma regime
+             * @enum {string}
+             */
+            fit: "favored" | "neutral" | "against";
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "call" | "put";
+            /**
+             * Premium
+             * @description Mid, per share
+             */
+            premium: number;
+            /** Reason */
+            reason: string;
+            /** Strike */
+            strike: number;
+            /**
+             * Target
+             * @description Buys: the level the idea aims at
+             */
+            target?: number | null;
         };
         /** UnitOut */
         UnitOut: {

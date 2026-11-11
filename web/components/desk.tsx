@@ -193,15 +193,18 @@ export function Meter({ value, target, after, max = 1.5, min = -max, width = "w-
 
 /** Vertical price ladder: levels placed by price, spot highlighted. Same-price levels merge; close labels are pushed apart. */
 export function Ladder({ levels, spot, height = 180 }: {
-  levels: { label: string; price: number | null | undefined; tone: string }[]; spot: number; height?: number;
+  /** `strong`: draw the label in the level's tone (a trade idea worth noticing) instead of muted. */
+  levels: { label: string; price: number | null | undefined; tone: string; strong?: boolean }[]; spot: number; height?: number;
 }) {
   if (spot == null || !Number.isFinite(spot)) return null;
-  const merged: { label: string; price: number; tone: string }[] = [];
+  type Part = { label: string; tone: string; strong?: boolean };
+  const merged: { label: string; price: number; tone: string; parts: Part[] }[] = [];
   for (const l of levels) {
     if (l.price == null) continue;
+    const part = { label: l.label, tone: l.tone, strong: l.strong };
     const hit = merged.find((m) => Math.abs(m.price - (l.price as number)) < 1e-6);
-    if (hit) hit.label += ` · ${l.label}`;
-    else merged.push({ label: l.label, price: l.price, tone: l.tone });
+    if (hit) { hit.label += ` · ${l.label}`; hit.parts.push(part); }
+    else merged.push({ label: l.label, price: l.price, tone: l.tone, parts: [part] });
   }
   const all = [spot, ...merged.map((p) => p.price)];
   const lo = Math.min(...all), hi = Math.max(...all);
@@ -209,7 +212,7 @@ export function Ladder({ levels, spot, height = 180 }: {
   const y = (p: number) => ((hi + pad - p) / (hi - lo + 2 * pad)) * height;
   const GAP = 17;
   // place spot first, then levels top→bottom, nudging any label that would overlap the one above it
-  const rows = [{ label: "spot", price: spot, tone: "spot", y: y(spot) }, ...merged.map((m) => ({ ...m, y: y(m.price) }))]
+  const rows = [{ label: "spot", price: spot, tone: "spot", parts: [] as Part[], y: y(spot) }, ...merged.map((m) => ({ ...m, y: y(m.price) }))]
     .sort((a, b) => a.y - b.y);
   for (let i = 1; i < rows.length; i++) if (rows[i].y - rows[i - 1].y < GAP) rows[i].y = rows[i - 1].y + GAP;
   const h = Math.max(height, (rows.at(-1)?.y ?? 0) + GAP);
@@ -223,10 +226,14 @@ export function Ladder({ levels, spot, height = 180 }: {
           <span className="rounded-[3px] bg-foreground px-1 text-[10px] uppercase tracking-[0.1em] text-[var(--background)]">spot</span>
         </div>
       ) : (
-        <div key={p.label} className="absolute left-0 right-0 flex items-center gap-2" style={{ top: p.y - 8 }}>
-          <span className={clsx("w-[56px] text-right tabular-nums", p.tone)}>{p.price.toFixed(2)}</span>
-          <span className={clsx("h-px w-4 bg-current", p.tone)} />
-          <span className="truncate text-foreground/55">{p.label}</span>
+        <div key={p.label} className="absolute left-0 right-0 flex items-center gap-2" style={{ top: p.y - 8 }} title={`${p.price.toFixed(2)} · ${p.label}`}>
+          <span className={clsx("w-[56px] shrink-0 text-right tabular-nums", p.tone)}>{p.price.toFixed(2)}</span>
+          <span className={clsx("h-px w-4 shrink-0 bg-current", p.tone)} />
+          <span className="truncate text-foreground/55">
+            {p.parts.map((part, i) => (
+              <span key={part.label}>{i > 0 && " · "}<span className={part.strong ? clsx("font-medium", part.tone) : undefined}>{part.label}</span></span>
+            ))}
+          </span>
         </div>
       ))}
     </div>

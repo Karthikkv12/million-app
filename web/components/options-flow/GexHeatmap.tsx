@@ -237,8 +237,8 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
         kind: (l.quantity < 0 ? (l.otype === "call" ? "SC" : "SP") : (l.otype === "call" ? "BC" : "BP")) as Pos["kind"],
         n: Math.abs(l.quantity), strike: l.strike!, expiry: l.expiry!,
       })),
-    ...(mine?.suggestion && (mine.suggestion.action === "SELL_CALL" || mine.suggestion.action === "SELL_PUT") && mine.suggestion.strike != null && mine.suggestion.expiry
-      ? [{ kind: (mine.suggestion.action === "SELL_CALL" ? "SC" : "SP") as Pos["kind"], n: mine.suggestion.contracts, strike: mine.suggestion.strike, expiry: mine.suggestion.expiry, suggested: true }] : []),
+    ...(mine?.suggestion && (mine.suggestion.action === "SELL_CALL" || mine.suggestion.action === "SELL_PUT" || mine.suggestion.action === "BUY_CALL") && mine.suggestion.strike != null && mine.suggestion.expiry
+      ? [{ kind: (mine.suggestion.action === "SELL_CALL" ? "SC" : mine.suggestion.action === "BUY_CALL" ? "BC" : "SP") as Pos["kind"], n: mine.suggestion.contracts, strike: mine.suggestion.strike, expiry: mine.suggestion.expiry, suggested: true }] : []),
   ];
   const inCell = new Map<string, Pos[]>();              // "strike|expiry" on the board
   const inRow = new Map<number, Pos[]>();               // strike on the board, expiry not shown

@@ -104,7 +104,7 @@ class Context:
 
 @dataclass
 class Suggestion:
-    action: str                     # SELL_CALL | SELL_PUT | BUY_STOCK | HOLD | WAIT | TRACK
+    action: str                     # SELL_CALL | SELL_PUT | BUY_CALL | BUY_STOCK | HOLD | WAIT | TRACK
     headline: str
     reasons: List[str] = field(default_factory=list)
     strike: Optional[float] = None
@@ -122,8 +122,8 @@ class Suggestion:
     # Set by the strategy engine (strategy module); None for the spike wheel.
     long_strike: Optional[float] = None     # put credit spread: the put bought below the short
     yield_ann: Optional[float] = None       # premium ÷ capital at work, annualised
-    collateral: Optional[float] = None      # $ tied up: cash for a put, max loss for a spread
-    max_loss: Optional[float] = None        # $ (spreads)
+    collateral: Optional[float] = None      # $ tied up: cash for a put, max loss for a spread, the debit of a long call
+    max_loss: Optional[float] = None        # $ (spreads, long calls)
 
 
 @dataclass
@@ -225,7 +225,7 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
     else:
         from optionflow.modules.strategy.engine import decide
         quotes = [q for q in (chain if chain is not None else weekly)
-                  if strategy.dte_min <= q.dte <= strategy.dte_max]   # only what the rules can pick
+                  if strategy.in_window(q.dte)]                       # only what the rules can pick
         for q in quotes:
             q.delta = bs.delta(spot, q.strike, bs.year_fraction(q.dte), q.iv or 0.0, q.otype)
         s = decide(ctx, legs, quotes, net, shares, full_lots, warnings, strategy)

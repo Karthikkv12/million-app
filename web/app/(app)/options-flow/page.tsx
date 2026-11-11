@@ -103,7 +103,7 @@ export default function OptionsFlowPage() {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Flow</p>
             <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Dealer exposure board</h1>
           </div>
-          <p className="max-w-md text-right text-[12.5px] leading-relaxed text-foreground/50">Gamma (GEX) and vanna (VEX) by strike × expiry. ★ marks the king node; tap a ticker&apos;s Details for flow and levels.</p>
+          <p className="max-w-md text-right text-[12.5px] leading-relaxed text-foreground/50">Gamma (GEX) and vanna (VEX) by strike × expiry. ★ marks the king node. The ladder beside each board places the levels and a buy/sell call and put idea by strike; Details has flow.</p>
         </div>
 
         <div className="-mx-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[var(--border-strong)] px-4 py-2 sm:-mx-8 sm:px-8">
@@ -166,6 +166,7 @@ export default function OptionsFlowPage() {
               accentColor={accent}
               nStrikes={nStrikes}
               heatOpts={heat}
+              columns={slots.length}
               canRemove={slots.length > 1}
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}

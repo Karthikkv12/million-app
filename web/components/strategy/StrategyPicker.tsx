@@ -40,7 +40,7 @@ export function StrategyPicker({ align = "right" }: { align?: "left" | "right" }
                   <Check size={14} className={clsx("mt-0.5 shrink-0", on ? "text-accent" : "invisible")} />
                   <span className="min-w-0">
                     <span className="block text-[13.5px] font-medium text-foreground">{s.name}
-                      {s.buys_options && <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-warn">buys a put</span>}
+                      {s.buys_options && <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-warn">{s.sides === "call" ? "buys a call" : "buys a put"}</span>}
                     </span>
                     <span className="mt-0.5 block text-[12px] leading-snug text-foreground/55">{s.summary}</span>
                   </span>

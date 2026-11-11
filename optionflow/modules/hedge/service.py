@@ -281,6 +281,37 @@ def _far_contracts(sym: str, expiries: List[str]) -> Dict[Tuple[str, float, str]
         return {}
 
 
+LEAPS_TTL = 300.0          # long-dated quotes move slowly; refresh every 5 min
+LEAPS_EXPIRIES = 3         # at most this many far expiries per symbol
+
+
+def _leaps_quotes(sym: str, rules: Any) -> List[Quote]:
+    """Quotes for the long-dated expiries a LEAPS / diagonal strategy can buy (rules.long_dte_min…max): the
+    board chain stops at 60 days. Up to LEAPS_EXPIRIES expiries, nearest the middle of the window. [] on failure."""
+    lo, hi = int(rules.long_dte_min), int(rules.long_dte_max)
+
+    def load():
+        md = get_market_data()
+        days = {e: _dte(e) for e in md.option_expiries(sym)}
+        mid = (lo + hi) / 2
+        exps = sorted((e for e, d in days.items() if d is not None and lo <= d <= hi), key=lambda e: abs(days[e] - mid))
+        exps = sorted(exps[:LEAPS_EXPIRIES])
+        if not exps:
+            return []
+        out: List[Quote] = []
+        for r in md.option_contracts(sym, expiries=exps).rows.itertuples(index=False):
+            bid, ask, last, iv = _num(r.bid), _num(r.ask), _num(r.last), _num(r.iv)
+            mid_px = (bid + ask) / 2 if bid and ask and ask >= bid else (last or 0.0)
+            if mid_px > 0 and iv and iv > bs.MIN_SIGMA:
+                out.append(Quote(float(r.strike), str(r.otype), iv, bid, ask, mid_px, days[r.expiry], r.expiry))
+        return out
+    try:
+        return list(CACHE.get("leaps", f"{sym}|{lo}|{hi}", LEAPS_TTL, load) or [])
+    except Exception as exc:                       # no source could serve it: the desk says no long call fits
+        logger.info("hedge leaps quotes %s failed: %s", sym, exc)
+        return []
+
+
 def _num(v: Any) -> Optional[float]:
     try:
         x = float(v)
@@ -332,6 +363,9 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     chain_quotes = [Quote(k, t, iv, mid, mid, mid, dte, e)
                     for (e, k, t), (iv, mid, dte) in rows.items() if iv > bs.MIN_SIGMA]
     quotes = [q for q in chain_quotes if q.expiry == weekly]
+    if getattr(rules, "uses_leaps", False):            # LEAPS / diagonals also pick from the far expiries
+        seen = {(q.expiry, q.strike, q.otype) for q in chain_quotes}
+        chain_quotes += [q for q in _leaps_quotes(sym, rules) if (q.expiry, q.strike, q.otype) not in seen]
     day = _day_fields(sym, spot)
     prev, day_change = day["prev_close"], day["day_change"]
     ivs = TRACKER.state(sym, day_change)

@@ -4038,6 +4038,14 @@
       "title": "Heatmap Vex Values",
       "type": "array"
      },
+     "ideas": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/TradeIdea"
+      },
+      "title": "Ideas",
+      "type": "array"
+     },
      "max_call_wall": {
       "anyOf": [
        {
@@ -9222,6 +9230,7 @@
       "enum": [
        "SELL_CALL",
        "SELL_PUT",
+       "BUY_CALL",
        "BUY_STOCK",
        "HOLD",
        "WAIT",
@@ -9239,7 +9248,7 @@
         "type": "null"
        }
       ],
-      "description": "$ tied up: cash for a put, max loss for a spread",
+      "description": "$ tied up: cash for a put, max loss for a spread, the debit of a long call",
       "title": "Collateral"
      },
      "contracts": {
@@ -9305,7 +9314,7 @@
         "type": "null"
        }
       ],
-      "description": "$ max loss (spreads)",
+      "description": "$ max loss (spreads, long calls)",
       "title": "Max Loss"
      },
      "net_delta_after": {
@@ -9635,6 +9644,95 @@
      "bias"
     ],
     "title": "TopFlowStrike",
+    "type": "object"
+   },
+   "TradeIdea": {
+    "description": "One contract suggested from the dealer levels (flow.ideas).",
+    "properties": {
+     "action": {
+      "enum": [
+       "BUY_CALL",
+       "SELL_CALL",
+       "BUY_PUT",
+       "SELL_PUT"
+      ],
+      "title": "Action",
+      "type": "string"
+     },
+     "breakeven": {
+      "title": "Breakeven",
+      "type": "number"
+     },
+     "delta": {
+      "description": "Of one long option",
+      "title": "Delta",
+      "type": "number"
+     },
+     "dte": {
+      "title": "Dte",
+      "type": "integer"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "fit": {
+      "description": "How it sits with the gamma regime",
+      "enum": [
+       "favored",
+       "neutral",
+       "against"
+      ],
+      "title": "Fit",
+      "type": "string"
+     },
+     "otype": {
+      "enum": [
+       "call",
+       "put"
+      ],
+      "title": "Otype",
+      "type": "string"
+     },
+     "premium": {
+      "description": "Mid, per share",
+      "title": "Premium",
+      "type": "number"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Buys: the level the idea aims at",
+      "title": "Target"
+     }
+    },
+    "required": [
+     "action",
+     "otype",
+     "strike",
+     "expiry",
+     "dte",
+     "premium",
+     "delta",
+     "breakeven",
+     "fit",
+     "reason"
+    ],
+    "title": "TradeIdea",
     "type": "object"
    },
    "UnitOut": {

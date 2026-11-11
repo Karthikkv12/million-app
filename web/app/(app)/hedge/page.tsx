@@ -31,11 +31,12 @@ const ago = (iso?: string | null) => {
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
 };
 
-const OPT = new Set(["SELL_CALL", "SELL_PUT"]);
-const TRADE = new Set(["SELL_CALL", "SELL_PUT", "BUY_STOCK"]);
+const OPT = new Set(["SELL_CALL", "SELL_PUT", "BUY_CALL"]);
+const TRADE = new Set(["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK"]);
 const ACTION: Record<HedgeSuggestion["action"], { tag: "accent" | "gain" | "loss" | "warn" | "neutral"; label: string; edge: "accent" | "gain" | "loss" | "warn" | null }> = {
   SELL_CALL: { tag: "accent", label: "Sell call", edge: "accent" },
   SELL_PUT: { tag: "gain", label: "Sell put", edge: "gain" },
+  BUY_CALL: { tag: "warn", label: "Buy call", edge: "warn" },
   BUY_STOCK: { tag: "warn", label: "Buy stock", edge: "warn" },
   HOLD: { tag: "neutral", label: "Worked", edge: null },
   WAIT: { tag: "neutral", label: "Wait", edge: null },
@@ -56,7 +57,7 @@ const lotTone = (v: number | null) => (v == null ? "bg-foreground/40" : v >= 0.8
 const betaTone = (v?: number | null) => (v == null ? "text-foreground/40" : v >= 1.5 ? "text-loss" : v >= 1.1 ? "text-warn" : "text-foreground/75");
 const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? s?.headline
   : s.action === "BUY_STOCK" ? `+${s.shares} sh`
-  : `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.expiry?.slice(5)}`;
+  : `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.action === "BUY_CALL" ? s.expiry : s.expiry?.slice(5)}`;
 /** The action's tag; a put with a long leg is a put credit spread. */
 const actionOf = (s?: HedgeSuggestion | null) => !s ? null
   : s.long_strike != null ? { ...ACTION.SELL_PUT, label: "Put spread" } : ACTION[s.action];
@@ -87,11 +88,11 @@ function Detail({ b }: { b: HedgeBook }) {
             {trade && (
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ["Credit", usd(Math.abs(s.credit ?? 0), 0)],
+                  [s.action === "BUY_CALL" ? "Debit" : "Credit", usd(Math.abs(s.credit ?? 0), 0)],
                   [s.long_strike != null ? "Net credit / sh" : "Mid / sh", usd(s.premium)],
                   ...(s.long_strike != null ? [["Long put", String(s.long_strike)], ["Max loss", usd(s.max_loss, 0)]] : []),
                   ...(s.yield_ann != null ? [["Yield / yr", `${Math.round(s.yield_ann * 100)}%`]] : []),
-                  ...(s.collateral != null && s.long_strike == null ? [["Cash secured", usd(s.collateral, 0)]] : []),
+                  ...(s.action === "BUY_CALL" ? [["Max loss", usd(s.max_loss, 0)]] : s.collateral != null && s.long_strike == null ? [["Cash secured", usd(s.collateral, 0)]] : []),
                   ["Δ / contract", sd(s.option_delta)],
                   ["Net Δ after", sd(s.net_delta_after)],
                   ...(s.locked_gain != null ? [["If called", big(s.locked_gain)]] : []),

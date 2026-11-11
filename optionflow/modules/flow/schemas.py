@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FlowByExpiry(BaseModel):
@@ -19,6 +19,21 @@ class TopFlowStrike(BaseModel):
     put_prem: float
     net: float
     bias: Literal["call", "put"]
+
+
+class TradeIdea(BaseModel):
+    """One contract suggested from the dealer levels (flow.ideas)."""
+    action: Literal["BUY_CALL", "SELL_CALL", "BUY_PUT", "SELL_PUT"]
+    otype: Literal["call", "put"]
+    strike: float
+    expiry: str
+    dte: int
+    premium: float = Field(..., description="Mid, per share")
+    delta: float = Field(..., description="Of one long option")
+    breakeven: float
+    target: Optional[float] = Field(None, description="Buys: the level the idea aims at")
+    fit: Literal["favored", "neutral", "against"] = Field(..., description="How it sits with the gamma regime")
+    reason: str
 
 
 class GexOut(BaseModel):
@@ -45,6 +60,7 @@ class GexOut(BaseModel):
     total_volume: int = 0
     flow_by_expiry: List[FlowByExpiry] = []
     top_flow_strikes: List[TopFlowStrike] = []
+    ideas: List[TradeIdea] = []
     data_source: str
     error: Optional[str] = None
     as_of: Optional[str] = None      # ISO UTC time the numbers were computed

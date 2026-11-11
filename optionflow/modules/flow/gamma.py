@@ -131,6 +131,8 @@ class GEXResult:
     flow_by_expiry: List[dict] = field(default_factory=list)
     # top_flow_strikes: [{strike, call_prem, put_prem, net, otype_bias}]
     top_flow_strikes: List[dict] = field(default_factory=list)
+    # ideas: one contract per action (BUY_CALL, SELL_CALL, BUY_PUT, SELL_PUT) from the dealer levels (flow.ideas)
+    ideas: List[dict] = field(default_factory=list)
     data_source: str = "yfinance"
     error: Optional[str] = None
     as_of: Optional[str] = None    # ISO UTC time this result was computed
@@ -303,6 +305,15 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         else:
             idx = by_strike["gex"].abs().idxmax()
             result.max_gex_strike = float(by_strike.loc[idx, "strike"])
+
+        # ── Trade ideas off the levels (never fatal: the board works without them) ──
+        try:
+            from optionflow.modules.flow.ideas import trade_ideas
+            result.ideas = trade_ideas(df, spot, net_gex=result.net_gex, zero_gamma=result.zero_gamma,
+                                       call_wall=result.max_call_wall, put_wall=result.max_put_wall,
+                                       king=result.max_gex_strike)
+        except Exception:
+            result.ideas = []
 
         # ── Net flow: premium dollars changing hands ──────────────────────────
         # premium = OI × mid × lot_size  (proxy for committed capital)
