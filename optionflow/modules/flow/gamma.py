@@ -133,6 +133,8 @@ class GEXResult:
     top_flow_strikes: List[dict] = field(default_factory=list)
     # ideas: one contract per action (BUY_CALL, SELL_CALL, BUY_PUT, SELL_PUT) from the dealer levels (flow.ideas)
     ideas: List[dict] = field(default_factory=list)
+    # outlook: likely direction, battleground strike, expected range (flow.ideas.outlook); None when unavailable
+    outlook: Optional[dict] = None
     data_source: str = "yfinance"
     error: Optional[str] = None
     as_of: Optional[str] = None    # ISO UTC time this result was computed
@@ -325,6 +327,16 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         result.put_premium  = float(put_df["premium"].sum())
         result.net_flow     = result.call_premium - result.put_premium
         result.total_volume = int(df["volume"].sum())
+
+        try:
+            from optionflow.modules.flow.ideas import outlook
+            result.outlook = outlook(df, spot, strikes=result.strikes, call_gex=result.call_gex_by_strike,
+                                     put_gex=result.put_gex_by_strike, net_gex=result.net_gex,
+                                     zero_gamma=result.zero_gamma, call_wall=result.max_call_wall,
+                                     put_wall=result.max_put_wall, king=result.max_gex_strike,
+                                     call_premium=result.call_premium, put_premium=result.put_premium)
+        except Exception:
+            result.outlook = None
 
         # Flow by expiry (nearest 12 expiries, sorted)
         flow_rows = []

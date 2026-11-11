@@ -96,6 +96,7 @@ def gex_payload(result: GEXResult) -> Dict[str, Any]:
         "flow_by_expiry": result.flow_by_expiry,
         "top_flow_strikes": result.top_flow_strikes,
         "ideas": result.ideas,
+        "outlook": result.outlook,
         "data_source": result.data_source,
         "error": result.error,
         "as_of": result.as_of,

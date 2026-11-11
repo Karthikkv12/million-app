@@ -725,6 +725,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/insight/{symbol}/leaps-score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leaps Score
+         * @description 0–100: how good a moment it is to buy a long-dated call on this stock, with the factors behind it.
+         */
+        get: operations["leaps_score_api_v1_insight__symbol__leaps_score_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insight/{symbol}/swings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Swings
+         * @description Drawdown (below the range's high) and upside spike (above the rolling low) for each session of the range.
+         */
+        get: operations["swings_api_v1_insight__symbol__swings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ledger/cash-balance": {
         parameters: {
             query?: never;
@@ -3120,6 +3160,7 @@ export interface components {
              * @default 0
              */
             net_vex: number;
+            outlook?: components["schemas"]["Outlook"] | null;
             /**
              * Put Gex By Strike
              * @default []
@@ -3415,6 +3456,36 @@ export interface components {
              */
             spike: boolean;
         };
+        /** LeapsScoreOut */
+        LeapsScoreOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Band
+             * @description Avoid | Weak | Fair | Good | Excellent
+             */
+            band?: string | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Factors
+             * @default []
+             */
+            factors: components["schemas"]["ScoreFactor"][];
+            /**
+             * Score
+             * @description 0 (bad) to 100 (extremely good); None without enough history
+             */
+            score?: number | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Symbol */
+            symbol: string;
+            traits?: components["schemas"]["ScoreTraits"] | null;
+        };
         /** LedgerEntryOut */
         LedgerEntryOut: {
             /** Created At */
@@ -3626,6 +3697,47 @@ export interface components {
             spot?: number | null;
             /** Symbol */
             symbol: string;
+        };
+        /**
+         * Outlook
+         * @description A read of the dealer map (flow.ideas.outlook): not a forecast.
+         */
+        Outlook: {
+            /** Atm Iv */
+            atm_iv?: number | null;
+            /**
+             * Battleground
+             * @description Strike near the price where call and put gamma are both large
+             */
+            battleground?: number | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "sideways";
+            /** Down */
+            down: number;
+            /** Expected Dte */
+            expected_dte?: number | null;
+            /** Expected High */
+            expected_high?: number | null;
+            /**
+             * Expected Low
+             * @description Price − 1σ to the expiry nearest 30 days (ATM IV)
+             */
+            expected_low?: number | null;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sideways */
+            sideways: number;
+            /**
+             * Up
+             * @description Share of 100; up + down + sideways = 100
+             */
+            up: number;
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -4191,6 +4303,57 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ScoreFactor */
+        ScoreFactor: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Score */
+            score: number;
+            /** Value */
+            value: string;
+            /** Weight */
+            weight: number;
+        };
+        /** ScoreTraits */
+        ScoreTraits: {
+            /**
+             * Daily Move
+             * @description Typical one-day move (1σ, decimal)
+             */
+            daily_move?: number | null;
+            /** Monthly Move */
+            monthly_move?: number | null;
+            /** Off High */
+            off_high: number;
+            /** Rsi */
+            rsi?: number | null;
+            /** Sessions */
+            sessions: number;
+            /**
+             * State
+             * @description at the high | small dip | pulled back | deep drawdown
+             */
+            state: string;
+            /**
+             * Trend
+             * @enum {string}
+             */
+            trend: "up" | "down" | "sideways";
+            /**
+             * Volatility
+             * @description calm | normal | volatile | super volatile
+             */
+            volatility?: string | null;
+            /**
+             * Volume
+             * @description low | normal | high, vs its own 90 days
+             */
+            volume?: string | null;
+        };
         /** SeedHoldingsOut */
         SeedHoldingsOut: {
             /**
@@ -4555,6 +4718,82 @@ export interface components {
              * @description Premium ÷ capital at work, annualised (decimal)
              */
             yield_ann?: number | null;
+        };
+        /** SwingPoint */
+        SwingPoint: {
+            /** Close */
+            close: number;
+            /** Date */
+            date: string;
+            /**
+             * Drawdown
+             * @description Close vs the highest close so far in the range (≤ 0, decimal)
+             */
+            drawdown: number;
+            /**
+             * Spike
+             * @description Close vs the lowest close of the last `lookback` sessions (≥ 0, decimal)
+             */
+            spike: number;
+        };
+        /** SwingStats */
+        SwingStats: {
+            /** Avg Drawdown */
+            avg_drawdown: number;
+            /** Current Drawdown */
+            current_drawdown: number;
+            /** Current Spike */
+            current_spike: number;
+            /** First Date */
+            first_date: string;
+            /** Last Date */
+            last_date: string;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Max Drawdown Date */
+            max_drawdown_date: string;
+            /** Max Spike */
+            max_spike: number;
+            /** Max Spike Date */
+            max_spike_date: string;
+            /**
+             * Near High Share
+             * @description Share of sessions within 5% of the high
+             */
+            near_high_share: number;
+            /** Peak Date */
+            peak_date: string;
+            /** Sessions */
+            sessions: number;
+            /** Sessions Since Peak */
+            sessions_since_peak: number;
+            /**
+             * Spike Percentile
+             * @description Share of sessions whose spike was at or below today's
+             */
+            spike_percentile: number;
+        };
+        /** SwingsOut */
+        SwingsOut: {
+            /** Error */
+            error?: string | null;
+            /**
+             * Lookback
+             * @description Sessions in the rolling low the spike is measured from
+             */
+            lookback: number;
+            /** Period */
+            period: string;
+            /**
+             * Points
+             * @default []
+             */
+            points: components["schemas"]["SwingPoint"][];
+            /** Source */
+            source?: string | null;
+            stats?: components["schemas"]["SwingStats"] | null;
+            /** Symbol */
+            symbol: string;
         };
         /** SymbolSummaryOut */
         SymbolSummaryOut: {
@@ -6609,6 +6848,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leaps_score_api_v1_insight__symbol__leaps_score_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeapsScoreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    swings_api_v1_insight__symbol__swings_get: {
+        parameters: {
+            query?: {
+                period?: "1mo" | "3mo" | "6mo" | "1y" | "5y" | "max";
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwingsOut"];
                 };
             };
             /** @description Validation Error */

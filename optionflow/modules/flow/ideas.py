@@ -12,10 +12,13 @@ computed from, so every idea is a listed strike and expiry with a live mid:
   (moves run) favours the buy on the price's side of the flip and goes against the sell on that side.
 
 These are levels-based ideas for the board, not the desk's actions (those follow the owner's strategy).
+
+`outlook` reads the same map for the likely direction (up / down / sideways, as shares of 100), the
+battleground strike (where call and put gamma are both large) and the ±1σ range to the expiry nearest 30 days.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
 
@@ -129,3 +132,119 @@ def trade_ideas(df: pd.DataFrame, spot: float, *, net_gex: float = 0.0, zero_gam
 
     out = [buy("call", call_wall), sell("call", call_wall), buy("put", put_wall), sell("put", put_wall)]
     return [i for i in out if i]
+
+
+# ── Outlook: likely direction, battleground strike, expected range ────────────
+BATTLE_BAND = 0.05           # the battleground is looked for within ±5% of the price
+PIN_BAND = 0.005             # king within 0.5% of the price = pinned
+RANGE_DTE = 30               # expected range: ±1σ to the expiry nearest this many days
+
+
+def battleground(strikes: Sequence[float], call_gex: Sequence[float], put_gex: Sequence[float],
+                 spot: float) -> Optional[float]:
+    """The contested strike: where call gamma and put gamma are both large (the larger of the smaller side),
+    within ±BATTLE_BAND of the price. None when no strike near the price carries both."""
+    best, best_v = None, 0.0
+    for k, c, p in zip(strikes, call_gex, put_gex):
+        if abs(k / spot - 1.0) > BATTLE_BAND:
+            continue
+        v = min(abs(c or 0.0), abs(p or 0.0))
+        if v > best_v or (v == best_v and best is not None and v > 0 and abs(k - spot) < abs(best - spot)):
+            best, best_v = float(k), v
+    return best if best_v > 0 else None
+
+
+def _atm_iv(df: pd.DataFrame, expiry: str, spot: float) -> Optional[float]:
+    sub = df[(df["expiry"] == expiry) & (df["iv"] >= bs.MIN_SIGMA)]
+    if sub.empty:
+        return None
+    k = min(sub["strike"].unique(), key=lambda s: abs(float(s) - spot))
+    ivs = [float(v) for v in sub[sub["strike"] == k]["iv"]]
+    return sum(ivs) / len(ivs) if ivs else None
+
+
+def outlook(df: pd.DataFrame, spot: float, *, strikes: Sequence[float] = (), call_gex: Sequence[float] = (),
+            put_gex: Sequence[float] = (), net_gex: float = 0.0, zero_gamma: Optional[float] = None,
+            call_wall: Optional[float] = None, put_wall: Optional[float] = None, king: Optional[float] = None,
+            call_premium: float = 0.0, put_premium: float = 0.0) -> Optional[Dict[str, Any]]:
+    """{direction: up|down|sideways, up, down, sideways (percent, sum 100), reasons, battleground,
+    expected_low, expected_high, expected_dte, atm_iv}. A read of the dealer map, not a forecast."""
+    if not spot or spot <= 0:
+        return None
+    up = down = side = 1.0
+    why: List[str] = []
+    long_gamma = (net_gex or 0.0) >= 0
+    above = None if zero_gamma is None else spot >= zero_gamma
+
+    if long_gamma:
+        side += 3.0
+        why.append("Long gamma: dealers sell rallies and buy dips, which holds price in a range.")
+    else:
+        why.append("Short gamma: dealers chase moves, so the break tends to run.")
+    if above is not None:
+        if above:
+            up += 2.0 + (0.0 if long_gamma else 2.0)
+            why.append(f"Above the flip {zero_gamma:g}: the supportive side of the map.")
+        else:
+            down += 2.0 + (0.0 if long_gamma else 2.0)
+            why.append(f"Below the flip {zero_gamma:g}: dealers add to selling down here.")
+    if king is not None:
+        if abs(king / spot - 1.0) <= PIN_BAND:
+            side += 2.0
+            why.append(f"Sitting on the king {king:g}: the largest gamma strike pins price.")
+        elif king > spot:
+            up += 1.5 if long_gamma else 0.5
+            why.append(f"The king {king:g} is above ({_pct(king, spot)}): a magnet upward.")
+        else:
+            down += 1.5 if long_gamma else 0.5
+            why.append(f"The king {king:g} is below ({_pct(king, spot)}): a magnet downward.")
+    if call_wall is not None and put_wall is not None:
+        if spot > call_wall:
+            if long_gamma:
+                down += 1.0
+                why.append(f"Through the call wall {call_wall:g} with long gamma: stretched, tends to fade back.")
+            else:
+                up += 1.0
+                why.append(f"Through the call wall {call_wall:g} with short gamma: a breakout.")
+        elif spot < put_wall:
+            if long_gamma:
+                up += 1.0
+                why.append(f"Under the put wall {put_wall:g} with long gamma: stretched, tends to snap back.")
+            else:
+                down += 1.0
+                why.append(f"Under the put wall {put_wall:g} with short gamma: a breakdown.")
+        else:
+            room_up, room_dn = call_wall - spot, spot - put_wall
+            if room_up >= 2 * room_dn:
+                up += 1.0
+                why.append(f"Near the put wall {put_wall:g} (support), with room up to the call wall {call_wall:g}.")
+            elif room_dn >= 2 * room_up:
+                down += 1.0
+                why.append(f"Near the call wall {call_wall:g} (resistance), with room down to the put wall {put_wall:g}.")
+    total_prem = (call_premium or 0.0) + (put_premium or 0.0)
+    if total_prem > 0:
+        share = call_premium / total_prem
+        if share >= 0.60:
+            up += 1.0
+            why.append(f"{share:.0%} of the option premium is in calls.")
+        elif share <= 0.40:
+            down += 1.0
+            why.append(f"{1 - share:.0%} of the option premium is in puts.")
+
+    tot = up + down + side
+    pu, pd_ = int(round(up / tot * 100)), int(round(down / tot * 100))
+    ps = 100 - pu - pd_
+    direction = max((("sideways", ps), ("up", pu), ("down", pd_)), key=lambda x: x[1])[0]
+
+    lo = hi = dte = iv = None
+    if df is not None and not df.empty:
+        dtes = {str(e): float(t) * 365.0 for e, t in df.groupby("expiry")["T"].first().items()}
+        e = _pick_expiry(dtes, *SELL_DTE[:2], RANGE_DTE)
+        iv = _atm_iv(df, e, spot) if e else None
+        if iv:
+            dte = int(round(dtes[e]))
+            move = spot * iv * (dtes[e] / 365.0) ** 0.5
+            lo, hi = round(spot - move, 2), round(spot + move, 2)
+    return {"direction": direction, "up": pu, "down": pd_, "sideways": ps, "reasons": why,
+            "battleground": battleground(strikes, call_gex, put_gex, spot),
+            "expected_low": lo, "expected_high": hi, "expected_dte": dte, "atm_iv": round(iv, 4) if iv else None}

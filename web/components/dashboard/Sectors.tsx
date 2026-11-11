@@ -1,7 +1,8 @@
 "use client";
 /**
  * Sectors — ranked sector rows (SPDR ETF move, diverging bar) that expand in place into a
- * heat strip of the sector's key stocks, tile width ∝ market cap. Replaces the old Markets page.
+ * heat strip of the sector's key stocks (tile width ∝ market cap), with the sector's drawdown and
+ * upside-spike charts and its LEAPS score underneath. Replaces the old Markets page.
  */
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
@@ -9,6 +10,8 @@ import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import { heatColor } from "@/components/ui";
 import { DeskRow } from "@/components/desk";
+import { SwingCharts } from "@/components/insight/SwingCharts";
+import { LeapsScore } from "@/components/insight/LeapsScore";
 import { useQuotes } from "./quotes";
 import { SECTORS, SECTOR_ROWS, StockTile } from "./sector-baskets";
 
@@ -17,6 +20,15 @@ const ETFS = SECTOR_ROWS.map((r) => r.etf).filter((e): e is string => !!e);
 const SYMBOLS = [...ETFS, ...STOCKS];
 
 const pctTxt = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
+
+function SectorSwings({ symbol, label }: { symbol: string; label: string }) {
+  return (
+    <div className="grid gap-x-8 gap-y-5 border-t border-[var(--border)] px-4 py-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <SwingCharts symbol={symbol} title={`${label}: drawdown and upside spikes`} height={150} />
+      <LeapsScore symbol={symbol} compact />
+    </div>
+  );
+}
 
 export function Sectors() {
   const { data: q } = useQuotes(SYMBOLS, 15_000);
@@ -65,19 +77,23 @@ export function Sectors() {
               </div>
             </DeskRow>
             {isOpen && (
-              <div className="flex flex-wrap gap-[2px] border-b border-[var(--border)] bg-foreground/[0.025] p-3">
-                {r.stocks.map((s) => {
-                  const p = q?.[s.symbol]?.change_pct ?? null;
-                  const c = heatColor(p);
-                  return (
-                    <Link key={s.symbol} href={`/stocks/${s.symbol}`} title={`${s.name} ${pctTxt(p)}`}
-                      className="flex min-h-[54px] min-w-[64px] flex-col justify-between px-2 py-1.5 transition hover:brightness-110"
-                      style={{ flexGrow: Math.max(1, Math.sqrt(s.weight)), flexBasis: 0, background: c.bg, color: c.fg }}>
-                      <span className="font-mono text-[12px] font-semibold">{s.symbol}</span>
-                      <span className="font-mono text-[11px] tabular-nums opacity-90">{pctTxt(p)}</span>
-                    </Link>
-                  );
-                })}
+              <div className="border-b border-[var(--border)] bg-foreground/[0.025]">
+                <div className="flex flex-wrap gap-[2px] p-3">
+                  {r.stocks.map((s) => {
+                    const p = q?.[s.symbol]?.change_pct ?? null;
+                    const c = heatColor(p);
+                    return (
+                      <Link key={s.symbol} href={`/stocks/${s.symbol}`} title={`${s.name} ${pctTxt(p)}`}
+                        className="flex min-h-[54px] min-w-[64px] flex-col justify-between px-2 py-1.5 transition hover:brightness-110"
+                        style={{ flexGrow: Math.max(1, Math.sqrt(s.weight)), flexBasis: 0, background: c.bg, color: c.fg }}>
+                        <span className="font-mono text-[12px] font-semibold">{s.symbol}</span>
+                        <span className="font-mono text-[11px] tabular-nums opacity-90">{pctTxt(p)}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+                {/* Drawdown and upside spikes of the sector's ETF (or its largest stock when there is none), 1M to all time */}
+                <SectorSwings symbol={r.etf ?? r.stocks[0].symbol} label={r.etf ? `${r.label} (${r.etf})` : `${r.stocks[0].name} (${r.stocks[0].symbol}), the largest in ${r.label}`} />
               </div>
             )}
           </Fragment>

@@ -36,6 +36,20 @@ class TradeIdea(BaseModel):
     reason: str
 
 
+class Outlook(BaseModel):
+    """A read of the dealer map (flow.ideas.outlook): not a forecast."""
+    direction: Literal["up", "down", "sideways"]
+    up: int = Field(..., description="Share of 100; up + down + sideways = 100")
+    down: int
+    sideways: int
+    reasons: List[str] = []
+    battleground: Optional[float] = Field(None, description="Strike near the price where call and put gamma are both large")
+    expected_low: Optional[float] = Field(None, description="Price − 1σ to the expiry nearest 30 days (ATM IV)")
+    expected_high: Optional[float] = None
+    expected_dte: Optional[int] = None
+    atm_iv: Optional[float] = None
+
+
 class GexOut(BaseModel):
     symbol: str
     spot: float
@@ -61,6 +75,7 @@ class GexOut(BaseModel):
     flow_by_expiry: List[FlowByExpiry] = []
     top_flow_strikes: List[TopFlowStrike] = []
     ideas: List[TradeIdea] = []
+    outlook: Optional[Outlook] = None
     data_source: str
     error: Optional[str] = None
     as_of: Optional[str] = None      # ISO UTC time the numbers were computed

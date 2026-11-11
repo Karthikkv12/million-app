@@ -69,3 +69,35 @@ def test_buy_reason_says_when_the_wall_is_right_at_the_strike():
     assert "right at the put wall 100" in a["BUY_PUT"]["reason"]
     a = by_action(trade_ideas(chain_df(), 100.4, call_wall=99.0, put_wall=102.0))
     assert "through the call wall 99" in a["BUY_CALL"]["reason"] and "through the put wall 102" in a["BUY_PUT"]["reason"]
+
+
+# ── outlook ───────────────────────────────────────────────────────────────────
+from optionflow.modules.flow.ideas import battleground, outlook  # noqa: E402
+
+
+def test_battleground_is_the_strike_where_both_sides_are_large():
+    ks = [95.0, 98.0, 100.0, 102.0, 120.0]
+    assert battleground(ks, [1, 5, 40, 90, 500], [-80, -30, -35, -2, -500], 100.0) == 100.0   # 120 is outside ±5%
+    assert battleground(ks, [1, 5, 40, 90, 500], [0, 0, 0, 0, -500], 100.0) is None
+
+
+def test_outlook_shares_sum_to_100_and_follow_the_map():
+    df = chain_df()
+    o = outlook(df, 100.2, net_gex=5e9, zero_gamma=97.0, call_wall=105.0, put_wall=95.0, king=100.0,
+                call_premium=1.0, put_premium=1.0)
+    assert o["up"] + o["down"] + o["sideways"] == 100
+    assert o["direction"] == "sideways" and any("pins" in r for r in o["reasons"])           # long gamma, on the king
+    o = outlook(df, 100.2, net_gex=-5e9, zero_gamma=103.0, call_wall=110.0, put_wall=99.0, king=96.0,
+                call_premium=1.0, put_premium=3.0)
+    assert o["direction"] == "down" and o["down"] > o["up"] and o["down"] > o["sideways"]     # short gamma under the flip
+    o = outlook(df, 100.2, net_gex=-5e9, zero_gamma=98.0, call_wall=99.0, put_wall=90.0, king=104.0,
+                call_premium=3.0, put_premium=1.0)
+    assert o["direction"] == "up" and any("breakout" in r for r in o["reasons"])
+
+
+def test_outlook_expected_range_is_one_sigma_to_the_30_day_expiry():
+    o = outlook(chain_df(iv=0.30), 100.0, net_gex=1.0)
+    move = 100.0 * 0.30 * (28 / 365) ** 0.5
+    assert o["expected_dte"] == 28 and o["atm_iv"] == 0.3
+    assert o["expected_high"] == round(100 + move, 2) and o["expected_low"] == round(100 - move, 2)
+    assert outlook(pd.DataFrame(), 100.0)["expected_low"] is None

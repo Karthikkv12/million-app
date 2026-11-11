@@ -16,6 +16,7 @@ import { GexHeatmap } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
 import { DealerLadder, TradeIdeas } from "./DealerLadder";
+import { LeapsScore } from "@/components/insight/LeapsScore";
 import { sourceName } from "./SourceBadge";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
@@ -145,13 +146,23 @@ export function TickerPanel({
           <div className={ladderOpen && beside ? "xl:grid xl:grid-cols-[minmax(0,1fr)_380px]" : undefined}>
             {ladderOpen && (
               <aside className={beside ? "border-b border-[var(--border)] sm:grid sm:grid-cols-2 xl:order-2 xl:block xl:border-b-0 xl:border-l" : "border-b border-[var(--border)]"}>
-                <DealerLadder data={data} height={beside ? 230 : 190} />
-                {beside && <TradeIdeas data={data} className="xl:border-t xl:border-[var(--border)]" />}
+                <DealerLadder data={data} height={beside ? 250 : 215} />
+                {beside && (
+                  <div className="min-w-0 xl:border-t xl:border-[var(--border)]">
+                    <TradeIdeas data={data} />
+                    <LeapsScore symbol={slot.ticker} compact className="border-t border-[var(--border)] px-4 py-3" />
+                  </div>
+                )}
               </aside>
             )}
             <div className="min-w-0">
               <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
-              {ladderOpen && !beside && <TradeIdeas data={data} className="border-t border-[var(--border)]" />}
+              {ladderOpen && !beside && (
+                <>
+                  <TradeIdeas data={data} className="border-t border-[var(--border)]" />
+                  <LeapsScore symbol={slot.ticker} compact className="border-t border-[var(--border)] px-4 py-3" />
+                </>
+              )}
             </div>
           </div>
           <DetailsDrawer
