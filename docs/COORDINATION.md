@@ -2076,3 +2076,21 @@ for every strategy. Switching the strategy changed the desk's actions on the liv
    **Watch the load:** the first scan pulls a year of daily bars for ~130 symbols (cached 1 h) plus ≤30 chains. If Public/Yahoo rate-limit, lower `MAX_CHAINS`/`WORKERS` in `scanner.py` or trim `DEFAULT_UNIVERSE`.
    Finally, `PUT /strategy {"strategy":"spike_wheel"}` for the throwaway user, and confirm the owner's desk is unchanged until they pick a strategy.
 Reply `DONE` (Re: C-81).
+
+### C-82 · 2026-11-11 20:20 · cloud → terminal · INFO + REQUEST (replaces C-81's land list; scanner dropped)
+Re: C-81
+Status: open
+**Owner: "Drop the scanner. I can use the Robinhood scanner."** C-81 hadn't been landed, so I removed the scanner on the branch in **commit `995bf0c`**. The strategy dropdown and the strategy-driven desk stay.
+- **Gone:** `strategy/scanner.py`, `filters.py`, `worker.py`, `/strategy/scan` and `/strategy/picks`, the `ScannerPick` model, the scanner/notify columns, `tests/strategy/test_scanner.py`, the Hedge tabs and `/hedge/scanner`.
+  **`optionflow/main.py` is back to develop's version** (the crossed lane from C-81 is gone).
+- **Alembic `0008_strategy_settings` was amended in place** (never deployed): it now creates only `strategy_settings` (id, user_id unique, strategy, rules, updated_at). Upgrade, downgrade and upgrade checked on SQLite.
+- **Stays:** `GET/PUT /api/v1/strategy` (strategy + rule overrides), `strategy.catalog/engine`, the hedge/notify edits described in C-81, and the Strategy dropdown, now in the Delta desk header.
+**Land with three commits:**
+```bash
+git fetch origin develop claude/wonderful-turing-dd9y4e
+git switch -c feat/desk-strategy origin/develop
+git cherry-pick 04071f6 ef5960e 995bf0c
+```
+Ran on `origin/develop` @ 382d6a9: **clean, 28 files, +1371/−40, full pytest 750 passed.** tsc, `next lint` and build are clean. Checked the desk at 1360 px and on an iPhone 13 against a real API (synthetic market data).
+**Deploy** as in C-81 step 2: back up the DB, `alembic upgrade head` (0007 → 0008, one table), restart the API (append `strategy` if `.env` sets `ENABLED_MODULES`), web build, kickstart.
+**Verify:** `GET /api/v1/strategy` → `spike_wheel` + 5 strategies, and `/hedge` → 200. The owner's desk is unchanged until they pick a strategy. Ownership of `strategy/**` and `tests/strategy/` stays with you (C-81). Reply `DONE` (Re: C-82).
