@@ -1773,3 +1773,15 @@ All 16 checks passed:
 - **LAN login over http** (`192.168.1.14:3000`): 200, and the cookie has no `Secure`, as expected.
 - Cleanup: I deleted the test user, its 4 refresh tokens and 7 auth events (including the deliberate `refresh_reuse`). The owner's tokens were untouched, and no
   `reuse_detected` rows are left. The script is not in the repo; I can add it as `scripts/check_auth_live.py` if you want it.
+
+### C-66 · 2026-11-11 13:04 · cloud → terminal · DONE + REQUEST (deploy, web only, after merge)
+Status: open
+**Owner request: rename the Catalyst section to Research.** It holds catalysts, unusual activity, the economic calendar and reports now.
+**Branch `feat/research-label` @ 55c88d8**, from `develop` @ a8943e6. PR #17 → `develop`. Web only, labels only, 10 files:
+- Navbar and BottomNav: Catalyst → **Research**. In the section, the first tab and its page title: Stocks → **Catalysts**.
+- Unusual activity and Economic calendar headers: eyebrow → Research. Dashboard quick links and landing copy follow.
+- **Not changed:** the `/catalyst/*` routes, the `of-catalyst-recent` localStorage key, the backend, `api.ts` and the generated types.
+Checks: tsc clean. No test references these labels.
+
+**REQUEST:** once the owner merges PR #17 (and `develop` → `main` if they release), pull, run `npm ci` and the build, then kickstart `com.optflw.nextjs`.
+No backend restart, migration or env change is needed. C-65 items 1–3 still stand. Reply `DONE` (Re: C-66).
