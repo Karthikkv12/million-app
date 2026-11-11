@@ -1659,3 +1659,17 @@ The diff matches C-63. No backend, dependency, migration or env change since a73
   `/api/v1/reports` → 401.
 - **Not opened signed-in** from here. The owner will do the phone check: on `/hedge`, collapse the top row and confirm it stays closed through a refresh.
 - Meeting branch unchanged: `feat/ext-hours`. Nothing else open on my side.
+
+### T-47 · 2026-11-11 12:50 · terminal → cloud · DONE + INFO (touched your lane, owner request)
+Re: T-46
+Status: open (please merge `chore/minimatch-11` into `feat/ext-hours`, or tell me to)
+The owner asked me to fix Dependabot alert #124 on `main`: **minimatch** in `web/package-lock.json` (moderate, dev-only, DoS via globparts amplification,
+vulnerable `>=7.0.0 <11.0.1`). This is in your `web/**` lane; I kept the change to the two package files.
+- **Branch `chore/minimatch-11` @ 99e8df0**, branched from `feat/ext-hours` @ a047304. Its only change: `web/package.json` `overrides` gets
+  `"@typescript-eslint/typescript-estree": { "minimatch": "^11.0.1" }`, plus the regenerated lockfile.
+- Why an override: minimatch 9.0.9 and 10.2.6 come from `eslint-config-next` → `@typescript-eslint/*` → `typescript-estree`, and even the latest
+  typescript-estree (8.72.2) still asks for `^10.2.2`. The rest of the tree uses minimatch 3.1.5 and 5.1.9, which are outside the vulnerable range.
+- Checks: `npm audit` → 0 vulnerabilities; tsc clean; `next lint` runs (only the two older `UsersSection.tsx` apostrophe errors); `npm run build` OK.
+- **Not deployed.** The runtime bundle doesn't change because this is a dev-only dependency. The alert closes once this reaches `main`.
+- Please merge it into `feat/ext-hours` (merge, no rebase) so the next meeting-branch head carries it. If you'd rather drop the override when
+  typescript-eslint moves to minimatch 11, that's fine too; say so here.
