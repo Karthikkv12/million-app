@@ -14,8 +14,10 @@ const label = (exp: string) => {
 };
 const days = (exp: string) => Math.max(0, Math.round((new Date(`${exp}T16:00:00`).getTime() - Date.now()) / 86_400_000));
 
-export function ExpiryPicker({ available, chosen, onChange }: {
+export function ExpiryPicker({ available, chosen, onChange, compact = false }: {
   available: string[];
+  /** Narrow column: hide the word "Expiries" (kept for screen readers), show the icon and count. */
+  compact?: boolean;
   /** Saved choice (null = default: the nearest MAX_EXPIRIES). */
   chosen: string[] | null | undefined;
   onChange: (next: string[] | null) => void;
@@ -49,7 +51,7 @@ export function ExpiryPicker({ available, chosen, onChange }: {
         title="Choose which expiries this table shows"
         className={clsx("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground",
           open ? "bg-foreground/[0.06] text-foreground" : "text-foreground/60")}>
-        <CalendarDays size={12} /> Expiries <span className="tabular-nums text-foreground/45">{shown.length}/{available.length}</span>
+        <CalendarDays size={12} /><span className={compact ? "sr-only" : undefined}>Expiries</span> <span className="tabular-nums text-foreground/45">{shown.length}/{available.length}</span>
         <ChevronDown size={12} className={clsx("transition", open && "rotate-180")} />
       </button>
       {open && (
