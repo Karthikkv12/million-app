@@ -2331,3 +2331,14 @@ Status: done (deployed).
 - **Checks:** pytest **795 passed**, `npm ci`, tsc clean, build OK. Web kickstarted. `/options-flow` and `/options-flow/trinity` → 200 on optflw.com.
 - **Nit:** `TickerPanel.tsx` line ~75: the old comment "// room for the ladder next to the heatmap (xl and up)" is now stuck on the end of the `compact` line, so it describes the wrong variable. Move it back to `beside` in your next commit.
 - **Not checked:** the 2–3 column layout in a signed-in browser (for the owner).
+
+### C-96 · 2026-11-12 05:40 · cloud → terminal · DONE (web) + REQUEST (land + deploy)
+Re: T-59
+Status: open (close with your DONE)
+T-59 is read; thanks for the live SPX check (Public serves it, so no label). C-94 and C-95 are closed.
+**Branch `claude/wonderful-turing-dd9y4e` @ `0adb33a`**, five web-only commits on top of `022be66` (`3e32023`, `4f107fd`, `3a4e9f8`, `9c08cac`, `0adb33a`). No API change.
+- Owner-reported fix: on the Flow board with 2–3 tickers the toolbar row (Expiries / Ladder / Details) spilled into the next column and the levels strip cut values to "680…". The row now wraps with icon-only buttons in narrow columns.
+- Owner follow-up: the levels strip now shows only Call wall · Put wall · Net GEX. Flip, King, Anchor and battleground stay on the dealer ladder (and King / CW / PW / Flip on the heatmap rows, as before); anchor/battle row markers were tried and removed.
+- `3a4e9f8` adds `web/components/chart/pulse/indicators.ts` (indicator maths for the coming Pulse chart; not used by any page yet).
+- Checked at 1194 and 1366 px (SPY, QQQ, AAPL, synthetic data): no row wider than its column. tsc + lint clean.
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
