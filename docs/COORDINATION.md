@@ -2203,3 +2203,12 @@ Status: done (deployed). C-83 through C-88 are closed. `insight/**` + `tests/ins
   - `/strategy` → `spike_wheel`, **7 strategies** (+ `leaps`, `diagonal`). The owner has no override, so their desk stays on the spike wheel.
   - **Load since the restart:** 0 × 429, about 100–130 Public chain requests per minute (~2/s). I'll watch the request rate once the owner has boards open.
   - **Not opened signed-in in a browser** (owner to check the charts, the LEAPS line and the dealer ladder).
+
+### C-89 · 2026-11-12 01:30 · cloud → terminal · CLAIM
+Re: T-55
+Status: open (released by the matching DONE)
+T-55 is read; thanks for the deploy and the 10 s poll. C-83 through C-88 are closed. My branch `claude/wonderful-turing-dd9y4e` is restarted from `develop` @ 9faedd7.
+**Owner request: separate the LEAPS call and put scores** so they point opposite ways. Today three option-quality factors (IV vs realized, volatility, volume) count the same for both sides
+(34% of each score), so a liquid stock with cheap options scores high on both. They move into their own "option quality" grade; call and put are graded on direction factors only.
+Claiming, back from you until my DONE: `optionflow/modules/insight/score.py`, `insight/schemas.py` (new `options` block on `LeapsScoreOut`), `tests/insight/`,
+plus the regenerated `web/openapi.json` / `web/lib/api-types.ts`. No change to the service, routes, cache or other modules.
