@@ -85,14 +85,14 @@ export default function StockPage() {
         </div>
         <div className="grid min-w-0 gap-4">
         <Panel title="LEAPS score">
-          <LeapsScore symbol={sym} />
+          <LeapsScore symbol={sym} compact label={false} />
         </Panel>
         <Panel title="Dealer levels" actions={gex && !gex.error ? <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Pill> : null}>
           {gexLoading ? <div className="grid gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10" />)}</div>
             : !gex || gex.error ? <p className="text-[13px] text-foreground/60">No options data for {sym}.</p> : (
               <>
                 <DealerLadder data={gex} className="!px-0 !pt-0" />
-                <TradeIdeas data={gex} className="!px-0 border-t border-[var(--border)]" />
+                <TradeIdeas data={gex} collapsible className="!px-0 border-t border-[var(--border)]" />
                 <div className="mt-3 flex items-baseline justify-between border-t border-[var(--border)] pt-3">
                   <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Net GEX</span>
                   <span className={`font-mono text-[15px] tabular-nums ${longGamma ? "text-gain" : "text-loss"}`}>{bigUsd(gex.net_gex)}</span>

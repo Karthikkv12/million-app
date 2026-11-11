@@ -105,7 +105,11 @@ const better = (d: Score | undefined): Side => (d?.put && d.score != null && d.p
 
 const ENTER: Record<string, string> = { now: "Enter now, around ", pullback: "Enter at ", bounce: "Enter at ", reclaim: "Enter above ", break: "Enter below " };
 
-export function LeapsScore({ symbol, compact = false, className }: { symbol: string; compact?: boolean; className?: string }) {
+export function LeapsScore({ symbol, compact = false, label = true, className }: {
+  symbol: string; compact?: boolean; className?: string;
+  /** Show the "LEAPS score" caption (off inside a panel already titled that). */
+  label?: boolean;
+}) {
   const { data: raw, isLoading, isError } = useLeapsScore(symbol);
   const [open, setOpen] = useState(!compact);
   const [picked, setPicked] = useState<Side | null>(null);
@@ -115,10 +119,12 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
   const t = raw?.traits;
   return (
     <div className={clsx("min-w-0", className)} role="group" aria-label={`${symbol} LEAPS score`}>
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-baseline gap-3">
+        {label && <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</p>}
+        <LivePrice d={raw} />
+      </div>
+      <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="flex items-baseline gap-3">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</p>
-          <LivePrice d={raw} />
           {raw?.put && raw.score != null && (
             <div role="tablist" aria-label="Call or put" className="flex gap-2.5">
               {(["call", "put"] as const).map((sd) => (
