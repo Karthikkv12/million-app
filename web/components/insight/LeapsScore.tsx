@@ -2,7 +2,9 @@
 /**
  * LeapsScore — the 0–100 LEAPS score on a banded scale (Avoid · Weak · Fair · Good · Excellent), how the stock
  * trades (trend, pullback state, volatility, volume, typical move), and the factors behind the number.
- * Two sides: buying a long call, and buying a long put (the same factors flipped); a Call / Put switch picks one.
+ * Two sides graded on direction only: buying a long call, and buying a long put (the same factors flipped), so
+ * they point opposite ways; a Call / Put switch picks one. Option quality (IV, volatility, volume) is the same for
+ * both sides and shows as its own grade.
  * LeapsLine — the one-line version for the heat maps: both scores and the entry price of the stronger side.
  */
 import { useState } from "react";
@@ -27,6 +29,38 @@ const tone = (v: number) => (v >= 60 ? "text-gain" : v >= 40 ? "text-warn" : "te
 const bar = (v: number) => (v >= 60 ? "bg-gain" : v >= 40 ? "bg-warn" : "bg-loss");
 const pin = (v: number) => (v >= 60 ? "bg-gain" : v >= 40 ? "bg-warn" : "bg-loss");
 const pct = (v?: number | null) => (v == null ? null : `${(v * 100).toFixed(1)}%`);
+
+function Factors({ list }: { list: Score["factors"] }) {
+  return (
+    <>
+      {list.map((f) => (
+        <li key={f.key} className="border-b border-[var(--border)] py-2 last:border-0">
+          <div className="flex items-center gap-2 font-mono text-[11.5px]">
+            <span className="w-[128px] shrink-0 truncate text-foreground/80">{f.label}</span>
+            <span className="relative h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-foreground/[0.08]" aria-hidden>
+              <span className={clsx("absolute inset-y-0 left-0 rounded-full", bar(f.score))} style={{ width: `${f.score}%` }} />
+            </span>
+            <span className={clsx("w-7 shrink-0 text-right tabular-nums", tone(f.score))}>{f.score}</span>
+            <span className="w-8 shrink-0 text-right text-[10px] text-foreground/35" title="Weight in its grade">×{f.weight}</span>
+          </div>
+          <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/55"><span className="font-mono text-[10.5px] text-foreground/45">{f.value}.</span> {f.note}</p>
+        </li>
+      ))}
+    </>
+  );
+}
+
+/** "Option quality 61 · options cheap, liquid": separate from call / put because it is the same for both. */
+function OptionQuality({ o, className }: { o: NonNullable<Score["options"]>; className?: string }) {
+  return (
+    <p className={clsx("flex flex-wrap items-baseline gap-x-2 font-mono text-[11.5px] tabular-nums", className)}
+      title="Option price, volatility and volume: the same whether you buy a call or a put, so not part of either score">
+      <span className="text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">Option quality</span>
+      <Tick value={o.score} className={clsx("font-medium", tone(o.score))}>{o.score}</Tick>
+      <span className="text-foreground/60">{o.label}</span>
+    </p>
+  );
+}
 
 export function useLeapsScore(symbol: string, enabled = true) {
   return useQuery<Score>({
@@ -132,28 +166,24 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
                 {pct(t.monthly_move) && <Chip k="Month" v={`±${pct(t.monthly_move)}`} />}
               </div>
             )}
+            {raw?.options && <OptionQuality o={raw.options} className="mt-2 border-t border-[var(--border)] pt-2" />}
             {compact && (
               <button onClick={() => setOpen((o) => !o)} aria-expanded={open}
                 className="mt-2 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/55 hover:text-foreground">
-                {data.factors.length} factors <ChevronDown size={12} className={clsx("transition", open && "rotate-180")} />
+                {data.factors.length + (raw?.options?.factors?.length ?? 0)} factors <ChevronDown size={12} className={clsx("transition", open && "rotate-180")} />
               </button>
             )}
             {open && (
-              <ul className="mt-2 border-t border-[var(--border)]">
-                {data.factors.map((f) => (
-                  <li key={f.key} className="border-b border-[var(--border)] py-2 last:border-0">
-                    <div className="flex items-center gap-2 font-mono text-[11.5px]">
-                      <span className="w-[128px] shrink-0 truncate text-foreground/80">{f.label}</span>
-                      <span className="relative h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-foreground/[0.08]" aria-hidden>
-                        <span className={clsx("absolute inset-y-0 left-0 rounded-full", bar(f.score))} style={{ width: `${f.score}%` }} />
-                      </span>
-                      <span className={clsx("w-7 shrink-0 text-right tabular-nums", tone(f.score))}>{f.score}</span>
-                      <span className="w-8 shrink-0 text-right text-[10px] text-foreground/35" title="Weight in the total">×{f.weight}</span>
-                    </div>
-                    <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/55"><span className="font-mono text-[10.5px] text-foreground/45">{f.value}.</span> {f.note}</p>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/40">Direction: makes the {side} score</p>
+                <ul className="mt-1 border-t border-[var(--border)]"><Factors list={data.factors} /></ul>
+                {raw?.options && (
+                  <>
+                    <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/40">Option quality: same for call and put</p>
+                    <ul className="mt-1 border-t border-[var(--border)]"><Factors list={raw.options.factors ?? []} /></ul>
+                  </>
+                )}
+              </>
             )}
             <p className="mt-2 text-[10.5px] leading-snug text-foreground/40">From up to 5 years of daily prices{data.factors.some((f) => f.key === "dealers") ? ", option prices and dealer levels" : ""}. A score, not advice.</p>
           </>
@@ -186,6 +216,11 @@ export function LeapsLine({ symbol, className }: { symbol: string; className?: s
         <span className={clsx(side !== "put" && "opacity-60")}>
           <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">put</span>
           <Tick value={data.put.score} className={clsx("text-[15px] font-medium", tone(data.put.score))}>{data.put.score}</Tick>
+        </span>
+      )}
+      {data.options && (
+        <span className="text-foreground/50" title={`Option quality (same for call and put): ${data.options.label}`}>
+          <span className="mr-1 text-[10.5px] uppercase tracking-[0.12em] text-foreground/40">options</span>{data.options.score}
         </span>
       )}
       {e && (

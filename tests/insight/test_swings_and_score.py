@@ -57,7 +57,9 @@ def test_uptrend_on_a_pullback_with_cheap_options_scores_high():
     out = sc.leaps_score(px, [5e6] * len(px), spy_closes=path(len(px), drift=0.0003), atm_iv=cheap, net_gex=1e9, zero_gamma=px[-1] * 0.95)
     f = by_key(out)
     assert out["score"] >= 70 and out["band"] in ("Good", "Excellent") and out["error"] is None
-    assert set(f) == set(sc.WEIGHTS)                                             # every factor had data
+    assert set(f) == set(sc.DIRECTION_KEYS)                                      # every direction factor had data
+    assert {x["key"] for x in out["options"]["factors"]} == set(sc.OPTION_KEYS)
+    assert "options cheap" in out["options"]["label"] and out["options"]["score"] >= 60
     assert f["pullback"]["score"] >= 85 and out["traits"]["state"] == "pulled back" and out["traits"]["trend"] == "up"
     assert 0 <= f["strength"]["score"] <= 100 and f["dealers"]["score"] == 80
 
@@ -66,7 +68,9 @@ def test_downtrend_scores_low_and_calls_the_pullback_a_falling_knife():
     out = sc.leaps_score(path(1000, drift=-0.0012, wobble=0.03), [2e4] * 1000, atm_iv=1.4)
     f = by_key(out)
     assert out["score"] < 35 and out["band"] in ("Avoid", "Weak")
-    assert "falling knife" in f["pullback"]["note"] and f["trend"]["score"] < 38 and f["liquidity"]["score"] < 20
+    o = {x["key"]: x for x in out["options"]["factors"]}
+    assert "falling knife" in f["pullback"]["note"] and f["trend"]["score"] < 38 and o["liquidity"]["score"] < 20
+    assert "thinly traded" in out["options"]["label"] and "options expensive" in out["options"]["label"]
     assert "strength" not in f and "dealers" not in f                            # no data: left out, not scored 0
 
 
@@ -221,7 +225,7 @@ def test_put_score_is_the_call_idea_flipped():
     pf, cf = by_key(down["put"]), by_key(down)
     assert set(pf) == set(cf) and pf["pullback"]["label"] == "Bounce" and "52-wk low" in pf["pullback"]["value"]
     assert pf["trend"]["score"] == 100 - cf["trend"]["score"] and pf["growth"]["score"] == 100 - cf["growth"]["score"]
-    assert [pf[k]["score"] for k in ("volatility", "liquidity")] == [cf[k]["score"] for k in ("volatility", "liquidity")]
+    assert not set(pf) & set(sc.OPTION_KEYS) and not set(cf) & set(sc.OPTION_KEYS)       # option quality is its own grade
     assert "LEAPS put" in down["put"]["summary"] and "LEAPS call" in down["summary"]
     assert "fights" in by_key(up["put"])["trend"]["note"]
 
@@ -246,3 +250,15 @@ def test_put_entry_rules_mirror_the_call():
     assert (e["price"], e["when"]) == (120.0, "bounce")
     e = sc.put_entry_plan(130.0, 40, "sideways", 0.30, 100.0, 125.0, 120.0)
     assert (e["price"], e["when"]) == (120.0, "break")
+
+
+
+def test_call_and_put_now_point_opposite_ways():
+    """With option quality out of both, a clear trend gives one side a high score and the other a low one."""
+    for drift in (0.0010, -0.0012):
+        out = sc.leaps_score(path(1000, drift=drift, wobble=0.02), [5e6] * 1000, spy_closes=path(1000, drift=0.0002),
+                             atm_iv=0.05)                         # cheap options: would have lifted both before
+        hi, lo = sorted((out["score"], out["put"]["score"]), reverse=True)
+        assert hi >= 60 and lo <= 40 and hi - lo >= 30
+        assert out["options"]["score"] >= 60                      # still visible, just not in either side
+    assert sc.option_quality([]) is None
