@@ -61,7 +61,25 @@ def _clean_name(raw: str) -> str:
 
 def _out(g: WatchlistGroup) -> Dict:
     return {"id": g.id, "name": g.name, "kind": g.kind, "sector": g.sector, "position": g.position,
-            "symbols": json.loads(g.symbols or "[]"), "created_at": g.created_at, "updated_at": g.updated_at}
+            "symbols": json.loads(g.symbols or "[]"), "columns": json.loads(g.columns) if g.columns else None,
+            "created_at": g.created_at, "updated_at": g.updated_at}
+
+
+_COLUMN = re.compile(r"^[a-z0-9_]{1,24}$")
+MAX_COLUMNS = 40
+
+
+def _clean_columns(raw: List[str]) -> Optional[str]:
+    """Column ids are the web registry's; the server only checks their shape. [] = back to the default set."""
+    out: List[str] = []
+    for c in raw:
+        if not isinstance(c, str) or not _COLUMN.match(c):
+            raise WatchlistError(f"'{c}' is not a column id")
+        if c not in out:
+            out.append(c)
+    if len(out) > MAX_COLUMNS:
+        raise WatchlistError(f"At most {MAX_COLUMNS} columns")
+    return json.dumps(out) if out else None
 
 
 def _rows(session, user_id: int) -> List[WatchlistGroup]:
@@ -125,7 +143,8 @@ def create_group(user_id: int, name: str, symbols: List[str]) -> Dict:
         session.close()
 
 
-def update_group(user_id: int, list_id: int, name: Optional[str] = None, symbols: Optional[List[str]] = None) -> Dict:
+def update_group(user_id: int, list_id: int, name: Optional[str] = None, symbols: Optional[List[str]] = None,
+                 columns: Optional[List[str]] = None) -> Dict:
     session = get_session()
     try:
         g = _get(session, user_id, list_id)
@@ -136,6 +155,8 @@ def update_group(user_id: int, list_id: int, name: Optional[str] = None, symbols
             g.name = name
         if symbols is not None:
             g.symbols = json.dumps(_clean_symbols(symbols))
+        if columns is not None:
+            g.columns = _clean_columns(columns)
         g.updated_at = _now()
         session.commit()
         return _out(g)

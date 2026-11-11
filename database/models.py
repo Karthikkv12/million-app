@@ -565,7 +565,8 @@ class Report(Base):
 
 class WatchlistGroup(Base):
     """A named watchlist (watchlists module). Up to 20 per user. `kind` is "sector" for the lists seeded
-    one per sector, "custom" for the user's own; `symbols` is a JSON array of tickers in display order."""
+    one per sector, "custom" for the user's own; `symbols` is a JSON array of tickers in display order;
+    `columns` the table columns the user picked for this list (ids from the web column registry), in order."""
     __tablename__ = "watchlist_groups"
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -574,5 +575,6 @@ class WatchlistGroup(Base):
     sector     = Column(String, nullable=True)                      # sector name, for kind="sector"
     position   = Column(Integer, nullable=False, default=0)
     symbols    = Column(Text, nullable=False, default="[]")         # JSON array, upper-case tickers
+    columns    = Column(Text, nullable=True)                        # JSON array of column ids (web registry); null = default set
     created_at = Column(String, nullable=False)                     # ISO UTC
     updated_at = Column(String, nullable=False)

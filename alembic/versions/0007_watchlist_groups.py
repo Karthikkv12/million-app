@@ -1,4 +1,4 @@
-"""named watchlists (up to 20 per user), seeded one per sector
+"""named watchlists (up to 20 per user), seeded one per sector, with per-list columns
 
 Revision ID: 0007_watchlist_groups
 Revises: 0006_reports
@@ -28,6 +28,7 @@ def upgrade() -> None:
     sa.Column('sector', sa.String(), nullable=True),
     sa.Column('position', sa.Integer(), nullable=False),
     sa.Column('symbols', sa.Text(), nullable=False),
+    sa.Column('columns', sa.Text(), nullable=True),
     sa.Column('created_at', sa.String(), nullable=False),
     sa.Column('updated_at', sa.String(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),

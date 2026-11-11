@@ -9,26 +9,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Columns3, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, SkeletonCard } from "@/components/ui";
 import {
   addToWatchlistGroup, createWatchlistGroup, deleteWatchlistGroup, fetchBrokerPortfolio, fetchWatchlistGroups,
-  fetchWatchlistQuotes, removeFromWatchlistGroup, restoreSectorWatchlists, updateWatchlistGroup,
-  BrokerPortfolio, WatchlistGroup, WatchlistGroups, WatchlistQuote,
+  fetchOptionMetrics, fetchWatchlistQuotes, removeFromWatchlistGroup, restoreSectorWatchlists, updateWatchlistGroup,
+  BrokerPortfolio, OptionMetrics, WatchlistGroup, WatchlistGroups, WatchlistQuote,
 } from "@/lib/api";
-import { pct, TD, TH, tone, usd } from "./broker";
+import { okBooks, useLiveBooks } from "@/lib/live";
+import { TD, TH } from "./broker";
+import { COL, ColumnPicker, columnsFor, DEFAULT_COLUMNS, type WRow } from "./watchlist-columns";
 
-type SortKey = "symbol" | "price" | "change_pct" | "market_cap" | "pe_ratio" | "range" | "sector";
 type Category = "all" | "sector" | "custom";
 const KEY = ["watchlists"];
 const SEL_KEY = "watchlist_selected";
 const ALL = -1;                                   // the "All symbols" pseudo-list
 const QUOTE_CAP = 150;                            // /market/watchlist-quotes limit
-
-const pos = (price?: number | null, lo?: number | null, hi?: number | null) =>
-  price == null || lo == null || hi == null || hi <= lo ? null : Math.min(1, Math.max(0, (price - lo) / (hi - lo)));
+const OPT_CAP = 80;                               // option columns: first 80 symbols in view…
+const OPT_BATCH = 20;                             // …asked for 20 at a time so rows fill in as they arrive
+const AGG_COLS_KEY = "watchlist_columns_all";     // columns for the merged views (they're not a saved list)
 
 
 export function WatchlistTab() {
@@ -40,7 +41,10 @@ export function WatchlistTab() {
   const [err, setErr] = useState<string | null>(null);
   const [newName, setNewName] = useState<string | null>(null);
   const [rename, setRename] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "symbol", dir: 1 });
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "symbol", dir: 1 });
+  const [picker, setPicker] = useState(false);
+  const [aggCols, setAggCols] = useState<string[] | null>(null);
+  useEffect(() => { try { const v = localStorage.getItem(AGG_COLS_KEY); if (v) setAggCols(JSON.parse(v)); } catch { /* storage off */ } }, []);
 
   const groupsQ = useQuery<WatchlistGroups>({ queryKey: KEY, queryFn: fetchWatchlistGroups });
   const lists = useMemo(() => groupsQ.data?.lists ?? [], [groupsQ.data]);
@@ -90,7 +94,7 @@ export function WatchlistTab() {
     onSuccess: setList, onError: fail,
   });
   const replace = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: { name?: string; symbols?: string[] } }) => updateWatchlistGroup(id, body),
+    mutationFn: ({ id, body }: { id: number; body: { name?: string; symbols?: string[]; columns?: string[] } }) => updateWatchlistGroup(id, body),
     onSuccess: (g) => { setList(g); setRename(null); setErr(null); }, onError: fail,
   });
   const create = useMutation({
@@ -122,32 +126,58 @@ export function WatchlistTab() {
   const qmap = useMemo(() => new Map((quotes.data ?? []).map((r) => [r.symbol, r])), [quotes.data]);
   const sectorsInView = useMemo(() => [...new Set(symbols.map((s) => qmap.get(s)?.sector).filter(Boolean) as string[])].sort(), [symbols, qmap]);
   useEffect(() => { if (sector && quotes.data && !sectorsInView.includes(sector)) setSector(""); }, [sector, sectorsInView, quotes.data]);
-  const rows = useMemo(() => {
-    const out = shown.map((s) => ({ symbol: s, q: qmap.get(s) })).filter((r) => !sector || r.q?.sector === sector);
-    const val = (r: (typeof out)[number]): string | number | null => {
-      switch (sort.key) {
-        case "symbol": return r.symbol;
-        case "sector": return r.q?.sector ?? null;
-        case "range": return pos(r.q?.price, r.q?.week_52_low, r.q?.week_52_high);
-        default: return (r.q?.[sort.key] as number | null | undefined) ?? null;
-      }
-    };
+  // ── columns: the open list's own, or the merged views' (this device) ──
+  const colIds = columnsFor(current ? current.columns : aggCols);
+  const cols = colIds.map((id) => COL.get(id)!);
+  const setColumns = (ids: string[]) => {
+    if (current) {
+      setList({ ...current, columns: ids });                       // instant; the PATCH confirms
+      replace.mutate({ id: current.id, body: { columns: ids } });
+    } else {
+      setAggCols(ids);
+      try { localStorage.setItem(AGG_COLS_KEY, JSON.stringify(ids)); } catch { /* storage off */ }
+    }
+  };
+  const needOptions = cols.some((c) => c.needs === "options");
+  const needBooks = cols.some((c) => c.needs === "books");
+
+  // Option columns: batches of 20, only while one is shown.
+  const optSyms = shown.slice(0, OPT_CAP);
+  const batches = needOptions ? Array.from({ length: Math.ceil(optSyms.length / OPT_BATCH) }, (_, i) => optSyms.slice(i * OPT_BATCH, (i + 1) * OPT_BATCH)) : [];
+  const optQs = useQueries({
+    queries: batches.map((b) => ({
+      queryKey: ["watchlist", "options", b.join(",")], queryFn: () => fetchOptionMetrics(b),
+      refetchInterval: 120_000, staleTime: 60_000,
+    })),
+  });
+  const omap = new Map<string, OptionMetrics>();
+  for (const q of optQs) for (const m of q.data ?? []) omap.set(m.symbol, m);
+  const optLoading = optQs.some((q) => q.isLoading);
+  const books = okBooks(useLiveBooks(needBooks).data);
+  const deltaOf = new Map(books.map((b) => [b.symbol, b.net_delta ?? null]));
+  const sharesOf = new Map((pf?.holdings ?? []).map((h) => [h.symbol, h.shares]));
+
+  const rows: WRow[] = (() => {
+    const out: WRow[] = shown
+      .map((s) => ({ symbol: s, q: qmap.get(s), o: omap.get(s), posDelta: deltaOf.get(s), shares: sharesOf.get(s) }))
+      .filter((r) => !sector || r.q?.sector === sector);
     // Inside a list, "Symbol" sort keeps the list's own order (ETF first on sector lists).
     if (sort.key === "symbol" && current) return sort.dir === 1 ? out : [...out].reverse();
+    const val = (r: WRow) => (sort.key === "symbol" ? r.symbol : COL.get(sort.key)?.sort(r) ?? null);
     return out.sort((a, b) => {
       const x = val(a), y = val(b);
       if (x == null && y == null) return 0;
-      if (x == null) return 1;
+      if (x == null) return 1;                      // blanks last either way
       if (y == null) return -1;
       return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
     });
-  }, [shown, qmap, sector, sort, current]);
+  })();
   const up = rows.filter((r) => (r.q?.change_pct ?? 0) > 0).length;
   const down = rows.filter((r) => (r.q?.change_pct ?? 0) < 0).length;
 
-  const head = (key: SortKey, label: string, right = true, cls = "") => (
-    <th className={clsx(TH, right && "text-right", cls)}>
-      <button onClick={() => setSort((s) => ({ key, dir: s.key === key ? (-s.dir as 1 | -1) : key === "symbol" || key === "sector" ? 1 : -1 }))}
+  const head = (key: string, label: string, right = true, cls = "", help?: string) => (
+    <th key={key} className={clsx(TH, "whitespace-nowrap", right && "text-right", cls)} title={help}>
+      <button onClick={() => setSort((s) => ({ key, dir: s.key === key ? (-s.dir as 1 | -1) : right ? -1 : 1 }))}
         className={clsx("inline-flex items-center gap-1 uppercase hover:text-foreground", sort.key === key && "text-foreground")}>
         {label}{sort.key === key && (sort.dir === 1 ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
       </button>
@@ -177,6 +207,7 @@ export function WatchlistTab() {
             <Plus size={17} />
           </button>
           <ActionsMenu items={[
+            { label: "Customize columns", icon: Columns3, onClick: () => setPicker(true) },
             ...(current ? [{ label: "Edit name", icon: Pencil, onClick: () => setRename(current.name) }] : []),
             ...(sectorListsMissing ? [{ label: "Restore sector lists", icon: RotateCcw, onClick: () => restore.mutate(), disabled: atLimit }] : []),
             ...(current ? [{ label: "Delete list", icon: Trash2, danger: true, onClick: () => {
@@ -232,68 +263,63 @@ export function WatchlistTab() {
           title="Quotes"
           sub={<span>{rows.length}{sector ? ` of ${shown.length}` : ""} symbols · <span className="text-gain">{up} up</span> · <span className="text-loss">{down} down</span>
             {symbols.length > QUOTE_CAP ? ` · first ${QUOTE_CAP} quoted` : ""}{quotes.isFetching ? " · refreshing…" : ""}</span>}
-          actions={sectorsInView.length > 1 ? (
-            <label className="flex items-center gap-1.5 text-[12px] text-foreground/55">
-              Sector
-              <select value={sector} onChange={(e) => setSector(e.target.value)}
-                className="h-8 max-w-[180px] rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[12px] text-foreground">
-                <option value="">All sectors</option>
-                {sectorsInView.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-          ) : undefined}>
+          actions={
+            <div className="flex items-center gap-1.5">
+              {sectorsInView.length > 1 && (
+                <select value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector"
+                  className="h-8 max-w-[150px] rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[12px] text-foreground">
+                  <option value="">All sectors</option>
+                  {sectorsInView.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
+              <div className="relative">
+                <button onClick={() => setPicker((o) => !o)} aria-expanded={picker}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-[12px] text-foreground/70 hover:text-foreground">
+                  <Columns3 size={14} /> Columns <span className="font-mono text-foreground/45">{cols.length}</span>
+                </button>
+                {picker && (
+                  <Popover onClose={() => setPicker(false)}>
+                    <ColumnPicker value={colIds} onChange={setColumns} onClose={() => setPicker(false)} onReset={() => setColumns(current ? [] : DEFAULT_COLUMNS)} />
+                  </Popover>
+                )}
+              </div>
+            </div>
+          }>
+          {needOptions && (optLoading || shown.length > OPT_CAP) && (
+            <p className="border-b border-[var(--border)] px-4 py-1.5 font-mono text-[11px] text-foreground/45">
+              {optLoading ? "Loading option chains…" : ""}{shown.length > OPT_CAP ? ` Option columns cover the first ${OPT_CAP} symbols.` : ""}
+            </p>
+          )}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  {head("symbol", current ? "Symbol · list order" : "Symbol", false)}
-                  {head("price", "Price")}
-                  {head("change_pct", "Today")}
-                  <th className={`${TH} text-right`}>Day range</th>
-                  {head("range", "52-week", true, "w-[150px]")}
-                  {head("market_cap", "Mkt cap")}
-                  {head("pe_ratio", "P/E")}
-                  {head("sector", "Sector", false)}
+                  {head("symbol", "Symbol", false, "sticky left-0 z-[1] bg-[var(--surface)]", current ? "Symbol ↑ keeps the list's own order" : undefined)}
+                  {cols.map((c) => head(c.id, c.label, !c.left, c.width ?? "", c.help))}
                   <th className={TH}><span className="sr-only">Remove</span></th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ symbol, q }) => {
-                  const p52 = pos(q?.price, q?.week_52_low, q?.week_52_high);
+                {rows.map((r) => {
+                  const { symbol, q } = r;
                   const lists = memberOf.get(symbol) ?? [];
                   return (
                     <tr key={symbol} className="group border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]">
-                      <td className={TD}>
+                      <td className={clsx(TD, "sticky left-0 z-[1] bg-[var(--surface)] group-hover:bg-[var(--surface-2)]")}>
                         <Link href={`/stocks/${symbol}`} className="font-medium text-foreground hover:text-accent">{symbol}</Link>
                         {owned.has(symbol) && <span className="ml-2 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-sans text-[10px] text-foreground/55">Held</span>}
-                        <p className="max-w-[240px] truncate font-sans text-[11px] text-foreground/45">
+                        <p className="max-w-[96px] truncate font-sans text-[11px] text-foreground/45 sm:max-w-[240px]">
                           {q?.name ?? (quotes.isLoading ? "…" : q?.error ? "No quote" : "")}
                           {!current && lists.length > 0 && <span className="text-foreground/35"> · {lists.join(", ")}</span>}
                         </p>
                       </td>
-                      <td className={`${TD} text-right text-foreground`}>{usd(q?.price)}</td>
-                      <td className={`${TD} text-right ${tone(q?.change_pct)}`}>
-                        {q?.change_pct != null ? pct(q.change_pct / 100) : "—"}
-                        <p className="text-[11px]">{q?.change != null ? `${q.change > 0 ? "+" : ""}${q.change.toFixed(2)}` : ""}</p>
-                      </td>
-                      <td className={`${TD} text-right text-[12px] text-foreground/65`}>
-                        {q?.day_low != null && q?.day_high != null ? `${q.day_low.toFixed(2)} – ${q.day_high.toFixed(2)}` : "—"}
-                      </td>
-                      <td className={`${TD} text-right`}>
-                        {p52 != null ? (
-                          <div title={`52w low ${usd(q?.week_52_low)} · high ${usd(q?.week_52_high)}`}>
-                            <div className="relative ml-auto h-1 w-[120px] rounded-full bg-[var(--border)]">
-                              <span className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--surface)] bg-accent" style={{ left: `${p52 * 100}%` }} />
-                            </div>
-                            <p className="mt-1 text-[10.5px] text-foreground/45">{(p52 * 100).toFixed(0)}% of range</p>
-                          </div>
-                        ) : <span className="text-foreground/40">—</span>}
-                      </td>
-                      <td className={`${TD} text-right text-foreground/80`}>{q?.market_cap_fmt ?? "—"}</td>
-                      <td className={`${TD} text-right text-foreground/80`}>{q?.pe_ratio != null ? q.pe_ratio.toFixed(1) : "—"}</td>
-                      <td className={`${TD} max-w-[160px] truncate font-sans text-[12px] text-foreground/65`}>
-                        {q?.sector ? <button onClick={() => setSector(q.sector!)} className="hover:text-foreground hover:underline">{q.sector}</button> : "—"}
-                      </td>
+                      {cols.map((c) => (
+                        <td key={c.id} className={clsx(TD, "whitespace-nowrap", c.left ? "text-left" : "text-right", "text-foreground/85")}>
+                          {c.id === "sector" && q?.sector
+                            ? <button onClick={() => setSector(q.sector!)} className="font-sans text-[12px] text-foreground/65 hover:text-foreground hover:underline">{q.sector}</button>
+                            : c.cell(r)}
+                        </td>
+                      ))}
                       <td className={`${TD} w-10 text-right`}>
                         {current && (
                           <button onClick={() => remove.mutate({ id: current.id, s: symbol })} aria-label={`Remove ${symbol} from ${current.name}`} title={`Remove from ${current.name}`}
@@ -403,5 +429,21 @@ function ActionsMenu({ items }: { items: { label: string; icon: LucideIcon; onCl
         </div>
       )}
     </div>
+  );
+}
+
+/** The column picker as a fixed panel (the table's card clips anything absolute): top-right on desktop,
+ *  a sheet from the bottom on phones. Closes on outside click / Escape. */
+function Popover({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const ref = useDismiss(true, onClose);
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 sm:bg-transparent" aria-hidden />
+      <div ref={ref} role="dialog" aria-label="Customize columns"
+        className="fixed inset-x-0 bottom-0 z-50 overflow-hidden rounded-t-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-float)]
+          sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-24 sm:rounded-2xl">
+        {children}
+      </div>
+    </>
   );
 }

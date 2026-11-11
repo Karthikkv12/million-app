@@ -1719,6 +1719,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlists/option-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Option Metrics
+         * @description ATM IV, IV change today, HV20, IV/HV, weekly expected move and ATM deltas, for the option columns.
+         */
+        get: operations["option_metrics_api_v1_watchlists_option_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlists/order": {
         parameters: {
             query?: never;
@@ -1772,7 +1792,7 @@ export interface paths {
         head?: never;
         /**
          * Update List
-         * @description Rename and/or replace the symbols (in order).
+         * @description Rename, replace the symbols, and/or replace the columns (each in order).
          */
         patch: operations["update_list_api_v1_watchlists__list_id__patch"];
         trace?: never;
@@ -3526,6 +3546,53 @@ export interface components {
              */
             symbols: string[];
         };
+        /** OptionMetricsOut */
+        OptionMetricsOut: {
+            /** Atm Call Delta */
+            atm_call_delta?: number | null;
+            /**
+             * Atm Iv
+             * @description ATM implied vol of the weekly expiry, fraction (0.42 = 42%)
+             */
+            atm_iv?: number | null;
+            /** Atm Put Delta */
+            atm_put_delta?: number | null;
+            /** Dte */
+            dte?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Expected Move
+             * @description ± $ to that expiry: spot × IV × √(dte/365)
+             */
+            expected_move?: number | null;
+            /** Expected Move Pct */
+            expected_move_pct?: number | null;
+            /**
+             * Expiry
+             * @description The weekly expiry used
+             */
+            expiry?: string | null;
+            /**
+             * Hv20
+             * @description 20-day historical vol, annualised fraction
+             */
+            hv20?: number | null;
+            /**
+             * Iv Change Day
+             * @description ATM IV now vs the first reading today, fraction
+             */
+            iv_change_day?: number | null;
+            /**
+             * Iv Hv
+             * @description atm_iv / hv20
+             */
+            iv_hv?: number | null;
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
             /** Cash */
@@ -4592,6 +4659,11 @@ export interface components {
         };
         /** WatchlistGroupOut */
         WatchlistGroupOut: {
+            /**
+             * Columns
+             * @description Column ids the user picked for this list, in order; null = the default set
+             */
+            columns?: string[] | null;
             /** Created At */
             created_at: string;
             /** Id */
@@ -4720,6 +4792,11 @@ export interface components {
         };
         /** WatchlistUpdateIn */
         WatchlistUpdateIn: {
+            /**
+             * Columns
+             * @description Replaces the column set (and its order); [] = reset to default
+             */
+            columns?: string[] | null;
             /** Name */
             name?: string | null;
             /**
@@ -8299,6 +8376,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistGroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    option_metrics_api_v1_watchlists_option_metrics_get: {
+        parameters: {
+            query: {
+                /** @description Comma-separated, up to 40 */
+                symbols: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionMetricsOut"][];
                 };
             };
             /** @description Validation Error */

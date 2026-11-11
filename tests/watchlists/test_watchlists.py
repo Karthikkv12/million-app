@@ -95,3 +95,32 @@ def test_service_rejects_too_many_symbols(db_engine_and_session):
     uid = 1
     with pytest.raises(service.WatchlistError):
         service.create_group(uid, "Huge", [f"S{i}" for i in range(service.MAX_SYMBOLS + 1)])
+
+
+def test_columns_saved_per_list_and_reset(client):
+    h = _login(client)
+    gid = client.get("/api/v1/watchlists", headers=h).json()["lists"][0]["id"]
+    assert client.get("/api/v1/watchlists", headers=h).json()["lists"][0]["columns"] is None
+    r = client.patch(f"/api/v1/watchlists/{gid}", json={"columns": ["last", "atm_iv", "atm_call_delta", "atm_iv"]}, headers=h)
+    assert r.json()["columns"] == ["last", "atm_iv", "atm_call_delta"]
+    assert client.patch(f"/api/v1/watchlists/{gid}", json={"columns": ["DROP TABLE"]}, headers=h).status_code == 400
+    assert client.patch(f"/api/v1/watchlists/{gid}", json={"columns": []}, headers=h).json()["columns"] is None
+
+
+def test_option_metrics_from_the_desk_caches(client, monkeypatch):
+    from optionflow.modules.hedge import service as desk
+    from optionflow.modules.watchlists import options
+    rows = {("2026-11-14", 100.0, "call"): (0.40, 2.0, 3.0), ("2026-11-14", 100.0, "put"): (0.40, 2.0, 3.0),
+            ("2026-11-14", 105.0, "call"): (0.38, 0.6, 3.0)}
+    monkeypatch.setattr(desk, "_chain", lambda s: {"rows": rows, "weekly": "2026-11-14", "atm_iv": 0.40} if s == "AAPL" else None)
+    monkeypatch.setattr(desk, "_spot", lambda s: 100.0 if s == "AAPL" else None)
+    monkeypatch.setattr(desk, "_hv", lambda s: {"hv20": 0.25})
+    h = _login(client)
+    out = client.get("/api/v1/watchlists/option-metrics?symbols=aapl,NOPE,<bad>", headers=h).json()
+    assert [m["symbol"] for m in out] == ["AAPL", "NOPE"]
+    a = out[0]
+    assert a["atm_iv"] == 0.4 and a["iv_hv"] == 1.6 and a["expiry"] == "2026-11-14" and a["dte"] == 3.0
+    assert a["expected_move"] == round(100 * 0.4 * (3 / 365) ** 0.5, 2)
+    assert 0.5 < a["atm_call_delta"] < 0.56 and -0.5 < a["atm_put_delta"] < -0.44
+    assert out[1]["error"] == "No option chain" and out[1]["atm_iv"] is None
+    assert len(options.batch([f"S{i}" for i in range(60)])) == options.MAX_SYMBOLS

@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from optionflow.core.deps import get_current_user
-from optionflow.modules.watchlists import service
+from optionflow.modules.watchlists import options, service
 from optionflow.modules.watchlists.schemas import (
-    WatchlistCreateIn, WatchlistGroupOut, WatchlistGroupsOut, WatchlistOrderIn, WatchlistUpdateIn,
+    OptionMetricsOut, WatchlistCreateIn, WatchlistGroupOut, WatchlistGroupsOut, WatchlistOrderIn, WatchlistUpdateIn,
 )
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
@@ -33,6 +33,19 @@ def get_lists(user=Depends(get_current_user)) -> WatchlistGroupsOut:
     return _all(service.list_groups(int(user["sub"])))
 
 
+@router.get("/option-metrics", response_model=List[OptionMetricsOut])
+def option_metrics(symbols: str = Query(..., max_length=600, description="Comma-separated, up to 40"),
+                   _user=Depends(get_current_user)) -> List[OptionMetricsOut]:
+    """ATM IV, IV change today, HV20, IV/HV, weekly expected move and ATM deltas, for the option columns."""
+    syms = []
+    for s in symbols.split(","):
+        try:
+            syms.append(service.clean_symbol(s))
+        except service.WatchlistError:
+            continue
+    return [OptionMetricsOut(**m) for m in options.batch(syms)]
+
+
 @router.post("", response_model=WatchlistGroupOut, status_code=201)
 def create_list(body: WatchlistCreateIn, user=Depends(get_current_user)) -> WatchlistGroupOut:
     """New list (409 at the 20-list limit or on a duplicate name)."""
@@ -41,8 +54,8 @@ def create_list(body: WatchlistCreateIn, user=Depends(get_current_user)) -> Watc
 
 @router.patch("/{list_id}", response_model=WatchlistGroupOut)
 def update_list(list_id: int, body: WatchlistUpdateIn, user=Depends(get_current_user)) -> WatchlistGroupOut:
-    """Rename and/or replace the symbols (in order)."""
-    return WatchlistGroupOut(**_run(lambda: service.update_group(int(user["sub"]), list_id, body.name, body.symbols)))
+    """Rename, replace the symbols, and/or replace the columns (each in order)."""
+    return WatchlistGroupOut(**_run(lambda: service.update_group(int(user["sub"]), list_id, body.name, body.symbols, body.columns)))
 
 
 @router.delete("/{list_id}", status_code=204)

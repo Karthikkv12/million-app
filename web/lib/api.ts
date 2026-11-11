@@ -923,7 +923,11 @@ const sym = (s: string) => encodeURIComponent(s.trim().toUpperCase());
 /** Every list in display order. The first call creates "My watchlist" plus one list per sector. */
 export const fetchWatchlistGroups = () => api.get<WatchlistGroups>("/watchlists");
 export const createWatchlistGroup = (name: string, symbols: string[] = []) => api.post<WatchlistGroup>("/watchlists", { name, symbols });
-export const updateWatchlistGroup = (id: number, body: { name?: string; symbols?: string[] }) => api.patch<WatchlistGroup>(wl(id), body);
+export const updateWatchlistGroup = (id: number, body: { name?: string; symbols?: string[]; columns?: string[] }) => api.patch<WatchlistGroup>(wl(id), body);
+export type OptionMetrics = Schemas["OptionMetricsOut"];
+/** ATM IV, IV change today, HV20, IV/HV, weekly expected move and ATM deltas (up to 40 symbols per call). */
+export const fetchOptionMetrics = (symbols: string[]) =>
+  api.get<OptionMetrics[]>(`/watchlists/option-metrics?symbols=${symbols.map((s) => encodeURIComponent(s)).join(",")}`);
 export const deleteWatchlistGroup = (id: number) => api.del<void>(wl(id));
 export const addToWatchlistGroup = (id: number, symbol: string) => api.put<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
 export const removeFromWatchlistGroup = (id: number, symbol: string) => api.del<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
