@@ -36,7 +36,7 @@ GATE = RateLimitGate(first=120.0, maximum=1800.0)   # one gate for every Yahoo c
 _tl = threading.local()
 
 MAX_CHAIN_DTE = 60          # option chains: expiries within 60 days…
-MAX_CHAIN_EXPIRIES = 12     # …and at most 12 of them (the board shows 8)
+MAX_CHAIN_EXPIRIES = 12     # …and at most 12 of them (the heatmap carries all 12, the board shows 6 by default)
 _chain_cache: TTLCache = TTLCache(maxsize=512, ttl=300)   # (symbol, expiry) -> parsed rows, 5 min
 
 

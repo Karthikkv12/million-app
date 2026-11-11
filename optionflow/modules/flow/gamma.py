@@ -34,6 +34,8 @@ import pandas as pd
 
 from optionflow.providers.market_data import MarketDataRateLimited, get_market_data
 
+HEATMAP_EXPIRIES = 12   # heatmap rows sent: every expiry the providers fetch (MAX_CHAIN_EXPIRIES = 12)
+
 def _get_lot_size(symbol: str) -> int:
     """Contract multiplier: 100 for US-listed options (the only market supported)."""
     return 100
@@ -380,8 +382,9 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         if not heatmap_strikes:
             heatmap_strikes = sorted(by_strike["strike"].tolist())
 
-        # Limit expiries to nearest 8 for heatmap readability
-        heatmap_expiries = expiries[:8]
+        # Every fetched expiry (up to HEATMAP_EXPIRIES): the board shows the first 6 unless the owner picks
+        # others in the per-table expiry dropdown (C-93)
+        heatmap_expiries = expiries[:HEATMAP_EXPIRIES]
 
         heatmap_values: list[list[float]] = []
         heatmap_vex_values: list[list[float]] = []

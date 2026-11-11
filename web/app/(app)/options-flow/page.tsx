@@ -25,7 +25,7 @@ function loadLayout(): PersistedLayout {
     const parsed = JSON.parse(raw) as PersistedLayout;
     const slots = (Array.isArray(parsed.slots) ? parsed.slots : [])
       .filter((s) => typeof s.ticker === "string" && s.ticker.length > 0)
-      .map((s) => makeSlot(s.ticker, s.metric))
+      .map((s) => makeSlot(s.ticker, s.metric, s.expiryFilter))
       .slice(0, MAX_TICKERS);
     if (!slots.length) return fallback;
     const nStrikes = (STRIKE_OPTIONS as readonly number[]).includes(parsed.nStrikes) ? parsed.nStrikes : DEFAULT_STRIKES;
@@ -43,7 +43,7 @@ function loadLayout(): PersistedLayout {
 
 function saveLayout(slots: Slot[], nStrikes: number, heat: HeatOpts) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker, s.metric)), nStrikes, heat }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots: slots.map((s) => makeSlot(s.ticker, s.metric, s.expiryFilter)), nStrikes, heat }));
   } catch { /* storage unavailable */ }
 }
 
@@ -171,9 +171,10 @@ export default function OptionsFlowPage() {
               onRemove={() => removeSlot(i)}
               onInputChange={(v) => updateSlot(i, { input: v })}
               onMetricChange={(m) => updateSlot(i, { metric: m })}
+              onExpiriesChange={(e) => updateSlot(i, { expiryFilter: e })}
               onSelect={(sym) => {
                 const t = sym.trim().toUpperCase();
-                if (t) updateSlot(i, { ticker: t, input: t });
+                if (t) updateSlot(i, { ticker: t, input: t, expiryFilter: null });   // new ticker: its own expiries
               }}
             />
           ))}
