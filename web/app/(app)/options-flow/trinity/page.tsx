@@ -18,6 +18,7 @@ import { useGexStream } from "@/lib/useGexStream";
 import { useQuotes } from "@/components/dashboard/quotes";
 import { cellColor, fmtMoney, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow/GexHeatmap";
 import type { Palette } from "@/components/options-flow/GexHeatmap";
+import { ANCHOR_TONE, anchorOf } from "@/lib/gex";
 
 const NAMES = [
   { sym: "SPX", quote: "^SPX", label: "SPX" },
@@ -115,6 +116,8 @@ function Column({ name, d, isLoading, chosen, rows, windowMin, palette, change }
   }, [key, rows, !!col]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const kingDist = col && d ? (col.king / d.spot - 1) * 100 : null;
+  const anchor = col && d ? anchorOf(d, exp) : null;
+  const anchorDist = anchor && d ? (anchor.price / d.spot - 1) * 100 : null;
   return (
     <section className="flex min-w-[230px] snap-start flex-col border border-[var(--border-strong)] bg-[var(--surface)]" aria-label={`${name.label} gamma for ${exp ?? "no expiry"}`}>
       <header className="border-b border-[var(--border)] px-3 py-2.5">
@@ -132,6 +135,13 @@ function Column({ name, d, isLoading, chosen, rows, windowMin, palette, change }
             <span className={clsx("inline-flex items-center", Math.abs(kingDist) < 0.05 ? "text-foreground/60" : kingDist > 0 ? "text-gain" : "text-loss")}>
               {Math.abs(kingDist).toFixed(1)}%{Math.abs(kingDist) >= 0.05 && (kingDist > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
             </span>
+          </p>
+        )}
+        {col && (
+          <p className={clsx("mt-0.5 flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums", ANCHOR_TONE)}
+            title={anchor ? "Gamma-weighted centre of positive GEX within 10% of the price for this expiry: where long-gamma dealers tend to pull the price."
+              : "Positive gamma doesn't dominate near the price in this expiry, so there is no pin level."}>
+            ⚓ {anchor && anchorDist != null ? <>Anchor {anchor.price.toFixed(anchor.price >= 1000 ? 0 : 2)} <span className="text-foreground/55">{anchorDist >= 0 ? "+" : ""}{anchorDist.toFixed(1)}%</span></> : <span className="text-foreground/45">No pin</span>}
           </p>
         )}
       </header>

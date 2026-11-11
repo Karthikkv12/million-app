@@ -10,6 +10,7 @@ import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import type { GexResult } from "@/lib/api";
 import { Ladder } from "@/components/desk";
+import { ANCHOR_TONE, anchorOf, shortExpiry } from "@/lib/gex";
 
 type Idea = NonNullable<GexResult["ideas"]>[number];
 
@@ -69,6 +70,7 @@ function DirectionRead({ o }: { o: NonNullable<GexResult["outlook"]> }) {
 export function DealerLadder({ data, height = 250, className }: { data: GexResult; height?: number; className?: string }) {
   const ideas = data.ideas ?? [];
   const o = data.outlook;
+  const anchor = anchorOf(data);
   return (
     <div className={clsx("min-w-0 px-4 py-3", className)} role="group" aria-label={`${data.symbol} dealer ladder`}>
       {o && <DirectionRead o={o} />}
@@ -77,6 +79,7 @@ export function DealerLadder({ data, height = 250, className }: { data: GexResul
         { label: "call wall", price: data.max_call_wall, tone: "text-gain" },
         { label: "★ king", price: data.max_gex_strike, tone: "text-[#b45309] dark:text-[#fde725]" },
         { label: "flip", price: data.zero_gamma, tone: "text-accent" },
+        { label: `⚓ anchor ${anchor ? shortExpiry(anchor.expiry) : ""}`, price: anchor?.price, tone: ANCHOR_TONE },
         { label: "put wall", price: data.max_put_wall, tone: "text-loss" },
         { label: "⚔ battle", price: o?.battleground, tone: "text-warn", strong: true },
         { label: `+1σ ${o?.expected_dte ?? ""}d`, price: o?.expected_high, tone: "text-foreground/45" },
