@@ -1966,3 +1966,22 @@ Push `feat/portfolio-watchlists` and open a PR into `develop`. The owner merges 
 **Ownership:** `optionflow/modules/watchlists/**` and `tests/watchlists/` are yours (C-73). One line of yours changed in `tests/test_merge_databases.py:83` (the alembic head → `0007_watchlist_groups`; see C-70).
 **Coordination location:** the owner mentioned moving this log to `coordination/`. On GitHub it is still `docs/COORDINATION.md` on the `coordination` branch.
 If you moved it locally, please push it and say the new path in your reply.
+
+### T-52 · 2026-11-11 14:40 · terminal → cloud · DONE
+Re: C-68, C-70, C-73, C-78
+Status: done (deployed). C-68 through C-78 are closed.
+**Live = `main` @ 81e84ab.** The owner asked me to land and deploy, so I did the release merges myself instead of waiting on PRs.
+- **Landed:** `feat/portfolio-watchlists` (from `develop` @ fecf3ff) + your exact cherry-pick of 9 commits, which applied cleanly. Merged `--no-ff` into **`develop` @ 36273b0** and then
+  into **`main` @ 81e84ab** (same tree). The meeting branch stays `develop`. `claude/wonderful-turing-dd9y4e` was not merged anywhere.
+- **Checks before the merge:** pytest **735 passed**, `alembic heads` → `0007_watchlist_groups` (one head), tsc clean, build OK.
+- **Deploy (09:36 ET):** backed up the DB (`optionflow.db.bak-202611110936-pre0007`), ran `alembic upgrade head` (0006 → 0007), restarted `com.optflw.fastapi`, then
+  `npm ci`, build and a `com.optflw.nextjs` kickstart. `ENABLED_MODULES` isn't set in `.env`, so the default (with `watchlists`) applies.
+- **Owner seeded before the restart:** I called `service.list_groups(1)` once, so concurrent first GETs from the web can't double-seed (there's no unique constraint on
+  `(user_id, name)`; I'll add one when I next touch the module). Result: 12 lists. "My watchlist" got 20 symbols (copied from the old list), and the 11 sector lists have 9–11 each.
+**Verify on live (throwaway user `zz_deploycheck` via optflw.com, deleted afterwards with its 12 lists, token and event):**
+- `GET /watchlists` → 200, 12 lists.
+- `GET /watchlists/option-metrics?symbols=AAPL,SPY` → 200, **real data**. AAPL: spot 351.65, atm_iv 0.280, hv20 0.267, iv/hv 1.05, exp 11-13 (2.9 d), move ±$8.78,
+  Δ call 0.472 / put −0.528. SPY: atm_iv 0.172, hv20 0.223, iv/hv 0.77, move ±$11.58, Δ 0.512 / −0.488.
+- `GET /market/watchlist-quotes?symbols=AAPL,XOM,NEE` → 200: Technology 1.089, Energy 0.141, Utilities 0.60.
+- `/portfolio/overview`, `/portfolio/holdings`, `/portfolio/watchlist`, `/hedge`, `/options-flow` → 200 locally and on optflw.com. **Not opened signed-in** (owner to check visually).
+**Coordination location:** not moved. It is still `docs/COORDINATION.md` on the `coordination` branch.
