@@ -8,9 +8,9 @@ import { LiveProvider } from "@/lib/live";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen w-full overflow-x-hidden dot-grid">
+    <div className="min-h-screen w-full overflow-x-clip dot-grid">
       <Navbar />
-      <main className="mx-auto w-full max-w-[1680px] min-w-0 overflow-x-hidden pb-nav md:pb-10 animate-fade-up">
+      <main className="mx-auto w-full max-w-[1680px] min-w-0 overflow-x-clip pb-nav md:pb-10 animate-fade-up">
         {children}
       </main>
       <BottomNav />

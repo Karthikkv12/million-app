@@ -15,6 +15,7 @@ import { LevelsStrip } from "./LevelsStrip";
 import { GexHeatmap } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
+import { ExpiryPicker } from "./ExpiryPicker";
 import { DealerLadder, TradeIdeas } from "./DealerLadder";
 import { LeapsLine } from "@/components/insight/LeapsScore";
 import { sourceName } from "./SourceBadge";
@@ -23,14 +24,15 @@ import { sourceName } from "./SourceBadge";
 export interface Slot {
   ticker: string;
   input: string;
-  /** Kept for compatibility with saved layouts; no longer used by the UI. */
+  /** Expiry columns this table shows (≤ 6, from the dropdown); null = the nearest 6. Saved with the layout. */
   expiryFilter: string[] | null;
   /** Which exposure this ticker's table shows (tab above the table). */
   metric: Metric;
 }
 
-export function makeSlot(ticker: string, metric?: unknown): Slot {
-  return { ticker, input: ticker, expiryFilter: null, metric: metric === "vex" ? "vex" : "gex" };
+export function makeSlot(ticker: string, metric?: unknown, expiries?: unknown): Slot {
+  const exp = Array.isArray(expiries) ? expiries.filter((e): e is string => typeof e === "string" && /^\d{4}-\d{2}-\d{2}$/.test(e)).slice(0, 6) : [];
+  return { ticker, input: ticker, expiryFilter: exp.length ? exp : null, metric: metric === "vex" ? "vex" : "gex" };
 }
 
 /** Strike-window sizes around spot; 0 = every strike the server sent. The board also grows past
@@ -51,6 +53,8 @@ export interface TickerPanelProps {
   onInputChange: (v: string) => void;
   onSelect: (symbol: string) => void;
   onMetricChange: (metric: Metric) => void;
+  /** New expiry choice for this table (null = back to the nearest 6). */
+  onExpiriesChange?: (expiries: string[] | null) => void;
   data: GexResult | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -62,7 +66,7 @@ export interface TickerPanelProps {
 }
 
 export function TickerPanel({
-  slot, accentColor, nStrikes, heatOpts, columns = 1, canRemove, onRemove, onInputChange, onSelect, onMetricChange,
+  slot, accentColor, nStrikes, heatOpts, columns = 1, canRemove, onRemove, onInputChange, onSelect, onMetricChange, onExpiriesChange,
   data, isLoading, isError, errorText, isFetching, onRefresh, dataUpdatedAt,
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -130,8 +134,11 @@ export function TickerPanel({
             </div>
             <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
             <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+            <span className="ml-auto" />
+            <ExpiryPicker available={data.heatmap_expiries ?? []} chosen={slot.expiryFilter}
+              onChange={(next) => onExpiriesChange?.(next)} />
             <button onClick={() => setLadderOpen((o) => !o)} aria-pressed={ladderOpen} title="Dealer ladder with buy/sell call and put ideas"
-              className={`ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground ${ladderOpen ? "text-foreground" : "text-foreground/60"}`}>
+              className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground ${ladderOpen ? "text-foreground" : "text-foreground/60"}`}>
               <Ruler size={12} /> Ladder
             </button>
             <button
@@ -152,7 +159,7 @@ export function TickerPanel({
             )}
             <div className="min-w-0">
               <LeapsLine symbol={slot.ticker} className="border-b border-[var(--border)] px-4 py-1.5" />
-              <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
+              <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" expiries={slot.expiryFilter ?? undefined} />
               {ladderOpen && !beside && <TradeIdeas data={data} className="border-t border-[var(--border)]" />}
             </div>
           </div>

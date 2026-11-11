@@ -212,7 +212,7 @@ export default function DashboardPage() {
                         <span className="min-w-0 truncate text-[13px] text-foreground" title={c.headline}>
                           {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · {Math.round(c.profit_pct * 100)}% in
                         </span>
-                        <span className="sensitive text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{usd(c.cost, 0)}</span>
+                        <span className="text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{usd(c.cost, 0)}</span>
                       </div>
                     </DeskRow>
                   </Link>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                           <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
                           <span><Tag tone={a.tone}>{a.label}</Tag></span>
                           <span className={clsx("min-w-0 truncate text-[13px]", a.edge ? "text-foreground" : "text-foreground/50")} title={s.headline}>{what}</span>
-                          <span className="sensitive text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{a.edge && s.credit ? usd(Math.abs(s.credit), 0) : ""}</span>
+                          <span className="text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{a.edge && s.credit ? usd(Math.abs(s.credit), 0) : ""}</span>
                         </div>
                       </DeskRow>
                     </Link>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
                       <span className="font-mono text-[14px] font-semibold text-foreground">{o.symbol}</span>
                       <span><Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag></span>
-                      <span className={clsx("sensitive text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
+                      <span className={clsx("text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
                       <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">
                         {o.contracts < 0 ? "Short" : "Long"} {Math.abs(o.contracts)} {o.strike}{o.option_type === "call" ? "C" : "P"} · {o.expiry.slice(5)} · spot <Tick value={o.spot}>{usd(o.spot)}</Tick>
                       </span>
