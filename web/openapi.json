@@ -5057,6 +5057,16 @@
       "description": "Avoid | Weak | Fair | Good | Excellent",
       "title": "Band"
      },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreEntry"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "error": {
       "anyOf": [
        {
@@ -8149,6 +8159,42 @@
      "size"
     ],
     "title": "ReportSummary",
+    "type": "object"
+   },
+   "ScoreEntry": {
+    "description": "The stock price at which to buy the long call (score.entry_plan).",
+    "properties": {
+     "distance": {
+      "description": "price vs the last close (decimal; 0 for now)",
+      "title": "Distance",
+      "type": "number"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "when": {
+      "description": "now | wait for a dip to price | wait for a close back above price",
+      "enum": [
+       "now",
+       "pullback",
+       "reclaim"
+      ],
+      "title": "When",
+      "type": "string"
+     }
+    },
+    "required": [
+     "price",
+     "when",
+     "distance",
+     "note"
+    ],
+    "title": "ScoreEntry",
     "type": "object"
    },
    "ScoreFactor": {

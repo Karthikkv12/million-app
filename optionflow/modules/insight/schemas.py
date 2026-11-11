@@ -61,6 +61,14 @@ class ScoreTraits(BaseModel):
     sessions: int
 
 
+class ScoreEntry(BaseModel):
+    """The stock price at which to buy the long call (score.entry_plan)."""
+    price: float
+    when: Literal["now", "pullback", "reclaim"] = Field(..., description="now | wait for a dip to price | wait for a close back above price")
+    distance: float = Field(..., description="price vs the last close (decimal; 0 for now)")
+    note: str
+
+
 class LeapsScoreOut(BaseModel):
     symbol: str
     score: Optional[int] = Field(None, description="0 (bad) to 100 (extremely good); None without enough history")
@@ -68,5 +76,6 @@ class LeapsScoreOut(BaseModel):
     summary: str = ""
     factors: List[ScoreFactor] = []
     traits: Optional[ScoreTraits] = None
+    entry: Optional[ScoreEntry] = None
     as_of: Optional[str] = None
     error: Optional[str] = None

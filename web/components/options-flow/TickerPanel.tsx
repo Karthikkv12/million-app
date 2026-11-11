@@ -16,7 +16,7 @@ import { GexHeatmap } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
 import { DealerLadder, TradeIdeas } from "./DealerLadder";
-import { LeapsScore } from "@/components/insight/LeapsScore";
+import { LeapsLine } from "@/components/insight/LeapsScore";
 import { sourceName } from "./SourceBadge";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
@@ -147,22 +147,13 @@ export function TickerPanel({
             {ladderOpen && (
               <aside className={beside ? "border-b border-[var(--border)] sm:grid sm:grid-cols-2 xl:order-2 xl:block xl:border-b-0 xl:border-l" : "border-b border-[var(--border)]"}>
                 <DealerLadder data={data} height={beside ? 250 : 215} />
-                {beside && (
-                  <div className="min-w-0 xl:border-t xl:border-[var(--border)]">
-                    <TradeIdeas data={data} />
-                    <LeapsScore symbol={slot.ticker} compact className="border-t border-[var(--border)] px-4 py-3" />
-                  </div>
-                )}
+                {beside && <TradeIdeas data={data} className="xl:border-t xl:border-[var(--border)]" />}
               </aside>
             )}
             <div className="min-w-0">
+              <LeapsLine symbol={slot.ticker} className="border-b border-[var(--border)] px-4 py-1.5" />
               <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
-              {ladderOpen && !beside && (
-                <>
-                  <TradeIdeas data={data} className="border-t border-[var(--border)]" />
-                  <LeapsScore symbol={slot.ticker} compact className="border-t border-[var(--border)] px-4 py-3" />
-                </>
-              )}
+              {ladderOpen && !beside && <TradeIdeas data={data} className="border-t border-[var(--border)]" />}
             </div>
           </div>
           <DetailsDrawer

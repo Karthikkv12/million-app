@@ -2,6 +2,7 @@
 /**
  * LeapsScore — the 0–100 LEAPS score on a banded scale (Avoid · Weak · Fair · Good · Excellent), how the stock
  * trades (trend, pullback state, volatility, volume, typical move), and the factors behind the number.
+ * LeapsLine — the one-line version for the heat maps: score and entry price only.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -59,6 +60,14 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
                 tips={{ value: `${data.score} of 100: ${data.band}. 0 is bad, 100 is extremely good.` }} />
             </div>
             <p className="text-[12.5px] leading-snug text-foreground/70">{data.summary}</p>
+            {data.entry && (
+              <p className="mt-1.5 border-l-[3px] border-accent pl-2 text-[12.5px] leading-snug text-foreground/80">
+                <span className="font-mono font-medium tabular-nums text-foreground">
+                  {data.entry.when === "now" ? "Enter now, around " : data.entry.when === "pullback" ? "Enter at " : "Enter above "}
+                  ${data.entry.price.toFixed(2)}
+                </span>{" "}{data.entry.note}
+              </p>
+            )}
             {t && (
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <Chip k="Trend" v={t.trend} cls={t.trend === "up" ? "text-gain" : t.trend === "down" ? "text-loss" : undefined} />
@@ -96,5 +105,30 @@ export function LeapsScore({ symbol, compact = false, className }: { symbol: str
           </>
         )}
     </div>
+  );
+}
+
+
+const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** One line for the heat maps: the score, and the stock price at which to buy the long call. No scale, no factors. */
+export function LeapsLine({ symbol, className }: { symbol: string; className?: string }) {
+  const { data, isLoading } = useLeapsScore(symbol);
+  if (isLoading) return <p className={clsx("font-mono text-[11.5px] text-foreground/35", className)}>LEAPS score …</p>;
+  if (!data || data.score == null) return null;
+  const e = data.entry;
+  const away = e && e.when !== "now" ? ` (${e.distance > 0 ? "+" : ""}${(e.distance * 100).toFixed(1)}%)` : "";
+  return (
+    <p className={clsx("flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-mono text-[12px] tabular-nums", className)} title={e?.note}>
+      <span className="text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">LEAPS score</span>
+      <span className={clsx("text-[15px] font-medium", tone(data.score))}>{data.score}</span>
+      {e && (
+        <span className="text-foreground/75">
+          {e.when === "now" ? <>Buy a LEAPS call now, around <b className="font-medium text-foreground">{usd(e.price)}</b></>
+            : e.when === "pullback" ? <>Buy a LEAPS call when {symbol} is at <b className="font-medium text-foreground">{usd(e.price)}</b><span className="text-foreground/45">{away}</span></>
+            : <>Buy a LEAPS call when {symbol} closes back above <b className="font-medium text-foreground">{usd(e.price)}</b><span className="text-foreground/45">{away}</span></>}
+        </span>
+      )}
+    </p>
   );
 }

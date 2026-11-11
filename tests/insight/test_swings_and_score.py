@@ -135,3 +135,36 @@ def test_api_needs_login_and_validates_the_period(md):
     c = TestClient(create_app(Settings(_env_file=None)))
     assert c.get("/api/v1/insight/ABC/swings").status_code == 401
     assert c.get("/api/v1/insight/ABC/leaps-score").status_code == 401
+
+
+# ── entry price ───────────────────────────────────────────────────────────────
+def test_entry_is_now_after_a_pullback_in_an_uptrend():
+    e = sc.entry_plan(85.0, 70, "up", -0.15, 100.0, 90.0, 80.0)
+    assert e == {"price": 85.0, "when": "now", "distance": 0.0, "note": e["note"]} and "15% under" in e["note"]
+
+
+def test_entry_waits_for_a_dip_when_near_the_high():
+    e = sc.entry_plan(99.0, 70, "up", -0.01, 100.0, 94.0, 85.0)            # 50-day avg is a real dip, above high −10%
+    assert (e["price"], e["when"]) == (94.0, "pullback") and e["distance"] == pytest.approx(94 / 99 - 1, abs=1e-4)
+    e = sc.entry_plan(99.0, 70, "up", -0.01, 100.0, 98.5, 85.0)            # 50-day avg too close: 10% under the high
+    assert (e["price"], e["when"]) == (90.0, "pullback")
+    e = sc.entry_plan(99.0, 70, "up", -0.01, 100.0, 80.0, 70.0)            # 50-day avg too far: 10% under the high
+    assert e["price"] == 90.0
+
+
+def test_entry_in_a_downtrend_is_a_reclaim_above_the_price():
+    e = sc.entry_plan(60.0, 25, "down", -0.40, 100.0, 66.0, 78.0)
+    assert (e["price"], e["when"]) == (78.0, "reclaim") and e["distance"] > 0 and "200-day" in e["note"]
+
+
+def test_entry_with_a_weak_score_waits_for_the_long_average():
+    e = sc.entry_plan(85.0, 40, "sideways", -0.15, 100.0, 88.0, 80.0)
+    assert (e["price"], e["when"]) == (80.0, "pullback")
+    e = sc.entry_plan(70.0, 40, "sideways", -0.30, 100.0, 75.0, 80.0)
+    assert (e["price"], e["when"]) == (80.0, "reclaim")
+
+
+def test_score_carries_the_entry():
+    out = sc.leaps_score(path(1000, drift=0.0008, wobble=0.004))
+    assert out["entry"]["when"] == "pullback" and out["entry"]["price"] < path(1000, drift=0.0008, wobble=0.004)[-1]
+    assert sc.leaps_score(path(30))["entry"] is None

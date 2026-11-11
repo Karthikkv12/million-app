@@ -3465,6 +3465,7 @@ export interface components {
              * @description Avoid | Weak | Fair | Good | Excellent
              */
             band?: string | null;
+            entry?: components["schemas"]["ScoreEntry"] | null;
             /** Error */
             error?: string | null;
             /**
@@ -4302,6 +4303,27 @@ export interface components {
             source_url?: string | null;
             /** Title */
             title: string;
+        };
+        /**
+         * ScoreEntry
+         * @description The stock price at which to buy the long call (score.entry_plan).
+         */
+        ScoreEntry: {
+            /**
+             * Distance
+             * @description price vs the last close (decimal; 0 for now)
+             */
+            distance: number;
+            /** Note */
+            note: string;
+            /** Price */
+            price: number;
+            /**
+             * When
+             * @description now | wait for a dip to price | wait for a close back above price
+             * @enum {string}
+             */
+            when: "now" | "pullback" | "reclaim";
         };
         /** ScoreFactor */
         ScoreFactor: {

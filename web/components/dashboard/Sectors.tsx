@@ -2,7 +2,7 @@
 /**
  * Sectors — ranked sector rows (SPDR ETF move, diverging bar) that expand in place into a
  * heat strip of the sector's key stocks (tile width ∝ market cap), with the sector's drawdown and
- * upside-spike charts and its LEAPS score underneath. Replaces the old Markets page.
+ * upside-spike charts and a one-line LEAPS score with its entry price underneath. Replaces the old Markets page.
  */
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { ChevronDown } from "lucide-react";
 import { heatColor } from "@/components/ui";
 import { DeskRow } from "@/components/desk";
 import { SwingCharts } from "@/components/insight/SwingCharts";
-import { LeapsScore } from "@/components/insight/LeapsScore";
+import { LeapsLine } from "@/components/insight/LeapsScore";
 import { useQuotes } from "./quotes";
 import { SECTORS, SECTOR_ROWS, StockTile } from "./sector-baskets";
 
@@ -23,9 +23,9 @@ const pctTxt = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${
 
 function SectorSwings({ symbol, label }: { symbol: string; label: string }) {
   return (
-    <div className="grid gap-x-8 gap-y-5 border-t border-[var(--border)] px-4 py-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="border-t border-[var(--border)] px-4 py-4">
+      <LeapsLine symbol={symbol} className="mb-4" />
       <SwingCharts symbol={symbol} title={`${label}: drawdown and upside spikes`} height={150} />
-      <LeapsScore symbol={symbol} compact />
     </div>
   );
 }

@@ -16,6 +16,9 @@ volatility is cheap, in a name that trades enough to get in and out and does not
   strength      7  1-year return vs SPY
   dealers       5  above / below the gamma flip, long / short gamma
 
+`entry` is the stock price to buy at (entry_plan): now if it has already pulled back, else the dip to wait for,
+or in a downtrend the level it has to reclaim.
+
 A factor with no data is left out and the rest are re-weighted. Bands: 0–19 Avoid, 20–39 Weak, 40–59 Fair,
 60–79 Good, 80–100 Excellent.
 """
@@ -89,7 +92,7 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
     """{score, band, summary, factors, traits}; score None (with `error`) under MIN_BARS sessions of history."""
     px = [float(c) for c in closes if c and c > 0]
     if len(px) < MIN_BARS:
-        return {"score": None, "band": None, "summary": "", "factors": [], "traits": None,
+        return {"score": None, "band": None, "summary": "", "factors": [], "traits": None, "entry": None,
                 "error": f"Needs {MIN_BARS} sessions of history; {len(px)} available."}
     last = px[-1]
     f: List[Dict[str, Any]] = []
@@ -235,4 +238,43 @@ def leaps_score(closes: Sequence[float], volumes: Optional[Sequence[Optional[flo
               "daily_move": round(day_vol, 4) if day_vol else None,                 # typical one-day move (1σ)
               "monthly_move": round(day_vol * math.sqrt(21.0), 4) if day_vol else None,
               "sessions": len(px)}
-    return {"score": score, "band": band(score), "summary": summary, "factors": f, "traits": traits, "error": None}
+    entry = entry_plan(last, score, direction, off, high, ma50, ma_long, n_long)
+    return {"score": score, "band": band(score), "summary": summary, "factors": f, "traits": traits,
+            "entry": entry, "error": None}
+
+
+ENTER_SCORE = 50             # at or above this, a stock that has already pulled back is an entry now
+PULLBACK = 0.08              # "pulled back" = this far under the 52-week high
+DIP_TARGET = 0.10            # at the highs: wait for a dip this far under the 52-week high …
+NEAR = 0.02                  # … or the 50-day average when that is at least this far under the price
+
+
+def entry_plan(last: float, score: int, direction: str, off: float, high: float, ma50: float, ma_long: float,
+               n_long: int = 200) -> Dict[str, Any]:
+    """The stock price at which to buy the long call: {price, when, distance, note}.
+
+    when = "now"       already pulled back (≥ PULLBACK off the high), trend not down, score ≥ ENTER_SCORE
+           "pullback"  wait for a dip: the 50-day average if it is a real dip below the price, else DIP_TARGET
+                       under the 52-week high; a weak score waits for the long-term average instead
+           "reclaim"   downtrend: wait for a close back above the long-term average (the price is above today's)
+    """
+    avg = f"{n_long}-day average"
+    if direction == "down":
+        level = max(ma_long, ma50)
+        if level > last:
+            which = avg if level == ma_long else "50-day average"
+            return _entry(last, level, "reclaim", f"Downtrend: wait for a close back above the {which}.")
+    if off <= -PULLBACK and direction != "down" and score >= ENTER_SCORE:
+        return _entry(last, last, "now", f"Already {-off:.0%} under the 52-week high with the trend intact: enter around here.")
+    if off > -PULLBACK:
+        dip = high * (1.0 - DIP_TARGET)
+        if ma50 <= last * (1.0 - NEAR) and ma50 >= dip:
+            return _entry(last, ma50, "pullback", "Near the high: wait for a dip to the 50-day average.")
+        return _entry(last, dip, "pullback", f"Near the high: wait for a dip {DIP_TARGET:.0%} under the 52-week high.")
+    if ma_long < last:
+        return _entry(last, ma_long, "pullback", f"Weak score: wait for the {avg}, where long-term buyers step in.")
+    return _entry(last, max(ma_long, ma50), "reclaim", f"Weak score: wait for a close back above the {avg}.")
+
+
+def _entry(last: float, price: float, when: str, note: str) -> Dict[str, Any]:
+    return {"price": round(price, 2), "when": when, "distance": round(price / last - 1.0, 4), "note": note}
