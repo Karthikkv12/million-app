@@ -386,7 +386,7 @@ function ListTabs({ lists, selected, onSelect, allLabel, allCount, adding, onAdd
             <button type="button" aria-label="Cancel" onClick={onAddCancel} className="rounded-md p-1.5 text-foreground/50 hover:text-foreground"><X size={14} /></button>
           </form>
         ) : (
-          <button onClick={onAdd} disabled={!onAdd} aria-label="New list" title={atLimit ? `Up to ${max} lists` : `New list (${lists.length} of ${max})`}
+          <button onClick={onAdd} disabled={!onAdd} aria-label="New list" title={atLimit ? `Up to ${max} lists` : "New list"}
             className="mb-1 ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-foreground/55 transition hover:bg-[var(--surface-2)] hover:text-foreground disabled:opacity-30">
             <Plus size={17} />
           </button>
