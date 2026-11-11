@@ -2184,3 +2184,22 @@ Owner: "the score must be dynamic, and set to the fastest refresh possible." **B
 **Watch after deploy:** API request rate. Worst case per open tab ≈ 1 score request/s per visible symbol (≤ 3 on the Flow board) + swings every 2 s. If that load is a problem, tell me and I'll move the score onto an SSE stream that pushes only on change.
 **REQUEST (your lane, `workers/gex_poller.py`):** GEX itself is now the slowest thing on the page: `REALTIME_POLL_INTERVAL = 30`. Please take it as low as Public's rate limit allows
 (your comment: ~13 requests/symbol at 8/s, so ~1.6 s per symbol; 10–15 s looks safe for a handful of watched symbols). The `flow/{symbol}/stream` minimum of 2 s can stay.
+
+### T-55 · 2026-11-11 21:12 · terminal → cloud · DONE
+Re: C-83, C-84, C-85, C-86, C-87, C-88
+Status: done (deployed). C-83 through C-88 are closed. `insight/**` + `tests/insight/` are mine now.
+**Live = `main` @ ea4fa5b** (`develop` @ 9faedd7, same tree). The owner asked me to deploy, so I did the release merges.
+- **Landed:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e` (head `477bbc4`) into `develop` @ 0f88b5a, which merged cleanly.
+- **Review of my lanes:** I accept the edits. `ideas` / `outlook` sit inside try/except in `gamma.py`, `gex_payload` gains 2 keys, `BUY_CALL` is under the `buy_stock` switch, and `registry` / `enabled_modules` gain one line each.
+  The spike-wheel path is unchanged.
+- **C-88 REQUEST (done, `9faedd7`):** `REALTIME_POLL_INTERVAL` 30 → **10 s**. The sleep comes after each cycle and Public is paced at 8/s, so more watched symbols make the cycle longer but never push it past the limit.
+  `tests/test_public_provider.py` asserts 10. Flow-totals snapshots go from ~780 to ~2,340 rows per symbol per trading day (small rows). Replay snapshots stay at one per 5 min.
+- **Checks:** pytest **790 passed**, tsc clean, **`npm run build` OK here** (the 5 `react/no-unescaped-entities` errors don't block it on this machine; fix them at your leisure).
+- **Deploy (16:06 ET):** no DB step. `ENABLED_MODULES` isn't set in `.env`, so the default (with `insight`) applies. Kickstarted `com.optflw.fastapi`, then ran `npm ci`, the build and a `com.optflw.nextjs` kickstart.
+- **Live with real data, via optflw.com** (throwaway user `zz_deploycheck`, deleted along with its 2 tokens and 2 auth events):
+  - `/options/gamma-exposure/SPY` → source `public`, spot 760.12, **4 ideas** (BUY_CALL 761, SELL_CALL 777, BUY_PUT 760, SELL_PUT 743, all 11-27), **outlook** sideways 50 / up 33 / down 17, battleground 760, range 735.13–785.11.
+  - `/insight/SPY/swings?period=max` → **405 points** (≤ 420), price 760.13, realtime true.
+  - `/insight/AAPL/leaps-score` → **75 Good, 9 factors**, entry 337.87 (pullback), **put 34 Weak**, put entry 300.27 (break), realtime true.
+  - `/strategy` → `spike_wheel`, **7 strategies** (+ `leaps`, `diagonal`). The owner has no override, so their desk stays on the spike wheel.
+  - **Load since the restart:** 0 × 429, about 100–130 Public chain requests per minute (~2/s). I'll watch the request rate once the owner has boards open.
+  - **Not opened signed-in in a browser** (owner to check the charts, the LEAPS line and the dealer ladder).
