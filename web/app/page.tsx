@@ -13,7 +13,7 @@ import { useTheme } from "@/lib/theme";
 // ── Content ──────────────────────────────────────────────────────────────────
 
 const FACTS = [
-  { value: "10–40", label: "strikes per board, your choice" },
+  { value: "10–All", label: "strikes per board, your choice" },
   { value: "5", label: "colour palettes, two colour-blind safe" },
   { value: "60 s", label: "refresh while the page is open" },
   { value: "~15 min", label: "data delay, shown on every board" },
@@ -204,7 +204,7 @@ function Product() {
           eyebrow="Flow board"
           title="Find the king node in a second."
           body="Every strike and expiry on one board, coloured by how much gamma sits there. The biggest cell is starred, spot is marked, and the board centres itself on price."
-          points={["Choose 10, 20, 30 or 40 strikes around spot", "Five palettes, including Cividis and Viridis", "“% of king” and “dim small” to cut the noise"]}
+          points={["Choose 10, 20, 30, 40 or all strikes around spot", "Five palettes, including Cividis and Viridis", "“% of king” and “dim small” to cut the noise"]}
           visual={<SampleBoard />}
         />
         <Feature

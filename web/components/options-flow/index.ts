@@ -13,6 +13,6 @@ export {
   TickerPanel,
   TickerPanelWithQuery,
   makeSlot,
-  STRIKE_OPTIONS,
+  STRIKE_OPTIONS, strikeLabel,
 } from "./TickerPanel";
 export type { Slot, TickerPanelProps, TickerPanelWithQueryProps } from "./TickerPanel";
