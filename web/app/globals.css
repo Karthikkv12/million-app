@@ -81,9 +81,11 @@ body {
 /* ── Global scroll ─────────────────────────────────────────────────────────── */
 
 /* Contain horizontal overflow at the app shell level, not on html/body.
-   This avoids Chrome's bug where overflow on the root blocks scroll events. */
+   This avoids Chrome's bug where overflow on the root blocks scroll events.
+   `clip`, not `hidden`: hidden turns the element into a scroll container, which silently breaks every
+   position: sticky inside it (the nav bar, the Settings menu, the stock page's side column). */
 #__next {
-  overflow-x: hidden;
+  overflow-x: clip;
   /* min-height keeps the Next.js root filling the viewport */
   min-height: 100dvh;
 }

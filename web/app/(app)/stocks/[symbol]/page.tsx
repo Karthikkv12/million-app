@@ -67,6 +67,8 @@ export default function StockPage() {
         </div>
       </div>
 
+      {/* Left: price, drawdown and GEX replay stacked. Right (wide screens): LEAPS score and dealer levels in a
+          column that stays in view and scrolls on its own, so its long cards don't stretch the page. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid min-w-0 gap-4">
         <Panel padded={false} title="Price" actions={
@@ -82,8 +84,10 @@ export default function StockPage() {
           <SwingCharts symbol={sym} title={`How far ${sym} falls from its highs and jumps off its lows`} height={190} />
         </Panel>
 
+        <GexReplay symbol={sym} />
         </div>
-        <div className="grid min-w-0 gap-4">
+        <aside aria-label={`${sym} LEAPS score and dealer levels`}
+          className="grid min-w-0 gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:rounded-[var(--radius,12px)] xl:pr-1 [scrollbar-width:thin]">
         <Panel title="LEAPS score">
           <LeapsScore symbol={sym} compact label={false} />
         </Panel>
@@ -105,12 +109,7 @@ export default function StockPage() {
               </>
             )}
         </Panel>
-
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <GexReplay symbol={sym} />
+        </aside>
       </div>
     </div>
   );
