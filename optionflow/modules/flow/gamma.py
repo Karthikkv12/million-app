@@ -348,19 +348,14 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         ]
 
         # --- Heatmap data: GEX by expiry × strike ---
-        # Only keep top N strikes near spot for readability
+        # Every strike within ±50% of spot, uncapped: the board centres its 10–40 window on spot itself
+        # and widens it to reach the owner's legs, so far-out positions must be in the payload (C-79).
         _near = by_strike[
-            (by_strike["strike"] >= spot * 0.8) & (by_strike["strike"] <= spot * 1.2)
+            (by_strike["strike"] >= spot * 0.5) & (by_strike["strike"] <= spot * 1.5)
         ]
         heatmap_strikes = sorted(_near["strike"].tolist())
         if not heatmap_strikes:
             heatmap_strikes = sorted(by_strike["strike"].tolist())
-
-        # Cap at 40 strikes for display
-        if len(heatmap_strikes) > 40:
-            # Pick 40 evenly spaced around spot
-            arr = sorted(heatmap_strikes, key=lambda s: abs(s - spot))[:40]
-            heatmap_strikes = sorted(arr)
 
         # Limit expiries to nearest 8 for heatmap readability
         heatmap_expiries = expiries[:8]
