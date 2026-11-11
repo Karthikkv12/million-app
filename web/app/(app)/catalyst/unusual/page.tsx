@@ -57,7 +57,7 @@ export default function UnusualPage() {
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 pb-16 pt-8 sm:px-6">
       <PageHeader
-        eyebrow="Catalyst"
+        eyebrow="Research"
         title="Unusual activity"
         sub="Option contracts trading far above their open interest with large premium: fresh positioning today."
         action={<RefreshButton onRefresh={() => refetch()} isRefreshing={isFetching} />}

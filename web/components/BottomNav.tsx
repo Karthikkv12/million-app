@@ -11,7 +11,7 @@ const TABS = [
   { href: "/options-flow", label: "Flow",    icon: Zap             },
   { href: "/hedge",        label: "Hedge",   icon: Scale           },
   { href: "/portfolio",    label: "Portfolio", icon: Briefcase     },
-  { href: "/catalyst",     label: "Catalyst", icon: CalendarClock  },   // Settings lives in the ☰ menu
+  { href: "/catalyst",     label: "Research", icon: CalendarClock  },   // Settings lives in the ☰ menu
 ];
 
 export default function BottomNav() {
