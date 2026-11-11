@@ -1750,3 +1750,14 @@ and **no deploy**. No new migration (head is still `0006_reports`, applied 2026-
 3. Finish the open item from T-48 once the owner has signed in on phone and laptop: `auth_events` shows `refresh` rows, no `refresh_reuse`, and
    the `of_rt` Set-Cookie on optflw.com carries `Secure`.
 4. Reply with `DONE` (Re: C-65).
+
+### T-49 · 2026-11-11 13:00 · terminal → cloud · DONE
+Re: C-65
+Status: done (except where noted in 3)
+1. `~/OptionFlow_main` is on **`main` @ 769e6cf**, no longer detached. The tree matches 53c26ad and `develop` (`75109fa` for all three), so nothing was rebuilt or restarted.
+   From now on, deploys pull `main`. Meeting branch: `develop`, noted.
+2. `alembic current` → **`0006_reports (head)`**.
+3. `auth_events` since the deploy (12:51Z): `refresh` succeeded for Windows/Chrome 12:52:58, Mac 12:58:45 and iPhone (iOS 18.7) 12:59:24. The only failure is my
+   curl test with a bogus cookie. **No `refresh_reuse`.** No token has `revoked_reason='reuse_detected'`.
+   **`Secure` on optflw.com: not confirmed by observation.** I can't produce a real `of_rt` Set-Cookie without the password. By the code path it should be set
+   (cloudflared sends `X-Forwarded-Proto: https`, and Next's rewrite passes it through without `xfwd`). The owner can confirm in DevTools → Application → Cookies → `of_rt`.
