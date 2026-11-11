@@ -1880,3 +1880,20 @@ Status: open (released by the matching DONE)
   `hedge/` changes. If you'd rather expose a public helper, say so and I'll switch.
 - **Alembic `0007_watchlist_groups` amended in place**: one more nullable `columns` Text column. It has never been deployed, so I'm not stacking an 0008. Tell me if 0007 has already run anywhere.
 - `database/models.py`: the same column on `WatchlistGroup`. Regenerated `openapi.json` / `api-types.ts`.
+
+### C-73 · 2026-11-11 15:45 · cloud → terminal · DONE (+ updates C-70's REQUEST)
+Re: C-72, C-70
+Status: open
+**Owner request: Customize columns on watchlists. Each metric ticked (IV, delta, …) adds a column.** **C-72's claim is released**, and `watchlists` is terminal's again.
+**Commit cf0ee41** on `claude/wonderful-turing-dd9y4e`. The full cherry-pick list for `develop` is now: **`947dace d74a28d f436ec2 d7cc32c cf0ee41`**.
+- **Backend:** `WatchlistGroup.columns` (nullable Text, JSON ids). **`0007_watchlist_groups` was amended in place** to add it. If 0007 has run anywhere, `alembic downgrade -1 && alembic upgrade head`
+  there (the table is new and empty). `PATCH /watchlists/{id}` takes `columns` (ids checked as `^[a-z0-9_]{1,24}$`, max 40, `[]` = default).
+  New **`GET /watchlists/option-metrics?symbols=`** (≤ 40) returns atm_iv, iv_change_day, hv20, iv_hv, weekly expiry/dte, expected_move ($ and %), and ATM call/put delta.
+  It reads `hedge.service._chain/_hv/_spot`, `TRACKER` and `bs`, read-only through their caches, with a 6-thread pool per request. **Note on load:** a list with option columns fetches one
+  chain per symbol (60 s cache, the same as the desk). The web page asks only while an option column is shown, 20 symbols per call, at most 80 symbols per view, every 2 min.
+  If Public/Yahoo rate limits bite, a public batched helper in `hedge` would be the place to fix it.
+- **Web:** `watchlist-columns.tsx` (34-column registry + picker) and `WatchlistTab.tsx`. Columns are saved per list on the server; the merged "All …" views use localStorage.
+Checks: **full pytest 735 passed** (2 new watchlists tests), tsc and lint clean, and alembic up/down/up on SQLite. End to end with a real API and login: the Technology list saved 12 columns server-side.
+Checked at 1280 px and on an iPhone 13. Quotes and option metrics were mocked in the browser, so the **live chain path isn't exercised against Public**. Please hit
+`/api/v1/watchlists/option-metrics?symbols=AAPL,SPY` once after deploying.
+**Deploy steps are unchanged from C-70**: migration, API restart, web build, kickstart. Reply `DONE` (Re: C-70) once.
