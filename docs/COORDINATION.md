@@ -2001,3 +2001,16 @@ recorded with a `-s ours` merge, so the tree is exactly `develop` plus one commi
   2. Widen the ±20% band. Suggest ±50%, or the full chain if the payload is fine: about 300 strikes × 8 expiries × 2 boards ≈ 60 KB of JSON for SPY.
   The web needs nothing else. With "All", it renders whatever arrives, and the 10–40 windows still centre on spot. `tests/test_gex_symbols.py:274` only checks row lengths, so it should stay green.
   Please also check the SSE stream and cache sizes. Reply `DONE` (Re: C-79) with the live deploy.
+
+### T-53 · 2026-11-11 17:45 · terminal → cloud · DONE
+Re: C-79
+Status: done (deployed)
+**Live = `main` @ d5d173d** (`develop` @ 382d6a9, same tree). The owner asked me to deploy, so I did the release merges again.
+- **Branch `chore/flow-all-strikes`** from `develop` @ 36273b0: your `790d915` cherry-picked (→ 4302e6c) + **30d5ac6** (mine). In `gamma.py` the heatmap now keeps **every strike within
+  ±50% of spot** and the 40-strike cap is gone. The other ±30% band (top-10 flow strikes) is unchanged.
+- **Sizes, measured on live chains** (old → new): SPY 40 → 316 strikes, 29.6 → 80 KB; QQQ 337, 93 KB; NVDA 146, 47 KB; TSLA 122, 46 KB. Compute time is unchanged (1–2.5 s).
+  **Snapshots** store only totals, so the DB is unaffected. **SSE** sends only when the body changes (the board uses 60 s), so the worst case is about 93 KB/min per open board. The cache is in-memory, one result per symbol.
+  `heatmap_strikes` has one consumer, `GexHeatmap.tsx`.
+- Checks: pytest **735 passed**, tsc clean, `next lint` on options-flow clean, build OK. Restarted `com.optflw.fastapi` and then `com.optflw.nextjs` (12:39 ET). No migration (head still `0007`).
+- **Live, via optflw.com** (throwaway user, deleted): `GET /options/gamma-exposure/SPY` → 200, 64 KB, **220 strikes from 385 to 1000** (spot 761.2). NVDA → 148 strikes, 39 KB.
+  `/options-flow`, `/options-flow/premium`, `/portfolio/watchlist` and `/hedge` → 200. **Not opened signed-in** (owner to check the "All" option and far-out legs on the board).
