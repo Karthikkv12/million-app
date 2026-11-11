@@ -22,7 +22,9 @@ function Fig({ label, value, sub, tone, className, title }: { label: string; val
   );
 }
 
-export function LevelsStrip({ data, metric = "gex" }: { data: GexResult; metric?: "gex" | "vex" }) {
+/** `compact`: a narrow board column (2–3 tickers side by side). Six figures in one row leave ~55 px each, which cut
+ *  values to "680…"; compact always lays them out 3 × 2 so every number shows in full. */
+export function LevelsStrip({ data, metric = "gex", compact = false }: { data: GexResult; metric?: "gex" | "vex"; compact?: boolean }) {
   const { spot, zero_gamma, max_call_wall, max_put_wall, max_gex_strike, net_gex } = data;
   const longGamma = (net_gex ?? 0) >= 0;
   const aboveFlip = zero_gamma != null ? spot >= zero_gamma : null;
@@ -36,18 +38,19 @@ export function LevelsStrip({ data, metric = "gex" }: { data: GexResult; metric?
           <Tag tone={longGamma ? "gain" : "warn"}>{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Tag>
         </span>
       </div>
-      <div className="mt-3 grid grid-cols-3 divide-x divide-[var(--border)] sm:grid-cols-6">
+      <div className={clsx("mt-3 grid grid-cols-3 divide-x divide-[var(--border)]",
+        compact ? "gap-y-2.5 [&>*:nth-child(3n+1)]:border-l-0 [&>*:nth-child(3n+1)]:pl-0" : "sm:grid-cols-6")}>
         <Fig label="Flip" value={money(zero_gamma)} sub={pct(zero_gamma, spot)} tone="text-accent" />
         <Fig label="Call wall" value={money(max_call_wall)} sub={pct(max_call_wall, spot)} tone="text-gain" />
         <Fig label="Put wall" value={money(max_put_wall)} sub={pct(max_put_wall, spot)} tone="text-loss" />
-        <Fig className="hidden sm:block" label="★ King" value={money(max_gex_strike)} sub={pct(max_gex_strike, spot)} tone="text-[#b45309] dark:text-[#fde725]" />
-        <Fig className="hidden sm:block" label="⚓ Anchor" value={anchor ? anchor.price.toFixed(2) : "—"}
+        <Fig className={compact ? undefined : "hidden sm:block"} label="★ King" value={money(max_gex_strike)} sub={pct(max_gex_strike, spot)} tone="text-[#b45309] dark:text-[#fde725]" />
+        <Fig className={compact ? undefined : "hidden sm:block"} label="⚓ Anchor" value={anchor ? anchor.price.toFixed(2) : "—"}
           sub={anchor ? `${pct(anchor.price, spot)} · ${shortExpiry(anchor.expiry)}` : "no pin"} tone={ANCHOR_TONE}
           title={anchor ? `Gamma-weighted centre of positive GEX within 10% of the price, ${anchor.expiry} expiry (${Math.round(anchor.share * 100)}% of gamma there is positive). Where long-gamma dealers tend to pull the price.`
             : "Positive gamma doesn't dominate near the price in the nearest expiry, so there is no pin level."} />
         {metric === "vex"
-          ? <Fig className="hidden sm:block" label="Net VEX" value={fmtGex(data.net_vex)} sub="per 1 vol pt" tone={(data.net_vex ?? 0) >= 0 ? "text-gain" : "text-loss"} />
-          : <Fig className="hidden sm:block" label="Net GEX" value={fmtGex(net_gex)} sub="per 1% move" tone={longGamma ? "text-gain" : "text-loss"} />}
+          ? <Fig className={compact ? undefined : "hidden sm:block"} label="Net VEX" value={fmtGex(data.net_vex)} sub="per 1 vol pt" tone={(data.net_vex ?? 0) >= 0 ? "text-gain" : "text-loss"} />
+          : <Fig className={compact ? undefined : "hidden sm:block"} label="Net GEX" value={fmtGex(net_gex)} sub="per 1% move" tone={longGamma ? "text-gain" : "text-loss"} />}
       </div>
     </div>
   );
