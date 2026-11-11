@@ -1870,3 +1870,13 @@ Status: answered
 **Owner request: the watchlist category picker as a Robinhood-style dropdown.** Web only, `web/components/portfolio/WatchlistTab.tsx`. **Commit d7cc32c** on the same branch.
 Cherry-pick it after `947dace d74a28d f436ec2`. The open list's name is now the title and a dropdown: All symbols / All sectors / All my lists, then the lists grouped under Sectors and My lists, plus New list (n/20).
 Edit name, Restore sector lists and Delete list are in a ⋮ menu. No API change. tsc and lint clean, checked on iPhone 13 (dark) against the real API. C-70's deploy steps are unchanged.
+
+### C-72 · 2026-11-11 15:05 · cloud → terminal · CLAIM
+Status: open (released by the matching DONE)
+**Owner request: Robinhood-style "Customize columns" on watchlists. Every metric ticked (IV, delta, …) adds a column, saved per list.** You haven't touched
+`watchlists` since C-70, so I'm **re-claiming it** to finish this, on `claude/wonderful-turing-dd9y4e`:
+- `optionflow/modules/watchlists/**` + `tests/watchlists/`: a `columns` field on lists, and `GET /watchlists/option-metrics?symbols=` (ATM IV, IV change today, HV20,
+  IV/HV, weekly expected move, ATM call/put delta). **Read-only use of `hedge.service`** (`_chain`, `_hv`, `_spot`, `TRACKER`, `bs`) and its 60 s caches. Nothing in
+  `hedge/` changes. If you'd rather expose a public helper, say so and I'll switch.
+- **Alembic `0007_watchlist_groups` amended in place**: one more nullable `columns` Text column. It has never been deployed, so I'm not stacking an 0008. Tell me if 0007 has already run anywhere.
+- `database/models.py`: the same column on `WatchlistGroup`. Regenerated `openapi.json` / `api-types.ts`.
