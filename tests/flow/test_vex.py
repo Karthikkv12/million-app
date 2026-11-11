@@ -57,3 +57,10 @@ def test_vex_grid_and_sign(fake_market_data):
     assert r.heatmap_vex_values[exp][i560] == pytest.approx(put_vex)
     assert call_vex > 0 and put_vex > 0
     assert r.net_vex == pytest.approx(sum(map(sum, r.heatmap_vex_values)))
+
+
+def test_heatmap_carries_every_fetched_expiry():
+    """C-93: the Flow board's expiry dropdown can offer all 12 fetched expiries, not just the nearest 8."""
+    from optionflow.modules.flow import gamma
+    from optionflow.providers.public import MAX_CHAIN_EXPIRIES
+    assert gamma.HEATMAP_EXPIRIES == MAX_CHAIN_EXPIRIES == 12
