@@ -15,6 +15,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { GexResult } from "@/lib/api";
 import { okBooks, useLiveBooks } from "@/lib/live";
+import { ANCHOR_TONE, anchorOf, shortExpiry } from "@/lib/gex";
 
 // ── Palettes ─────────────────────────────────────────────────────────────────
 type RGB = [number, number, number];
@@ -281,6 +282,12 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
   const step = strikes.length > 1 ? Math.abs(strikes[0] - strikes[1]) : 0;
   const zg = data.zero_gamma;
   const flip = isGex && zg != null && zg <= strikes[0] + step / 2 && zg >= strikes[strikes.length - 1] - step / 2 ? nearest(strikes, zg) : null;
+  // ⚓ Anchor (gamma-weighted pin, nearest expiry) and ⚔ battleground (heavy call AND put gamma) as row markers,
+  // so the levels strip above can stay to three numbers (owner).
+  const anchor = isGex ? anchorOf(data) : null;
+  const anchorRow = anchor ? onBoard(anchor.price) : null;
+  const battle = data.outlook?.battleground;
+  const battleRow = isGex ? onBoard(battle) : null;
 
   const label = (v: number, max: number) =>
     opts.showPct && max ? (v ? `${Math.round((v / max) * 100)}%` : "0%") : fmtMoney(v);
@@ -346,6 +353,14 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                     {isGex && strike === data.max_call_wall && <span className="text-[8.5px] uppercase tracking-wider text-gain/90">CW</span>}
                     {isGex && strike === data.max_put_wall && <span className="text-[8.5px] uppercase tracking-wider text-violet-300/90">PW</span>}
                     {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
+                    {strike === anchorRow && (
+                      <span title={`Anchor ${anchor!.price.toFixed(2)} (${shortExpiry(anchor!.expiry)}): gamma-weighted centre of positive GEX near the price, where long-gamma dealers tend to pull it`}
+                        className={`text-[8.5px] uppercase tracking-wider ${ANCHOR_TONE}`}>⚓ Anchor</span>
+                    )}
+                    {strike === battleRow && (
+                      <span title={`Battleground ${battle}: calls and puts both carry heavy gamma here, so the side that wins it sets the next move`}
+                        className="text-[8.5px] uppercase tracking-wider text-warn">⚔ Battle</span>
+                    )}
                     {strike === avgStrike && (
                       <span title={`Your average cost ${mine!.avg_cost!.toFixed(2)}`} className="rounded-[3px] border border-accent/60 px-1 text-[8.5px] font-semibold leading-[14px] tracking-[0.06em] text-accent">AVG {mine!.avg_cost!.toFixed(2)}</span>
                     )}

@@ -115,7 +115,7 @@ export function TickerPanel({
               <Clock size={12} className="shrink-0 text-warn" /> {staleNote}
             </p>
           )}
-          <LevelsStrip data={data} metric={metric} compact={compact} />
+          <LevelsStrip data={data} metric={metric} />
           {/* Wraps instead of spilling into the next column; with 2–3 columns the Expiries / Ladder / Details labels
               collapse to icons (names stay as tooltips and screen-reader text). */}
           <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
