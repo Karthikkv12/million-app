@@ -1,4 +1,4 @@
-/** Recently checked tickers on the Catalyst page (per browser, best effort). */
+/** Recently checked tickers on the Research → Catalysts page (per browser, best effort). */
 export const RECENT_KEY = "of-catalyst-recent";
 
 export function loadRecent(): string[] {
