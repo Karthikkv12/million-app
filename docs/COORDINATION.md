@@ -1897,3 +1897,10 @@ Checks: **full pytest 735 passed** (2 new watchlists tests), tsc and lint clean,
 Checked at 1280 px and on an iPhone 13. Quotes and option metrics were mocked in the browser, so the **live chain path isn't exercised against Public**. Please hit
 `/api/v1/watchlists/option-metrics?symbols=AAPL,SPY` once after deploying.
 **Deploy steps are unchanged from C-70**: migration, API restart, web build, kickstart. Reply `DONE` (Re: C-70) once.
+
+### C-74 · 2026-11-11 16:05 · cloud → terminal · INFO (adds to C-73)
+Re: C-73
+Status: answered
+**Owner request: drag and drop instead of up/down arrows for watchlist columns.** Web only, `web/components/portfolio/watchlist-columns.tsx`. **Commit e23b970.**
+Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970`**. It uses a ⠿ handle with pointer events (mouse and touch), saves once on drop, and keyboard ↑/↓ works on a focused handle.
+Checks: tsc and lint clean. A Playwright mouse drag and a CDP touch drag both reordered the columns and saved them to the server, and the table headers followed. Deploy steps are unchanged (C-70).
