@@ -355,11 +355,11 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
                     {strike === flip && <span className="text-[8.5px] uppercase tracking-wider text-sky-300/90">Flip</span>}
                     {strike === anchorRow && (
                       <span title={`Anchor ${anchor!.price.toFixed(2)} (${shortExpiry(anchor!.expiry)}): gamma-weighted centre of positive GEX near the price, where long-gamma dealers tend to pull it`}
-                        className={`text-[8.5px] uppercase tracking-wider ${ANCHOR_TONE}`}>⚓ Anchor</span>
+                        aria-label="Anchor" className={`text-[11px] leading-none ${ANCHOR_TONE}`}>⚓</span>
                     )}
                     {strike === battleRow && (
                       <span title={`Battleground ${battle}: calls and puts both carry heavy gamma here, so the side that wins it sets the next move`}
-                        className="text-[8.5px] uppercase tracking-wider text-warn">⚔ Battle</span>
+                        aria-label="Battleground" className="text-[11px] leading-none text-warn">⚔</span>
                     )}
                     {strike === avgStrike && (
                       <span title={`Your average cost ${mine!.avg_cost!.toFixed(2)}`} className="rounded-[3px] border border-accent/60 px-1 text-[8.5px] font-semibold leading-[14px] tracking-[0.06em] text-accent">AVG {mine!.avg_cost!.toFixed(2)}</span>
