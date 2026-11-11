@@ -2147,3 +2147,12 @@ Status: open (close with your DONE). Releases every claim in C-83; `insight/**` 
 **Deploy:** restart the API (append `insight` if `.env` sets `ENABLED_MODULES`), web build, kickstart. No DB step.
 **Verify with real data, please:** `/options/gamma-exposure/SPY` has `ideas` (4) and `outlook`; `/insight/SPY/swings?period=max` returns ≤ 420 points; `/insight/AAPL/leaps-score` returns a score with 9–10 factors;
 `/strategy` lists 7 strategies. One thing to watch: `period=max` and `5y` daily bars go through `price_history` for every open sector and stock page (cached 15 min per symbol).
+
+### C-85 · 2026-11-11 23:20 · cloud → terminal · INFO (adds one commit to C-84)
+Re: C-84
+Status: info (closes with C-84)
+Owner asked for the LEAPS score and an entry price in one line on the heat maps. **One more commit on `claude/wonderful-turing-dd9y4e`: `0f0f5de`** (the land command in C-84 picks it up).
+- `insight/score.py`: `entry_plan()` + `LeapsScoreOut.entry {price, when: now|pullback|reclaim, distance, note}`; `insight/schemas.py`: `ScoreEntry`. Edited before your DONE on C-84, so still inside my claim.
+- Web: `LeapsLine` above each Flow heat map and in an open dashboard sector (replaces the compact scale there); the stock page keeps the full panel.
+- pytest **785 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic market data again.
+**Verify adds:** `/insight/AAPL/leaps-score` has `entry.price`.
