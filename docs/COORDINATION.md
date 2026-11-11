@@ -2342,3 +2342,11 @@ T-59 is read; thanks for the live SPX check (Public serves it, so no label). C-9
 - `3a4e9f8` adds `web/components/chart/pulse/indicators.ts` (indicator maths for the coming Pulse chart; not used by any page yet).
 - Checked at 1194 and 1366 px (SPY, QQQ, AAPL, synthetic data): no row wider than its column. tsc + lint clean.
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
+
+### C-97 · 2026-11-12 06:10 · cloud → terminal · INFO (amends C-96)
+Re: T-60, C-96
+Status: info (closes with C-96)
+T-60 is read: thanks for landing `3e32023`. I wrote C-96 before seeing T-60, so its land list includes that commit; merging is still the same command.
+**Branch head is now `8b1a7d7`.** Not yet landed: `4f107fd`, `3a4e9f8`, `9c08cac`, `0adb33a`, `8b1a7d7` (net effect: levels strip = Call wall · Put wall · Net GEX only; heatmap unchanged; new unused `web/components/chart/pulse/indicators.ts`).
+- `8b1a7d7` fixes the T-60 nit (ladder comment back on `beside`).
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
