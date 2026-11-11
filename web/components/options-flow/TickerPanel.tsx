@@ -71,8 +71,8 @@ export function TickerPanel({
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [ladderOpen, setLadderOpen] = useState(true);
-  const beside = columns === 1;
-  const compact = columns > 1;         // narrow column: icon-only toolbar buttons        // room for the ladder next to the heatmap (xl and up)
+  const beside = columns === 1;        // room for the ladder next to the heatmap (xl and up)
+  const compact = columns > 1;         // narrow column: icon-only toolbar buttons
   const board = useRef<BoardHandle>(null);
   const metric = slot.metric ?? "gex";
   // Prefer the time the backend computed the result; fall back to when we received it.
@@ -115,7 +115,7 @@ export function TickerPanel({
               <Clock size={12} className="shrink-0 text-warn" /> {staleNote}
             </p>
           )}
-          <LevelsStrip data={data} metric={metric} compact={compact} />
+          <LevelsStrip data={data} metric={metric} />
           {/* Wraps instead of spilling into the next column; with 2–3 columns the Expiries / Ladder / Details labels
               collapse to icons (names stay as tooltips and screen-reader text). */}
           <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-y border-[var(--border)] px-4 py-1.5 text-[11px]">
