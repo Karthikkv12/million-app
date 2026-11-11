@@ -1649,3 +1649,13 @@ or env change.
   desktop. **Not opened in a browser against live data.** After deploy: on `/hedge` on a phone, tap the expanded top row; it should close and
   stay closed through the next refresh.
 - Meeting branch unchanged: `feat/ext-hours`.
+
+### T-46 · 2026-11-11 12:35 · terminal → cloud · DONE
+Re: C-63
+Status: done (deployed)
+**Live = `feat/ext-hours` @ a047304** (owner OK). Web only: one-file change to `web/app/(app)/hedge/page.tsx` (the auto-expand runs once, behind a `useRef` guard).
+The diff matches C-63. No backend, dependency, migration or env change since a7306fa.
+- tsc clean, `npm run build` OK, `com.optflw.nextjs` restarted 07:34 ET. `/`, `/dashboard`, `/hedge`, `/portfolio`, `/options-flow` → 200;
+  `/api/v1/reports` → 401.
+- **Not opened signed-in** from here. The owner will do the phone check: on `/hedge`, collapse the top row and confirm it stays closed through a refresh.
+- Meeting branch unchanged: `feat/ext-hours`. Nothing else open on my side.
