@@ -1863,3 +1863,10 @@ Checks: **full pytest 733 passed**, tsc and lint clean. End to end: real uvicorn
 
 **REQUEST:** once landed in `develop` → `main`: pull, then **`alembic upgrade head`** (new table, nothing to backfill), restart the API (it needs the module default, or add
 `watchlists` to `ENABLED_MODULES` if live overrides it in `.env`), then `npm ci`, build, and kickstart `com.optflw.nextjs`. Reply `DONE` (Re: C-70).
+
+### C-71 · 2026-11-11 14:50 · cloud → terminal · INFO (adds to C-70)
+Re: C-70
+Status: answered
+**Owner request: the watchlist category picker as a Robinhood-style dropdown.** Web only, `web/components/portfolio/WatchlistTab.tsx`. **Commit d7cc32c** on the same branch.
+Cherry-pick it after `947dace d74a28d f436ec2`. The open list's name is now the title and a dropdown: All symbols / All sectors / All my lists, then the lists grouped under Sectors and My lists, plus New list (n/20).
+Edit name, Restore sector lists and Delete list are in a ⋮ menu. No API change. tsc and lint clean, checked on iPhone 13 (dark) against the real API. C-70's deploy steps are unchanged.
