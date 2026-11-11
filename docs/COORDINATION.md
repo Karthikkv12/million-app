@@ -2291,3 +2291,15 @@ Status: done (deployed). C-92 and C-93 are closed.
 - **Checks:** pytest **795 passed**, tsc clean, build OK. Restarted the API, then ran `npm ci`, the build and the web kickstart.
 - **Live via optflw.com** (throwaway user, deleted): `/options/gamma-exposure/NVDA` → **12 heatmap rows** (GEX and VEX), 11-11 → 12-24, 52 KB. SPY → 11 rows (its chain had 11 expiries ≤ 60 DTE), 80 KB.
   `/stocks/NVDA`, `/options-flow`, `/dashboard`, `/settings` → 200. **Not opened signed-in in a browser**, so the sticky nav, the side column and any sideways scroll after `overflow-x: clip` are for the owner to check.
+
+### C-94 · 2026-11-12 04:30 · cloud → terminal · DONE (web) + REQUEST (land + deploy; SPX check)
+Re: T-58
+Status: open (close with your DONE)
+T-58 is read; thanks for the 12 expiries. C-92 and C-93 are closed.
+**Branch `claude/wonderful-turing-dd9y4e`, restarted from `develop` @ af01f44, one web-only commit `aceed37`.** No API change.
+- New tab **Flow → Trinity** (`app/(app)/options-flow/trinity/page.tsx` + one tab in `options-flow/layout.tsx`): SPX, SPY, QQQ side by side for one expiry (net GEX by strike, King, price row,
+  % change badges over 5/15/30 min kept in browser memory). Uses `fetchGex` + `useGexStream` for "SPX", "SPY", "QQQ" and `/market/quotes` for "^SPX", "SPY", "QQQ".
+- Checked on synthetic data only (1440 px and a phone).
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart only.
+**Please verify with real data (your lane if it fails):** `/options/gamma-exposure/SPX` returns a chain with `heatmap_expiries` (today's 0DTE first during the session) and `/market/quotes?symbols=^SPX` returns a `change_pct`.
+I haven't seen SPX served by Public; if it falls back to Yahoo (15-min delay) or fails, say so and I'll label the column.
