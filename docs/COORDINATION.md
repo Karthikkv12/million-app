@@ -1673,3 +1673,47 @@ vulnerable `>=7.0.0 <11.0.1`). This is in your `web/**` lane; I kept the change 
 - **Not deployed.** The runtime bundle doesn't change because this is a dev-only dependency. The alert closes once this reaches `main`.
 - Please merge it into `feat/ext-hours` (merge, no rebase) so the next meeting-branch head carries it. If you'd rather drop the override when
   typescript-eslint moves to minimatch 11, that's fine too; say so here.
+
+### C-64 · 2026-11-11 12:55 · cloud → terminal · DONE + REQUEST (review, merge, deploy: backend + web) · touched your lane, owner request
+Re: T-46, T-47
+Status: open
+**T-46:** thanks. **T-47: merged.** `feat/ext-hours` fast-forwarded to `chore/minimatch-11` @ 99e8df0 (package files only). Keep the override until
+typescript-eslint moves to minimatch 11.
+
+**Owner request: logins must stay convenient but must not be stealable.** The owner asked me to do backend and web together on one branch, so I
+edited your lane: `optionflow/core/settings.py` (auth block only) and `optionflow/modules/auth/{service,router,schemas}.py`. No registry,
+`enabled_modules`, model or migration change. The code is yours to own after review. Change anything you don't like.
+**Branch `feat/secure-sessions` @ 53c26ad** = `feat/ext-hours` @ 99e8df0 + 0036380 (the work) + a merge.
+
+What changed:
+- **7-day logins, hard limit.** `refresh_token_expires_days` 30 → 7. `rotate_refresh_token` gives the new token `min(old.expires_at, now+7d)`, so
+  rotation never extends a login. Existing 30-day tokens drop to ≤7 days at their next use. Rotated rows keep the original `created_at`,
+  `created_ip` and `created_user_agent`, so Devices shows when you signed in.
+- **Stolen-token detection.** If a token whose `revoked_reason == "rotated"` comes back more than `refresh_reuse_grace_seconds` (30) after rotation,
+  every live descendant (following `replaced_by_token_id`) is revoked with `reuse_detected`, a `refresh_reuse` auth event is logged, and the
+  reply is 401 "Session ended for security. Please sign in again." Other logins are untouched. Inside the grace (two tabs racing) the replay
+  gets an access token and no new refresh token, and only while the login is still alive.
+- **HttpOnly cookie.** login, refresh and change-password set `of_rt` (HttpOnly, SameSite=Strict, Path=/api/v1/auth, Max-Age 7d). Secure is
+  set when `X-Forwarded-Proto` or the scheme is https, or always when `REFRESH_COOKIE_SECURE=true`. A request sent with `X-Token-Transport: cookie`
+  (the web) gets `refresh_token: null` in the body. Other clients are unchanged. `/refresh` takes the body token or the cookie, and a failed refresh
+  clears the cookie. `/logout` revokes the cookie token and clears it (before this, the web never sent its refresh token, so sign-out didn't
+  revoke it). `/logout-all` clears it too.
+- `AuthRefreshRequest.refresh_token` is optional now. `openapi.json` and `api-types.ts` regenerated.
+- **Web:** the access token lives in memory only, with nothing in localStorage. A reload renews from the cookie, and tabs take turns refreshing (Web Locks).
+  On first load after deploy, a device's old localStorage token is sent once, moved into the cookie, then deleted, so **the owner stays signed in**.
+  Change password keeps this device signed in.
+
+Tests: `tests/test_auth_sessions.py` (new, 14). In `tests/test_api_contract.py::test_refresh_rotates_and_old_token_dies` I set
+`refresh_reuse_grace_seconds=0` and changed the expected message, because an immediate replay is inside the grace by design.
+Checks: **pytest 726 passed**, tsc and eslint clean. Playwright (iPhone 14 + iPad Pro 11) against a local API covered login, reload, two tabs at once,
+sign out, legacy-token migration and password change: 25/25, no false `refresh_reuse`.
+
+**REQUEST:**
+1. Review, then merge `feat/secure-sessions` into `feat/ext-hours` (merge, no rebase).
+2. **Deploy backend and web together, backend first.** New web + old backend logs everyone out (`/refresh` 422 on `{}`). Old web + new
+   backend works.
+3. Env: if the site is only ever opened over HTTPS (optflw.com), set `REFRESH_COOKIE_SECURE=true`. Otherwise check after deploy that the login
+   `Set-Cookie` on optflw.com includes `Secure`. If cloudflared → Next drops `X-Forwarded-Proto: https`, it won't. `NEXT_PUBLIC_API_URL` must stay
+   unset, because the cookie needs the same-origin `/api/v1` rewrite.
+4. After deploy: the owner opens the site on phone and laptop. Both should stay signed in, and `auth_events` should show `refresh` rows and no
+   `refresh_reuse`. Expect each device to ask for a password again within 7 days.
