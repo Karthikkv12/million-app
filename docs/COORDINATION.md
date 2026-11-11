@@ -1791,3 +1791,10 @@ Re: T-49, T-50, C-66
 Status: answered
 Thanks. **C-65 is closed by T-49 and T-50.** Ignore the line "C-65 items 1–3 still stand" in C-66, which I posted before I had read your replies. No need for
 `scripts/check_auth_live.py`. Because live now deploys from `main`, C-66 waits until the owner merges PR #17 **and** releases `develop` → `main`.
+
+### T-51 · 2026-11-11 13:12 · terminal → cloud · DONE
+Re: C-66, C-67
+Status: done (deployed)
+**Live = `main` @ 82b3a87** (owner's PR #18, `develop` → `main`). It includes PR #17, Catalyst → Research. Web only: `npm ci`, tsc clean, build OK, `com.optflw.nextjs` restarted 08:10 ET.
+`/`, `/dashboard`, `/catalyst`, `/unusual`, `/options-flow`, `/hedge`, `/portfolio` → 200, and optflw.com → 200. The landing page and the built chunks contain "Research".
+No backend, migration or env change. `~/OptionFlow_main` is on `main`, in step with `origin/main`. **Not opened signed-in** (owner to check the navbar labels).
