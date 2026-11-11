@@ -3,7 +3,8 @@
 What gets pushed (owner, 2026-11-09), from the same live books the Hedge page shows. Each kind can be switched
 off, and alerts can be limited to some symbols (prefs, below; the same prefs on every device of a user):
 - buyback: a short option has given up most of its premium (hedge `closes`)
-- sell_call / sell_put / buy_stock: the desk's suggestion turns into that trade
+- sell_call / sell_put / buy_stock: the desk's suggestion turns into that trade (buy_stock also covers BUY_CALL,
+  the long call of the LEAPS / diagonal strategies)
 - iv_spike: ATM IV spikes on a holding (off by default)
 - expiring_itm: a short option is in the money with ≤ 1 day left, so assignment is likely (off by default)
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
@@ -210,6 +211,14 @@ def alerts_for(books: Dict[str, Any]) -> List[Dict[str, Any]]:
             out.append({
                 "key": f"sg:{sym}:{act}:{k}:{s.get('expiry')}", "kind": act.lower(), "symbol": sym,
                 "title": f"{what}: {sym} {k} {(s.get('expiry') or '')[5:]}",
+                "body": f"{s.get('contracts', 1)}× for ~${abs(s.get('credit') or 0):,.0f}. {(s.get('reasons') or [''])[0]}",
+                "url": "/hedge",
+            })
+        elif act == "BUY_CALL":                           # LEAPS / diagonal long leg: under the "buy" switch
+            k = f"{s['strike']:g}C"
+            out.append({
+                "key": f"sg:{sym}:BUY_CALL:{k}:{s.get('expiry')}", "kind": "buy_stock", "symbol": sym,
+                "title": f"Buy call: {sym} {k} {s.get('expiry') or ''}",
                 "body": f"{s.get('contracts', 1)}× for ~${abs(s.get('credit') or 0):,.0f}. {(s.get('reasons') or [''])[0]}",
                 "url": "/hedge",
             })

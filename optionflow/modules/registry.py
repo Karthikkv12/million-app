@@ -66,6 +66,11 @@ def _strategy() -> List[APIRouter]:
     return [router]
 
 
+def _insight() -> List[APIRouter]:
+    from optionflow.modules.insight.router import router
+    return [router]
+
+
 def _ai() -> List[APIRouter]:
     from optionflow.modules.ai.router import router
     return [router]
@@ -90,4 +95,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "hedge": _hedge,
     "notify": _notify,          # phone notifications (Web Push) for the hedge desk
     "strategy": _strategy,      # the owner's options strategy (drives the hedge desk's actions)
+    "insight": _insight,        # drawdown / spike series and the LEAPS score
 }

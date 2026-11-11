@@ -317,6 +317,15 @@ export interface StockHistory {
 export const fetchStockHistory = (symbol: string, period = "1d", interval = "1m") =>
   api.get<StockHistory>(`/stocks/${symbol.toUpperCase()}/history?period=${period}&interval=${interval}`);
 
+// ── Insight: drawdown / spike series and the LEAPS score ─────────────────────
+export type Swings = Schemas["SwingsOut"];
+export type SwingPeriod = "1mo" | "3mo" | "6mo" | "1y" | "5y" | "max";
+export type LeapsScore = Schemas["LeapsScoreOut"];
+export const fetchSwings = (symbol: string, period: SwingPeriod = "1y") =>
+  api.get<Swings>(`/insight/${encodeURIComponent(symbol.toUpperCase())}/swings?period=${period}`);
+export const fetchLeapsScore = (symbol: string) =>
+  api.get<LeapsScore>(`/insight/${encodeURIComponent(symbol.toUpperCase())}/leaps-score`);
+
 // ── Net flow history ──────────────────────────────────────────────────────────
 export interface FlowSnapshot {
   ts: string;

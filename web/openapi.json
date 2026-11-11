@@ -4038,6 +4038,14 @@
       "title": "Heatmap Vex Values",
       "type": "array"
      },
+     "ideas": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/TradeIdea"
+      },
+      "title": "Ideas",
+      "type": "array"
+     },
      "max_call_wall": {
       "anyOf": [
        {
@@ -4085,6 +4093,16 @@
       "default": 0.0,
       "title": "Net Vex",
       "type": "number"
+     },
+     "outlook": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Outlook"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "put_gex_by_strike": {
       "default": [],
@@ -5014,6 +5032,126 @@
     "title": "IvOut",
     "type": "object"
    },
+   "LeapsScoreOut": {
+    "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
+     "band": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Avoid | Weak | Fair | Good | Excellent",
+      "title": "Band"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreEntry"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "factors": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ScoreFactor"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live price the score was computed at (today's close)",
+      "title": "Price"
+     },
+     "put": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PutScore"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "realtime": {
+      "default": false,
+      "description": "True when that price came from a real-time source",
+      "title": "Realtime",
+      "type": "boolean"
+     },
+     "score": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Long call: 0 (bad) to 100 (extremely good); None without enough history",
+      "title": "Score"
+     },
+     "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "traits": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreTraits"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "LeapsScoreOut",
+    "type": "object"
+   },
    "LedgerEntryOut": {
     "additionalProperties": true,
     "properties": {
@@ -5720,6 +5858,106 @@
      "symbol"
     ],
     "title": "OptionMetricsOut",
+    "type": "object"
+   },
+   "Outlook": {
+    "description": "A read of the dealer map (flow.ideas.outlook): not a forecast.",
+    "properties": {
+     "atm_iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Atm Iv"
+     },
+     "battleground": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Strike near the price where call and put gamma are both large",
+      "title": "Battleground"
+     },
+     "direction": {
+      "enum": [
+       "up",
+       "down",
+       "sideways"
+      ],
+      "title": "Direction",
+      "type": "string"
+     },
+     "down": {
+      "title": "Down",
+      "type": "integer"
+     },
+     "expected_dte": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Dte"
+     },
+     "expected_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected High"
+     },
+     "expected_low": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Price \u2212 1\u03c3 to the expiry nearest 30 days (ATM IV)",
+      "title": "Expected Low"
+     },
+     "reasons": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "sideways": {
+      "title": "Sideways",
+      "type": "integer"
+     },
+     "up": {
+      "description": "Share of 100; up + down + sideways = 100",
+      "title": "Up",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "direction",
+     "up",
+     "down",
+     "sideways"
+    ],
+    "title": "Outlook",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -7467,6 +7705,50 @@
     "title": "PushConfigOut",
     "type": "object"
    },
+   "PutScore": {
+    "description": "The LEAPS score for buying a long-dated put: the call score's factors, flipped.",
+    "properties": {
+     "band": {
+      "title": "Band",
+      "type": "string"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreEntry"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "factors": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ScoreFactor"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "integer"
+     },
+     "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+     }
+    },
+    "required": [
+     "score",
+     "band"
+    ],
+    "title": "PutScore",
+    "type": "object"
+   },
    "QuoteOut": {
     "description": "Outside the regular session, prev_close / change / change_pct describe the last regular session's move\n(Robinhood's \"Today\") and ext_change the move since its close (after-hours / overnight).",
     "properties": {
@@ -7949,6 +8231,176 @@
      "size"
     ],
     "title": "ReportSummary",
+    "type": "object"
+   },
+   "ScoreEntry": {
+    "description": "The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).",
+    "properties": {
+     "distance": {
+      "description": "price vs the last close (decimal; 0 for now)",
+      "title": "Distance",
+      "type": "number"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "when": {
+      "description": "now | call: wait for a dip to price / a close back above price | put: wait for a bounce to price / a close back below price",
+      "enum": [
+       "now",
+       "pullback",
+       "reclaim",
+       "bounce",
+       "break"
+      ],
+      "title": "When",
+      "type": "string"
+     }
+    },
+    "required": [
+     "price",
+     "when",
+     "distance",
+     "note"
+    ],
+    "title": "ScoreEntry",
+    "type": "object"
+   },
+   "ScoreFactor": {
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "integer"
+     },
+     "value": {
+      "title": "Value",
+      "type": "string"
+     },
+     "weight": {
+      "title": "Weight",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "score",
+     "weight",
+     "value",
+     "note"
+    ],
+    "title": "ScoreFactor",
+    "type": "object"
+   },
+   "ScoreTraits": {
+    "properties": {
+     "daily_move": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Typical one-day move (1\u03c3, decimal)",
+      "title": "Daily Move"
+     },
+     "monthly_move": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Move"
+     },
+     "off_high": {
+      "title": "Off High",
+      "type": "number"
+     },
+     "rsi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rsi"
+     },
+     "sessions": {
+      "title": "Sessions",
+      "type": "integer"
+     },
+     "state": {
+      "description": "at the high | small dip | pulled back | deep drawdown",
+      "title": "State",
+      "type": "string"
+     },
+     "trend": {
+      "enum": [
+       "up",
+       "down",
+       "sideways"
+      ],
+      "title": "Trend",
+      "type": "string"
+     },
+     "volatility": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "calm | normal | volatile | super volatile",
+      "title": "Volatility"
+     },
+     "volume": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "low | normal | high, vs its own 90 days",
+      "title": "Volume"
+     }
+    },
+    "required": [
+     "trend",
+     "state",
+     "off_high",
+     "sessions"
+    ],
+    "title": "ScoreTraits",
     "type": "object"
    },
    "SeedHoldingsOut": {
@@ -9222,6 +9674,7 @@
       "enum": [
        "SELL_CALL",
        "SELL_PUT",
+       "BUY_CALL",
        "BUY_STOCK",
        "HOLD",
        "WAIT",
@@ -9239,7 +9692,7 @@
         "type": "null"
        }
       ],
-      "description": "$ tied up: cash for a put, max loss for a spread",
+      "description": "$ tied up: cash for a put, max loss for a spread, the debit of a long call",
       "title": "Collateral"
      },
      "contracts": {
@@ -9305,7 +9758,7 @@
         "type": "null"
        }
       ],
-      "description": "$ max loss (spreads)",
+      "description": "$ max loss (spreads, long calls)",
       "title": "Max Loss"
      },
      "net_delta_after": {
@@ -9415,6 +9868,198 @@
      "headline"
     ],
     "title": "SuggestionOut",
+    "type": "object"
+   },
+   "SwingPoint": {
+    "properties": {
+     "close": {
+      "title": "Close",
+      "type": "number"
+     },
+     "date": {
+      "title": "Date",
+      "type": "string"
+     },
+     "drawdown": {
+      "description": "Close vs the highest close so far in the range (\u2264 0, decimal)",
+      "title": "Drawdown",
+      "type": "number"
+     },
+     "spike": {
+      "description": "Close vs the lowest close of the last `lookback` sessions (\u2265 0, decimal)",
+      "title": "Spike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "date",
+     "close",
+     "drawdown",
+     "spike"
+    ],
+    "title": "SwingPoint",
+    "type": "object"
+   },
+   "SwingStats": {
+    "properties": {
+     "avg_drawdown": {
+      "title": "Avg Drawdown",
+      "type": "number"
+     },
+     "current_drawdown": {
+      "title": "Current Drawdown",
+      "type": "number"
+     },
+     "current_spike": {
+      "title": "Current Spike",
+      "type": "number"
+     },
+     "first_date": {
+      "title": "First Date",
+      "type": "string"
+     },
+     "last_date": {
+      "title": "Last Date",
+      "type": "string"
+     },
+     "max_drawdown": {
+      "title": "Max Drawdown",
+      "type": "number"
+     },
+     "max_drawdown_date": {
+      "title": "Max Drawdown Date",
+      "type": "string"
+     },
+     "max_spike": {
+      "title": "Max Spike",
+      "type": "number"
+     },
+     "max_spike_date": {
+      "title": "Max Spike Date",
+      "type": "string"
+     },
+     "near_high_share": {
+      "description": "Share of sessions within 5% of the high",
+      "title": "Near High Share",
+      "type": "number"
+     },
+     "peak_date": {
+      "title": "Peak Date",
+      "type": "string"
+     },
+     "sessions": {
+      "title": "Sessions",
+      "type": "integer"
+     },
+     "sessions_since_peak": {
+      "title": "Sessions Since Peak",
+      "type": "integer"
+     },
+     "spike_percentile": {
+      "description": "Share of sessions whose spike was at or below today's",
+      "title": "Spike Percentile",
+      "type": "number"
+     }
+    },
+    "required": [
+     "current_drawdown",
+     "max_drawdown",
+     "max_drawdown_date",
+     "avg_drawdown",
+     "peak_date",
+     "sessions_since_peak",
+     "near_high_share",
+     "current_spike",
+     "max_spike",
+     "max_spike_date",
+     "spike_percentile",
+     "sessions",
+     "first_date",
+     "last_date"
+    ],
+    "title": "SwingStats",
+    "type": "object"
+   },
+   "SwingsOut": {
+    "properties": {
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "lookback": {
+      "description": "Sessions in the rolling low the spike is measured from",
+      "title": "Lookback",
+      "type": "integer"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     },
+     "points": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SwingPoint"
+      },
+      "title": "Points",
+      "type": "array"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Live price used as today's close",
+      "title": "Price"
+     },
+     "realtime": {
+      "default": false,
+      "description": "True when that price came from a real-time source",
+      "title": "Realtime",
+      "type": "boolean"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
+     "stats": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStats"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "period",
+     "lookback"
+    ],
+    "title": "SwingsOut",
     "type": "object"
    },
    "SymbolSummaryOut": {
@@ -9635,6 +10280,95 @@
      "bias"
     ],
     "title": "TopFlowStrike",
+    "type": "object"
+   },
+   "TradeIdea": {
+    "description": "One contract suggested from the dealer levels (flow.ideas).",
+    "properties": {
+     "action": {
+      "enum": [
+       "BUY_CALL",
+       "SELL_CALL",
+       "BUY_PUT",
+       "SELL_PUT"
+      ],
+      "title": "Action",
+      "type": "string"
+     },
+     "breakeven": {
+      "title": "Breakeven",
+      "type": "number"
+     },
+     "delta": {
+      "description": "Of one long option",
+      "title": "Delta",
+      "type": "number"
+     },
+     "dte": {
+      "title": "Dte",
+      "type": "integer"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "fit": {
+      "description": "How it sits with the gamma regime",
+      "enum": [
+       "favored",
+       "neutral",
+       "against"
+      ],
+      "title": "Fit",
+      "type": "string"
+     },
+     "otype": {
+      "enum": [
+       "call",
+       "put"
+      ],
+      "title": "Otype",
+      "type": "string"
+     },
+     "premium": {
+      "description": "Mid, per share",
+      "title": "Premium",
+      "type": "number"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Buys: the level the idea aims at",
+      "title": "Target"
+     }
+    },
+    "required": [
+     "action",
+     "otype",
+     "strike",
+     "expiry",
+     "dte",
+     "premium",
+     "delta",
+     "breakeven",
+     "fit",
+     "reason"
+    ],
+    "title": "TradeIdea",
     "type": "object"
    },
    "UnitOut": {
@@ -13737,6 +14471,120 @@
     "summary": "Delete Account Holding",
     "tags": [
      "accounts"
+    ]
+   }
+  },
+  "/api/v1/insight/{symbol}/leaps-score": {
+   "get": {
+    "description": "0\u2013100: how good a moment it is to buy a long-dated call on this stock, with the factors behind it.",
+    "operationId": "leaps_score_api_v1_insight__symbol__leaps_score_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeapsScoreOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Leaps Score",
+    "tags": [
+     "insight"
+    ]
+   }
+  },
+  "/api/v1/insight/{symbol}/swings": {
+   "get": {
+    "description": "Drawdown (below the range's high) and upside spike (above the rolling low) for each session of the range.",
+    "operationId": "swings_api_v1_insight__symbol__swings_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "period",
+      "required": false,
+      "schema": {
+       "default": "1y",
+       "enum": [
+        "1mo",
+        "3mo",
+        "6mo",
+        "1y",
+        "5y",
+        "max"
+       ],
+       "title": "Period",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SwingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Swings",
+    "tags": [
+     "insight"
     ]
    }
   },

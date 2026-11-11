@@ -6,7 +6,7 @@
  */
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, PanelRight } from "lucide-react";
+import { Clock, PanelRight, Ruler } from "lucide-react";
 import { fetchGex, GexResult } from "@/lib/api";
 import { useGexStream } from "@/lib/useGexStream";
 import { SkeletonStatGrid, ErrorBanner } from "@/components/ui";
@@ -15,6 +15,8 @@ import { LevelsStrip } from "./LevelsStrip";
 import { GexHeatmap } from "./GexHeatmap";
 import type { HeatOpts, BoardHandle, Metric } from "./GexHeatmap";
 import { DetailsDrawer } from "./DetailsDrawer";
+import { DealerLadder, TradeIdeas } from "./DealerLadder";
+import { LeapsLine } from "@/components/insight/LeapsScore";
 import { sourceName } from "./SourceBadge";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
@@ -42,6 +44,8 @@ export interface TickerPanelProps {
   accentColor: string;
   nStrikes: number;
   heatOpts: HeatOpts;
+  /** Columns on the board (1–3): alone, the dealer ladder sits beside the heatmap on wide screens. */
+  columns?: number;
   canRemove: boolean;
   onRemove: () => void;
   onInputChange: (v: string) => void;
@@ -58,10 +62,12 @@ export interface TickerPanelProps {
 }
 
 export function TickerPanel({
-  slot, accentColor, nStrikes, heatOpts, canRemove, onRemove, onInputChange, onSelect, onMetricChange,
+  slot, accentColor, nStrikes, heatOpts, columns = 1, canRemove, onRemove, onInputChange, onSelect, onMetricChange,
   data, isLoading, isError, errorText, isFetching, onRefresh, dataUpdatedAt,
 }: TickerPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [ladderOpen, setLadderOpen] = useState(true);
+  const beside = columns === 1;        // room for the ladder next to the heatmap (xl and up)
   const board = useRef<BoardHandle>(null);
   const metric = slot.metric ?? "gex";
   // Prefer the time the backend computed the result; fall back to when we received it.
@@ -124,14 +130,32 @@ export function TickerPanel({
             </div>
             <button onClick={() => board.current?.centerOnSpot()} className="rounded-md px-2 py-0.5 text-foreground/65 hover:bg-foreground/[0.06] hover:text-foreground">⌖ Spot</button>
             <button onClick={() => board.current?.centerOnKing()} className="rounded-md px-2 py-0.5 text-amber-500 hover:bg-foreground/[0.06]">★ King</button>
+            <button onClick={() => setLadderOpen((o) => !o)} aria-pressed={ladderOpen} title="Dealer ladder with buy/sell call and put ideas"
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground ${ladderOpen ? "text-foreground" : "text-foreground/60"}`}>
+              <Ruler size={12} /> Ladder
+            </button>
             <button
               onClick={() => setDetailsOpen(true)}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground"
             >
               <PanelRight size={12} /> Details
             </button>
           </div>
-          <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
+          {/* Alone on a wide screen the ladder and ideas sit beside the heatmap; otherwise the ladder
+              goes above it and the ideas below, so the board stays near the top. */}
+          <div className={ladderOpen && beside ? "xl:grid xl:grid-cols-[minmax(0,1fr)_380px]" : undefined}>
+            {ladderOpen && (
+              <aside className={beside ? "border-b border-[var(--border)] sm:grid sm:grid-cols-2 xl:order-2 xl:block xl:border-b-0 xl:border-l" : "border-b border-[var(--border)]"}>
+                <DealerLadder data={data} height={beside ? 250 : 215} />
+                {beside && <TradeIdeas data={data} className="xl:border-t xl:border-[var(--border)]" />}
+              </aside>
+            )}
+            <div className="min-w-0">
+              <LeapsLine symbol={slot.ticker} className="border-b border-[var(--border)] px-4 py-1.5" />
+              <GexHeatmap ref={board} data={data} metric={metric} nStrikes={nStrikes} opts={heatOpts} maxHeight="68vh" />
+              {ladderOpen && !beside && <TradeIdeas data={data} className="border-t border-[var(--border)]" />}
+            </div>
+          </div>
           <DetailsDrawer
             open={detailsOpen}
             onClose={() => setDetailsOpen(false)}
@@ -159,7 +183,7 @@ export function TickerPanelWithQuery(props: TickerPanelWithQueryProps) {
     queryFn: () => fetchGex(props.slot.ticker),
     staleTime: 60_000,
     // Yahoo data is ~15 min delayed; the stream pushes changes, polling is only a fallback.
-    refetchInterval: live ? false : 120_000,
+    refetchInterval: live ? false : 30_000,
     refetchIntervalInBackground: false,
   });
 

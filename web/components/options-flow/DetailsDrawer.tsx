@@ -1,7 +1,7 @@
 "use client";
 /**
  * DetailsDrawer — one ticker's dealer levels and option premium, desk style.
- *   Levels: a plain-language read, every level in one table (price, distance, meaning),
+ *   Levels: the LEAPS score scale first, then a plain-language read, every level in one table (price, distance, meaning),
  *           the GEX profile, and the strikes holding the most gamma.
  *   Flow:   premium figures + call/put split, where the premium sits (strikes, expiries),
  *           and how net premium moved through the day.
@@ -13,6 +13,7 @@ import type { GexResult } from "@/lib/api";
 import { Tag } from "@/components/desk";
 import { GexProfileChart } from "./GexProfileChart";
 import { FlowMomentumChart } from "./FlowMomentumChart";
+import { LeapsScore } from "@/components/insight/LeapsScore";
 
 type Tab = "levels" | "flow";
 
@@ -254,6 +255,7 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
           {tab === "levels" ? (
             <>
+              <LeapsScore symbol={ticker} compact className="border-b border-[var(--border)] px-5 py-4" />
               <Read d={data} />
               <LevelsTable d={data} />
               <GexProfileChart data={data} accentColor={accentColor} />
