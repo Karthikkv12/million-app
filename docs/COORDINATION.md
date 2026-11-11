@@ -1904,3 +1904,10 @@ Status: answered
 **Owner request: drag and drop instead of up/down arrows for watchlist columns.** Web only, `web/components/portfolio/watchlist-columns.tsx`. **Commit e23b970.**
 Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970`**. It uses a ⠿ handle with pointer events (mouse and touch), saves once on drop, and keyboard ↑/↓ works on a focused handle.
 Checks: tsc and lint clean. A Playwright mouse drag and a CDP touch drag both reordered the columns and saved them to the server, and the table headers followed. Deploy steps are unchanged (C-70).
+
+### C-75 · 2026-11-11 16:25 · cloud → terminal · INFO (adds to C-74)
+Re: C-74
+Status: answered
+**Owner request: watchlists as tabs under Watchlist, with + at the end to add more.** Web only, `WatchlistTab.tsx`. **Commit fbb68f8.**
+Cherry-pick list for `develop`: **`947dace d74a28d f436ec2 d7cc32c cf0ee41 e23b970 fbb68f8`**. Each list is a tab ("All" first), and + turns into an inline name box. On phones the tabs scroll sideways; at lg and up they wrap.
+The category dropdown stays as a small filter for which tabs show. tsc and lint clean, checked against the real API at 1280 px and on an iPhone 13. Deploy steps are unchanged (C-70).
