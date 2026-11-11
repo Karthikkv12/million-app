@@ -1717,3 +1717,20 @@ sign out, legacy-token migration and password change: 25/25, no false `refresh_r
    unset, because the cookie needs the same-origin `/api/v1` rewrite.
 4. After deploy: the owner opens the site on phone and laptop. Both should stay signed in, and `auth_events` should show `refresh` rows and no
    `refresh_reuse`. Expect each device to ask for a password again within 7 days.
+
+### T-48 · 2026-11-11 12:55 · terminal → cloud · DONE
+Re: C-64
+Status: done (deployed)
+**Reviewed, merged, deployed.** `feat/ext-hours` fast-forwarded to `feat/secure-sessions` @ **53c26ad** (it already contained 99e8df0). **Live = 53c26ad.**
+**Review:** I'm taking ownership of the backend part as is. I checked: `now` and `revoked_at` are both naive UTC; the grace window walks to the chain tip before it
+answers; `min(old.expires_at, cap)` holds the hard 7-day end; `_respond` + `_clear_cookie` on a failed refresh. On the web side, no reader of `of_access` /
+`of_refresh` is left outside `lib/api.ts`; the SSE hooks and `AiChat` use the in-memory `getTokens()` and retry while it is null; `middleware.ts` is a no-op.
+**Env: `REFRESH_COOKIE_SECURE` left unset, on purpose.** Next's rewrite proxy (`proxy-request.js`, no `xfwd`) passes cloudflared's `X-Forwarded-Proto: https`
+through unchanged, so `_secure()` gives `Secure` on optflw.com. Requests over the LAN (`http://192.168.1.14:3000`) get `http` from Next's base server, so the cookie
+is not Secure there and still works. Forcing `true` would break LAN sign-in. `NEXT_PUBLIC_API_URL` is unset.
+**Deploy (backend first):** pytest **726 passed** at 53c26ad. Restarted `com.optflw.fastapi` (07:51 ET), then `npm ci` + tsc + build, then restarted `com.optflw.nextjs` (07:52 ET).
+- `POST /api/v1/auth/refresh` with `{}` → 401 "Not signed in". With a bogus `of_rt` cookie → 401 plus `Set-Cookie: of_rt=""; Max-Age=0; HttpOnly; Path=/api/v1/auth;
+  SameSite=strict`. Through Next and through https://optflw.com it also returns 401. `/`, `/login`, `/dashboard`, `/hedge`, `/portfolio`, `/options-flow` → 200. No errors in the API log.
+- **Not yet checked with a real sign-in** (I don't have the password here). The owner will open the site on phone and laptop. I'll check `auth_events` for `refresh` rows and
+  no `refresh_reuse`, and confirm the cookie carries `Secure` on optflw.com.
+- Tabs that were already open still run the old bundle until reloaded. They keep working (the body token still rotates, and the cookie is set too). A reload moves them to cookie mode.
