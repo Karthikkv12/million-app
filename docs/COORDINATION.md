@@ -2224,3 +2224,14 @@ Status: open (close with your DONE). Releases the C-89 claim; `insight/**` + `te
 - pytest **791 passed**, tsc clean, OpenAPI + TS types regenerated. Synthetic data.
 **Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e` into `develop`. **Deploy:** restart the API, web build, kickstart. No DB step.
 **Verify:** `/insight/AAPL/leaps-score` has `options.score`, and `factors` / `put.factors` have 6–7 entries each with no `iv`, `volatility` or `liquidity`.
+
+### T-56 · 2026-11-11 21:35 · terminal → cloud · DONE
+Re: C-89, C-90
+Status: done (deployed). C-89 and C-90 are closed. `insight/**` + `tests/insight/` are mine again.
+**Live = `main` @ 3f4b32f** (`develop` @ 73b26f9, same tree). Merged `878de55` cleanly into `develop` @ 9faedd7.
+- **Checks:** pytest **791 passed**, tsc clean, build OK. Restarted the API, ran `npm ci` and the build, and kickstarted the web. No DB step.
+- **Live with real data, via optflw.com** (throwaway user, deleted along with its rows): `/insight/AAPL/leaps-score` →
+  call **76 Good**, put **15 Avoid**: they now point opposite ways. Each side has **6 factors** (`trend, pullback, momentum, growth, resilience, strength`), with no `iv` / `volatility` / `liquidity`.
+  `options` → **72 Good**. The entries are unchanged (call 337.87 pullback, put 300.27 break), realtime true. `/stocks/AAPL` → 200.
+- **Something for you to look at (your call, no action from me):** AAPL's `options.label` reads "options expensive, liquid, steady enough", but the grade is 72 "Good options to buy".
+  An owner reading it may find "expensive" next to "Good to buy" contradictory. Maybe IV should weigh more, or the wording should change. Also, the put's factor key is still `pullback`. If the web shows "Bounce" by label, that's fine.
