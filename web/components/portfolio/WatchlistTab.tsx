@@ -2,15 +2,14 @@
 /**
  * Watchlists: up to 20 named lists. The first visit seeds "My watchlist" (the old single list)
  * plus one list per sector, each starting with its SPDR ETF. Every list is a tab, with + at the end to
- * add one; "All" merges the lists in view. The category dropdown (All lists / Sectors / My lists)
- * narrows which tabs show. ⋮ holds Customize columns / Edit name / Restore / Delete. Sector narrows the table by the
+ * add one; "All" merges every list. ⋮ holds Customize columns / Edit name / Restore / Delete. Sector narrows the table by the
  * quote's own sector. Quotes come from /market/watchlist-quotes and refresh every minute.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Columns3, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Columns3, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, SkeletonCard } from "@/components/ui";
 import {
@@ -22,7 +21,6 @@ import { okBooks, useLiveBooks } from "@/lib/live";
 import { TD, TH } from "./broker";
 import { COL, ColumnPicker, columnsFor, DEFAULT_COLUMNS, type WRow } from "./watchlist-columns";
 
-type Category = "all" | "sector" | "custom";
 const KEY = ["watchlists"];
 const SEL_KEY = "watchlist_selected";
 const ALL = -1;                                   // the "All symbols" pseudo-list
@@ -34,7 +32,6 @@ const AGG_COLS_KEY = "watchlist_columns_all";     // columns for the merged view
 
 export function WatchlistTab() {
   const qc = useQueryClient();
-  const [category, setCategory] = useState<Category>("all");
   const [selected, setSelected] = useState<number>(ALL);
   const [sector, setSector] = useState<string>("");
   const [input, setInput] = useState("");
@@ -54,17 +51,16 @@ export function WatchlistTab() {
   useEffect(() => { try { const v = Number(localStorage.getItem(SEL_KEY)); if (v) setSelected(v); } catch { /* storage off */ } }, []);
   useEffect(() => { try { localStorage.setItem(SEL_KEY, String(selected)); } catch { /* storage off */ } }, [selected]);
 
-  const inCategory = lists.filter((g) => category === "all" || g.kind === category);
   const current = lists.find((g) => g.id === selected) ?? null;
-  // A list that's gone (deleted, or hidden by the category) falls back to "All symbols".
+  // A list that's gone (deleted) falls back to "All".
   useEffect(() => {
-    if (selected !== ALL && groupsQ.data && (!current || (category !== "all" && current.kind !== category))) setSelected(ALL);
-  }, [selected, current, category, groupsQ.data]);
+    if (selected !== ALL && groupsQ.data && !current) setSelected(ALL);
+  }, [selected, current, groupsQ.data]);
 
   const symbols = useMemo(() => {
-    const src = current ? [current] : inCategory;
+    const src = current ? [current] : lists;
     return [...new Set(src.flatMap((g) => g.symbols))];
-  }, [current, inCategory]);
+  }, [current, lists]);
   const memberOf = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const g of lists) for (const s of g.symbols) m.set(s, [...(m.get(s) ?? []), g.name]);
@@ -101,7 +97,7 @@ export function WatchlistTab() {
     mutationFn: (name: string) => createWatchlistGroup(name),
     onSuccess: (g) => {
       qc.setQueryData<WatchlistGroups>(KEY, (d) => d && { ...d, lists: [...d.lists, g] });
-      setNewName(null); setErr(null); setCategory("all"); setSelected(g.id);
+      setNewName(null); setErr(null); setSelected(g.id);
     },
     onError: fail,
   });
@@ -191,11 +187,20 @@ export function WatchlistTab() {
 
   return (
     <div className="space-y-4">
-      {/* Category filter + list actions, then every list as a tab with + at the end. */}
-      <div className="flex items-center justify-between gap-3">
-        <CategoryMenu value={category} lists={lists} onPick={(c) => { setCategory(c); setSelected(ALL); setSector(""); setErr(null); }} />
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="font-mono text-[11px] text-foreground/45">{lists.length}/{maxLists} lists</span>
+      {/* Every list as a tab with + at the end; ⋮ (list actions) pinned on the right. */}
+      <div className="flex items-end gap-1 border-b border-[var(--border)]">
+        <div className="min-w-0 flex-1">
+        <ListTabs
+          lists={lists} selected={selected} onSelect={(id) => { setSelected(id); setSector(""); setErr(null); }}
+          allLabel="All"
+          allCount={new Set(lists.flatMap((g) => g.symbols)).size}
+          adding={newName} onAdd={atLimit ? undefined : () => { setNewName(""); setErr(null); }}
+          onAddChange={setNewName} onAddCancel={() => setNewName(null)}
+          onAddSubmit={() => { if (newName?.trim()) create.mutate(newName.trim()); }}
+          atLimit={atLimit} max={maxLists}
+        />
+        </div>
+        <div className="mb-1 shrink-0">
           <ActionsMenu items={[
             { label: "Customize columns", icon: Columns3, onClick: () => setPicker(true) },
             ...(current ? [{ label: "Edit name", icon: Pencil, onClick: () => setRename(current.name) }] : []),
@@ -206,16 +211,6 @@ export function WatchlistTab() {
           ]} />
         </div>
       </div>
-
-      <ListTabs
-        lists={inCategory} selected={selected} onSelect={(id) => { setSelected(id); setSector(""); setErr(null); }}
-        allLabel={category === "sector" ? "All sectors" : category === "custom" ? "All my lists" : "All"}
-        allCount={new Set(inCategory.flatMap((g) => g.symbols)).size}
-        adding={newName} onAdd={atLimit ? undefined : () => { setNewName(""); setErr(null); }}
-        onAddChange={setNewName} onAddCancel={() => setNewName(null)}
-        onAddSubmit={() => { if (newName?.trim()) create.mutate(newName.trim()); }}
-        atLimit={atLimit} max={maxLists}
-      />
 
       {rename != null && current && (
         <form onSubmit={(e) => { e.preventDefault(); if (rename.trim()) replace.mutate({ id: current.id, body: { name: rename.trim() } }); }}
@@ -353,39 +348,6 @@ function useDismiss(open: boolean, close: () => void) {
 const MENU = "absolute z-30 mt-1.5 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]";
 const ITEM = "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-[var(--surface-2)]";
 
-/** Which lists the tabs show: all of them, the sector lists, or the user's own. */
-function CategoryMenu({ value, lists, onPick }: { value: Category; lists: WatchlistGroup[]; onPick: (c: Category) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
-  const opts: [Category, string, number][] = [
-    ["all", "All lists", lists.length],
-    ["sector", "Sectors", lists.filter((g) => g.kind === "sector").length],
-    ["custom", "My lists", lists.filter((g) => g.kind === "custom").length],
-  ];
-  const cur = opts.find((o) => o[0] === value)!;
-  return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-[13px] font-medium text-foreground transition hover:bg-[var(--surface-2)]">
-        {cur[1]} <span className="font-mono text-[11px] text-foreground/45">{cur[2]}</span>
-        <ChevronsUpDown size={14} className="text-foreground/50" />
-      </button>
-      {open && (
-        <div role="listbox" className={clsx(MENU, "left-0 w-48")}>
-          {opts.map(([c, label, n]) => (
-            <button key={c} role="option" aria-selected={value === c} onClick={() => { onPick(c); setOpen(false); }}
-              className={clsx(ITEM, value === c ? "bg-[var(--surface-2)] text-foreground" : "text-foreground/80")}>
-              <span className="w-3.5 shrink-0">{value === c && <Check size={14} />}</span>
-              <span className="flex-1">{label}</span>
-              <span className="font-mono text-[11px] text-foreground/45">{n}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Every list as a tab (scrolls sideways on phones), "All" first and + at the end to add a list. */
 function ListTabs({ lists, selected, onSelect, allLabel, allCount, adding, onAdd, onAddChange, onAddCancel, onAddSubmit, atLimit, max }: {
   lists: WatchlistGroup[]; selected: number; onSelect: (id: number) => void; allLabel: string; allCount: number;
@@ -409,7 +371,7 @@ function ListTabs({ lists, selected, onSelect, allLabel, allCount, adding, onAdd
     );
   };
   return (
-    <div ref={strip} role="tablist" aria-label="Watchlists" className="-mx-4 overflow-x-auto border-b border-[var(--border)] px-4 sm:mx-0 sm:px-0 lg:overflow-visible">
+    <div ref={strip} role="tablist" aria-label="Watchlists" className="-ml-4 overflow-x-auto pl-4 sm:ml-0 sm:pl-0 lg:overflow-visible">
       {/* Phones: one row that swipes sideways. Wide screens: tabs wrap so every list is visible. */}
       <div className="flex min-w-max items-end gap-0.5 lg:min-w-0 lg:flex-wrap">
         {tab(ALL, allLabel, allCount)}
@@ -424,7 +386,7 @@ function ListTabs({ lists, selected, onSelect, allLabel, allCount, adding, onAdd
             <button type="button" aria-label="Cancel" onClick={onAddCancel} className="rounded-md p-1.5 text-foreground/50 hover:text-foreground"><X size={14} /></button>
           </form>
         ) : (
-          <button onClick={onAdd} disabled={!onAdd} aria-label="New list" title={atLimit ? `Up to ${max} lists` : "New list"}
+          <button onClick={onAdd} disabled={!onAdd} aria-label="New list" title={atLimit ? `Up to ${max} lists` : `New list (${lists.length} of ${max})`}
             className="mb-1 ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-foreground/55 transition hover:bg-[var(--surface-2)] hover:text-foreground disabled:opacity-30">
             <Plus size={17} />
           </button>
