@@ -20,7 +20,11 @@ import { Clock, Pin, X } from "lucide-react";
 import { fetchNetFlowHistory, FlowSnapshot } from "@/lib/api";
 import { useChartStyle } from "@/components/chart/kit";
 
-interface Props { symbol: string; accentColor?: string; variant?: "drawer" | "page" }
+interface Props {
+  symbol: string; accentColor?: string; variant?: "drawer" | "page";
+  /** Price levels drawn dashed on the price axis (e.g. Anchor and Flip), shown while Price is on. */
+  levels?: { label: string; price: number | null | undefined; color: string }[];
+}
 
 const DAYS = [1, 3, 7, 14] as const;
 type Day = (typeof DAYS)[number];
@@ -55,7 +59,7 @@ const when = (ts: string, days: number) => {
     : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
-export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
+export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: Props) {
   const page = variant === "page";
   const [days, setDays] = useState<Day>(1);
   const [picked, setPicked] = useState(false);          // the user chose a range: don't auto-widen
@@ -210,6 +214,10 @@ export function FlowMomentumChart({ symbol, variant = "drawer" }: Props) {
                   ? <Line yAxisId="m" type="monotone" dataKey="put" stroke={c.loss} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
                   : <Bar yAxisId="m" dataKey="put" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />)}
                 {on.net && <Area yAxisId="m" type="monotone" dataKey="net" stroke={c.accent} strokeWidth={2.25} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
+                {on.price && levels.filter((l) => l.price != null).map((l) => (
+                  <ReferenceLine key={l.label} yAxisId="px" y={l.price!} stroke={l.color} strokeDasharray="5 4" strokeWidth={1.25} ifOverflow="extendDomain"
+                    label={{ value: `${l.label} ${l.price!.toFixed(2)}`, position: "insideBottomRight", fill: l.color, fontSize: 10.5 }} />
+                ))}
                 {on.price && <Line yAxisId="px" type="monotone" dataKey="price" stroke={c.ink} strokeOpacity={0.55} strokeWidth={1.25} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
                 {rows.length > 20 && (
                   <Brush dataKey="ts" height={20} travellerWidth={8} stroke={c.border} fill="transparent" tickFormatter={(v: string) => when(v, days)} />
