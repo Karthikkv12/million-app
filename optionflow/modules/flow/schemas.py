@@ -112,3 +112,30 @@ class GexDayOut(BaseModel):
     date: Optional[str] = None
     snapshots: List[GexReplaySnapshot] = []
     days: List[str] = []                 # latest 10 days with data, newest first
+
+
+class FlowLeader(BaseModel):
+    symbol: str
+    net: float = Field(..., description="Call − put premium added since the 09:30 ET open (chain snapshot, not prints)")
+    call_prem: float
+    put_prem: float
+    spot: Optional[float] = None
+    change_pct: Optional[float] = Field(None, description="Day change %, from real-time quotes when available")
+
+
+class FlowLeadersOut(BaseModel):
+    session: Optional[str] = Field(None, description="US-Eastern session date (YYYY-MM-DD) the totals are for")
+    as_of: Optional[str] = Field(None, description="Latest snapshot used (UTC)")
+    universe: str
+    symbols: int = Field(..., description="Symbols with snapshots in the session")
+    bullish: List[FlowLeader]
+    bearish: List[FlowLeader]
+
+
+class TidePoint(BaseModel):
+    ts: str = Field(..., description="Bucket start (UTC)")
+    net: float
+    call_prem: float
+    put_prem: float
+    spy: Optional[float] = None
+    symbols: int = Field(..., description="Symbols contributing at this point")
