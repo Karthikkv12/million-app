@@ -1,4 +1,4 @@
-"""optionflow/modules/insight/router.py — GET /insight/{symbol}/swings and /leaps-score (HTTP only)."""
+"""optionflow/modules/insight/router.py — GET /insight/{symbol}/swings, /leaps-score and the batch /leaps-scores (HTTP only)."""
 from __future__ import annotations
 
 from typing import Literal
@@ -7,9 +7,16 @@ from fastapi import APIRouter, Depends, Query
 
 from optionflow.core.deps import get_current_user
 from optionflow.modules.insight import service
-from optionflow.modules.insight.schemas import LeapsScoreOut, SwingsOut
+from optionflow.modules.insight.schemas import LeapsScoreOut, LeapsScoresOut, SwingsOut
 
 router = APIRouter(prefix="/insight", tags=["insight"])
+
+
+@router.get("/leaps-scores", response_model=LeapsScoresOut)
+def leaps_scores(symbols: str = Query(..., description="Comma-separated, e.g. AAPL,MSFT (up to 60)"),
+                 _user=Depends(get_current_user)) -> LeapsScoresOut:
+    """The LEAPS score of many symbols in one request (e.g. every holding): scores and entry, no factors."""
+    return service.leaps_scores(symbols.split(","))
 
 
 @router.get("/{symbol}/swings", response_model=SwingsOut)

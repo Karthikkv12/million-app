@@ -5032,6 +5032,142 @@
     "title": "IvOut",
     "type": "object"
    },
+   "LeapsScoreBrief": {
+    "description": "One symbol's LEAPS score in a batch: the numbers only, no factors (open the stock page for those).",
+    "properties": {
+     "band": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Band"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ScoreEntry"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Entry for the stronger side"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "options_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Options Label"
+     },
+     "options_score": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Option quality, same for call and put",
+      "title": "Options Score"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "put_band": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Band"
+     },
+     "put_score": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Score"
+     },
+     "realtime": {
+      "default": false,
+      "title": "Realtime",
+      "type": "boolean"
+     },
+     "score": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Long call score, 0\u2013100; None without enough history",
+      "title": "Score"
+     },
+     "side": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The stronger side (call on a tie)",
+      "title": "Side"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "LeapsScoreBrief",
+    "type": "object"
+   },
    "LeapsScoreOut": {
     "properties": {
      "as_of": {
@@ -5161,6 +5297,31 @@
      "symbol"
     ],
     "title": "LeapsScoreOut",
+    "type": "object"
+   },
+   "LeapsScoresOut": {
+    "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
+     "scores": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LeapsScoreBrief"
+      },
+      "title": "Scores",
+      "type": "array"
+     }
+    },
+    "title": "LeapsScoresOut",
     "type": "object"
    },
    "LedgerEntryOut": {
@@ -14522,6 +14683,56 @@
     "summary": "Delete Account Holding",
     "tags": [
      "accounts"
+    ]
+   }
+  },
+  "/api/v1/insight/leaps-scores": {
+   "get": {
+    "description": "The LEAPS score of many symbols in one request (e.g. every holding): scores and entry, no factors.",
+    "operationId": "leaps_scores_api_v1_insight_leaps_scores_get",
+    "parameters": [
+     {
+      "description": "Comma-separated, e.g. AAPL,MSFT (up to 60)",
+      "in": "query",
+      "name": "symbols",
+      "required": true,
+      "schema": {
+       "description": "Comma-separated, e.g. AAPL,MSFT (up to 60)",
+       "title": "Symbols",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeapsScoresOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Leaps Scores",
+    "tags": [
+     "insight"
     ]
    }
   },

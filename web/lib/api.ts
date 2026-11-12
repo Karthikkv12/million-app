@@ -327,6 +327,11 @@ export const fetchSwings = (symbol: string, period: SwingPeriod = "1y") =>
   api.get<Swings>(`/insight/${encodeURIComponent(symbol.toUpperCase())}/swings?period=${period}`);
 export const fetchLeapsScore = (symbol: string) =>
   api.get<LeapsScore>(`/insight/${encodeURIComponent(symbol.toUpperCase())}/leaps-score`);
+export type LeapsScoreBrief = Schemas["LeapsScoreBrief"];
+export type LeapsScores = Schemas["LeapsScoresOut"];
+/** Many symbols in one request (up to 60): scores and entry, no factors. */
+export const fetchLeapsScores = (symbols: string[]) =>
+  api.get<LeapsScores>(`/insight/leaps-scores?symbols=${symbols.map((s) => encodeURIComponent(s.toUpperCase())).join(",")}`);
 
 // ── Net flow history ──────────────────────────────────────────────────────────
 export interface FlowSnapshot {

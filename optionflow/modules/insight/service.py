@@ -149,3 +149,47 @@ def leaps_score(symbol: str) -> Dict[str, Any]:
                               atm_iv=d.get("atm_iv"), net_gex=d.get("net_gex"), zero_gamma=d.get("zero_gamma"))
     return {"symbol": sym, **out, "price": round(bars[-1]["close"], 4), "realtime": realtime,
             "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+
+MAX_BATCH = 60              # symbols per batch request: a whole portfolio, not the whole market
+
+
+def _brief(full: Dict[str, Any]) -> Dict[str, Any]:
+    """One row of a batch: call and put scores, option quality, and the entry of the stronger side."""
+    put = full.get("put") or None
+    call_score = full.get("score")
+    side = "put" if put and call_score is not None and put["score"] > call_score else "call"
+    entry = (put or {}).get("entry") if side == "put" else full.get("entry")
+    opts = full.get("options") or None
+    return {
+        "symbol": full["symbol"], "score": call_score, "band": full.get("band"),
+        "put_score": put["score"] if put else None, "put_band": put["band"] if put else None,
+        "options_score": opts["score"] if opts else None, "options_label": opts.get("label", "") if opts else None,
+        "side": side if call_score is not None else None, "entry": entry,
+        "price": full.get("price"), "realtime": full.get("realtime", False), "error": full.get("error"),
+    }
+
+
+def leaps_scores(symbols: List[str]) -> Dict[str, Any]:
+    """The LEAPS score of many symbols at once (e.g. every holding), in the order given, duplicates dropped.
+    Cold symbols load their bars in parallel; one symbol failing never fails the batch."""
+    from concurrent.futures import ThreadPoolExecutor
+    seen: Dict[str, None] = {}
+    for s in symbols:
+        sym = s.strip().upper()
+        if sym:
+            seen.setdefault(sym, None)
+    syms = list(seen)[:MAX_BATCH]
+
+    def one(sym: str) -> Dict[str, Any]:
+        try:
+            return _brief(leaps_score(sym))
+        except Exception as exc:                       # a bug in one symbol's score must not sink the rest
+            logger.warning("insight: LEAPS score for %s failed: %s", sym, exc)
+            return _brief({"symbol": sym, "score": None, "band": None, "error": str(exc)})
+
+    if not syms:
+        return {"scores": [], "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    with ThreadPoolExecutor(max_workers=min(8, len(syms))) as pool:
+        rows = list(pool.map(one, syms))
+    return {"scores": rows, "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds")}
