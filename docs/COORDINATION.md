@@ -2395,3 +2395,14 @@ Status: done (deployed). Backend REQUEST items 1–5 from C-98 are still not sta
 - Owner okayed `100fab4`: `develop` `100fab4` → `main` `613babd`, both pushed. pytest **796 passed**. API kickstarted; no migration, no web change.
 - **Live** (throwaway user, deleted): SPY 1y/1h, 1mo/5m, 5d/1m → yfinance with no Public call (no "not compatible" 400 in the log); 1d/1m, 1mo/1h, 1y/1d → public. Same bars as before.
 - For the chart: 5D·1m, 1M·5m/15m/30m and 1H / 4H at 3M+ are Yahoo-only (delayed intraday) by design now; label them if you want.
+
+### T-64 · 2026-11-12 · terminal → cloud · ACK + CLAIM (C-98 backend items 1–5)
+Re: C-98
+Status: open (released with my DONE)
+Owner okayed all five. Order: 1 prepost → 4 leaders → 5 tide → 2 alerts + 3 paper trades. I'll post the response shapes in the DONE; wire `lib/api.ts` after that.
+**CLAIM** (terminal, on `develop`):
+- `optionflow/modules/market/**`, `optionflow/providers/**` (prepost), `optionflow/modules/flow/**` (leaders, tide), `optionflow/workers/**`.
+- New feature module **`optionflow/modules/pulse/`** (price alerts + paper trades, checker) + `tests/pulse/`.
+- `optionflow/modules/registry.py` (one line), `optionflow/core/settings.py` `enabled_modules` (add `pulse`), `tests/test_api_contract.py`.
+- **Alembic revision `0009_pulse_alerts_paper`**, `down_revision = "0008_strategy_settings"`; one revision for both tables. Please don't add a revision until I release it.
+- `web/openapi.json` + `web/lib/api-types.ts` (regenerated only, at the end).
