@@ -67,3 +67,22 @@ def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
         return [tuple(r) for r in q.all()]
     finally:
         session.close()
+
+
+def list_all_since(since_z: str, since_offset: str) -> List[tuple]:
+    """(symbol, ts, price, call_prem, put_prem, net_flow, total_prem, volume) rows for every
+    symbol, ordered by symbol then time (both timestamp spellings, as list_since)."""
+    session = get_session()
+    try:
+        q = (
+            session.query(
+                NetFlowSnapshot.symbol, NetFlowSnapshot.ts, NetFlowSnapshot.price,
+                NetFlowSnapshot.call_prem, NetFlowSnapshot.put_prem, NetFlowSnapshot.net_flow,
+                NetFlowSnapshot.total_prem, NetFlowSnapshot.volume,
+            )
+            .filter(or_(NetFlowSnapshot.ts >= since_z, NetFlowSnapshot.ts >= since_offset))
+            .order_by(NetFlowSnapshot.symbol, NetFlowSnapshot.ts)
+        )
+        return [tuple(r) for r in q.all()]
+    finally:
+        session.close()

@@ -3895,6 +3895,117 @@
     "title": "FlowByExpiry",
     "type": "object"
    },
+   "FlowLeader": {
+    "properties": {
+     "call_prem": {
+      "title": "Call Prem",
+      "type": "number"
+     },
+     "change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Day change %, from real-time quotes when available",
+      "title": "Change Pct"
+     },
+     "net": {
+      "description": "Call \u2212 put premium added since the 09:30 ET open (chain snapshot, not prints)",
+      "title": "Net",
+      "type": "number"
+     },
+     "put_prem": {
+      "title": "Put Prem",
+      "type": "number"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "net",
+     "call_prem",
+     "put_prem"
+    ],
+    "title": "FlowLeader",
+    "type": "object"
+   },
+   "FlowLeadersOut": {
+    "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Latest snapshot used (UTC)",
+      "title": "As Of"
+     },
+     "bearish": {
+      "items": {
+       "$ref": "#/components/schemas/FlowLeader"
+      },
+      "title": "Bearish",
+      "type": "array"
+     },
+     "bullish": {
+      "items": {
+       "$ref": "#/components/schemas/FlowLeader"
+      },
+      "title": "Bullish",
+      "type": "array"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "US-Eastern session date (YYYY-MM-DD) the totals are for",
+      "title": "Session"
+     },
+     "symbols": {
+      "description": "Symbols with snapshots in the session",
+      "title": "Symbols",
+      "type": "integer"
+     },
+     "universe": {
+      "title": "Universe",
+      "type": "string"
+     }
+    },
+    "required": [
+     "universe",
+     "symbols",
+     "bullish",
+     "bearish"
+    ],
+    "title": "FlowLeadersOut",
+    "type": "object"
+   },
    "GexDayOut": {
     "properties": {
      "date": {
@@ -6011,6 +6122,309 @@
     "title": "Outlook",
     "type": "object"
    },
+   "PaperTradeIn": {
+    "properties": {
+     "entry": {
+      "exclusiveMinimum": 0.0,
+      "title": "Entry",
+      "type": "number"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "qty": {
+      "exclusiveMinimum": 0.0,
+      "title": "Qty",
+      "type": "number"
+     },
+     "side": {
+      "enum": [
+       "long",
+       "short"
+      ],
+      "title": "Side",
+      "type": "string"
+     },
+     "status": {
+      "default": "planned",
+      "description": "'open' starts it at once, filled at entry",
+      "enum": [
+       "planned",
+       "open"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "stop": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stop"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
+     }
+    },
+    "required": [
+     "symbol",
+     "side",
+     "qty",
+     "entry"
+    ],
+    "title": "PaperTradeIn",
+    "type": "object"
+   },
+   "PaperTradeOut": {
+    "properties": {
+     "closed_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Closed At"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Price when planned: entry triggers when crossed from this side",
+      "title": "Created Price"
+     },
+     "entry": {
+      "title": "Entry",
+      "type": "number"
+     },
+     "exit_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exit Price"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "opened_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opened At"
+     },
+     "qty": {
+      "title": "Qty",
+      "type": "number"
+     },
+     "side": {
+      "enum": [
+       "long",
+       "short"
+      ],
+      "title": "Side",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "planned",
+       "open",
+       "stopped",
+       "target",
+       "closed"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "stop": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stop"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
+     }
+    },
+    "required": [
+     "id",
+     "symbol",
+     "side",
+     "qty",
+     "entry",
+     "status",
+     "created_at"
+    ],
+    "title": "PaperTradeOut",
+    "type": "object"
+   },
+   "PaperTradePatch": {
+    "description": "Levels / qty while planned or open (an open trade's entry is fixed); status 'closed' closes it at\nexit_price, or the current price when omitted.",
+    "properties": {
+     "entry": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry"
+     },
+     "exit_price": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exit Price"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "qty": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qty"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "const": "closed",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "stop": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stop"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
+     }
+    },
+    "title": "PaperTradePatch",
+    "type": "object"
+   },
    "PortfolioSnapshotCreateRequest": {
     "properties": {
      "cash": {
@@ -7614,6 +8028,163 @@
     "title": "PremiumWeekSymbol",
     "type": "object"
    },
+   "PriceAlertIn": {
+    "properties": {
+     "direction": {
+      "enum": [
+       "above",
+       "below"
+      ],
+      "title": "Direction",
+      "type": "string"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "price": {
+      "exclusiveMinimum": 0.0,
+      "title": "Price",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "price",
+     "direction"
+    ],
+    "title": "PriceAlertIn",
+    "type": "object"
+   },
+   "PriceAlertOut": {
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "direction": {
+      "enum": [
+       "above",
+       "below"
+      ],
+      "title": "Direction",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "triggered_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set once, when the price first reached the level (UTC)",
+      "title": "Triggered At"
+     },
+     "triggered_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Triggered Price"
+     }
+    },
+    "required": [
+     "id",
+     "symbol",
+     "price",
+     "direction",
+     "created_at"
+    ],
+    "title": "PriceAlertOut",
+    "type": "object"
+   },
+   "PriceAlertPatch": {
+    "description": "Changing price or direction re-arms a triggered alert.",
+    "properties": {
+     "direction": {
+      "anyOf": [
+       {
+        "enum": [
+         "above",
+         "below"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Direction"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     }
+    },
+    "title": "PriceAlertPatch",
+    "type": "object"
+   },
    "PriceBar": {
     "properties": {
      "close": {
@@ -7707,6 +8278,11 @@
        }
       ],
       "title": "Error"
+     },
+     "prepost": {
+      "default": false,
+      "title": "Prepost",
+      "type": "boolean"
      },
      "source": {
       "anyOf": [
@@ -10296,6 +10872,52 @@
     "title": "TickerSearchResult",
     "type": "object"
    },
+   "TidePoint": {
+    "properties": {
+     "call_prem": {
+      "title": "Call Prem",
+      "type": "number"
+     },
+     "net": {
+      "title": "Net",
+      "type": "number"
+     },
+     "put_prem": {
+      "title": "Put Prem",
+      "type": "number"
+     },
+     "spy": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spy"
+     },
+     "symbols": {
+      "description": "Symbols contributing at this point",
+      "title": "Symbols",
+      "type": "integer"
+     },
+     "ts": {
+      "description": "Bucket start (UTC)",
+      "title": "Ts",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ts",
+     "net",
+     "call_prem",
+     "put_prem",
+     "symbols"
+    ],
+    "title": "TidePoint",
+    "type": "object"
+   },
    "TopFlowStrike": {
     "properties": {
      "bias": {
@@ -12562,6 +13184,204 @@
     ]
    }
   },
+  "/api/v1/alerts/price": {
+   "get": {
+    "operationId": "list_alerts_api_v1_alerts_price_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "symbol",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Symbol"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PriceAlertOut"
+         },
+         "title": "Response List Alerts Api V1 Alerts Price Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Alerts",
+    "tags": [
+     "pulse"
+    ]
+   },
+   "post": {
+    "description": "Push once when the price is at or beyond the level (checked every few seconds, extended hours included).",
+    "operationId": "create_alert_api_v1_alerts_price_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PriceAlertIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PriceAlertOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Alert",
+    "tags": [
+     "pulse"
+    ]
+   }
+  },
+  "/api/v1/alerts/price/{alert_id}": {
+   "delete": {
+    "operationId": "delete_alert_api_v1_alerts_price__alert_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "alert_id",
+      "required": true,
+      "schema": {
+       "title": "Alert Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Alert",
+    "tags": [
+     "pulse"
+    ]
+   },
+   "patch": {
+    "operationId": "update_alert_api_v1_alerts_price__alert_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "alert_id",
+      "required": true,
+      "schema": {
+       "title": "Alert Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PriceAlertPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PriceAlertOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Alert",
+    "tags": [
+     "pulse"
+    ]
+   }
+  },
   "/api/v1/auth/change-password": {
    "post": {
     "operationId": "change_password_api_v1_auth_change_password_post",
@@ -14045,6 +14865,136 @@
     ]
    }
   },
+  "/api/v1/flow/leaders": {
+   "get": {
+    "description": "Top bullish / bearish symbols by net premium (calls \u2212 puts) added since today's open.",
+    "operationId": "flow_leaders_api_v1_flow_leaders_get",
+    "parameters": [
+     {
+      "description": "Only 'default': symbols the poller has watched today",
+      "in": "query",
+      "name": "universe",
+      "required": false,
+      "schema": {
+       "default": "default",
+       "description": "Only 'default': symbols the poller has watched today",
+       "title": "Universe",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 10,
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FlowLeadersOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Flow Leaders",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
+  "/api/v1/flow/tide": {
+   "get": {
+    "description": "Market tide: premium added since each session's open, summed across the watched universe, with SPY.",
+    "operationId": "flow_tide_api_v1_flow_tide_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "maximum": 30,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "bucket",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "maximum": 60,
+       "minimum": 1,
+       "title": "Bucket",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TidePoint"
+         },
+         "title": "Response Flow Tide Api V1 Flow Tide Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Flow Tide",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
   "/api/v1/flow/{symbol}/replay": {
    "get": {
     "description": "GEX replay: one day of 5-minute snapshots.",
@@ -15240,6 +16190,221 @@
     "summary": "Watch",
     "tags": [
      "flow"
+    ]
+   }
+  },
+  "/api/v1/paper-trades": {
+   "get": {
+    "operationId": "list_trades_api_v1_paper_trades_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "symbol",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Symbol"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(planned|open|stopped|target|closed)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PaperTradeOut"
+         },
+         "title": "Response List Trades Api V1 Paper Trades Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Trades",
+    "tags": [
+     "pulse"
+    ]
+   },
+   "post": {
+    "description": "Paper only. planned \u2192 open when the price reaches entry; open \u2192 stopped / target at those levels.",
+    "operationId": "create_trade_api_v1_paper_trades_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PaperTradeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PaperTradeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Trade",
+    "tags": [
+     "pulse"
+    ]
+   }
+  },
+  "/api/v1/paper-trades/{trade_id}": {
+   "delete": {
+    "operationId": "delete_trade_api_v1_paper_trades__trade_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "trade_id",
+      "required": true,
+      "schema": {
+       "title": "Trade Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Trade",
+    "tags": [
+     "pulse"
+    ]
+   },
+   "patch": {
+    "operationId": "update_trade_api_v1_paper_trades__trade_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "trade_id",
+      "required": true,
+      "schema": {
+       "title": "Trade Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PaperTradePatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PaperTradeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Trade",
+    "tags": [
+     "pulse"
     ]
    }
   },
@@ -17270,6 +18435,16 @@
        "default": "1d",
        "title": "Interval",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "prepost",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Prepost",
+       "type": "boolean"
       }
      }
     ],

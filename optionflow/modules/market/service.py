@@ -121,16 +121,19 @@ def live_quote(symbol: str) -> Dict[str, Any]:
     return {"symbol": sym, "price": round(price, 4), "from_cache": False}
 
 
-def price_history(symbol: str, period: str = "6mo", interval: str = "1d") -> Dict[str, Any]:
+def price_history(symbol: str, period: str = "6mo", interval: str = "1d", prepost: bool = False) -> Dict[str, Any]:
+    """`prepost` adds pre/after-market bars to intraday intervals; daily and longer ignore it."""
     sym = symbol.strip().upper()
     p = period if period in PERIODS else "6mo"
     iv = interval if interval in INTERVALS else "1d"
+    ext = prepost and iv not in _DAILY_OR_LONGER
     try:
-        df = get_market_data().price_history(sym, p, iv)
+        df = (get_market_data().price_history(sym, p, iv, prepost=True) if ext
+              else get_market_data().price_history(sym, p, iv))
     except Exception as exc:
         return {"symbol": sym, "bars": [], "current_price": None, "error": str(exc)}
     if df.empty:
         return {"symbol": sym, "bars": [], "current_price": None, "error": f"No data for {sym}"}
     bars = bars_from_history(df, intraday=iv not in _DAILY_OR_LONGER)
     return {"symbol": sym, "bars": bars, "current_price": bars[-1]["close"] if bars else None, "error": None,
-            "source": df.attrs.get("source")}
+            "source": df.attrs.get("source"), "prepost": ext}
