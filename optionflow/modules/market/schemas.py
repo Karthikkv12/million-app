@@ -134,3 +134,4 @@ class PriceHistoryOut(BaseModel):
     current_price: Num = None
     error: Optional[str] = None
     source: Optional[str] = None      # provider that served the bars: "public" or "yfinance"
+    prepost: bool = False             # pre/after-market bars included (intraday interval + ?prepost=true)

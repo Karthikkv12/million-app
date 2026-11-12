@@ -590,3 +590,39 @@ class StrategySetting(Base):
     strategy   = Column(String, nullable=False, default="spike_wheel")
     rules      = Column(Text, nullable=True)
     updated_at = Column(String, nullable=False)                     # ISO UTC
+
+
+class PriceAlert(Base):
+    """A price level a user wants a push for (pulse module). Checked by pulse.worker against real-time quotes;
+    `triggered_at` is set once, on the first check where the price is at or beyond the level."""
+    __tablename__ = "price_alerts"
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    symbol       = Column(String, nullable=False, index=True)
+    price        = Column(Float, nullable=False)
+    direction    = Column(String, nullable=False)              # "above" | "below"
+    note         = Column(String, nullable=True)
+    created_at   = Column(String, nullable=False)              # ISO UTC
+    triggered_at = Column(String, nullable=True)
+    triggered_price = Column(Float, nullable=True)
+
+
+class PaperTrade(Base):
+    """A paper trade plan (pulse module). Never routed to a broker. pulse.worker moves it planned → open when the
+    price reaches `entry`, and open → stopped / target when it reaches `stop` / `target`."""
+    __tablename__ = "paper_trades"
+    id          = Column(Integer, primary_key=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    symbol      = Column(String, nullable=False, index=True)
+    side        = Column(String, nullable=False)               # "long" | "short"
+    qty         = Column(Float, nullable=False)
+    entry       = Column(Float, nullable=False)
+    stop        = Column(Float, nullable=True)
+    target      = Column(Float, nullable=True)
+    status      = Column(String, nullable=False)               # planned | open | stopped | target | closed
+    note        = Column(String, nullable=True)
+    created_at  = Column(String, nullable=False)               # ISO UTC
+    opened_at   = Column(String, nullable=True)
+    closed_at   = Column(String, nullable=True)
+    exit_price  = Column(Float, nullable=True)
+    created_price = Column(Float, nullable=True)               # price when planned: which side `entry` is on

@@ -11,8 +11,10 @@ from fastapi.responses import StreamingResponse
 
 from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
-from optionflow.modules.flow import history, service
-from optionflow.modules.flow.schemas import GexDayOut, GexOut, NetFlowPoint, WatchRequest
+from optionflow.modules.flow import history, service, tide
+from optionflow.modules.flow.schemas import (
+    FlowLeadersOut, GexDayOut, GexOut, NetFlowPoint, TidePoint, WatchRequest,
+)
 from optionflow.workers import backfill
 
 router = APIRouter(prefix="/options", tags=["flow"])
@@ -36,6 +38,22 @@ def watch(body: WatchRequest, _user=Depends(get_current_user)) -> None:
 def net_flow_history(symbol: str, days: int = 1, bucket: int = 0,
                      _user=Depends(get_current_user)) -> List[NetFlowPoint]:
     return service.net_flow_history(symbol, days=days, bucket_minutes=bucket)
+
+
+@stream_router.get("/leaders", response_model=FlowLeadersOut)
+def flow_leaders(universe: str = Query("default", description="Only 'default': symbols the poller has watched today"),
+                 limit: int = Query(10, ge=1, le=50), _user=Depends(get_current_user)) -> FlowLeadersOut:
+    """Top bullish / bearish symbols by net premium (calls − puts) added since today's open."""
+    if universe not in tide.UNIVERSES:
+        raise errors.BadRequest(f"Unknown universe {universe!r}")
+    return tide.leaders(universe, limit)
+
+
+@stream_router.get("/tide", response_model=List[TidePoint])
+def flow_tide(days: int = Query(1, ge=1, le=30), bucket: int = Query(5, ge=1, le=60),
+              _user=Depends(get_current_user)) -> List[TidePoint]:
+    """Market tide: premium added since each session's open, summed across the watched universe, with SPY."""
+    return tide.tide(days, bucket)
 
 
 @stream_router.get("/{symbol}/stream", response_class=StreamingResponse)
