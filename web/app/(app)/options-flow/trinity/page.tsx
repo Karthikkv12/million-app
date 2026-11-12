@@ -67,6 +67,23 @@ const dayLabel = (exp: string) => {
 };
 const daysTo = (exp: string) => Math.max(0, Math.round((new Date(`${exp}T16:00:00`).getTime() - Date.now()) / 86_400_000));
 const fmtStrike = (k: number) => (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1));
+/** Phone width: no "$", fewer digits ("-1.2B"), so three columns fit side by side. */
+const fmtCompact = (v: number) => {
+  const a = Math.abs(v), s = v < 0 ? "-" : "";
+  if (a >= 1e9) return `${s}${(a / 1e9).toFixed(1)}B`;
+  if (a >= 1e6) return `${s}${(a / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M`;
+  if (a >= 1e3) return `${s}${(a / 1e3).toFixed(0)}K`;
+  return `${s}${a.toFixed(0)}`;
+};
+/** Phone header: "Nov 13" instead of "Thu, Nov 13". */
+const shortDay = (exp: string) => {
+  const d = new Date(`${exp}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? exp : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+/** Both widths in one node: the phone text below `sm`, the full text from `sm` up. */
+const Fit = ({ phone, full }: { phone: React.ReactNode; full: React.ReactNode }) => (
+  <><span className="sm:hidden">{phone}</span><span className="hidden sm:inline">{full}</span></>
+);
 
 // ── Data: one GEX query per name, kept live by the stream ────────────────────
 function useLiveGex(sym: string) {
@@ -119,29 +136,29 @@ function Column({ name, d, isLoading, chosen, rows, windowMin, palette, change }
   const anchor = col && d ? anchorOf(d, exp) : null;
   const anchorDist = anchor && d ? (anchor.price / d.spot - 1) * 100 : null;
   return (
-    <section className="flex min-w-[230px] snap-start flex-col border border-[var(--border-strong)] bg-[var(--surface)]" aria-label={`${name.label} gamma for ${exp ?? "no expiry"}`}>
-      <header className="border-b border-[var(--border)] px-3 py-2.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <Link href={`/stocks/${name.sym}`} className="font-mono text-[15px] font-semibold text-foreground hover:text-accent">{name.label}</Link>
-          {exp && <span className="font-mono text-[11px] text-foreground/50" title={exp}>{dayLabel(exp)} · {daysTo(exp)}d</span>}
+    <section className="flex min-w-0 flex-col border border-[var(--border-strong)] bg-[var(--surface)]" aria-label={`${name.label} gamma for ${exp ?? "no expiry"}`}>
+      <header className="border-b border-[var(--border)] px-1.5 py-2 sm:px-3 sm:py-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+          <Link href={`/stocks/${name.sym}`} className="font-mono text-[13px] font-semibold text-foreground hover:text-accent sm:text-[15px]">{name.label}</Link>
+          {exp && <span className="font-mono text-[10px] text-foreground/50 sm:text-[11px]" title={exp}><Fit phone={shortDay(exp)} full={dayLabel(exp)} /> · {daysTo(exp)}d</span>}
         </div>
-        <div className="mt-1 flex items-baseline gap-2 font-mono tabular-nums">
-          <span className="text-[18px] font-medium text-foreground">{d && !d.error ? d.spot.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</span>
-          {change != null && <span className={clsx("rounded-[3px] px-1.5 text-[12px]", change >= 0 ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss")}>{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>}
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums">
+          <span className="text-[14px] font-medium text-foreground sm:text-[18px]">{d && !d.error ? d.spot.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</span>
+          {change != null && <span className={clsx("rounded-[3px] px-1 text-[10.5px] sm:px-1.5 sm:text-[12px]", change >= 0 ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss")}>{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>}
         </div>
         {col && kingDist != null && (
-          <p className="mt-1 flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums text-foreground/65" title="Largest |GEX| strike in this expiry, and how far it is from the price">
-            <span className="text-[#b45309] dark:text-[#fde725]">★ King {fmtStrike(col.king)}</span>
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 font-mono text-[10.5px] tabular-nums text-foreground/65 sm:text-[11.5px]" title="Largest |GEX| strike in this expiry, and how far it is from the price">
+            <span className="text-[#b45309] dark:text-[#fde725]">★<span className="hidden sm:inline"> King</span> {fmtStrike(col.king)}</span>
             <span className={clsx("inline-flex items-center", Math.abs(kingDist) < 0.05 ? "text-foreground/60" : kingDist > 0 ? "text-gain" : "text-loss")}>
-              {Math.abs(kingDist).toFixed(1)}%{Math.abs(kingDist) >= 0.05 && (kingDist > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+              {Math.abs(kingDist).toFixed(1)}%{Math.abs(kingDist) >= 0.05 && (kingDist > 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
             </span>
           </p>
         )}
         {col && (
-          <p className={clsx("mt-0.5 flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums", ANCHOR_TONE)}
+          <p className={clsx("mt-0.5 flex flex-wrap items-center gap-x-1.5 font-mono text-[10.5px] tabular-nums sm:text-[11.5px]", ANCHOR_TONE)}
             title={anchor ? "Gamma-weighted centre of positive GEX within 10% of the price for this expiry: where long-gamma dealers tend to pull the price."
               : "Positive gamma doesn't dominate near the price in this expiry, so there is no pin level."}>
-            ⚓ {anchor && anchorDist != null ? <>Anchor {anchor.price.toFixed(anchor.price >= 1000 ? 0 : 2)} <span className="text-foreground/55">{anchorDist >= 0 ? "+" : ""}{anchorDist.toFixed(1)}%</span></> : <span className="text-foreground/45">No pin</span>}
+            ⚓ {anchor && anchorDist != null ? <><span className="hidden sm:inline">Anchor </span>{anchor.price.toFixed(anchor.price >= 1000 ? 0 : 2)} <span className="text-foreground/55">{anchorDist >= 0 ? "+" : ""}{anchorDist.toFixed(1)}%</span></> : <span className="text-foreground/45"><Fit phone="—" full="No pin" /></span>}
           </p>
         )}
       </header>
@@ -158,21 +175,21 @@ function Column({ name, d, isLoading, chosen, rows, windowMin, palette, change }
               const isSpot = k === col.spotRow, isKing = k === col.king;
               return (
                 <div key={k} {...(isSpot ? { "data-spot": "" } : {})}
-                  className={clsx("grid grid-cols-[66px_54px_minmax(0,1fr)] items-stretch border-b border-[var(--background)] font-mono text-[12px] tabular-nums",
+                  className={clsx("grid grid-cols-[38px_30px_minmax(0,1fr)] items-stretch border-b border-[var(--background)] font-mono text-[10.5px] tabular-nums sm:grid-cols-[66px_54px_minmax(0,1fr)] sm:text-[12px]",
                     isSpot && "outline outline-2 -outline-offset-2 outline-foreground")}>
-                  <span className={clsx("flex items-center whitespace-nowrap px-2", isSpot ? "bg-foreground font-semibold text-[var(--background)]" : "text-foreground/70")}>
-                    {isSpot && "▸ "}{fmtStrike(k)}
+                  <span className={clsx("flex items-center whitespace-nowrap px-1 sm:px-2", isSpot ? "bg-foreground font-semibold text-[var(--background)]" : "text-foreground/70")}>
+                    {isSpot && <span className="hidden sm:inline">▸ </span>}{fmtStrike(k)}
                   </span>
                   <span className="flex items-center justify-center" style={{ background: c.bg }}>
                     {showPct && (
-                      <span className={clsx("rounded-[3px] px-1 text-[10px] font-medium leading-[15px]", pct! > 0 ? "bg-gain text-white" : "bg-loss text-white")}
+                      <span className={clsx("rounded-[3px] px-0.5 text-[9px] font-medium leading-[14px] sm:px-1 sm:text-[10px] sm:leading-[15px]", pct! > 0 ? "bg-gain text-white" : "bg-loss text-white")}
                         title={`${pct! > 0 ? "+" : ""}${(pct! * 100).toFixed(1)}% vs ${windowMin} min ago`}>
-                        {pct! > 0 ? "+" : ""}{Math.abs(pct!) >= 0.995 ? Math.round(pct! * 100) : (pct! * 100).toFixed(1)}%
+                        {pct! > 0 ? "+" : ""}<Fit phone={Math.round(pct! * 100)} full={Math.abs(pct!) >= 0.995 ? Math.round(pct! * 100) : (pct! * 100).toFixed(1)} />%
                       </span>
                     )}
                   </span>
-                  <span className={clsx("flex items-center justify-end gap-1 py-[5px] pr-2", isKing && "font-semibold")} style={{ background: c.bg, color: c.fg }}>
-                    {fmtMoney(v)}{isKing && <span aria-label="King">★</span>}
+                  <span className={clsx("flex items-center justify-end gap-0.5 whitespace-nowrap py-[5px] pr-1 sm:gap-1 sm:pr-2", isKing && "font-semibold")} style={{ background: c.bg, color: c.fg }}>
+                    <Fit phone={fmtCompact(v)} full={fmtMoney(v)} />{isKing && <span aria-label="King">★</span>}
                   </span>
                 </div>
               );
@@ -278,7 +295,7 @@ export default function TrinityPage() {
           <p className="ml-auto text-[11.5px] text-foreground/45">Change badges build up while this page is open.</p>
         </div>
       </div>
-      <div className="grid snap-x grid-flow-col auto-cols-[minmax(230px,1fr)] gap-3 overflow-x-auto px-4 pb-10 pt-4 sm:px-8 lg:grid-flow-row lg:grid-cols-3 lg:overflow-visible">
+      <div className="grid grid-cols-3 gap-1 px-2 pb-10 pt-3 sm:gap-3 sm:px-8 sm:pt-4">
         {NAMES.map((n, i) => (
           <Column key={n.sym} name={n} d={data[i].data} isLoading={data[i].isLoading} chosen={chosen} rows={rows} windowMin={windowMin}
             palette={palette} change={quotes.data?.[n.quote]?.change_pct} />
