@@ -43,6 +43,6 @@ def stock_info(symbol: str, _user=Depends(get_current_user)) -> StockInfoOut:
 
 
 @router.get("/stocks/{symbol}/history", response_model=PriceHistoryOut)
-def stock_history(symbol: str, period: str = "6mo", interval: str = "1d",
+def stock_history(symbol: str, period: str = "6mo", interval: str = "1d", prepost: bool = False,
                   _user=Depends(get_current_user)) -> PriceHistoryOut:
-    return service.price_history(symbol, period, interval)
+    return service.price_history(symbol, period, interval, prepost)

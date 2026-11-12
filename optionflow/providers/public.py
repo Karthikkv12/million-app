@@ -376,11 +376,13 @@ def _history_request(period: str, interval: str) -> Optional[Tuple[str, str, Opt
     return None
 
 
-def parse_bars(payload: Dict[str, Any]) -> pd.DataFrame:
+def parse_bars(payload: Dict[str, Any], extended: bool = False) -> pd.DataFrame:
     """Regular-session bars of a historicdata response → OHLCV frame with a UTC DatetimeIndex
-    (the provider's price_history shape). Pre/after-market bars are left out, like Yahoo's default."""
+    (the provider's price_history shape). Pre/after-market bars are left out, like Yahoo's default,
+    unless `extended` (Yahoo's prepost=True)."""
+    sections = ("preMarket", "regularMarket", "afterMarket") if extended else ("regularMarket",)
     recs, idx = [], []
-    for b in ((payload.get("regularMarket") or {}).get("bars") or []):
+    for b in (b for sec in sections for b in ((payload.get(sec) or {}).get("bars") or [])):
         close = _f(b.get("close"))
         ts = b.get("timestamp")
         if close is None or not ts:
@@ -527,8 +529,10 @@ class PublicClient:
         """DAY historicdata without an aggregation: the only form that carries lastRegularTradingSessionClose."""
         return self._authed("GET", f"/userapigateway/historicdata/{instrument['type']}/{instrument['symbol']}/DAY")
 
-    def bars(self, instrument: Dict[str, str], period: str, aggregation: str) -> Dict[str, Any]:
-        params = {"tradingSessionToggle": "REGULAR_HOURS"} if instrument["type"] == "EQUITY" else None
+    def bars(self, instrument: Dict[str, str], period: str, aggregation: str,
+             extended: bool = False) -> Dict[str, Any]:
+        params = ({"tradingSessionToggle": "REGULAR_HOURS"}
+                  if instrument["type"] == "EQUITY" and not extended else None)
         return self._authed("GET", f"/userapigateway/historicdata/{instrument['type']}/"
                                    f"{instrument['symbol']}/{period}/{aggregation}", params=params)
 
@@ -752,30 +756,37 @@ class PublicHistory:
 
     def __init__(self, client: PublicClient):
         self.client = client
-        self._cache: Dict[Tuple[str, str, str], Tuple[float, pd.DataFrame]] = {}
+        self._cache: Dict[Tuple[str, str, str, bool], Tuple[float, pd.DataFrame]] = {}
         self._lock = threading.Lock()
 
     @staticmethod
-    def supports(symbol: str, period: str, interval: str) -> bool:
-        """False for requests Public has no equivalent for (non-US listings, 2m/90m bars): the
-        caller goes straight to Yahoo, without counting it as a Public failure."""
-        return instrument_for(symbol) is not None and history_request(period, interval) is not None
+    def supports(symbol: str, period: str, interval: str, prepost: bool = False) -> bool:
+        """False for requests Public has no equivalent for (non-US listings, 2m/90m bars, and
+        extended-hours intraday bars beyond one day: only the DAY period carries pre/after-market
+        bars, probed 2026-11-11): the caller goes straight to Yahoo, without counting it as a
+        Public failure."""
+        req = history_request(period, interval)
+        if instrument_for(symbol) is None or req is None:
+            return False
+        return not (prepost and req[1] in INTRADAY_AGGREGATIONS and req[0] != "DAY")
 
-    def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
+    def price_history(self, symbol: str, period: str, interval: str, prepost: bool = False) -> pd.DataFrame:
         """Raises PublicError when Public can't serve this symbol / period / interval or returns
-        no bars, and MarketDataRateLimited on a 429, so the caller can fall back to Yahoo."""
+        no bars, and MarketDataRateLimited on a 429, so the caller can fall back to Yahoo.
+        `prepost` adds pre/after-market bars to intraday requests (DAY period only)."""
         inst = instrument_for(symbol)
         req = history_request(period, interval)
-        if inst is None or req is None:
+        if inst is None or req is None or not self.supports(symbol, period, interval, prepost):
             raise PublicError(f"{symbol} {period}/{interval}: no Public.com equivalent")
         pub_period, agg, trim = req
-        key = (f"{inst['type']}:{inst['symbol']}", period, interval)
+        ext = prepost and agg in INTRADAY_AGGREGATIONS
+        key = (f"{inst['type']}:{inst['symbol']}", period, interval, ext)
         ttl = HISTORY_TTL_INTRADAY if agg in INTRADAY_AGGREGATIONS else HISTORY_TTL_DAILY
         with self._lock:
             hit = self._cache.get(key)
             if hit and time.monotonic() - hit[0] < ttl:
                 return hit[1].copy()
-        df = parse_bars(self.client.bars(inst, pub_period, agg))
+        df = parse_bars(self.client.bars(inst, pub_period, agg, extended=ext), extended=ext)
         if trim and trim[0] == "sessions" and pub_period == "WEEK":
             have = len(set(df.index.tz_convert("America/New_York").date)) if not df.empty else 0
             if have < trim[1]:                    # early in the week: WEEK may hold fewer sessions

@@ -62,8 +62,9 @@ class MarketDataProvider(Protocol):
     def stock_info(self, symbol: str) -> Dict[str, Any]:
         """Company profile, valuation, margins and dividend fields."""
 
-    def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
-        """OHLCV bars: UTC DatetimeIndex; columns open, high, low, close, volume."""
+    def price_history(self, symbol: str, period: str, interval: str, prepost: bool = False) -> pd.DataFrame:
+        """OHLCV bars: UTC DatetimeIndex; columns open, high, low, close, volume. `prepost` adds
+        pre/after-market bars to intraday intervals (ignored for daily and longer)."""
 
     def option_chain(self, symbol: str) -> OptionChain:
         """Spot price and every unexpired contract (see CHAIN_COLUMNS)."""
@@ -142,16 +143,18 @@ class PublicFirstMarketData:
         return fallback_call()
 
     # ── history and contracts: Public first ──────────────────────────────────
-    def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
+    def price_history(self, symbol: str, period: str, interval: str, prepost: bool = False) -> pd.DataFrame:
+        kw = {"prepost": True} if prepost else {}     # providers without the flag keep working
+
         def _yahoo() -> pd.DataFrame:
-            df = self.fallback.price_history(symbol, period, interval)
+            df = self.fallback.price_history(symbol, period, interval, **kw)
             df.attrs.setdefault("source", self.fallback.name)
             return df
         supports = getattr(self.history, "supports", None)
-        if self.history is None or (supports is not None and not supports(symbol, period, interval)):
+        if self.history is None or (supports is not None and not supports(symbol, period, interval, **kw)):
             return _yahoo()
         return self._primary("price history", self.history,
-                             lambda: self.history.price_history(symbol, period, interval),
+                             lambda: self.history.price_history(symbol, period, interval, **kw),
                              _yahoo, f"{symbol} {period}/{interval}")
 
     def option_expiries(self, symbol: str) -> List[str]:
