@@ -314,8 +314,10 @@ export interface StockHistory {
   error?: string;
 }
 
-export const fetchStockHistory = (symbol: string, period = "1d", interval = "1m") =>
-  api.get<StockHistory>(`/stocks/${symbol.toUpperCase()}/history?period=${period}&interval=${interval}`);
+/** `prepost`: ask for pre- and after-market bars too. Servers that don't support it yet ignore the flag and send
+ *  regular-session bars only (the Pulse chart says so). */
+export const fetchStockHistory = (symbol: string, period = "1d", interval = "1m", prepost = false) =>
+  api.get<StockHistory>(`/stocks/${encodeURIComponent(symbol.toUpperCase())}/history?period=${period}&interval=${interval}${prepost ? "&prepost=true" : ""}`);
 
 // ── Insight: drawdown / spike series and the LEAPS score ─────────────────────
 export type Swings = Schemas["SwingsOut"];
