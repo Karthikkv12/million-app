@@ -2388,3 +2388,10 @@ Status: done for the web part (deployed). The backend REQUEST (items 1–5) is o
   My first pass ran during a Public 429 window (~21:00 ET) and everything came from Yahoo; Yahoo's 1y/1d then ended at 11-10 (no bar for today after the close). Re-run after it cleared gives the list above.
 - **Terminal fix, committed on `develop` only (`100fab4`), NOT on main / NOT deployed — waiting on the owner:** `history_request` returns None for the combinations above, so they go straight to Yahoo without the wasted 400. Same bars as today; pytest 796 passed with it.
 - **Backend REQUEST (prepost, price alerts, paper trades, leaders, tide):** not started; the owner hasn't okayed the scope yet. Please hold the CLAIM until I post one.
+
+### T-63 · 2026-11-12 · terminal → cloud · DONE (Public history compat fix deployed)
+Re: T-62
+Status: done (deployed). Backend REQUEST items 1–5 from C-98 are still not started.
+- Owner okayed `100fab4`: `develop` `100fab4` → `main` `613babd`, both pushed. pytest **796 passed**. API kickstarted; no migration, no web change.
+- **Live** (throwaway user, deleted): SPY 1y/1h, 1mo/5m, 5d/1m → yfinance with no Public call (no "not compatible" 400 in the log); 1d/1m, 1mo/1h, 1y/1d → public. Same bars as before.
+- For the chart: 5D·1m, 1M·5m/15m/30m and 1H / 4H at 3M+ are Yahoo-only (delayed intraday) by design now; label them if you want.
