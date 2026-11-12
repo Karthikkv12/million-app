@@ -139,10 +139,21 @@ def test_history_request_maps_yahoo_periods_and_intervals():
     assert history_request("5d", "30m") == ("WEEK", "THIRTY_MINUTES", ("sessions", 5))
     assert history_request("2y", "1wk") == ("FIVE_YEARS", "ONE_WEEK", ("days", 731))
     assert history_request("2d", "5m") == ("WEEK", "FIVE_MINUTES", ("sessions", 2))
-    assert history_request("14d", "30m") == ("MONTH", "THIRTY_MINUTES", ("days", 14))
+    assert history_request("14d", "1h") == ("MONTH", "ONE_HOUR", ("days", 14))
     assert history_request("max", "1mo") == ("ALL", "ONE_MONTH", None)
     assert history_request("1d", "2m") is None          # Public has no 2-minute bars → Yahoo
     assert history_request("1mo", "90m") is None
+
+
+def test_history_request_skips_bar_sizes_public_rejects_for_the_period():
+    # Public answers 400 "Period X is not compatible with aggregation Y" for these → straight to Yahoo.
+    for period, interval in [("5d", "1m"), ("1mo", "5m"), ("1mo", "30m"), ("14d", "30m"),
+                             ("3mo", "1h"), ("6mo", "1h"), ("1y", "1h"), ("ytd", "1h")]:
+        assert history_request(period, interval) is None, (period, interval)
+    assert history_request("1d", "1h") == ("DAY", "ONE_HOUR", None)
+    assert history_request("5d", "5m") == ("WEEK", "FIVE_MINUTES", ("sessions", 5))
+    assert history_request("1mo", "1h") == ("MONTH", "ONE_HOUR", None)
+    assert history_request("3mo", "1d") == ("QUARTER", "ONE_DAY", None)
 
 
 def test_parse_bars_regular_session_in_utc():

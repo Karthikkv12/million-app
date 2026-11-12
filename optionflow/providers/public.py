@@ -336,9 +336,25 @@ _PERIODS: Dict[str, Tuple[str, Optional[Tuple[str, int]]]] = {
 }
 
 
+# Finest aggregation Public accepts per period; finer ones get HTTP 400 "Period X is not compatible
+# with aggregation Y" (probed 2026-11-11: WEEK/ONE_MINUTE, MONTH/30m, QUARTER…YTD/ONE_HOUR all 400).
+_AGG_ORDER = ["ONE_MINUTE", "FIVE_MINUTES", "FIFTEEN_MINUTES", "THIRTY_MINUTES", "ONE_HOUR",
+              "ONE_DAY", "ONE_WEEK", "ONE_MONTH", "THREE_MONTHS"]
+_FINEST = {"DAY": "ONE_MINUTE", "WEEK": "FIVE_MINUTES", "MONTH": "ONE_HOUR"}   # longer periods: ONE_DAY
+
+
+def _compatible(pub_period: str, agg: str) -> bool:
+    return _AGG_ORDER.index(agg) >= _AGG_ORDER.index(_FINEST.get(pub_period, "ONE_DAY"))
+
+
 def history_request(period: str, interval: str) -> Optional[Tuple[str, str, Optional[Tuple[str, int]]]]:
     """(Public period, aggregation, trim) for a Yahoo-style period/interval, or None when Public
-    has no equivalent (the caller uses Yahoo)."""
+    has no equivalent or rejects the bar size for that period (the caller uses Yahoo)."""
+    req = _history_request(period, interval)
+    return req if req is not None and _compatible(req[0], req[1]) else None
+
+
+def _history_request(period: str, interval: str) -> Optional[Tuple[str, str, Optional[Tuple[str, int]]]]:
     agg = AGGREGATIONS.get(interval)
     p = period.strip().lower()
     if agg is None:
