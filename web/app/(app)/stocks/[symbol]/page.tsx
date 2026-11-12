@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -27,7 +27,6 @@ export default function StockPage() {
   const sym = decodeURIComponent(symbol).toUpperCase();
   const router = useRouter();
   const [q, setQ] = useState("");
-  const [showLevels, setShowLevels] = useState(true);
 
   const gexLive = useGexStream(sym);
   const { data: gex, isLoading: gexLoading } = useQuery<GexResult>({
@@ -36,14 +35,6 @@ export default function StockPage() {
     staleTime: 30_000,
     refetchInterval: gexLive ? false : 30_000,
   });
-
-  const levels = useMemo(() => (gex && !gex.error && showLevels ? {
-    spot: gex.spot,
-    callWall: gex.max_call_wall,
-    putWall: gex.max_put_wall,
-    zeroGamma: gex.zero_gamma,
-    kingNode: gex.max_gex_strike,
-  } : undefined), [gex, showLevels]);
 
   const longGamma = (gex?.net_gex ?? 0) >= 0;
   return (
@@ -67,19 +58,16 @@ export default function StockPage() {
         </div>
       </div>
 
-      {/* Left: price, drawdown and GEX replay stacked. Right (wide screens): LEAPS score and dealer levels in a
+      {/* Pulse chart across the full width: dealer levels are layers inside it (Layers menu). */}
+      <section aria-label={`${sym} chart`} className="mb-4">
+        <TradingChart symbol={sym} gex={gex} initialPeriod="5D" height={520}
+          onSymbol={(s) => router.push(`/stocks/${encodeURIComponent(s)}`)} />
+      </section>
+
+      {/* Left: drawdown and GEX replay stacked. Right (wide screens): LEAPS score and dealer levels in a
           column that stays in view and scrolls on its own, so its long cards don't stretch the page. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid min-w-0 gap-4">
-        <Panel padded={false} title="Price" actions={
-          <label className="flex cursor-pointer items-center gap-2 text-[12px] text-foreground/65">
-            <input type="checkbox" checked={showLevels} onChange={(e) => setShowLevels(e.target.checked)} className="accent-[rgb(var(--accent-rgb))]" />
-            GEX levels <SourceBadge data={gex} />
-          </label>
-        }>
-          <div className="p-2"><TradingChart symbol={sym} gexLevels={levels} initialPeriod="5D" /></div>
-        </Panel>
-
         <Panel title="Drawdown and upside spikes">
           <SwingCharts symbol={sym} title={`How far ${sym} falls from its highs and jumps off its lows`} height={190} />
         </Panel>
