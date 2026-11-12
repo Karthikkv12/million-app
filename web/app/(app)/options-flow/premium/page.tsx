@@ -11,7 +11,10 @@ import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchGex, GexResult, watchSymbols } from "@/lib/api";
 import { useGexStream } from "@/lib/useGexStream";
 import { DeskPage, DeskSection } from "@/components/desk";
-import { ExpiryTable, FlowMomentumChart, Premium, StrikesTable } from "@/components/options-flow";
+import { FlowMomentumChart } from "@/components/options-flow";
+import { PremiumBreakdown } from "@/components/options-flow/PremiumBreakdown";
+import { anchorOf } from "@/lib/gex";
+import { useTheme } from "@/lib/theme";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 
 const KEY = "flow_premium_ticker";
@@ -45,6 +48,9 @@ function PremiumPage() {
   const gexLive = useGexStream(symbol ?? undefined);
   const gex = useQuery<GexResult>({ queryKey: ["gex", symbol], queryFn: () => fetchGex(symbol!), enabled: !!symbol, refetchInterval: gexLive ? false : 30_000 });
   const d = gex.data && !gex.data.error ? gex.data : null;
+  const anchor = anchorOf(d);
+  const { theme } = useTheme();
+  const dark = theme === "dark";
   const failed = gex.error ? (gex.error as Error).message : gex.data?.error;
 
   return (
@@ -62,14 +68,17 @@ function PremiumPage() {
       </div>
 
       <DeskSection label="Through the day" meta={<>Money in open calls and puts,<br />and the stock price.</>}>
-        {symbol && <FlowMomentumChart key={symbol} symbol={symbol} variant="page" />}
+        {symbol && <FlowMomentumChart key={symbol} symbol={symbol} variant="page" levels={[
+          { label: "⚓ Anchor", price: anchor?.price, color: dark ? "#67e8f9" : "#0e7490" },
+          { label: "Flip", price: d?.zero_gamma, color: dark ? "#90bff9" : "#2f5bea" },
+        ]} />}
       </DeskSection>
 
       <DeskSection label="How to read it">
         <ul className="grid max-w-3xl gap-2 text-[14px] leading-relaxed text-foreground/75">
           <li><b className="font-medium text-gain">Calls</b> and <b className="font-medium text-loss">puts</b>: how much the money sitting in open call and put contracts has changed since the 9:30 ET open on the 1-day view (&ldquo;Since open&rdquo;), since the first reading on longer views (&ldquo;Since start&rdquo;), or the full amount (&ldquo;Totals&rdquo;).</li>
           <li><b className="font-medium text-accent">Net</b> = calls − puts. Rising means call money is growing faster than put money (bullish tilt); falling means the opposite.</li>
-          <li><b className="font-medium text-foreground">Price</b> is the stock, on the right-hand scale. Net rising while price falls (or the reverse) is the disagreement worth noticing.</li>
+          <li><b className="font-medium text-foreground">Price</b> is the stock, on the right-hand scale, with the ⚓ Anchor and the GEX Flip dashed on the same scale. Net rising while price falls (or the reverse) is the disagreement worth noticing.</li>
           <li className="text-foreground/55">It is contracts × the option&apos;s current price, so it also moves when option prices move with the stock, not only when new trades come in. Hover for exact values; click to pin a moment and measure from there.</li>
         </ul>
       </DeskSection>
@@ -77,10 +86,7 @@ function PremiumPage() {
       {gex.isLoading && <div className="h-40 animate-pulse border-t border-[var(--border-strong)] bg-foreground/[0.03]" />}
       {failed && !d && <p className="border-t border-[var(--border-strong)] py-6 text-[14px] text-loss">{symbol}: {failed || "no options data for this ticker."}</p>}
       {d && (
-        <div className="grid border-t border-[var(--border-strong)] lg:grid-cols-2 lg:divide-x lg:divide-[var(--border)] [&_section]:px-0 lg:[&>div:first-child_section]:pr-8 lg:[&>div:last-child_section]:pl-8">
-          <div className="min-w-0"><Premium d={d} /><ExpiryTable d={d} /></div>
-          <div className="min-w-0"><StrikesTable d={d} /></div>
-        </div>
+        <PremiumBreakdown d={d} />
       )}
     </DeskPage>
   );

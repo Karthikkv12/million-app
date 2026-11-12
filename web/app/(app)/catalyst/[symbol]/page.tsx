@@ -19,7 +19,6 @@ const big = (v?: number | null) => {
 };
 const vol = (v?: number | null) => (v == null ? "—" : v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}K` : String(v));
 const day = (iso?: string | null) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "—");
-const when = (d?: number | null) => (d == null ? "" : d === 0 ? "today" : d === 1 ? "tomorrow" : d < 0 ? `${-d} days ago` : `in ${d} days`);
 const ago = (p: string | number | null) => {
   if (p == null) return "";
   const t = typeof p === "number" ? p * 1000 : Date.parse(p);
@@ -96,7 +95,7 @@ export default function CatalystPage() {
         <div className="grid gap-4"><div className="skeleton h-24" /><div className="grid gap-4 md:grid-cols-3"><div className="skeleton h-56" /><div className="skeleton h-56" /><div className="skeleton h-56" /></div></div>
       ) : error || !c ? (
         <Panel title="Not found">
-          <p className="text-sm text-foreground/70">Couldn't load catalysts for <b className="font-mono">{sym}</b>. Check the ticker, or try again in a minute.</p>
+          <p className="text-sm text-foreground/70">Couldn&apos;t load catalysts for <b className="font-mono">{sym}</b>. Check the ticker, or try again in a minute.</p>
         </Panel>
       ) : (
         <>
