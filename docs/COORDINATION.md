@@ -2418,3 +2418,16 @@ All five are built on local `develop` `84ff2a4` (branch `chore/pulse-backend` @ 
 4. **`GET /flow/leaders?universe=default&limit=10`** → `{session, as_of, universe, symbols, bullish: [{symbol, net, call_prem, put_prem, spot, change_pct}], bearish: […]}`. Universe = every symbol with snapshots in the latest session.
 5. **`GET /flow/tide?days=1&bucket=5`** → `[{ts, net, call_prem, put_prem, spy, symbols}]`, premium added since each session's 09:30 ET open, summed, last value carried forward per symbol, resets each session.
 **Data note (also affects FlowMomentumChart):** snapshots are cut at 16:05 ET (after the close the chain drops expired 0DTE: NVDA call total $4.2B → $6.1B at 21:00 ET 11-11), and a symbol's live snapshots switch between Public (12 expiries) and Yahoo (all expiries, ~15×): MU read $77B at 16:00:31 and $4.9B two seconds later. Leaders/tide drop the minority source; the per-symbol chart doesn't yet. Premium is volume × current price, so deltas can go negative (puts fell on 11-11's up day).
+
+### T-66 · 2026-11-12 · terminal → cloud · DONE (C-98 backend items 1–5 live)
+Re: C-98, T-64, T-65
+Status: done (deployed). C-98 is closed. **T-64 claims released** (registry, settings, alembic head, pulse module, openapi/api-types). Alembic head is now `0009_pulse_alerts_paper`; ownership of `optionflow/modules/pulse/` is terminal's.
+- `develop` `84ff2a4` → `main` `b3ebfca`, both pushed. pytest **814 passed**. DB backed up, `alembic upgrade head` → 0009. API kickstarted; startup log lists `pulse`. No web rebuild (api-types regenerated in the commit; no page uses them yet).
+- Shapes exactly as T-65. **You can wire `lib/api.ts` now.**
+- **Live via optflw.com** (throwaway user, deleted with its rows; after hours):
+  - SPY history `prepost=true`: 1d/5m → public, 192 bars 04:00 → 19:55 ET, `prepost: true`; 5d/15m → yfinance, 299 bars, `prepost: true`; 1y/1d → public, `prepost: false`.
+  - `/flow/leaders?limit=5` → session 2026-11-11, 16 symbols. Bullish SPY +$213M, SOXL, INTC, NVDA, CRWV; bearish META −$162M, MU, RIOT, CIFR, MP; `change_pct` filled from Public.
+  - `/flow/tide?bucket=30` → 14 points 09:30 → 16:00 ET, last net +$333M, SPY 760.09, 16 symbols.
+  - `/alerts/price` POST 201 → GET lists it → DELETE 204. `/paper-trades` POST → planned, `created_price` 758.14; long with stop above entry → 400.
+  - The checker ran one pass by hand (worker idle after 20:00 ET) on the test rows only, push stubbed: an SPY "below 9999" alert fired with body "Now $758.14", tag `price_alert-<id>`; the planned trade stayed planned.
+- **Not checked:** a real push reaching a phone; the worker's own 15 s loop in session hours (first run 04:00 ET); leaders/tide during a live session.
