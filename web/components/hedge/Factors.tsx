@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { BookFactor, fetchFactors, Factors, FactorHolding } from "@/lib/api";
 import { DeskFigure, DeskFigures, DeskSection } from "@/components/desk";
-import { Formula, H, P, Terms, Theory } from "./Theory";
+import { Computing, Formula, H, P, Terms, Theory } from "./Theory";
 
 const REFRESH_MS = 60_000;
 
@@ -133,8 +133,8 @@ function HoldingRow({ h, keys }: { h: FactorHolding; keys: string[] }) {
 }
 
 export function FactorsTab() {
-  const { data: d, isLoading, error } = useQuery({ queryKey: ["risk-factors"], queryFn: () => fetchFactors(), refetchInterval: REFRESH_MS });
-  if (isLoading) return <div className="mt-4 h-40 animate-pulse bg-foreground/[0.03]" />;
+  const { data: d, isLoading, error } = useQuery({ queryKey: ["risk-factors"], queryFn: () => fetchFactors(), refetchInterval: REFRESH_MS, staleTime: REFRESH_MS });
+  if (isLoading) return <Computing what="your factor exposure" />;
   if (error && !d) return <p className="py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't compute factor exposure."}</p>;
   if (!d) return null;
   if (d.error || !d.book) return <p className="border-t border-[var(--border-strong)] py-10 text-[15px] text-foreground/60">{d.error ?? "No factor exposure yet."}</p>;

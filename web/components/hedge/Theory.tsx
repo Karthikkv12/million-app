@@ -44,3 +44,16 @@ export function Terms({ rows }: { rows: [React.ReactNode, React.ReactNode][] }) 
     </dl>
   );
 }
+
+/** While the server prices the book with live option greeks (the first load can take ~20 s). */
+export function Computing({ what }: { what: string }) {
+  return (
+    <div className="border-t border-[var(--border-strong)] py-10" role="status" aria-live="polite">
+      <div className="h-1 w-40 overflow-hidden rounded-full bg-foreground/[0.08]">
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
+      </div>
+      <p className="mt-3 text-[14px] text-foreground/75">Computing {what}…</p>
+      <p className="mt-1 text-[12.5px] text-foreground/50">Pricing every option you hold with live greeks and loading years of daily prices. The first load can take up to 20 seconds; after that it&apos;s quick for a minute.</p>
+    </div>
+  );
+}

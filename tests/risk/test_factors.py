@@ -119,3 +119,18 @@ def test_api(client):  # noqa: F811
     assert h["symbol"] == "ABC" and h["betas"]["market"] == pytest.approx(1.5, abs=0.1) and h["risk_share"] > 0.9
     assert d["book"]["factors"][0]["beta"] == pytest.approx(h["betas"]["market"] * h["exposure"] / 50_000)
     insight.clear_cache()
+
+
+def test_holdings_are_computed_once_per_ttl(monkeypatch):
+    calls = []
+    monkeypatch.setattr(book, "_load_holdings", lambda uid: calls.append(uid) or [{"symbol": "A", "exposure": 1.0}])
+    t = [0.0]
+    monkeypatch.setattr(book.time, "monotonic", lambda: t[0])
+    book.clear_cache()
+    first = book.holdings(7)
+    first[0]["exposure"] = 99.0                                  # callers may mutate their copy
+    assert book.holdings(7) == [{"symbol": "A", "exposure": 1.0}] and calls == [7]
+    t[0] += book.HOLDINGS_TTL + 1
+    book.holdings(7)
+    assert calls == [7, 7]
+    book.clear_cache()

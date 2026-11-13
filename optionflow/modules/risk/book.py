@@ -4,17 +4,46 @@
   (net Δ in lots × 100 × spot), so shares and options count alike.
 - closes:   the insight module's cached 5-year daily bars, today's close = the live price.
 - capital:  the synced account value (sum of accounts), None when nothing has synced.
+
+hedge.books_for prices every option leg from live chains (~17 s cold on a real book, T-68), so the holdings are
+cached per user for HOLDINGS_TTL: switching between the Vol target and Factors tabs computes them once.
 """
 from __future__ import annotations
 
 import logging
 import math
+import threading
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("optionflow.risk")
 
+HOLDINGS_TTL = 60.0
+_held: Dict[int, Tuple[float, List[Dict[str, Any]]]] = {}
+_locks: Dict[int, threading.Lock] = {}
+_guard = threading.Lock()
+
+
+def clear_cache() -> None:
+    with _guard:
+        _held.clear()
+
 
 def holdings(user_id: int) -> List[Dict[str, Any]]:
+    """Copies of the cached rows (callers add fields to them). One computation at a time per user: a second
+    request that arrives while the first is pricing the book waits for it instead of starting its own."""
+    with _guard:
+        lock = _locks.setdefault(user_id, threading.Lock())
+    with lock:
+        hit = _held.get(user_id)
+        if hit and time.monotonic() - hit[0] < HOLDINGS_TTL:
+            return [dict(r) for r in hit[1]]
+        rows = _load_holdings(user_id)
+        _held[user_id] = (time.monotonic(), rows)
+        return [dict(r) for r in rows]
+
+
+def _load_holdings(user_id: int) -> List[Dict[str, Any]]:
     from optionflow.modules.hedge import service as hedge
     rows = []
     for b in hedge.books_for(user_id)["books"]:
