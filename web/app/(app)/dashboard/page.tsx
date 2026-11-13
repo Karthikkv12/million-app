@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
@@ -21,6 +21,7 @@ import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBoo
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
+import { PulseChart } from "@/components/dashboard/PulseChart";
 import { TickerLink } from "@/components/TickerLink";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -96,6 +97,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [openPulse, setOpenPulse] = useState<string | null>(null);
   const quotes = useQuotes(ALL);
   const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
   const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
@@ -334,13 +336,21 @@ export default function DashboardPage() {
                   <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/40">{grp.group}</p>
                   {grp.items.map((it) => {
                     const qt = quotes.data?.[it.symbol];
+                    const isOpen = openPulse === it.symbol;
                     return (
-                      <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
-                        <TickerLink symbol={it.symbol} title={`Open ${it.label} (${it.symbol})`} className="truncate font-sans text-[13px] text-foreground/75">{it.label}</TickerLink>
-                        <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
-                        <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}
-                          {extMove(qt?.session, qt?.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(qt?.session, qt?.ext_change_pct)} /></span>}
-                        </span>
+                      <div key={it.symbol} className="border-b border-[var(--border)] last:border-0">
+                        <div role="button" tabIndex={0} aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} ${it.label} chart`}
+                          onClick={() => setOpenPulse(isOpen ? null : it.symbol)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPulse(isOpen ? null : it.symbol); } }}
+                          className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto_68px_16px] items-baseline gap-3 py-2 font-mono text-[13px] tabular-nums hover:bg-foreground/[0.03]">
+                          <TickerLink symbol={it.symbol} title={`Open ${it.label} (${it.symbol})`} className="truncate font-sans text-[13px] text-foreground/75">{it.label}</TickerLink>
+                          <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
+                          <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}
+                            {extMove(qt?.session, qt?.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(qt?.session, qt?.ext_change_pct)} /></span>}
+                          </span>
+                          <ChevronDown size={14} className={clsx("self-center text-foreground/45 transition-transform", isOpen && "rotate-180")} />
+                        </div>
+                        {isOpen && <PulseChart symbol={it.symbol} label={it.label} fmt={(p) => fmtPx(it.symbol, p)} />}
                       </div>
                     );
                   })}
