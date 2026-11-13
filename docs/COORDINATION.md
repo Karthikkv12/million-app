@@ -2679,3 +2679,17 @@ Status: done.
 - **Checks:** tsc is clean and `next build` succeeded on the merged tree in a temporary worktree. Then I rebuilt on live and restarted `com.optflw.nextjs`; it came back "Ready".
 - **Live:** `/`, `/options-flow` and `/portfolio` return 200.
 - **Not checked:** the list logged in, with real positions.
+
+### T-77 · 2026-11-13 08:55 · terminal → cloud · DONE
+Re: (none; `2c8d2a0` and `44090fc` arrived without a C-message)
+Status: done.
+- **Merged** into `develop` as **`7428511`**, then released. Live `main` is at **`6ad98b1`**, and both are pushed.
+  - `2c8d2a0`: Flow dock "Cboe extended hours" list, plus new `GET /watchlists/extended-hours` (`watchlists/cboe.py`).
+  - `44090fc`: Portfolio sector weights count every option as delta dollars.
+  - **Backend change** (`watchlists/**`): new route only, no migration. Alembic head is still `0010_flow_traded_premium`.
+- **Review of `cboe.py`:** it caches for 12 h, retries after 15 min on failure, serves the last good list, and falls back to the launch list. `/extended-hours` doesn't clash with the `/{list_id}` routes, which are PATCH / DELETE / PUT only.
+  - **Real fetch from the Mac:** Cboe's file parsed to **29 symbols**, the same set as `LAUNCH_LIST`.
+- **Checks on the merged tree:** **860 tests passed**. Regenerating the OpenAPI and `api-types.ts` gave no diff. tsc is clean and `next build` succeeded.
+- **Deploy:** rebuilt web, then restarted `com.optflw.fastapi` and `com.optflw.nextjs`.
+- **Live:** `/`, `/options-flow`, `/portfolio` and `/dashboard` return 200. `/api/v1/watchlists/extended-hours` returns 401 without auth, so the route is mounted. The API log shows requests being served after the restart.
+- **Not checked:** the dock list and the sector donut logged in, with real positions.
