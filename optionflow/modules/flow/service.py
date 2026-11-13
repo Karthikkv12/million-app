@@ -23,6 +23,7 @@ logger = logging.getLogger("optionflow.flow")
 GEX_CACHE_TTL = 120     # seconds a cached GEX result is served to the API (board refetches every 60s)
 WATCH_TTL = 120         # seconds a symbol stays watched after the last heartbeat
 RESPOT_MAX_CHAIN_AGE = 120   # re-price a cached chain at the live spot only while the chain is this fresh
+STRIKES_EVERY = 60      # seconds between saves of the per-strike sides (flow_strike_sides) per symbol
 SNAPSHOT_EVERY = 10     # seconds between stored flow snapshots per symbol (refreshes run every ~2 s on Public;
                         # traded premium is still counted on every refresh, the row just stores the running total)
 
@@ -154,6 +155,8 @@ def record_snapshot(result: GEXResult) -> None:
     ts = now_iso()
     sym = (result.symbol or "").upper()
     traded = _traded(result)                       # every refresh: the Δvolume baseline must keep up
+    if traded:
+        _save_strikes(sym)
     t = _parse_ts(ts)
     with _snapshot_lock:
         prev = _last_snapshot.get(sym)
@@ -187,7 +190,7 @@ def _traded(result: GEXResult) -> Optional[Tuple[float, float]]:
         return None
     try:
         from optionflow.modules.flow import traded
-        return traded.update(result.symbol, result.contracts, restore=_restore_traded)
+        return traded.update(result.symbol, result.contracts, restore=_restore_traded, restore_strikes=_restore_strikes)
     except Exception as exc:
         logger.error("traded premium failed for %s: %s", result.symbol, exc)
         return None
@@ -209,6 +212,75 @@ def _restore_traded(symbol: str, day) -> Optional[Tuple[float, float]]:
     from optionflow.workers.backfill import ET
     start = datetime(day.year, day.month, day.day, tzinfo=ET).astimezone(timezone.utc)
     return repo.last_traded(symbol, start.strftime("%Y-%m-%dT%H:%M:%SZ"), start.strftime("%Y-%m-%dT%H:%M:%S+00:00"))
+
+
+def _restore_strikes(symbol: str, day):
+    hit = repo.load_strike_sides(symbol, day.isoformat())
+    return hit[1] if hit else None
+
+
+_last_strikes: Dict[str, float] = {}
+
+
+def _save_strikes(symbol: str) -> None:
+    """Persist today's per-strike sides at most once per STRIKES_EVERY seconds. Never raises."""
+    sym = symbol.upper()
+    now = time.monotonic()
+    with _snapshot_lock:
+        if now - _last_strikes.get(sym, -1e9) < STRIKES_EVERY:
+            return
+        _last_strikes[sym] = now
+    try:
+        from optionflow.modules.flow import traded
+        hit = traded.strikes(sym)
+        if hit and hit[1]:
+            repo.save_strike_sides(sym, hit[0].isoformat(), hit[1])
+    except Exception as exc:
+        logger.error("saving strike sides failed for %s: %s", sym, exc)
+
+
+def strike_flow(symbol: str, expiry: Optional[str] = None) -> Dict[str, Any]:
+    """Today's sided premium and delta dollars by strike (live from flow.traded, else the latest saved day).
+
+    customer Δ$ = bought − sold delta dollars, with the option's sign (calls +, puts −): > 0 means customers added
+    long delta (bought calls, sold puts); dealers on the other side hedge that by buying shares.
+    """
+    from optionflow.modules.flow import traded
+    sym = symbol.upper()
+    hit = traded.strikes(sym)
+    live = bool(hit and hit[1])
+    if live:
+        day, by = hit[0].isoformat(), hit[1]
+    else:
+        saved = repo.load_strike_sides(sym)
+        day, by = (saved if saved else (None, {}))
+    expiries = sorted({k[0] for k in by})
+    rows: Dict[float, Dict[str, float]] = {}
+    for (exp, strike, otype), (b, s, bdd, sdd) in by.items():
+        if expiry and exp != expiry:
+            continue
+        r = rows.setdefault(strike, {"strike": strike, "call_bought": 0.0, "call_sold": 0.0, "put_bought": 0.0,
+                                     "put_sold": 0.0, "call_delta": 0.0, "put_delta": 0.0})
+        p = "call" if otype == "call" else "put"
+        r[f"{p}_bought"] += b
+        r[f"{p}_sold"] += s
+        r[f"{p}_delta"] += bdd - sdd
+    out = sorted(rows.values(), key=lambda r: r["strike"])
+    for r in out:
+        r["net_delta"] = r["call_delta"] + r["put_delta"]
+    g = cached_gex(sym)
+    ok = g is not None and not g.error
+    tot = lambda k: sum(r[k] for r in out)
+    return {
+        "symbol": sym, "day": day, "live": live, "expiry": expiry, "expiries": expiries,
+        "spot": g.spot if ok else None,
+        "zero_gamma": g.zero_gamma if ok else None, "call_wall": g.max_call_wall if ok else None,
+        "put_wall": g.max_put_wall if ok else None, "king": g.max_gex_strike if ok else None,
+        "rows": out,
+        "call_bought": tot("call_bought"), "call_sold": tot("call_sold"),
+        "put_bought": tot("put_bought"), "put_sold": tot("put_sold"),
+        "call_delta": tot("call_delta"), "put_delta": tot("put_delta"), "net_delta": tot("net_delta"),
+    }
 
 
 def _parse_ts(ts: str) -> Optional[datetime]:

@@ -14,6 +14,7 @@ import { useGexStream } from "@/lib/useGexStream";
 import { DeskPage, DeskSection } from "@/components/desk";
 import { FlowMomentumChart } from "@/components/options-flow";
 import { PremiumBreakdown } from "@/components/options-flow/PremiumBreakdown";
+import { StrikeFlow } from "@/components/options-flow/StrikeFlow";
 import { anchorOf } from "@/lib/gex";
 import { useTheme } from "@/lib/theme";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
@@ -76,6 +77,8 @@ function PremiumPage() {
           { label: "Flip", price: d?.zero_gamma, color: dark ? "#90bff9" : "#2f5bea" },
         ]} />}
       </DeskSection>
+
+      {symbol && <StrikeFlow key={`sf-${symbol}`} symbol={symbol} />}
 
       <DeskSection label="How to read it">
         <ul className="grid max-w-3xl gap-2 text-[14px] leading-relaxed text-foreground/75">

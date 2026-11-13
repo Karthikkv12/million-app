@@ -142,3 +142,65 @@ class FactorsOut(BaseModel):
     book: Optional[BookFactors] = None
     holdings: List[FactorHolding] = []
     error: Optional[str] = None
+
+
+# ── Scenario / payoff (risk.scenario) ─────────────────────────────────────────
+class ScenarioLegIn(BaseModel):
+    kind: Literal["stock", "option"]
+    quantity: float = Field(..., description="Shares, or contracts (negative = sold)")
+    otype: Optional[Literal["call", "put"]] = None
+    strike: Optional[float] = Field(None, gt=0)
+    expiry: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    iv: Optional[float] = Field(None, gt=0, le=5, description="Decimal; omitted → the cached chain's IV")
+    avg_price: Optional[float] = Field(None, description="Entry price per share, for P&L since entry")
+
+
+class ScenarioIn(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=12)
+    legs: List[ScenarioLegIn] = Field(..., min_length=1, max_length=20)
+    days: float = Field(0, ge=0, le=730, description="Horizon for the matrix and the middle curve, in calendar days")
+    range_pct: float = Field(0.15, gt=0.01, le=0.6)
+
+
+class ScenarioCurve(BaseModel):
+    label: str
+    days: float
+    pnl: List[float]
+
+
+class ScenarioLegOut(BaseModel):
+    kind: str
+    quantity: float
+    otype: Optional[str] = None
+    strike: Optional[float] = None
+    expiry: Optional[str] = None
+    iv: Optional[float] = None
+    iv_source: Optional[Literal["leg", "chain", "atm", "default"]] = None
+    avg_price: Optional[float] = None
+
+
+class ScenarioOut(BaseModel):
+    symbol: str
+    spot: Optional[float] = None
+    days: float = 0
+    expiry_days: Optional[float] = None
+    range_pct: float = 0.15
+    spots: List[float] = []
+    curves: List[ScenarioCurve] = []
+    moves: List[float] = []
+    iv_shifts: List[float] = []
+    matrix: List[List[float]] = Field([], description="P&L from now at `days`: rows = spot move, columns = IV × (1 + shift)")
+    breakevens: List[float] = Field([], description="Spots where P&L since entry is zero at the nearest expiry")
+    max_gain: Optional[float] = None
+    max_loss: Optional[float] = None
+    entry_offset: float = Field(0, description="Open P&L now vs the legs' avg_price; add to P&L from now for P&L since entry")
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    theta: Optional[float] = None
+    vega: Optional[float] = None
+    legs: List[ScenarioLegOut] = []
+    zero_gamma: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    king: Optional[float] = None
+    error: Optional[str] = None

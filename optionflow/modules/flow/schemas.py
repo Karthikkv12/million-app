@@ -105,6 +105,38 @@ class NetFlowPoint(BaseModel):
     npp: Optional[float] = Field(None, description="Net put premium: put_bought − put_sold")
 
 
+class StrikeFlowRow(BaseModel):
+    strike: float
+    call_bought: float = 0.0
+    call_sold: float = 0.0
+    put_bought: float = 0.0
+    put_sold: float = 0.0
+    call_delta: float = Field(0.0, description="Customer delta $ from calls: bought − sold (Δvolume × delta × 100 × spot)")
+    put_delta: float = Field(0.0, description="Customer delta $ from puts (puts bought add negative delta)")
+    net_delta: float = 0.0
+
+
+class StrikeFlowOut(BaseModel):
+    symbol: str
+    day: Optional[str] = Field(None, description="US-Eastern session date the totals are for")
+    live: bool = Field(False, description="True while today's session is being tracked; False = latest saved day")
+    expiry: Optional[str] = None
+    expiries: List[str] = []
+    spot: Optional[float] = None
+    zero_gamma: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    king: Optional[float] = None
+    rows: List[StrikeFlowRow] = []
+    call_bought: float = 0.0
+    call_sold: float = 0.0
+    put_bought: float = 0.0
+    put_sold: float = 0.0
+    call_delta: float = 0.0
+    put_delta: float = 0.0
+    net_delta: float = Field(0.0, description="Customer delta $ added today; > 0 = dealers hedge by buying shares")
+
+
 class WatchRequest(BaseModel):
     symbols: List[str] = []
 

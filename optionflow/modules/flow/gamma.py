@@ -419,7 +419,7 @@ def _build(display_sym: str, sym: str, spot: float, df: pd.DataFrame, source: st
         result.total_volume = int(df["volume"].sum())
         try:
             from optionflow.modules.flow.traded import contracts
-            result.contracts = contracts(df, lot_size) if with_contracts else []
+            result.contracts = contracts(df, lot_size, spot) if with_contracts else []
         except Exception:
             result.contracts = []
 
