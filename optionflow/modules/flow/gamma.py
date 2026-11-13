@@ -27,9 +27,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import math
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
 
 from optionflow.providers.market_data import MarketDataRateLimited, get_market_data
@@ -158,16 +161,10 @@ def _fill_gamma(df: pd.DataFrame, spot: float, r: float = 0.045) -> pd.DataFrame
         return df
     df = df.copy()
     feed = pd.to_numeric(df["gamma"], errors="coerce") if "gamma" in df.columns else pd.Series(float("nan"), index=df.index)
-
-    def _row_gamma(row) -> float:
-        g = feed.loc[row.name]
-        if pd.notna(g) and g > 0:
-            return float(g)
-        if row["iv"] > 0 and spot > 0:
-            return bs_gamma(S=spot, K=row["strike"], T=row["T"], r=r, sigma=row["iv"])
-        return 0.0
-
-    df["gamma"] = df.apply(_row_gamma, axis=1)
+    iv = pd.to_numeric(df["iv"], errors="coerce").fillna(0.0)
+    bs = _bs_gamma_vec(spot, pd.to_numeric(df["strike"], errors="coerce").fillna(0.0),
+                       pd.to_numeric(df["T"], errors="coerce").fillna(0.0), iv, r) if spot > 0 else 0.0
+    df["gamma"] = feed.where(feed > 0, bs).fillna(0.0).astype(float)      # vectorised; same rules as bs_gamma
     return df
 
 
@@ -187,13 +184,13 @@ def _compute_gex(df: pd.DataFrame, spot: float, lot_size: int = 100) -> tuple[pd
     # Canonical formula: gamma × OI × lot_size × spot² × 0.01
     df["gex_raw"] = df["gamma"] * df["oi"] * lot_size * spot * spot * 0.01
     # Calls = positive, Puts = negative
-    df["gex"] = df.apply(
-        lambda r: r["gex_raw"] if r["otype"] == "call" else -r["gex_raw"], axis=1
-    )
+    sign = np.where(df["otype"] == "call", 1.0, -1.0)
+    df["gex"] = df["gex_raw"] * sign
     # VEX: Black-Scholes vanna from IV/T, × OI × lot_size × spot × 0.01; calls +, puts −
     if len(df) and "iv" in df.columns and "T" in df.columns:
-        vanna = df.apply(lambda r: bs_vanna(spot, float(r["strike"]), float(r["T"]), 0.045, float(r["iv"] or 0.0)), axis=1)
-        sign = df["otype"].map(lambda o: 1.0 if o == "call" else -1.0)
+        vanna = _bs_vanna_vec(spot, pd.to_numeric(df["strike"], errors="coerce").fillna(0.0),
+                              pd.to_numeric(df["T"], errors="coerce").fillna(0.0),
+                              pd.to_numeric(df["iv"], errors="coerce").fillna(0.0))
         df["vex"] = vanna * df["oi"] * lot_size * spot * 0.01 * sign
     else:
         df["vex"] = 0.0
@@ -260,17 +257,106 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
     sym = _SYMBOL_ALIASES.get(raw, raw)
     # Display symbol stays as the user typed (e.g. "SPX") for labels
     display_sym = raw
+    try:
+        provider = get_market_data()
+        chain = provider.option_chain(sym)
+    except MarketDataRateLimited:
+        raise                       # let the flow service serve the last good result
+    except Exception as e:
+        return GEXResult(symbol=display_sym, spot=0.0, expiries=[], error=str(e),
+                         as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    source = chain.source or provider.name
+    filled = _fill_gamma(chain.rows, chain.spot)
+    if filled is not None and not filled.empty and chain.spot and chain.spot > 0:
+        with _chains_lock:
+            _chains[display_sym.upper()] = _Chain(sym, display_sym, chain.spot, filled, source, time.monotonic())
+    return _build(display_sym, sym, chain.spot, filled, source)
+
+
+# ── Last chain per symbol, for re-pricing at a new spot (respot) ─────────────
+@dataclass
+class _Chain:
+    sym: str                # provider symbol ("^SPX")
+    display: str            # as the user typed it ("SPX")
+    spot: float             # spot the chain was fetched at
+    rows: pd.DataFrame      # chain rows (CHAIN_COLUMNS) with gamma filled at `spot` (_fill_gamma)
+    source: str
+    fetched: float          # time.monotonic() of the fetch
+
+
+_chains: dict[str, "_Chain"] = {}
+_chains_lock = threading.Lock()
+
+
+def chain_age(symbol: str) -> Optional[float]:
+    """Seconds since `symbol`'s chain was last fetched, or None when there is none."""
+    c = _chains.get(symbol.upper())
+    return None if c is None else time.monotonic() - c.fetched
+
+
+def chain_symbol(symbol: str) -> Optional[str]:
+    """The provider symbol of `symbol`'s cached chain ("^SPX" for "SPX"), or None."""
+    c = _chains.get(symbol.upper())
+    return None if c is None else c.sym
+
+
+def clear_chains() -> None:
+    with _chains_lock:
+        _chains.clear()
+
+
+def respot_gex(symbol: str, spot: float) -> Optional[GEXResult]:
+    """The GEX result for `symbol`'s last fetched chain re-priced at `spot`, without fetching anything.
+
+    Open interest, IV, volume and quotes stay as fetched; only the spot moves. Gamma is re-priced with
+    Black-Scholes: a feed gamma is scaled by BS(new spot) / BS(fetch spot), so the result lines up with the
+    next full refresh. None when there is no cached chain or the spot is unusable.
+    """
+    c = _chains.get(symbol.upper())
+    if c is None or not spot or spot <= 0:
+        return None
+    df = c.rows
+    if abs(spot - c.spot) > 1e-9 and not df.empty:
+        df = df.copy()
+        iv = pd.to_numeric(df["iv"], errors="coerce").fillna(0.0)
+        k, t = df["strike"].astype(float), pd.to_numeric(df["T"], errors="coerce").fillna(0.0)
+        old = _bs_gamma_vec(c.spot, k, t, iv)
+        new = _bs_gamma_vec(spot, k, t, iv)
+        ratio = (new / old.where(old > 0)).where(old > 0)
+        df["gamma"] = (df["gamma"] * ratio).where(ratio.notna(), new)
+    return _build(c.display, c.sym, spot, df, c.source, with_contracts=False)
+
+
+def _bs_gamma_vec(S: float, K: pd.Series, T: pd.Series, sigma: pd.Series, r: float = 0.045) -> pd.Series:
+    """Vectorised bs_gamma (same guards: 0 for T ≤ 0, IV < 0.5 %, or a bad strike)."""
+    ok = (T > 0) & (sigma >= 0.005) & (K > 0) & (S > 0)
+    Ts, sg, Ks = T.where(ok, 1.0), sigma.where(ok, 1.0), K.where(ok, 1.0)
+    st = sg * np.sqrt(Ts)
+    d1 = (np.log(S / Ks) + (r + 0.5 * sg ** 2) * Ts) / st
+    g = np.exp(-0.5 * d1 ** 2) / math.sqrt(2 * math.pi) / (S * st)
+    return g.where(ok, 0.0)
+
+
+def _bs_vanna_vec(S: float, K: pd.Series, T: pd.Series, sigma: pd.Series, r: float = 0.045) -> pd.Series:
+    """Vectorised bs_vanna (same guards)."""
+    ok = (T > 0) & (sigma >= 0.005) & (K > 0) & (S > 0)
+    Ts, sg, Ks = T.where(ok, 1.0), sigma.where(ok, 1.0), K.where(ok, 1.0)
+    st = sg * np.sqrt(Ts)
+    d1 = (np.log(S / Ks) + (r + 0.5 * sg ** 2) * Ts) / st
+    v = -np.exp(-0.5 * d1 ** 2) / math.sqrt(2 * math.pi) * (d1 - st) / sg
+    return v.where(ok, 0.0)
+
+
+def _build(display_sym: str, sym: str, spot: float, df: pd.DataFrame, source: str,
+           with_contracts: bool = True) -> GEXResult:
+    """Everything computed from a chain whose gamma is already filled (see _fill_gamma) at `spot`.
+    `with_contracts=False` (respot) skips the per-contract rows that only traded-premium tracking reads."""
     result = GEXResult(symbol=display_sym, spot=0.0, expiries=[],
                        as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
     try:
-        provider = get_market_data()
-        chain = provider.option_chain(sym)
-        spot, df = chain.spot, chain.rows
-        df = _fill_gamma(df, spot)
-
         result.spot = round(spot, 2)
-        result.data_source = chain.source or provider.name
+        result.data_source = source
 
         if df.empty:
             result.error = f"No options data found for {sym}."
@@ -333,7 +419,7 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         result.total_volume = int(df["volume"].sum())
         try:
             from optionflow.modules.flow.traded import contracts
-            result.contracts = contracts(df, lot_size)
+            result.contracts = contracts(df, lot_size) if with_contracts else []
         except Exception:
             result.contracts = []
 
@@ -393,14 +479,13 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         # others in the per-table expiry dropdown (C-93)
         heatmap_expiries = expiries[:HEATMAP_EXPIRIES]
 
+        # expiry × strike sums in one pass (a per-strike loop cost most of a 1 s respot)
+        grid = df[df["expiry"].isin(heatmap_expiries)].groupby(["expiry", "strike"])[["gex", "vex"]].sum()
         heatmap_values: list[list[float]] = []
         heatmap_vex_values: list[list[float]] = []
-        for exp in heatmap_expiries:
-            sub = df[df["expiry"] == exp]
-            sub_gex = sub.groupby("strike")["gex"].sum()
-            sub_vex = sub.groupby("strike")["vex"].sum()
-            heatmap_values.append([float(sub_gex.get(s, 0.0)) for s in heatmap_strikes])
-            heatmap_vex_values.append([float(sub_vex.get(s, 0.0)) for s in heatmap_strikes])
+        for metric, out in (("gex", heatmap_values), ("vex", heatmap_vex_values)):
+            table = grid[metric].unstack("strike").reindex(index=heatmap_expiries, columns=heatmap_strikes).fillna(0.0)
+            out.extend([[float(v) for v in row] for row in table.to_numpy()])
 
         result.heatmap_expiries = heatmap_expiries
         result.heatmap_strikes = heatmap_strikes

@@ -156,7 +156,8 @@ def test_estimates_are_cumulative_per_et_day_and_skip_todays_daily_bar():
                                                      ("2026-11-09T14:31:00Z", 7)]       # skipped rows still count
 
 
-def test_record_snapshot_once_per_second(monkeypatch):
+def test_record_snapshot_at_most_every_10_seconds(monkeypatch):
+    service.clear_cache()
     calls = []
     monkeypatch.setattr(service.repo, "add_snapshot", lambda **row: calls.append(row))
     monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:10Z")
@@ -164,7 +165,11 @@ def test_record_snapshot_once_per_second(monkeypatch):
     for _ in range(3):
         service.record_snapshot(r)
     assert len(calls) == 1
-    monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:11Z")
+    for ts in ("2026-11-10T01:45:11Z", "2026-11-10T01:45:19Z"):     # refreshes every ~2 s: not stored
+        monkeypatch.setattr(service, "now_iso", lambda ts=ts: ts)
+        service.record_snapshot(r)
+    assert len(calls) == 1
+    monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:20Z")
     service.record_snapshot(r)
     assert len(calls) == 2
 

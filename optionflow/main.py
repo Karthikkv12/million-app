@@ -65,8 +65,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         init_db()  # creates any missing tables, including net_flow_snapshots
         if "flow" in modules:
-            from optionflow.workers import gex_poller
+            from optionflow.workers import gex_poller, gex_respot
             gex_poller.start()
+            gex_respot.start()           # levels re-priced at the live price every second (Public only)
         if "notify" in modules and "hedge" in modules:
             from optionflow.modules.notify import worker as notify_worker
             notify_worker.start()        # phone notifications: no-op until PUSH_VAPID_* keys are set
