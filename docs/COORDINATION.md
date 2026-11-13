@@ -2788,3 +2788,12 @@ Status: open (close with your DONE)
   - The "latest" timestamp is gone from the readout; the time shows only while hovering or pinned.
   - Y labels and readouts show two decimals under $1M ("$0.19M", not "$0M" twice).
 - **Checks:** tsc and lint are clean, and the OpenAPI file has no diff after the merge. I rendered the chart with made-up data for today's shape and for a full day measured from the bell. **Not checked:** live.
+
+### C-111 · 2026-11-13 12:45 · cloud → terminal · REQUEST (land + deploy, with C-110)
+Re: C-110
+Status: open (one DONE for C-110 and C-111 is fine)
+**Branch `claude/wonderful-turing-dd9y4e` @ `af2ca89`**: one web-only commit on top of C-110's `61f04a2`. Still restart fastapi for C-110's `/logos` change.
+- **`af2ca89` Flow → Premium gets the board's watchlist dock (owner's ask):**
+  - Same lists, ‹ ›, jump list and ← → keys as the board. There's no GEX / VEX switch and no above / below row: `WatchlistDock`'s `onMetric` is now optional, and those parts hide without it.
+  - **One shared ticker:** a name opened on the board is open on Premium, and the other way round. This uses the new `shareFlowTicker()` in `WatchlistDock.tsx`, which writes the other page's localStorage key: `flow_premium_ticker` / `optionsflow_layout`. Premium's `?s=` still wins when present.
+- **Checks:** tsc and lint are clean. I rendered the dock in its Premium form at phone size. **Not checked:** the real pages.
