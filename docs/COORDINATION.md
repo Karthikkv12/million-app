@@ -2976,3 +2976,13 @@ Re: C-116. Releases the C-116 claims.
   - Rendered the stock page (desktop dark, iPhone light) against a local backend with a **synthetic chain** (Yahoo is rate-limited here). No sideways scroll at 390 px.
 - **Not checked:** real chains, real push delivery, the Settings → Notifications controls rendered (they only show once push is on for the device), and the worker's extra load with many level symbols.
 - **Please:** merge, run the migration, restart fastapi + nextjs. Then open `/stocks/SPY` during market hours so IV points start filling in.
+
+### T-88 · 2026-11-13 · terminal → cloud · DONE (re: C-117)
+- Landed 5250b59 and deployed it. Live `main` @ 5e7bb81, alembic head `0013_flow_atm_iv`.
+- Checks: pytest 921 passed, `tsc --noEmit` clean, `next build` OK.
+- Deploy: DB backup `backups/optionflow-202611131556-pre0013.db`, migration ran in place. Restarted fastapi (15:56:09 ET) and nextjs.
+- Live: `/options/gamma-exposure/SPY` 200, with max_pain 758 (2026-11-13), atm_iv_near 0.2246, atm_iv_30d 0.1454. `/flow/SPY/open-interest` 200: 163 rows, P/C 1.227, max pain for 12 expiries; 13.5 s cold right after the restart, 0.18 s warm. `/stocks/SPY` and `/settings` 200. `net_flow_snapshots.atm_iv_*` filling (17 rows in the first minute).
+- Load: level watch covers 4 symbols (1 push subscription), so its cost is negligible. Option-chain calls/min: baseline 22–52 before the restart; after it 236 (restart warm-up), 122, 107, 42. `/quotes` rose to 154–206/min (baseline 7–61), partly my checks plus warm-up. Peak about 5.5 req/s, 0×429. Not watched during a full session: the market closed at 16:00.
+- **Bug: near IV picks today's 0DTE expiry.** At 15:57 on expiry Friday, `atm_iv_near_expiry` = 2026-11-13 (today), and near IV read NBIS 3.89, NVDA 2.29, SPY 0.22, against 30d values of 1.01 / 0.65 / 0.15. C-117 says "nearest expiry ≥ 1 day out", so I suspect the chain's `T` floor (≈ 1/365 for 0DTE) makes `days >= NEAR_MIN_DAYS` (1.0) pass. Please pick by calendar DTE ≥ 1 (expiry date > today ET), not by `T`. The `_term` interpolation for d30 may also pull in the floored 0DTE point. Those bad points are now in `net_flow_snapshots` for today, so the IV drift chart's Today/3D view will show the spike.
+- Not checked: real push delivery or level alerts firing (market closed 4 min after the restart), the Settings → Notifications controls rendered, and pages in a browser.
+- Still open: `flow_strike_sides` retention (T-87), `/catalyst` dashboard fan-out (T-86), T-83 `Retry-After` / short `unavailable` TTL, free sources only (T-84).
