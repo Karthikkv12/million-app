@@ -8,7 +8,8 @@
  * watchlist to browse ("All lists" merges them); the ticker button opens that list to jump straight to a name.
  * Above it, a small pill sums the board's exposure above and below the price. The next name's GEX is prefetched
  * so stepping feels instant. Lists come from /watchlists (the same lists as Portfolio → Watchlist), plus
- * "My stocks": the stocks you hold on Robinhood (largest position first), which follows each Robinhood sync.
+ * "My stocks": every name you have a Robinhood position in, shares or options (bought or sold), largest exposure
+ * first; it follows each Robinhood sync.
  * "My stocks" is the default until you pick another list.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -74,10 +75,15 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
 
   // Same query (and cache) as Portfolio; the holdings refresh with every Robinhood sync.
   const pfQ = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 60_000 });
-  const held = useMemo(() => [...(pfQ.data?.holdings ?? [])]
-    .filter((h) => h.shares > 0)
-    .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
-    .map((h) => h.symbol.toUpperCase()), [pfQ.data]);
+  // Exposure per name: stock market value + |contracts| × 100 × price (spot, else strike) for each option leg,
+  // long or short. Options-only names count too.
+  const held = useMemo(() => {
+    const exp = new Map<string, number>();
+    const add = (sym: string, v: number) => { const k = sym.toUpperCase(); exp.set(k, (exp.get(k) ?? 0) + v); };
+    for (const h of pfQ.data?.holdings ?? []) if (h.shares > 0) add(h.symbol, Math.abs(h.market_value ?? 0));
+    for (const o of pfQ.data?.options ?? []) if (o.contracts) add(o.symbol, Math.abs(o.contracts) * 100 * (o.spot ?? o.strike ?? 0));
+    return [...exp.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  }, [pfQ.data]);
 
   const [listId, setListId] = useState<number>(HELD);
   useEffect(() => { try { const v = Number(localStorage.getItem(LIST_KEY)); if (v) setListId(v); } catch { /* storage off */ } }, []);
@@ -195,7 +201,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
                     {s}{s === ticker.toUpperCase() && <Check size={13} className="text-accent" />}
                   </button>
                 ))}
-                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{mode === "held" ? (pfQ.isLoading ? "Loading your stocks…" : "No stocks synced from Robinhood yet.") : "This list is empty."}</p>}
+                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{mode === "held" ? (pfQ.isLoading ? "Loading your stocks…" : "No positions synced from Robinhood yet.") : "This list is empty."}</p>}
               </div>
             )}
           </div>
