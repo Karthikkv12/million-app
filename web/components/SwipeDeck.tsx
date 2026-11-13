@@ -1,10 +1,12 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import clsx from "clsx";
 
 /**
- * Cards side by side in one slot: swipe (touch, trackpad) or use the tabs to move between them.
- * The deck takes the height of the card on show, so a short card doesn't leave a gap under it.
+ * Cards in one slot: the tabs (or a horizontal swipe, or ← →) switch between them.
+ * Only the card on show is displayed; the others stay mounted (hidden) so their data and open sections survive a
+ * switch. This replaced a scroll-snap strip: on iPhone Safari a smooth scroll interrupted by the height change left
+ * the strip parked between two cards, cutting both off.
  * `slideClassName` lets a caller cap each card's height so it scrolls on its own.
  */
 export function SwipeDeck({ slides, label, className, slideClassName }: {
@@ -13,51 +15,22 @@ export function SwipeDeck({ slides, label, className, slideClassName }: {
   className?: string;
   slideClassName?: string;
 }) {
-  const row = useRef<HTMLDivElement>(null);
-  const items = useRef<(HTMLDivElement | null)[]>([]);
   const [active, setActive] = useState(0);
-  const [height, setHeight] = useState<number>();
+  const start = useRef<{ x: number; y: number } | null>(null);
 
-  const go = useCallback((i: number) => {
-    const el = row.current;
-    if (!el) return;
-    const n = Math.max(0, Math.min(slides.length - 1, i));
-    el.scrollTo({ left: n * el.clientWidth, behavior: "smooth" });
-    setActive(n);
-  }, [slides.length]);
+  const go = useCallback((i: number) => setActive(Math.max(0, Math.min(slides.length - 1, i))), [slides.length]);
 
-  const onScroll = () => {
-    const el = row.current;
-    if (!el || !el.clientWidth) return;
-    setActive(Math.max(0, Math.min(slides.length - 1, Math.round(el.scrollLeft / el.clientWidth))));
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    start.current = t ? { x: t.clientX, y: t.clientY } : null;
   };
-
-  // Follow the height of the card on show, including when it grows (data loads, a section opens).
-  useLayoutEffect(() => {
-    const el = items.current[active];
-    if (!el) return;
-    const measure = () => setHeight(el.offsetHeight);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [active]);
-
-  // Keep the shown card in place when the deck is resized (rotation, window resize).
-  useEffect(() => {
-    const el = row.current;
-    if (!el) return;
-    // Only on a width change: the row's height animates on every switch, and re-aligning then would cut a smooth
-    // tab-click scroll short.
-    let width = el.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      el.scrollLeft = active * width;
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [active]);
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = start.current, t = e.changedTouches[0];
+    start.current = null;
+    if (!s || !t) return;
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) go(active + (dx < 0 ? 1 : -1));
+  };
 
   return (
     <section aria-label={label} aria-roledescription="carousel" className={clsx("min-w-0", className)}>
@@ -89,13 +62,10 @@ export function SwipeDeck({ slides, label, className, slideClassName }: {
           ))}
         </div>
       </div>
-      <div ref={row} onScroll={onScroll}
-        style={height ? { height } : undefined}
-        className="flex snap-x snap-mandatory items-start overflow-x-auto overscroll-x-contain transition-[height] duration-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className="min-w-0 touch-pan-y">
         {slides.map((s, i) => (
-          <div key={s.key} ref={(el) => { items.current[i] = el; }} id={`deck-slide-${s.key}`}
-            role="tabpanel" aria-labelledby={`deck-tab-${s.key}`}
-            className={clsx("w-full min-w-0 shrink-0 snap-start snap-always", slideClassName)}>
+          <div key={s.key} id={`deck-slide-${s.key}`} role="tabpanel" aria-labelledby={`deck-tab-${s.key}`}
+            hidden={active !== i} className={clsx("w-full min-w-0", slideClassName)}>
             {s.node}
           </div>
         ))}

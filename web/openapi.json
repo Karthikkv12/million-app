@@ -10382,6 +10382,483 @@
     "title": "ReportSummary",
     "type": "object"
    },
+   "ScenarioCurve": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "number"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "pnl": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Pnl",
+      "type": "array"
+     }
+    },
+    "required": [
+     "label",
+     "days",
+     "pnl"
+    ],
+    "title": "ScenarioCurve",
+    "type": "object"
+   },
+   "ScenarioIn": {
+    "properties": {
+     "days": {
+      "default": 0,
+      "description": "Horizon for the matrix and the middle curve, in calendar days",
+      "maximum": 730.0,
+      "minimum": 0.0,
+      "title": "Days",
+      "type": "number"
+     },
+     "legs": {
+      "items": {
+       "$ref": "#/components/schemas/ScenarioLegIn"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Legs",
+      "type": "array"
+     },
+     "range_pct": {
+      "default": 0.15,
+      "exclusiveMinimum": 0.01,
+      "maximum": 0.6,
+      "title": "Range Pct",
+      "type": "number"
+     },
+     "symbol": {
+      "maxLength": 12,
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "legs"
+    ],
+    "title": "ScenarioIn",
+    "type": "object"
+   },
+   "ScenarioLegIn": {
+    "properties": {
+     "avg_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Entry price per share, for P&L since entry",
+      "title": "Avg Price"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "iv": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "maximum": 5.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Decimal; omitted \u2192 the cached chain's IV",
+      "title": "Iv"
+     },
+     "kind": {
+      "enum": [
+       "stock",
+       "option"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "otype": {
+      "anyOf": [
+       {
+        "enum": [
+         "call",
+         "put"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Otype"
+     },
+     "quantity": {
+      "description": "Shares, or contracts (negative = sold)",
+      "title": "Quantity",
+      "type": "number"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     }
+    },
+    "required": [
+     "kind",
+     "quantity"
+    ],
+    "title": "ScenarioLegIn",
+    "type": "object"
+   },
+   "ScenarioLegOut": {
+    "properties": {
+     "avg_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Price"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv"
+     },
+     "iv_source": {
+      "anyOf": [
+       {
+        "enum": [
+         "leg",
+         "chain",
+         "atm",
+         "default"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iv Source"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "otype": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Otype"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "number"
+     },
+     "strike": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Strike"
+     }
+    },
+    "required": [
+     "kind",
+     "quantity"
+    ],
+    "title": "ScenarioLegOut",
+    "type": "object"
+   },
+   "ScenarioOut": {
+    "properties": {
+     "breakevens": {
+      "default": [],
+      "description": "Spots where P&L since entry is zero at the nearest expiry",
+      "items": {
+       "type": "number"
+      },
+      "title": "Breakevens",
+      "type": "array"
+     },
+     "call_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Wall"
+     },
+     "curves": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ScenarioCurve"
+      },
+      "title": "Curves",
+      "type": "array"
+     },
+     "days": {
+      "default": 0,
+      "title": "Days",
+      "type": "number"
+     },
+     "delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta"
+     },
+     "entry_offset": {
+      "default": 0,
+      "description": "Open P&L now vs the legs' avg_price; add to P&L from now for P&L since entry",
+      "title": "Entry Offset",
+      "type": "number"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "expiry_days": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry Days"
+     },
+     "gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gamma"
+     },
+     "iv_shifts": {
+      "default": [],
+      "items": {
+       "type": "number"
+      },
+      "title": "Iv Shifts",
+      "type": "array"
+     },
+     "king": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "King"
+     },
+     "legs": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ScenarioLegOut"
+      },
+      "title": "Legs",
+      "type": "array"
+     },
+     "matrix": {
+      "default": [],
+      "description": "P&L from now at `days`: rows = spot move, columns = IV \u00d7 (1 + shift)",
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Matrix",
+      "type": "array"
+     },
+     "max_gain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Gain"
+     },
+     "max_loss": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Loss"
+     },
+     "moves": {
+      "default": [],
+      "items": {
+       "type": "number"
+      },
+      "title": "Moves",
+      "type": "array"
+     },
+     "put_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Wall"
+     },
+     "range_pct": {
+      "default": 0.15,
+      "title": "Range Pct",
+      "type": "number"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "spots": {
+      "default": [],
+      "items": {
+       "type": "number"
+      },
+      "title": "Spots",
+      "type": "array"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "theta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Theta"
+     },
+     "vega": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vega"
+     },
+     "zero_gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zero Gamma"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "ScenarioOut",
+    "type": "object"
+   },
    "ScoreEntry": {
     "description": "The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).",
     "properties": {
@@ -11776,6 +12253,205 @@
      }
     },
     "title": "StrategyUpdate",
+    "type": "object"
+   },
+   "StrikeFlowOut": {
+    "properties": {
+     "call_bought": {
+      "default": 0.0,
+      "title": "Call Bought",
+      "type": "number"
+     },
+     "call_delta": {
+      "default": 0.0,
+      "title": "Call Delta",
+      "type": "number"
+     },
+     "call_sold": {
+      "default": 0.0,
+      "title": "Call Sold",
+      "type": "number"
+     },
+     "call_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Wall"
+     },
+     "day": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "US-Eastern session date the totals are for",
+      "title": "Day"
+     },
+     "expiries": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Expiries",
+      "type": "array"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expiry"
+     },
+     "king": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "King"
+     },
+     "live": {
+      "default": false,
+      "description": "True while today's session is being tracked; False = latest saved day",
+      "title": "Live",
+      "type": "boolean"
+     },
+     "net_delta": {
+      "default": 0.0,
+      "description": "Customer delta $ added today; > 0 = dealers hedge by buying shares",
+      "title": "Net Delta",
+      "type": "number"
+     },
+     "put_bought": {
+      "default": 0.0,
+      "title": "Put Bought",
+      "type": "number"
+     },
+     "put_delta": {
+      "default": 0.0,
+      "title": "Put Delta",
+      "type": "number"
+     },
+     "put_sold": {
+      "default": 0.0,
+      "title": "Put Sold",
+      "type": "number"
+     },
+     "put_wall": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Wall"
+     },
+     "rows": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/StrikeFlowRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "zero_gamma": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zero Gamma"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "StrikeFlowOut",
+    "type": "object"
+   },
+   "StrikeFlowRow": {
+    "properties": {
+     "call_bought": {
+      "default": 0.0,
+      "title": "Call Bought",
+      "type": "number"
+     },
+     "call_delta": {
+      "default": 0.0,
+      "description": "Customer delta $ from calls: bought \u2212 sold (\u0394volume \u00d7 delta \u00d7 100 \u00d7 spot)",
+      "title": "Call Delta",
+      "type": "number"
+     },
+     "call_sold": {
+      "default": 0.0,
+      "title": "Call Sold",
+      "type": "number"
+     },
+     "net_delta": {
+      "default": 0.0,
+      "title": "Net Delta",
+      "type": "number"
+     },
+     "put_bought": {
+      "default": 0.0,
+      "title": "Put Bought",
+      "type": "number"
+     },
+     "put_delta": {
+      "default": 0.0,
+      "description": "Customer delta $ from puts (puts bought add negative delta)",
+      "title": "Put Delta",
+      "type": "number"
+     },
+     "put_sold": {
+      "default": 0.0,
+      "title": "Put Sold",
+      "type": "number"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "strike"
+    ],
+    "title": "StrikeFlowRow",
     "type": "object"
    },
    "SubscriptionIn": {
@@ -17217,6 +17893,71 @@
     ]
    }
   },
+  "/api/v1/flow/{symbol}/strikes": {
+   "get": {
+    "description": "Today's option volume by strike, split into bought (at the ask) and sold (at the bid), in premium and in\ndelta dollars. Quote rule on the last print per refresh: a burst of trades between refreshes takes one side.",
+    "operationId": "strike_flow_api_v1_flow__symbol__strikes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "expiry",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Expiry"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StrikeFlowOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Strike Flow",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
   "/api/v1/gex-history/{symbol}": {
    "get": {
     "description": "Same as /flow/{symbol}/replay (the path the stock page used before the move).",
@@ -20738,6 +21479,53 @@
      }
     ],
     "summary": "Factors",
+    "tags": [
+     "risk"
+    ]
+   }
+  },
+  "/api/v1/risk/scenario": {
+   "post": {
+    "description": "Payoff and P&L of a set of legs across spot moves, days forward and IV crush / expansion, with the GEX walls.",
+    "operationId": "scenario_api_v1_risk_scenario_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScenarioIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScenarioOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Scenario",
     "tags": [
      "risk"
     ]

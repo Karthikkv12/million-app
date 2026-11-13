@@ -236,12 +236,13 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 /* ── Privacy mode (hide account values) ─────────────────────────────────────
-   <html class="privacy">: `.sensitive` text is replaced by dots, `.sensitive-blur` is blurred. */
-html.privacy .sensitive { position: relative; color: transparent !important; user-select: none; }
-html.privacy .sensitive * { color: transparent !important; background-color: transparent; }
-html.privacy .sensitive::after {
+   <html class="privacy">: inside a [data-privacy-scope] (the Portfolio section, where account figures live),
+   `.sensitive` text is replaced by dots and `.sensitive-blur` is blurred. Elsewhere nothing is masked. */
+html.privacy [data-privacy-scope] .sensitive { position: relative; color: transparent !important; user-select: none; }
+html.privacy [data-privacy-scope] .sensitive * { color: transparent !important; background-color: transparent; }
+html.privacy [data-privacy-scope] .sensitive::after {
   content: "•••••"; position: absolute; inset: 0; padding: inherit; display: flex; align-items: center;
   justify-content: flex-start; color: rgb(var(--foreground-rgb) / 0.45); letter-spacing: 0.08em; overflow: hidden; white-space: nowrap;
 }
-html.privacy .sensitive.text-right::after { justify-content: flex-end; }
-html.privacy .sensitive-blur { filter: blur(10px); pointer-events: none; user-select: none; }
+html.privacy [data-privacy-scope] .sensitive.text-right::after { justify-content: flex-end; }
+html.privacy [data-privacy-scope] .sensitive-blur { filter: blur(10px); pointer-events: none; user-select: none; }

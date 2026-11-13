@@ -13,7 +13,7 @@ from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.flow import history, service, tide
 from optionflow.modules.flow.schemas import (
-    FlowLeadersOut, GexDayOut, GexOut, NetFlowPoint, TidePoint, WatchRequest,
+    FlowLeadersOut, GexDayOut, GexOut, NetFlowPoint, StrikeFlowOut, TidePoint, WatchRequest,
 )
 from optionflow.workers import backfill
 
@@ -54,6 +54,14 @@ def flow_tide(days: int = Query(1, ge=1, le=30), bucket: int = Query(5, ge=1, le
               _user=Depends(get_current_user)) -> List[TidePoint]:
     """Market tide: premium added since each session's open, summed across the watched universe, with SPY."""
     return tide.tide(days, bucket)
+
+
+@stream_router.get("/{symbol}/strikes", response_model=StrikeFlowOut)
+def strike_flow(symbol: str, expiry: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+                _user=Depends(get_current_user)) -> StrikeFlowOut:
+    """Today's option volume by strike, split into bought (at the ask) and sold (at the bid), in premium and in
+    delta dollars. Quote rule on the last print per refresh: a burst of trades between refreshes takes one side."""
+    return StrikeFlowOut(**service.strike_flow(symbol, expiry))
 
 
 @stream_router.get("/{symbol}/stream", response_class=StreamingResponse)

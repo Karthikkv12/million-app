@@ -102,7 +102,7 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <PrivacyButton /><ThemeButton />
+          {isActive("/portfolio") && <PrivacyButton />}<ThemeButton />
 
           <div className="relative hidden md:block" ref={menuRef}>
             <button

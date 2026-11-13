@@ -439,6 +439,23 @@ class NetFlowSnapshot(Base):
     put_bought  = Column(Float, nullable=True)
     put_sold    = Column(Float, nullable=True)
 
+class FlowStrikeSide(Base):
+    """Today's sided traded premium per contract (flow.traded.strikes), saved about once a minute per symbol so a
+    restart keeps the day's by-strike flow. Delta $ = Δvolume × Black-Scholes delta × 100 × spot (calls +, puts −)."""
+    __tablename__ = "flow_strike_sides"
+    id          = Column(Integer, primary_key=True)
+    symbol      = Column(String, nullable=False)
+    day         = Column(String, nullable=False)              # US-Eastern session date, YYYY-MM-DD
+    expiry      = Column(String, nullable=False)
+    strike      = Column(Float, nullable=False)
+    otype       = Column(String, nullable=False)              # "call" | "put"
+    bought      = Column(Float, nullable=False, default=0.0)  # premium filled at or near the ask
+    sold        = Column(Float, nullable=False, default=0.0)  # premium filled at or near the bid
+    bought_dd   = Column(Float, nullable=False, default=0.0)  # delta $ of the bought volume
+    sold_dd     = Column(Float, nullable=False, default=0.0)  # delta $ of the sold volume
+    __table_args__ = (Index("ix_flow_strike_sides_symbol_day", "symbol", "day"),)
+
+
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"
     id         = Column(Integer, primary_key=True)

@@ -296,6 +296,6 @@ def test_chain_rows_carry_quotes_for_flow_sides():
     rows = parse_contracts("2026-11-20", {"calls": [_contract(92)], "puts": None}, 0.1)
     df = pd.DataFrame(rows, columns=CHAIN_COLUMNS)
     assert (df.loc[0, "bid"], df.loc[0, "ask"], df.loc[0, "last"]) == (7.60, 8.80, 8.19)
-    (key, vol, prem, bid, ask, last), = traded.contracts(df)
+    (key, vol, prem, bid, ask, last, _dd), = traded.contracts(df)
     assert traded.side(bid, ask, last) == "mid"          # 8.19 is mid-spread
     assert traded.side(bid, ask, 8.70) == "bought"

@@ -1013,6 +1013,17 @@ export const fetchUnusual = (opts: { symbols?: string[]; minPremium?: number; ty
 export type FlowLeaders = Schemas["FlowLeadersOut"];
 export const fetchFlowLeaders = (limit = 5) => api.get<FlowLeaders>(`/flow/leaders?limit=${limit}`);
 
+// ── By-strike flow: bought / sold premium and customer delta $ per strike today ─
+export type StrikeFlow = Schemas["StrikeFlowOut"];
+export const fetchStrikeFlow = (symbol: string, expiry?: string | null) =>
+  api.get<StrikeFlow>(`/flow/${encodeURIComponent(symbol.toUpperCase())}/strikes${expiry ? `?expiry=${expiry}` : ""}`);
+
+// ── Scenario / payoff matrix (risk.scenario) ─────────────────────────────────
+export type ScenarioIn = Schemas["ScenarioIn"];
+export type ScenarioLegIn = Schemas["ScenarioLegIn"];
+export type Scenario = Schemas["ScenarioOut"];
+export const postScenario = (body: ScenarioIn) => api.post<Scenario>("/risk/scenario", body);
+
 // ── Hedge desk (delta-neutral indicator for held positions) ──────────────────
 export type HedgeBooks = Schemas["BooksOut"];
 export type HedgeBook = Schemas["BookOut"];

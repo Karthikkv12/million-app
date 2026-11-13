@@ -87,7 +87,7 @@ def test_contracts_keeps_the_nearest_12_expiries():
     df.loc[0, "mid"] = float("nan")
     rows = traded.contracts(df, 100)
     assert [r[0][0] for r in rows] == exps[:12]
-    assert rows[0][3:] == (None, None, None)               # no bid / ask / last columns
+    assert rows[0][3:] == (None, None, None, 0.0)          # no bid / ask / last columns, no spot → delta $ 0
     assert rows[0][2] == 0.0 and rows[1][2] == 200.0
 
 
@@ -128,3 +128,28 @@ def test_restart_restores_sides():
     assert traded.sides("X", now=at(13, 0)) == (300, 100, 50, 120)
     traded.update("X", [(C, 1004, 1.0, 1.0, 1.2, 1.2)], now=at(13, 1))
     assert traded.sides("X", now=at(13, 1)) == (304, 100, 50, 120)
+
+
+# ── by strike: premium and delta dollars per contract ───────────────────────
+def test_deltas_black_scholes_signs():
+    df = pd.DataFrame({"strike": [100.0, 100.0, 100.0], "otype": ["call", "put", "call"], "T": [0.1, 0.1, 0.0],
+                       "iv": [0.3, 0.3, 0.3]})
+    d = traded.deltas(df, 100.0)
+    assert 0.5 < d[0] < 0.6 and -0.5 < d[1] < -0.4 and d[2] == 0.0
+    assert d[0] - d[1] == pytest.approx(1.0)                  # put-call parity on delta
+    rows = traded.contracts(df.assign(expiry="2026-12-18", volume=1, mid=1.0), 100, 100.0)
+    assert rows[0][6] == pytest.approx(d[0] * 100 * 100)
+
+
+def test_strikes_keeps_sided_premium_and_delta_dollars():
+    assert traded.strikes("X", now=at(10, 0)) is None
+    traded.update("X", [(C, 10, 100.0, 1.0, 1.2, 1.1, 5000.0), (P, 10, 100.0, 1.0, 1.2, 1.1, -4000.0)], now=at(10, 0))
+    traded.update("X", [(C, 15, 100.0, 1.0, 1.2, 1.2, 5000.0), (P, 12, 100.0, 1.0, 1.2, 1.0, -4000.0)], now=at(10, 5))
+    day, by = traded.strikes("X", now=at(10, 6))
+    assert by[C] == [500.0, 0.0, 25000.0, 0.0]               # 5 calls bought at the ask: +5 × $5,000 delta
+    assert by[P] == [0.0, 200.0, 0.0, -8000.0]               # 2 puts sold at the bid
+    # restart: per-strike totals come back with the day's totals
+    traded.clear()
+    traded.update("X", [(C, 15, 100.0)], now=at(10, 10), restore=lambda s, d: (1500.0, 1200.0),
+                  restore_strikes=lambda s, d: {C: [500.0, 0.0, 25000.0, 0.0]})
+    assert traded.strikes("X", now=at(10, 11))[1] == {C: [500.0, 0.0, 25000.0, 0.0]}

@@ -6,6 +6,7 @@
  * Live: the app-wide SSE stream (lib/live.tsx) every second.
  * Actions follow the strategy picked in the header dropdown (GET /strategy; spike wheel by default).
  */
+import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown, Shapes } from "lucide-react";
@@ -489,6 +490,7 @@ function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
           <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Delta desk</h1>
+          <Link href="/hedge/scenario" className="mt-1 inline-block font-mono text-[11.5px] uppercase tracking-[0.14em] text-accent hover:underline">Scenario: payoff × IV × days →</Link>
         </div>
         <div className="flex w-full flex-wrap items-end justify-between gap-x-5 gap-y-3 sm:w-auto sm:flex-nowrap">
           <div className="w-full sm:w-auto"><StrategyPicker /></div>
