@@ -2794,6 +2794,16 @@ export interface components {
              * @default 0
              */
             collected: number;
+            /**
+             * Long Paid
+             * @default 0
+             */
+            long_paid: number;
+            /**
+             * Long Received
+             * @default 0
+             */
+            long_received: number;
             /** Period */
             period: string;
             /**
@@ -2831,6 +2841,11 @@ export interface components {
              * @default 0
              */
             collected_total: number;
+            /**
+             * Long Paid Total
+             * @default 0
+             */
+            long_paid_total: number;
             /** Monthly */
             monthly: components["schemas"]["BrokerIncomeBucket"][];
             /**
@@ -2845,6 +2860,8 @@ export interface components {
             realized_total: number;
             /** Since */
             since?: string | null;
+            /** This Week */
+            this_week?: string | null;
             /**
              * Trades
              * @default 0

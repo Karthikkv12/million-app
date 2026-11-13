@@ -73,3 +73,21 @@ def test_activity_upserts_and_income(client):
     acts = c.get("/api/v1/broker/activity", headers=auth).json()
     assert [a["ext_id"] for a in acts] == ["leg-1", "leg-2", "r-2", "r-1"] and acts[0]["symbol"] == "UPST"
     assert c.get("/api/v1/broker/activity", headers=_login(c, "other")).json() == []
+
+
+def test_income_keeps_long_options_out_of_premium(client):
+    """Buying calls/puts you own is not a buy-back: it must not drag net premium down."""
+    c, fake = client
+    fake.last_price = lambda s: 22.0
+    long_buy = {**FILL, "ext_id": "leg-L1", "ts": "2026-11-04T15:00:00Z", "side": "buy", "position_effect": "open",
+                "strike": 25, "expiry": "2027-01-15", "quantity": 10, "price": 14.0, "amount": -14000.0, "strategy": "long_call"}
+    long_sell = {**long_buy, "ext_id": "leg-L2", "ts": "2026-11-05T15:00:00Z", "side": "sell", "position_effect": "close", "amount": 500.0}
+    spread_short = {**FILL, "ext_id": "leg-S1", "ts": "2026-11-03T15:00:10Z", "option_type": "put", "strike": 20, "amount": 120.0, "strategy": "short_put"}
+    spread_long = {**spread_short, "ext_id": "leg-S2", "side": "buy", "strike": 18, "amount": -40.0, "strategy": "long_put"}
+    c.post("/api/v1/hedge/ingest", json=body("2026-11-06", 10000, [FILL, CLOSE, long_buy, long_sell, spread_short, spread_long]), headers=H)
+    inc = c.get("/api/v1/broker/income", headers=_login(c, "owner")).json()
+    assert inc["premium_total"] == pytest.approx(59 - 74 + 120 - 40)              # spread's long leg stays in
+    assert inc["long_paid_total"] == 14000
+    wk = inc["weekly"][-1]
+    assert wk["period"] == "2026-11-02" and wk["long_paid"] == 14000 and wk["long_received"] == 500
+    assert inc["this_week"] and len(inc["this_week"]) == 10
