@@ -10,14 +10,18 @@ expiry. It assumes every open contract is held long by customers, which is a con
 ATM IV:
 - at one expiry: each side's IV interpolated linearly in strike at the spot, then the call and put values averaged
   (whichever sides have a usable quote, IV ≥ 0.5%);
-- near: the nearest expiry at least NEAR_MIN_DAYS out (skips 0DTE, whose IV swings with the clock);
+- near: the nearest expiry at least NEAR_MIN_DAYS out (skips 0DTE, whose IV swings with the clock). An expiry
+  dated today or earlier (ET calendar) is dropped outright: providers floor T for 0DTE (≈ 1/365), so T alone
+  would let today's expiry through;
 - 30-day: total variance (IV² × T) interpolated linearly in time between the expiries either side of 30 days, the
   VIX method; the nearest expiry's IV when 30 days is outside the listed range.
 """
 from __future__ import annotations
 
+import datetime as dt
 import math
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -25,6 +29,15 @@ LOT = 100
 MIN_IV = 0.005
 NEAR_MIN_DAYS = 1.0
 TARGET_DAYS = 30.0
+ET = ZoneInfo("America/New_York")
+
+
+def _expired(expiry: str, today: dt.date) -> bool:
+    """True when `expiry` is an ISO date on or before `today` (ET); unparseable names are left to T."""
+    try:
+        return dt.date.fromisoformat(str(expiry)[:10]) <= today
+    except ValueError:
+        return False
 
 
 def _rows(df: pd.DataFrame, expiry: Optional[str] = None) -> pd.DataFrame:
@@ -89,12 +102,15 @@ def atm_iv_at(df: pd.DataFrame, spot: float, expiry: str) -> Optional[float]:
     return sum(vals) / len(vals) if vals else None
 
 
-def _term(df: pd.DataFrame, spot: float) -> List[tuple]:
-    """[(days, atm iv, expiry)] for every expiry with a usable ATM IV, nearest first."""
+def _term(df: pd.DataFrame, spot: float, today: Optional[dt.date] = None) -> List[tuple]:
+    """[(days, atm iv, expiry)] for every expiry after today (ET) with a usable ATM IV, nearest first."""
     if df is None or df.empty:
         return []
+    today = today or dt.datetime.now(ET).date()
     out = []
     for exp, g in df.groupby("expiry"):
+        if _expired(str(exp), today):
+            continue
         T = pd.to_numeric(g["T"], errors="coerce").dropna()
         if T.empty or float(T.iloc[0]) <= 0:
             continue
@@ -104,9 +120,9 @@ def _term(df: pd.DataFrame, spot: float) -> List[tuple]:
     return sorted(out)
 
 
-def atm_iv(df: pd.DataFrame, spot: float) -> Dict[str, Any]:
+def atm_iv(df: pd.DataFrame, spot: float, today: Optional[dt.date] = None) -> Dict[str, Any]:
     """{near, near_expiry, d30}: ATM IV (decimals) of the nearest expiry ≥ NEAR_MIN_DAYS out and at a constant 30 days."""
-    term = _term(df, spot)
+    term = _term(df, spot, today)
     out: Dict[str, Any] = {"near": None, "near_expiry": None, "d30": None}
     if not term:
         return out
