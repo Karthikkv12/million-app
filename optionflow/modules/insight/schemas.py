@@ -105,3 +105,24 @@ class LeapsScoreOut(BaseModel):
     realtime: bool = Field(False, description="True when that price came from a real-time source")
     as_of: Optional[str] = None
     error: Optional[str] = None
+
+
+class LeapsScoreBrief(BaseModel):
+    """One symbol's LEAPS score in a batch: the numbers only, no factors (open the stock page for those)."""
+    symbol: str
+    score: Optional[int] = Field(None, description="Long call score, 0–100; None without enough history")
+    band: Optional[str] = None
+    put_score: Optional[int] = None
+    put_band: Optional[str] = None
+    options_score: Optional[int] = Field(None, description="Option quality, same for call and put")
+    options_label: Optional[str] = None
+    side: Optional[Literal["call", "put"]] = Field(None, description="The stronger side (call on a tie)")
+    entry: Optional[ScoreEntry] = Field(None, description="Entry for the stronger side")
+    price: Optional[float] = None
+    realtime: bool = False
+    error: Optional[str] = None
+
+
+class LeapsScoresOut(BaseModel):
+    scores: List[LeapsScoreBrief] = []
+    as_of: Optional[str] = None

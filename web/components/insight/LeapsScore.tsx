@@ -8,10 +8,11 @@
  * LeapsLine — the one-line version for the heat maps: both scores and the entry price of the stronger side.
  */
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
-import { fetchLeapsScore, LeapsScore as Score } from "@/lib/api";
+import { fetchLeapsScore, fetchLeapsScores, LeapsScore as Score, LeapsScoreBrief } from "@/lib/api";
 import { Scale } from "@/components/desk";
 import { Tick } from "@/lib/live";
 
@@ -198,6 +199,38 @@ export function LeapsScore({ symbol, compact = false, label = true, className }:
   );
 }
 
+
+/** The LEAPS score of many symbols (e.g. every holding) in one request, refreshed every few seconds: a table of
+ *  them doesn't need the per-second pace of the single-stock panel. Keyed by symbol. */
+export const BATCH_REFRESH_MS = 5_000;
+export function useLeapsScores(symbols: string[]) {
+  const syms = [...new Set(symbols.map((s) => s.toUpperCase()))].sort();
+  return useQuery({
+    queryKey: ["leaps-scores", syms.join(",")], queryFn: () => fetchLeapsScores(syms), enabled: syms.length > 0,
+    refetchInterval: BATCH_REFRESH_MS, staleTime: BATCH_REFRESH_MS / 2, placeholderData: (prev) => prev,
+    select: (d) => new Map<string, LeapsScoreBrief>(d.scores.map((r) => [r.symbol, r])),
+  });
+}
+
+/** One table cell: the call score and band, the put score under it; the stronger side's entry on hover. */
+export function LeapsCell({ s, symbol }: { s?: LeapsScoreBrief; symbol: string }) {
+  if (!s) return <span className="text-foreground/30">…</span>;
+  if (s.score == null) return <span className="text-foreground/40" title={s.error ?? "No score right now"}>—</span>;
+  const e = s.entry;
+  const tip = [`Long call ${s.score} (${s.band})`, s.put_score != null ? `long put ${s.put_score} (${s.put_band})` : null,
+    s.options_score != null ? `option quality ${s.options_score}: ${s.options_label}` : null,
+    e ? `${s.side === "put" ? "Put" : "Call"}: ${ENTER[e.when]}$${e.price.toFixed(2)}. ${e.note}` : null]
+    .filter(Boolean).join(" · ");
+  return (
+    <Link href={`/stocks/${symbol}`} title={tip} className="inline-block text-right hover:opacity-80">
+      <span className={clsx("font-medium", tone(s.score), s.side === "put" && "opacity-60")}>{s.score}</span>
+      <span className={clsx("ml-1 text-[10.5px] uppercase tracking-[0.1em]", tone(s.score))}>{s.band}</span>
+      {s.put_score != null && (
+        <p className={clsx("text-[11px]", s.side === "put" ? tone(s.put_score) : "text-foreground/40")}>put {s.put_score}</p>
+      )}
+    </Link>
+  );
+}
 
 const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
