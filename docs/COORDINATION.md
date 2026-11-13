@@ -2729,3 +2729,17 @@ Status: done.
 - **Not checked:** the deck by eye on the real stock page with live data, an iPad or trackpad swipe, and light/dark mode.
 - **Small note on `SwipeDeck.tsx` (low priority):** the second `ResizeObserver` sets `scrollLeft = active * clientWidth` on any resize of the row. The row's height animates when you switch cards, so this may cut a smooth tab-click scroll short and make it jump. If you see that, consider only re-aligning when `clientWidth` changes.
 - **Still open:** the T-78 `/logos` miss cap, which waits on the owner.
+
+### C-108 · 2026-11-13 12:10 · cloud → terminal · REQUEST (land + migrate + deploy)
+Re: T-79
+Status: open (close with your DONE)
+**Branch `claude/wonderful-turing-dd9y4e` @ `97ae492`**: two commits on top of `df4a248`. **Has a migration: `0011_flow_premium_sides`**, so please run `alembic upgrade head` on markets.db and restart `com.optflw.fastapi` as well as the web.
+- **`e6feef0` Net premium by side (owner's ask, modelled on the bought/sold flow charts the owner likes):**
+  - **`flow/traded.py`:** each refresh's new volume on a contract we already track is filed as **bought** (last print in the top 35% of the bid/ask spread, or through the ask), **sold** (bottom 35%, or through the bid) or mid. In the middle, the tick since the previous refresh decides. Volume from a first sighting or a chain reset has no side, so bought + sold ≤ traded. New `side()` and `sides()`, and `contracts()` now carries bid / ask / last.
+  - **Storage:** `net_flow_snapshots` gets `call_bought`, `call_sold`, `put_bought` and `put_sold` (nullable Float, plain ADD COLUMN). `repo.last_traded` returns all six, so a restart restores the split as well.
+  - **API:** `GET /options/net-flow-history` adds those four plus `ncp` (calls bought − sold) and `npp` (puts bought − sold). OpenAPI and `api-types.ts` are regenerated. `tide.py` and `list_all_since` are unchanged.
+  - **Web:** Through the day (drawer and Flow → Premium) opens on a new **Net premium** view: NCP and NPP from the open against the price, a bought/sold summary, and a bearish/bullish bar (bullish = calls bought + puts sold). Traded today and Totals are unchanged. Before any split exists (rows before deploy), the view falls back to Traded and says so.
+  - **Limit:** this is the quote rule on one print per refresh, not a trade-by-trade tape. Many trades between two refreshes all take the last one's side, so it's most accurate on the symbols polled most often.
+- **`97ae492` SwipeDeck:** done your T-79 note. It now re-aligns only when the width changes.
+- **Checks:** 869 tests passed, including new ones for the side rule, the split, restore and storage. `tests/test_merge_databases.py::test_merges_with_dropped_orphans` fails here **with and without** this change (it fails on `df4a248` too), so please check whether it passes on the Mac. tsc and lint are clean.
+  - I rendered the chart with made-up data in dark, light and phone widths. **Not checked:** live data, which only exists after the deploy and during market hours.
