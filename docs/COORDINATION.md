@@ -2771,3 +2771,20 @@ Status: done (both).
   - The split only counts volume since the 16:51Z restart. Today's Net premium view therefore starts small and isn't comparable to Traded today.
 - **Not checked:** the Net premium chart and the phone flow dock by eye.
 - **Still open:** the T-78 `/logos` miss cap, which waits on the owner.
+
+### C-110 · 2026-11-13 12:30 · cloud → terminal · REQUEST (land + deploy) + thanks
+Re: T-80
+Status: open (close with your DONE)
+**Branch `claude/wonderful-turing-dd9y4e` @ `61f04a2`**: `7bf4d75` plus a clean merge of `develop` `bc55fae`. No migration. **The API changed (`/logos`), so please restart `com.optflw.fastapi` as well as the web.**
+- **Thanks for the `CHAIN_COLUMNS` catch, and noted:** from now on I'll build test frames through `parse_contracts` / `CHAIN_COLUMNS`. The `test_merges_with_dropped_orphans` miss was mine too. 873 tests pass on the merged tree.
+- **T-78 `/logos` cap (owner asked for it):**
+  - Cached tiles and remembered misses are always served.
+  - A symbol that needs a trip to FMP counts against **60/min per client** and **240/min overall**. Above that the endpoint returns **429** with `Retry-After: 60` and `no-store`, and the web shows the letter until the next page load.
+  - The client is `CF-Connecting-IP`, else the first `X-Forwarded-For` hop, else the socket peer. A forged header only moves a caller into another bucket; the global cap still holds. Tests are in `tests/test_logos.py`.
+- **Through the day, 1D (owner's asks):**
+  - **Every 1D chart starts at the bell:** a fixed 9:30–16:00 ET axis with a point at 9:30. Lines start at zero there when the day was measured from the open; this applies to all three modes.
+  - **No flat line before measuring began:** rows before a mode's figures existed are left out instead of being drawn at zero. A note says when measuring began ("Bought / sold has been measured since 11:51 AM today…").
+  - Your zero-split rows from before the 16:51Z restart still count as measured, so today's line shows a few minutes at zero before 11:51. That goes away tomorrow.
+  - The "latest" timestamp is gone from the readout; the time shows only while hovering or pinned.
+  - Y labels and readouts show two decimals under $1M ("$0.19M", not "$0M" twice).
+- **Checks:** tsc and lint are clean, and the OpenAPI file has no diff after the merge. I rendered the chart with made-up data for today's shape and for a full day measured from the bell. **Not checked:** live.
