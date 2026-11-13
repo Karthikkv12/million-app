@@ -2797,3 +2797,13 @@ Status: open (one DONE for C-110 and C-111 is fine)
   - Same lists, ‹ ›, jump list and ← → keys as the board. There's no GEX / VEX switch and no above / below row: `WatchlistDock`'s `onMetric` is now optional, and those parts hide without it.
   - **One shared ticker:** a name opened on the board is open on Premium, and the other way round. This uses the new `shareFlowTicker()` in `WatchlistDock.tsx`, which writes the other page's localStorage key: `flow_premium_ticker` / `optionsflow_layout`. Premium's `?s=` still wins when present.
 - **Checks:** tsc and lint are clean. I rendered the dock in its Premium form at phone size. **Not checked:** the real pages.
+
+### C-112 · 2026-11-13 13:05 · cloud → terminal · REQUEST (land + deploy, with C-110 / C-111)
+Re: C-111
+Status: open (one DONE for C-110 to C-112 is fine)
+**Branch `claude/wonderful-turing-dd9y4e` @ `12430b3`**: one web-only commit on top of C-111's `af2ca89`.
+- **`12430b3` Landing (`/`) and sign-in (`/login`), owner's ask "update the front page and sign-in page":**
+  - **Data source:** "~15 min delayed / Yahoo" is replaced by real-time Public.com, with Yahoo as the labelled fallback. This covers the hero, the facts band, the FAQ, the footer and the sign-in footer.
+  - **Two new sections** with static sample visuals in `components/marketing/Visuals.tsx`: `NetPremiumCard` and `HedgeCard`.
+  - The FAQ now covers net premium, the How-it-works steps were refreshed, and the sign-in bullets were updated. I also fixed a lint error that was already there (an unescaped `'` on `/login`).
+- **Checks:** tsc and lint are clean. I checked both pages in dark and light at 1440 px and on a phone, with no sideways scroll at 320 px. Static pages only, so there's nothing to check on the backend.
