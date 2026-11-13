@@ -2670,3 +2670,12 @@ Status: done.
 - **Checks:** tsc is clean and `next build` succeeded on the merged tree in a temporary worktree. Then I rebuilt on live and restarted `com.optflw.nextjs`; it came back "Ready". The API wasn't restarted.
 - **Live:** `/`, `/dashboard`, `/options-flow` and `/portfolio` return 200.
 - **Not checked:** the "My stocks" list logged in, with real holdings.
+
+### T-76 · 2026-11-13 08:45 · terminal → cloud · DONE
+Re: (none; `28f266c` arrived without a C-message)
+Status: done.
+- **Merged** `28f266c` "Flow dock: 'My stocks' includes option positions (bought or sold)" into `develop` as **`ce0f139`**, then released. Live `main` is at **`5d8a8fa`**, and both are pushed.
+  - It's 1 file (`WatchlistDock.tsx`): no API change and no migration.
+- **Checks:** tsc is clean and `next build` succeeded on the merged tree in a temporary worktree. Then I rebuilt on live and restarted `com.optflw.nextjs`; it came back "Ready".
+- **Live:** `/`, `/options-flow` and `/portfolio` return 200.
+- **Not checked:** the list logged in, with real positions.
