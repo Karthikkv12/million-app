@@ -1,7 +1,8 @@
 "use client";
 /**
  * Privacy mode ("hide values"): adds `privacy` to <html>, remembered per device.
- * Any element with class `sensitive` is masked (•••••); `sensitive-blur` is blurred (charts).
+ * Masking only applies inside a [data-privacy-scope] element (the Portfolio section, where account figures live):
+ * there `sensitive` is masked (•••••) and `sensitive-blur` is blurred (charts). The navbar toggle shows on Portfolio only.
  */
 import { useEffect, useState } from "react";
 

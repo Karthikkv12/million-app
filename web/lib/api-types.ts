@@ -665,6 +665,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/flow/{symbol}/strikes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Strike Flow
+         * @description Today's option volume by strike, split into bought (at the ask) and sold (at the bid), in premium and in
+         *     delta dollars. Quote rule on the last print per refresh: a burst of trades between refreshes takes one side.
+         */
+        get: operations["strike_flow_api_v1_flow__symbol__strikes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gex-history/{symbol}": {
         parameters: {
             query?: never;
@@ -1835,6 +1856,26 @@ export interface paths {
         get: operations["factors_api_v1_risk_factors_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk/scenario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scenario
+         * @description Payoff and P&L of a set of legs across spot moves, days forward and IV crush / expansion, with the GEX walls.
+         */
+        post: operations["scenario_api_v1_risk_scenario_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5454,6 +5495,165 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ScenarioCurve */
+        ScenarioCurve: {
+            /** Days */
+            days: number;
+            /** Label */
+            label: string;
+            /** Pnl */
+            pnl: number[];
+        };
+        /** ScenarioIn */
+        ScenarioIn: {
+            /**
+             * Days
+             * @description Horizon for the matrix and the middle curve, in calendar days
+             * @default 0
+             */
+            days: number;
+            /** Legs */
+            legs: components["schemas"]["ScenarioLegIn"][];
+            /**
+             * Range Pct
+             * @default 0.15
+             */
+            range_pct: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** ScenarioLegIn */
+        ScenarioLegIn: {
+            /**
+             * Avg Price
+             * @description Entry price per share, for P&L since entry
+             */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /**
+             * Iv
+             * @description Decimal; omitted → the cached chain's IV
+             */
+            iv?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "option";
+            /** Otype */
+            otype?: ("call" | "put") | null;
+            /**
+             * Quantity
+             * @description Shares, or contracts (negative = sold)
+             */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+        };
+        /** ScenarioLegOut */
+        ScenarioLegOut: {
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Iv */
+            iv?: number | null;
+            /** Iv Source */
+            iv_source?: ("leg" | "chain" | "atm" | "default") | null;
+            /** Kind */
+            kind: string;
+            /** Otype */
+            otype?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Strike */
+            strike?: number | null;
+        };
+        /** ScenarioOut */
+        ScenarioOut: {
+            /**
+             * Breakevens
+             * @description Spots where P&L since entry is zero at the nearest expiry
+             * @default []
+             */
+            breakevens: number[];
+            /** Call Wall */
+            call_wall?: number | null;
+            /**
+             * Curves
+             * @default []
+             */
+            curves: components["schemas"]["ScenarioCurve"][];
+            /**
+             * Days
+             * @default 0
+             */
+            days: number;
+            /** Delta */
+            delta?: number | null;
+            /**
+             * Entry Offset
+             * @description Open P&L now vs the legs' avg_price; add to P&L from now for P&L since entry
+             * @default 0
+             */
+            entry_offset: number;
+            /** Error */
+            error?: string | null;
+            /** Expiry Days */
+            expiry_days?: number | null;
+            /** Gamma */
+            gamma?: number | null;
+            /**
+             * Iv Shifts
+             * @default []
+             */
+            iv_shifts: number[];
+            /** King */
+            king?: number | null;
+            /**
+             * Legs
+             * @default []
+             */
+            legs: components["schemas"]["ScenarioLegOut"][];
+            /**
+             * Matrix
+             * @description P&L from now at `days`: rows = spot move, columns = IV × (1 + shift)
+             * @default []
+             */
+            matrix: number[][];
+            /** Max Gain */
+            max_gain?: number | null;
+            /** Max Loss */
+            max_loss?: number | null;
+            /**
+             * Moves
+             * @default []
+             */
+            moves: number[];
+            /** Put Wall */
+            put_wall?: number | null;
+            /**
+             * Range Pct
+             * @default 0.15
+             */
+            range_pct: number;
+            /** Spot */
+            spot?: number | null;
+            /**
+             * Spots
+             * @default []
+             */
+            spots: number[];
+            /** Symbol */
+            symbol: string;
+            /** Theta */
+            theta?: number | null;
+            /** Vega */
+            vega?: number | null;
+            /** Zero Gamma */
+            zero_gamma?: number | null;
+        };
         /**
          * ScoreEntry
          * @description The stock price at which to buy the long call (score.entry_plan) or the long put (score.put_entry_plan).
@@ -5805,6 +6005,122 @@ export interface components {
             } | null;
             /** Strategy */
             strategy?: string | null;
+        };
+        /** StrikeFlowOut */
+        StrikeFlowOut: {
+            /**
+             * Call Bought
+             * @default 0
+             */
+            call_bought: number;
+            /**
+             * Call Delta
+             * @default 0
+             */
+            call_delta: number;
+            /**
+             * Call Sold
+             * @default 0
+             */
+            call_sold: number;
+            /** Call Wall */
+            call_wall?: number | null;
+            /**
+             * Day
+             * @description US-Eastern session date the totals are for
+             */
+            day?: string | null;
+            /**
+             * Expiries
+             * @default []
+             */
+            expiries: string[];
+            /** Expiry */
+            expiry?: string | null;
+            /** King */
+            king?: number | null;
+            /**
+             * Live
+             * @description True while today's session is being tracked; False = latest saved day
+             * @default false
+             */
+            live: boolean;
+            /**
+             * Net Delta
+             * @description Customer delta $ added today; > 0 = dealers hedge by buying shares
+             * @default 0
+             */
+            net_delta: number;
+            /**
+             * Put Bought
+             * @default 0
+             */
+            put_bought: number;
+            /**
+             * Put Delta
+             * @default 0
+             */
+            put_delta: number;
+            /**
+             * Put Sold
+             * @default 0
+             */
+            put_sold: number;
+            /** Put Wall */
+            put_wall?: number | null;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["StrikeFlowRow"][];
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Zero Gamma */
+            zero_gamma?: number | null;
+        };
+        /** StrikeFlowRow */
+        StrikeFlowRow: {
+            /**
+             * Call Bought
+             * @default 0
+             */
+            call_bought: number;
+            /**
+             * Call Delta
+             * @description Customer delta $ from calls: bought − sold (Δvolume × delta × 100 × spot)
+             * @default 0
+             */
+            call_delta: number;
+            /**
+             * Call Sold
+             * @default 0
+             */
+            call_sold: number;
+            /**
+             * Net Delta
+             * @default 0
+             */
+            net_delta: number;
+            /**
+             * Put Bought
+             * @default 0
+             */
+            put_bought: number;
+            /**
+             * Put Delta
+             * @description Customer delta $ from puts (puts bought add negative delta)
+             * @default 0
+             */
+            put_delta: number;
+            /**
+             * Put Sold
+             * @default 0
+             */
+            put_sold: number;
+            /** Strike */
+            strike: number;
         };
         /** SubscriptionIn */
         SubscriptionIn: {
@@ -8302,6 +8618,39 @@ export interface operations {
             };
         };
     };
+    strike_flow_api_v1_flow__symbol__strikes_get: {
+        parameters: {
+            query?: {
+                expiry?: string | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrikeFlowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     gex_day_api_v1_gex_history__symbol__get: {
         parameters: {
             query?: {
@@ -10528,6 +10877,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FactorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scenario_api_v1_risk_scenario_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioOut"];
                 };
             };
             /** @description Validation Error */

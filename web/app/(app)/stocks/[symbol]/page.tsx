@@ -14,6 +14,7 @@ import { DealerLadder, TradeIdeas } from "@/components/options-flow/DealerLadder
 import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
 import { PoliticalCard } from "@/components/insight/PoliticalCard";
+import { VolumeCard } from "@/components/insight/VolumeCard";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 import { TickerLogo } from "@/components/TickerLogo";
 import { SwipeDeck } from "@/components/SwipeDeck";
@@ -73,6 +74,10 @@ export default function StockPage() {
         <div className="grid min-w-0 gap-4">
         <Panel title="Drawdown and upside spikes">
           <SwingCharts symbol={sym} title={`How far ${sym} falls from its highs and jumps off its lows`} height={190} />
+        </Panel>
+
+        <Panel title="Volume" sub={<span className="normal-case tracking-normal">Is today unusual for {sym}?</span>}>
+          <VolumeCard symbol={sym} optionsVolume={gex && !gex.error ? gex.total_volume : null} />
         </Panel>
 
         <GexReplay symbol={sym} />

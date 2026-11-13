@@ -27,7 +27,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const active = PORTFOLIO_TABS.find((t) => pathname.startsWith(`/portfolio/${t.id}`));
   return (
-    <div className="mx-auto w-full max-w-screen-2xl px-4 pb-16 pt-8 sm:px-6">
+    <div data-privacy-scope className="mx-auto w-full max-w-screen-2xl px-4 pb-16 pt-8 sm:px-6">
       <div className="mb-6">
         <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Portfolio</p>
         <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-foreground sm:text-[40px]">{active?.label ?? "Portfolio"}</h1>

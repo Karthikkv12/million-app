@@ -1,11 +1,11 @@
 """optionflow/modules/flow/repo.py — net-flow snapshots in the markets database (ORM only)."""
 from __future__ import annotations
 
-from typing import Iterable, List, Set
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from sqlalchemy import or_
 
-from database.models import NetFlowSnapshot
+from database.models import FlowStrikeSide, NetFlowSnapshot
 from optionflow.core.db import get_session
 
 _FIELDS = ("symbol", "ts", "price", "call_prem", "put_prem", "net_flow", "total_prem", "volume")
@@ -112,5 +112,43 @@ def last_traded(symbol: str, since_z: str, since_offset: str):
         if not r:
             return None
         return (float(r[0]), float(r[1])) + tuple(None if x is None else float(x) for x in r[2:6])
+    finally:
+        session.close()
+
+
+# ── per-strike sides (flow.traded.strikes) ──────────────────────────────────────
+StrikeKey = Tuple[str, float, str]
+
+
+def save_strike_sides(symbol: str, day: str, by: Dict[StrikeKey, List[float]]) -> int:
+    """Replace `symbol`'s rows for `day` with `by` ({(expiry, strike, otype): [bought, sold, bought $Δ, sold $Δ]})."""
+    session = get_session()
+    try:
+        session.query(FlowStrikeSide).filter(FlowStrikeSide.symbol == symbol, FlowStrikeSide.day == day).delete()
+        session.add_all([FlowStrikeSide(symbol=symbol, day=day, expiry=k[0], strike=k[1], otype=k[2],
+                                        bought=v[0], sold=v[1], bought_dd=v[2], sold_dd=v[3]) for k, v in by.items()])
+        session.commit()
+        return len(by)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def load_strike_sides(symbol: str, day: Optional[str] = None) -> Optional[Tuple[str, Dict[StrikeKey, List[float]]]]:
+    """(day, rows) for `day`, or for the latest saved day when `day` is None; None when nothing is saved."""
+    session = get_session()
+    try:
+        if day is None:
+            last = (session.query(FlowStrikeSide.day).filter(FlowStrikeSide.symbol == symbol)
+                    .order_by(FlowStrikeSide.day.desc()).first())
+            if not last:
+                return None
+            day = last[0]
+        rows = session.query(FlowStrikeSide).filter(FlowStrikeSide.symbol == symbol, FlowStrikeSide.day == day).all()
+        if not rows:
+            return None
+        return day, {(r.expiry, float(r.strike), r.otype): [r.bought, r.sold, r.bought_dd, r.sold_dd] for r in rows}
     finally:
         session.close()
