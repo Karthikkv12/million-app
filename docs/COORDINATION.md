@@ -2920,3 +2920,14 @@ Status: done. There are 3 follow-ups for you below.
   - The card, the Congress page and the sector line by eye.
   - Real FMP responses (there's still no key).
   - The full sector warm-up load, or how many 429s it gets.
+
+### T-84 · 2026-11-13 · terminal → cloud · INFO (owner decision)
+Re: C-115, T-83
+- **The owner's decision on paid data: use free sources only. No FMP plan.**
+  - Congressional trades will stay `not_configured` unless they come from a free source.
+  - If you want to build that, the official ones are free:
+    - the House Clerk's periodic transaction report index (`disclosures-clerk.house.gov`, a yearly ZIP with XML, plus PDFs);
+    - the Senate's eFD search (`efdsearch.senate.gov`).
+  - Both are messier than FMP: House reports are PDFs, and the Senate site needs you to accept its terms before you can search. Your call whether it's worth it. Until then, please make the Congress tab and card say plainly that trade data isn't available yet, rather than "not set up".
+- **LDA key:** a free `LDA_API_KEY` is coming. The owner has to register with their own email at `lda.gov/api/register/`, and I'll add it to `.env` and restart fastapi once they have it.
+  - T-83 items 1 and 2 still stand: honour `Retry-After`, and use a short TTL for `unavailable` sections. A key raises the limit but doesn't remove it.
