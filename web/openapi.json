@@ -1057,6 +1057,144 @@
     "title": "AuthSignupRequest",
     "type": "object"
    },
+   "BookFactor": {
+    "properties": {
+     "beta": {
+      "description": "% of capital the book moves per 1% factor move",
+      "title": "Beta",
+      "type": "number"
+     },
+     "dollar_per_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "$ the book makes per +1% factor move",
+      "title": "Dollar Per Pct"
+     },
+     "factor_vol": {
+      "description": "The factor's own annual vol",
+      "title": "Factor Vol",
+      "type": "number"
+     },
+     "hedge": {
+      "default": [],
+      "description": "ETF trades that take this beta to zero",
+      "items": {
+       "$ref": "#/components/schemas/HedgeLeg"
+      },
+      "title": "Hedge",
+      "type": "array"
+     },
+     "key": {
+      "enum": [
+       "market",
+       "tech",
+       "size",
+       "rates"
+      ],
+      "title": "Key",
+      "type": "string"
+     },
+     "risk": {
+      "description": "Annual variance from this factor (can be negative when it offsets)",
+      "title": "Risk",
+      "type": "number"
+     },
+     "risk_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share of the book's variance",
+      "title": "Risk Share"
+     }
+    },
+    "required": [
+     "key",
+     "beta",
+     "factor_vol",
+     "risk"
+    ],
+    "title": "BookFactor",
+    "type": "object"
+   },
+   "BookFactors": {
+    "properties": {
+     "factor_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Factor Share"
+     },
+     "factors": {
+      "items": {
+       "$ref": "#/components/schemas/BookFactor"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "r2": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share of the book's daily moves the factors explain",
+      "title": "R2"
+     },
+     "specific": {
+      "default": 0,
+      "title": "Specific",
+      "type": "number"
+     },
+     "specific_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share of variance no factor explains",
+      "title": "Specific Share"
+     },
+     "vol": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Book vol, annual, as % of capital",
+      "title": "Vol"
+     }
+    },
+    "required": [
+     "factors"
+    ],
+    "title": "BookFactors",
+    "type": "object"
+   },
    "BookOut": {
     "properties": {
      "accounts": {
@@ -3867,6 +4005,335 @@
     "title": "ExpectedMoveOut",
     "type": "object"
    },
+   "FactorHolding": {
+    "properties": {
+     "betas": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "number"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "factor key \u2192 beta of this stock",
+      "title": "Betas"
+     },
+     "dollar_betas": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "number"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "factor key \u2192 $ per 1% factor move",
+      "title": "Dollar Betas"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "exposure": {
+      "description": "Delta dollars: net \u0394 \u00d7 100 \u00d7 spot",
+      "title": "Exposure",
+      "type": "number"
+     },
+     "has_options": {
+      "default": false,
+      "title": "Has Options",
+      "type": "boolean"
+     },
+     "net_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Delta"
+     },
+     "r2": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share of this stock's moves the factors explain",
+      "title": "R2"
+     },
+     "risk_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Approximate share of the book's variance",
+      "title": "Risk Share"
+     },
+     "shares": {
+      "default": 0,
+      "title": "Shares",
+      "type": "number"
+     },
+     "specific_vol": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Annual vol no factor explains",
+      "title": "Specific Vol"
+     },
+     "spot": {
+      "title": "Spot",
+      "type": "number"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "vol": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vol"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight"
+     }
+    },
+    "required": [
+     "symbol",
+     "spot",
+     "exposure"
+    ],
+    "title": "FactorHolding",
+    "type": "object"
+   },
+   "FactorInfo": {
+    "properties": {
+     "about": {
+      "default": "",
+      "title": "About",
+      "type": "string"
+     },
+     "etf": {
+      "title": "Etf",
+      "type": "string"
+     },
+     "key": {
+      "enum": [
+       "market",
+       "tech",
+       "size",
+       "rates"
+      ],
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "minus": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Subtracted ETF, e.g. QQQ \u2212 SPY for the tech tilt",
+      "title": "Minus"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "etf"
+    ],
+    "title": "FactorInfo",
+    "type": "object"
+   },
+   "FactorWindow": {
+    "properties": {
+     "end": {
+      "title": "End",
+      "type": "string"
+     },
+     "start": {
+      "title": "Start",
+      "type": "string"
+     }
+    },
+    "required": [
+     "start",
+     "end"
+    ],
+    "title": "FactorWindow",
+    "type": "object"
+   },
+   "FactorsOut": {
+    "properties": {
+     "account_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Value"
+     },
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "book": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/BookFactors"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "capital": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capital"
+     },
+     "capital_source": {
+      "anyOf": [
+       {
+        "enum": [
+         "input",
+         "account",
+         "gross"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capital Source"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "factors": {
+      "items": {
+       "$ref": "#/components/schemas/FactorInfo"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "gross": {
+      "default": 0,
+      "title": "Gross",
+      "type": "number"
+     },
+     "holdings": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/FactorHolding"
+      },
+      "title": "Holdings",
+      "type": "array"
+     },
+     "net": {
+      "default": 0,
+      "title": "Net",
+      "type": "number"
+     },
+     "prices": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "default": {},
+      "title": "Prices",
+      "type": "object"
+     },
+     "sessions": {
+      "default": 0,
+      "title": "Sessions",
+      "type": "integer"
+     },
+     "window": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FactorWindow"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "as_of",
+     "factors"
+    ],
+    "title": "FactorsOut",
+    "type": "object"
+   },
    "FlowByExpiry": {
     "properties": {
      "call_prem": {
@@ -4377,6 +4844,36 @@
      }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "HedgeLeg": {
+    "properties": {
+     "dollars": {
+      "description": "Buy (+) or sell (\u2212) this many dollars of the ETF",
+      "title": "Dollars",
+      "type": "number"
+     },
+     "shares": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Shares"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "dollars"
+    ],
+    "title": "HedgeLeg",
     "type": "object"
    },
    "HoldingEventOut": {
@@ -15954,92 +16451,6 @@
     ]
    }
   },
-  "/api/v1/hedge/vol-target": {
-   "get": {
-    "description": "Volatility targeting: exposure = target \u00f7 GARCH forecast, for the whole book and each holding.",
-    "operationId": "vol_target_api_v1_hedge_vol_target_get",
-    "parameters": [
-     {
-      "description": "Target annual vol, decimal (0.15 = 15%)",
-      "in": "query",
-      "name": "target",
-      "required": false,
-      "schema": {
-       "default": 0.15,
-       "description": "Target annual vol, decimal (0.15 = 15%)",
-       "exclusiveMinimum": 0.0,
-       "maximum": 2.0,
-       "title": "Target",
-       "type": "number"
-      }
-     },
-     {
-      "description": "Max gross delta dollars \u00f7 capital",
-      "in": "query",
-      "name": "cap",
-      "required": false,
-      "schema": {
-       "default": 1.0,
-       "description": "Max gross delta dollars \u00f7 capital",
-       "exclusiveMinimum": 0.0,
-       "maximum": 5.0,
-       "title": "Cap",
-       "type": "number"
-      }
-     },
-     {
-      "description": "Override the synced account value",
-      "in": "query",
-      "name": "capital",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "exclusiveMinimum": 0.0,
-         "type": "number"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "description": "Override the synced account value",
-       "title": "Capital"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/VolTargetOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Vol Target",
-    "tags": [
-     "hedge"
-    ]
-   }
-  },
   "/api/v1/holdings/{holding_id}": {
    "delete": {
     "operationId": "delete_account_holding_api_v1_holdings__holding_id__delete",
@@ -19005,6 +19416,150 @@
     "summary": "Get Report",
     "tags": [
      "reports"
+    ]
+   }
+  },
+  "/api/v1/risk/factors": {
+   "get": {
+    "description": "Factor exposure (APT): the book's betas to market, tech, size and rates, and its risk split by factor.",
+    "operationId": "factors_api_v1_risk_factors_get",
+    "parameters": [
+     {
+      "description": "Override the synced account value",
+      "in": "query",
+      "name": "capital",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "exclusiveMinimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Override the synced account value",
+       "title": "Capital"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FactorsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Factors",
+    "tags": [
+     "risk"
+    ]
+   }
+  },
+  "/api/v1/risk/vol-target": {
+   "get": {
+    "description": "Volatility targeting: exposure = target \u00f7 GARCH forecast, for the whole book and each holding.",
+    "operationId": "vol_target_api_v1_risk_vol_target_get",
+    "parameters": [
+     {
+      "description": "Target annual vol, decimal (0.15 = 15%)",
+      "in": "query",
+      "name": "target",
+      "required": false,
+      "schema": {
+       "default": 0.15,
+       "description": "Target annual vol, decimal (0.15 = 15%)",
+       "exclusiveMinimum": 0.0,
+       "maximum": 2.0,
+       "title": "Target",
+       "type": "number"
+      }
+     },
+     {
+      "description": "Max gross delta dollars \u00f7 capital",
+      "in": "query",
+      "name": "cap",
+      "required": false,
+      "schema": {
+       "default": 1.0,
+       "description": "Max gross delta dollars \u00f7 capital",
+       "exclusiveMinimum": 0.0,
+       "maximum": 5.0,
+       "title": "Cap",
+       "type": "number"
+      }
+     },
+     {
+      "description": "Override the synced account value",
+      "in": "query",
+      "name": "capital",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "exclusiveMinimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Override the synced account value",
+       "title": "Capital"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VolTargetOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Vol Target",
+    "tags": [
+     "risk"
     ]
    }
   },

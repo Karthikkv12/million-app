@@ -11,6 +11,7 @@ import { ChevronDown } from "lucide-react";
 import type { GexResult } from "@/lib/api";
 import { Ladder } from "@/components/desk";
 import { ANCHOR_TONE, anchorOf, shortExpiry } from "@/lib/gex";
+import { TickerLink } from "@/components/TickerLink";
 
 type Idea = NonNullable<GexResult["ideas"]>[number];
 
@@ -74,7 +75,7 @@ export function DealerLadder({ data, height = 250, className }: { data: GexResul
   return (
     <div className={clsx("min-w-0 px-4 py-3", className)} role="group" aria-label={`${data.symbol} dealer ladder`}>
       {o && <DirectionRead o={o} />}
-      <p className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">{data.symbol} dealers</p>
+      <p className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45"><TickerLink symbol={data.symbol} /> dealers</p>
       <Ladder spot={data.spot} height={height} levels={[
         { label: "call wall", price: data.max_call_wall, tone: "text-gain" },
         { label: "★ king", price: data.max_gex_strike, tone: "text-[#b45309] dark:text-[#fde725]" },

@@ -1004,7 +1004,12 @@ export type VolTarget = Schemas["VolTargetOut"];
 export type VolTargetHolding = Schemas["VolTargetHolding"];
 /** Volatility targeting on the synced book: target and cap are decimals (0.15 = 15%, 1 = never more than all-in). */
 export const fetchVolTarget = (target: number, cap: number, capital?: number | null) =>
-  api.get<VolTarget>(`/hedge/vol-target?target=${target}&cap=${cap}${capital ? `&capital=${capital}` : ""}`);
+  api.get<VolTarget>(`/risk/vol-target?target=${target}&cap=${cap}${capital ? `&capital=${capital}` : ""}`);
+export type Factors = Schemas["FactorsOut"];
+export type FactorHolding = Schemas["FactorHolding"];
+export type BookFactor = Schemas["BookFactor"];
+/** Factor exposure of the synced book (APT): betas to market, tech, size and rates; risk split by factor. */
+export const fetchFactors = (capital?: number | null) => api.get<Factors>(`/risk/factors${capital ? `?capital=${capital}` : ""}`);
 
 // ── Strategy (drives the desk's actions) ─────────────────────────────────────
 export type StrategyState = Schemas["StrategyOut"];

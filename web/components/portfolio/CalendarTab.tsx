@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchBrokerActivity, BrokerActivity } from "@/lib/api";
 import { Panel, SkeletonCard } from "@/components/ui";
 import { Metric, NoData, signedUsd, TD, TH, tone, useAccount, usd } from "./broker";
+import { TickerLink } from "@/components/TickerLink";
 
 /** The API returns at most this many rows (fills and closes together), newest first. */
 const LIMIT = 2000;
@@ -155,7 +156,7 @@ export function CalendarTab() {
                 {[...selDay.rows].sort((a, b) => (b.realized_gain ?? 0) - (a.realized_gain ?? 0)).map((a) => (
                   <tr key={a.id} className="border-b border-[var(--border)] last:border-0">
                     <td className={`${TD} whitespace-nowrap font-sans text-[13px] text-foreground`}>
-                      <span className="font-medium">{a.symbol}</span>
+                      <TickerLink symbol={a.symbol} className="font-medium" />
                       {a.strike != null && <span className="ml-1.5 text-foreground/60">{a.strike}{a.option_type === "call" ? "C" : a.option_type === "put" ? "P" : ""} {a.expiry ?? ""}</span>}
                       {a.side ? <span className="ml-1.5 text-[11px] text-foreground/45">{a.side}</span> : null}
                     </td>
