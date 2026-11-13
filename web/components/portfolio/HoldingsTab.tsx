@@ -54,7 +54,7 @@ export function HoldingsTab() {
   const dash = <span className="text-foreground/30">—</span>;
   return (
     <div className="space-y-4">
-    {nStocks > 0 && <SectorDonut holdings={p.holdings} />}
+    {(nStocks > 0 || (p?.options.length ?? 0) > 0) && <SectorDonut holdings={p.holdings} options={p.options} />}
     <Panel padded={false} title="Stocks"
       sub={[nStocks ? `${nStocks} with shares` : null, nOpt ? `${nOpt} through options only` : null, "live prices"].filter(Boolean).join(" · ")}>
       <div className="overflow-x-auto">

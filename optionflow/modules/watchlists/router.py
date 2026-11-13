@@ -6,9 +6,9 @@ from typing import Callable, Dict, List, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from optionflow.core.deps import get_current_user
-from optionflow.modules.watchlists import options, service
+from optionflow.modules.watchlists import cboe, options, service
 from optionflow.modules.watchlists.schemas import (
-    OptionMetricsOut, WatchlistCreateIn, WatchlistGroupOut, WatchlistGroupsOut, WatchlistOrderIn, WatchlistUpdateIn,
+    ExtendedHoursOut, OptionMetricsOut, WatchlistCreateIn, WatchlistGroupOut, WatchlistGroupsOut, WatchlistOrderIn, WatchlistUpdateIn,
 )
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
@@ -44,6 +44,12 @@ def option_metrics(symbols: str = Query(..., max_length=600, description="Comma-
         except service.WatchlistError:
             continue
     return [OptionMetricsOut(**m) for m in options.batch(syms)]
+
+
+@router.get("/extended-hours", response_model=ExtendedHoursOut)
+def extended_hours(_user=Depends(get_current_user)) -> ExtendedHoursOut:
+    """Cboe's extended-hours options list (stocks and ETFs), read from Cboe's reference file and refreshed every 12 h."""
+    return ExtendedHoursOut(**cboe.extended_hours())
 
 
 @router.post("", response_model=WatchlistGroupOut, status_code=201)

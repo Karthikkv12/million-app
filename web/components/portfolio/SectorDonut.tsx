@@ -1,8 +1,15 @@
 "use client";
 /**
- * Sector weights, measured against SPY.
+ * Sector weights, measured against SPY — stocks AND options, as delta dollars.
  *
- * - A 360° donut of the stock book by sector, with a list beside it: your % next to SPY's %
+ * Every position counts by how much it moves with its stock: shares at market value, each option at
+ * contracts × 100 × delta × price (a short call takes exposure away, a short put adds it, a long put subtracts).
+ * Each contract's delta comes from the live hedge books (Black-Scholes on live IV), matched by strike / expiry /
+ * type, and is applied to the contracts shown here, so an account filter still works. Options without a live
+ * delta yet are left out and counted in a note. A sector whose stock and options net to zero or below is left
+ * off the donut and named in a note.
+ *
+ * - A 360° donut of the book by sector, with a list beside it: your % next to SPY's %
  *   and the gap in points.
  * - "Missing vs SPY": sectors SPY holds that you have none of, or are well under.
  * - "Beta vs SPY": the dollar-weighted beta of the stock book on a 0–2 meter with SPY at
@@ -19,7 +26,7 @@ import { clsx } from "clsx";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ChartTooltip, useChartStyle } from "@/components/chart/kit";
 import { Panel } from "@/components/ui";
-import { fetchWatchlistQuotes, WatchlistQuote, BrokerHolding } from "@/lib/api";
+import { fetchWatchlistQuotes, WatchlistQuote, BrokerHolding, BrokerOption } from "@/lib/api";
 import { okBooks, useLiveBooks } from "@/lib/live";
 import { useTheme } from "@/lib/theme";
 import { usd } from "./broker";
@@ -79,11 +86,14 @@ export function useSectors(symbols: string[]) {
 
 const pts = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x * 100).toFixed(1)}`;
 
-export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
+const legKey = (sym: string, type: string | null | undefined, strike: number | null | undefined, expiry: string | null | undefined) =>
+  `${sym.toUpperCase()}|${(type ?? "").toLowerCase().startsWith("p") ? "put" : "call"}|${Number(strike ?? 0).toFixed(3)}|${(expiry ?? "").slice(0, 10)}`;
+
+export function SectorDonut({ holdings, options = [] }: { holdings: BrokerHolding[]; options?: BrokerOption[] }) {
   const s = useChartStyle();
   const dark = useTheme().theme === "dark";
   const [hover, setHover] = useState<string | null>(null);
-  const symbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
+  const symbols = useMemo(() => [...new Set([...holdings.map((h) => h.symbol), ...options.map((o) => o.symbol)])], [holdings, options]);
   const { data: quotes, isLoading } = useSectors(symbols);
   const live = useLiveBooks().data;
   const books = useMemo(() => okBooks(live), [live]);
@@ -99,20 +109,43 @@ export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
       if (beta != null && Number.isFinite(beta)) { a.betaV += beta * v; a.betaW += v; }
       agg.set(sector, a);
     };
-    let total = 0, betaV = 0, betaW = 0;
-    for (const h of holdings) {
-      const v = h.market_value ?? 0;
-      if (v <= 0) continue;
-      total += v;
-      if (SP500_FUNDS.has(h.symbol)) {
-        for (const [sec, w] of Object.entries(SPY)) put(sec, v * w, SECTOR_BETA[sec], h.symbol);
+    let betaV = 0, betaW = 0;
+    // One position's delta dollars (signed) into its sector; S&P 500 funds spread over SPY's mix.
+    const add = (sym: string, v: number) => {
+      if (!v || !Number.isFinite(v)) return;
+      if (SP500_FUNDS.has(sym)) {
+        for (const [sec, w] of Object.entries(SPY)) put(sec, v * w, SECTOR_BETA[sec], sym);
         betaV += v; betaW += v;          // an S&P 500 fund is beta 1.00 by definition
-        continue;
+        return;
       }
-      const beta = liveBeta.get(h.symbol) ?? q.get(h.symbol)?.beta ?? null;
-      put(norm(q.get(h.symbol)?.sector), v, beta, h.symbol);
+      const beta = liveBeta.get(sym) ?? q.get(sym)?.beta ?? null;
+      put(norm(q.get(sym)?.sector), v, beta, sym);
       if (beta != null && Number.isFinite(beta)) { betaV += beta * v; betaW += v; }
+    };
+    for (const h of holdings) if ((h.market_value ?? 0) > 0) add(h.symbol, h.market_value ?? 0);
+
+    // Per-contract delta (per share) and price from the live books.
+    const legDelta = new Map<string, number>();
+    const spot = new Map<string, number>();
+    for (const b of books) {
+      if (b.spot != null) spot.set(b.symbol.toUpperCase(), b.spot);
+      for (const l of b.legs) if (l.kind === "option") legDelta.set(legKey(b.symbol, l.otype, l.strike, l.expiry), l.delta);
     }
+    let missed = 0, optDollars = 0;
+    for (const o of options) {
+      if (!o.contracts) continue;
+      const d = legDelta.get(legKey(o.symbol, o.option_type, o.strike, o.expiry));
+      const px = spot.get(o.symbol.toUpperCase()) ?? o.spot;
+      if (d == null || px == null) { missed += 1; continue; }
+      const v = o.contracts * 100 * d * px;
+      optDollars += v;
+      add(o.symbol, v);
+    }
+
+    // Sectors that net to zero or short leave the donut (named in a note); weights are of the long total.
+    const short = [...agg.entries()].filter(([, a]) => a.value <= 0).map(([sector, a]) => ({ sector, value: a.value }));
+    for (const x of short) agg.delete(x.sector);
+    const total = [...agg.values()].reduce((t, a) => t + a.value, 0);
     const T = total || 1;
     const sorted = [...agg.entries()].sort((a, b) => b[1].value - a[1].value);
     const head = sorted.length > MAX_SLICES ? sorted.slice(0, MAX_SLICES - 1) : sorted;
@@ -138,11 +171,12 @@ export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
       .map((sec) => ({ sector: sec, mine: mine(sec), spy: SPY[sec], gap: mine(sec) - SPY[sec], beta: SECTOR_BETA[sec] }))
       .filter((g) => g.gap <= -GAP || (g.mine === 0 && g.spy > 0))
       .sort((a, b) => a.gap - b.gap);
-    const beta = betaW ? betaV / betaW : null;
-    return { slices, rows, total, gaps, beta, coverage: total ? betaW / total : 0, funds: (agg.get(FUNDS)?.value ?? 0) / T };
-  }, [holdings, quotes, books, dark, s.c.muted]);
+    const beta = betaW > 0 ? betaV / betaW : null;
+    return { slices, rows, total, gaps, beta, coverage: total ? Math.min(1, betaW / total) : 0, funds: (agg.get(FUNDS)?.value ?? 0) / T,
+      short, missed, optDollars, nOpts: options.filter((o) => o.contracts).length };
+  }, [holdings, options, quotes, books, dark, s.c.muted]);
 
-  const { slices, rows, total, gaps, beta, coverage, funds } = model;
+  const { slices, rows, total, gaps, beta, coverage, funds, short, missed, optDollars, nOpts } = model;
   const focus = slices.find((x) => x.sector === hover) ?? null;
   const missing = gaps.filter((g) => g.mine === 0);
   const under = gaps.filter((g) => g.mine > 0);
@@ -159,11 +193,11 @@ export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
     .slice(0, 4);
 
   return (
-    <Panel title="Sector weights" sub={rows.length ? `${rows.filter((r) => r.sector !== FUNDS).length} sectors · stocks only · vs SPY (${SPY_ASOF})` : undefined}>
+    <Panel title="Sector weights" sub={rows.length ? `${rows.filter((r) => r.sector !== FUNDS).length} sectors · stocks + options, delta $ · vs SPY (${SPY_ASOF})` : undefined}>
       {isLoading ? (
         <p className="py-10 text-center text-[13px] text-foreground/55">Loading sectors…</p>
       ) : !slices.length ? (
-        <p className="py-10 text-center text-[13px] text-foreground/55">No stock positions to break down.</p>
+        <p className="py-10 text-center text-[13px] text-foreground/55">No stock or option exposure to break down.</p>
       ) : (
         <div className="space-y-5">
           <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
@@ -184,13 +218,13 @@ export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
                       { label: x.sector, value: `${(x.weight * 100).toFixed(1)}%`, color: x.color },
                       { label: "SPY", value: x.spy ? `${(x.spy * 100).toFixed(1)}%` : "—" },
                       { label: "Beta", value: x.beta != null ? x.beta.toFixed(2) : "—" },
-                      { label: "Value", value: usd(x.value, 0) },
+                      { label: "Delta $", value: usd(x.value, 0) },
                     ];
                   }} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-foreground/50">{focus ? focus.sector : "Stocks"}</p>
+                <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-foreground/50">{focus ? focus.sector : "Delta $"}</p>
                 <p className="sensitive font-mono text-[17px] font-medium tabular-nums text-foreground">
                   {focus ? `${(focus.weight * 100).toFixed(1)}%` : usd(total, 0)}
                 </p>
@@ -231,6 +265,15 @@ export function SectorDonut({ holdings }: { holdings: BrokerHolding[] }) {
               <p className="mt-2 flex items-center gap-1.5 px-1.5 font-mono text-[11px] text-foreground/45">
                 <span className="inline-block h-2 w-0.5 rounded-full bg-foreground/55" /> SPY weight · gap in points
               </p>
+              {/* What the options did to the picture, and anything left out. */}
+              <div className="mt-2 space-y-1 px-1.5 text-[11.5px] leading-snug text-foreground/50">
+                {nOpts > 0 && (
+                  <p>Options {optDollars >= 0 ? "add" : "take away"} <span className="sensitive font-mono text-foreground/70">{usd(Math.abs(optDollars), 0)}</span> of delta (stock-equivalent exposure){missed > 0 ? `; ${missed} of ${nOpts} without a live delta yet are not counted` : ""}.</p>
+                )}
+                {short.length > 0 && (
+                  <p>Net short, not on the donut: {short.map((x, i) => <span key={x.sector}>{i ? ", " : ""}<span className="text-foreground/70">{x.sector}</span> <span className="sensitive font-mono">{usd(x.value, 0)}</span></span>)}.</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -290,7 +333,7 @@ function BetaCard({ beta, coverage, dir, helpers }: {
     <div className="rounded-xl border border-[var(--border)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/50">Beta vs SPY</p>
-        <p className="font-mono text-[11px] text-foreground/45">{coverage > 0 && coverage < 0.995 ? `${(coverage * 100).toFixed(0)}% of $ has a beta` : "stocks, $-weighted"}</p>
+        <p className="font-mono text-[11px] text-foreground/45">{coverage > 0 && coverage < 0.995 ? `${(coverage * 100).toFixed(0)}% of $ has a beta` : "delta $-weighted"}</p>
       </div>
       <p className="mt-1 font-mono text-[22px] font-medium tabular-nums text-foreground">
         {beta != null ? beta.toFixed(2) : "—"}

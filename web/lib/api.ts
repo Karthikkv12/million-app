@@ -950,6 +950,9 @@ export type OptionMetrics = Schemas["OptionMetricsOut"];
 export const fetchOptionMetrics = (symbols: string[]) =>
   api.get<OptionMetrics[]>(`/watchlists/option-metrics?symbols=${symbols.map((s) => encodeURIComponent(s)).join(",")}`);
 export const deleteWatchlistGroup = (id: number) => api.del<void>(wl(id));
+/** Cboe's extended-hours options list (pre-market 7:30–9:25, post-market 4:00–4:15 ET), read from Cboe and refreshed every 12 h. */
+export type ExtendedHours = Schemas["ExtendedHoursOut"];
+export const fetchExtendedHours = () => api.get<ExtendedHours>("/watchlists/extended-hours");
 export const addToWatchlistGroup = (id: number, symbol: string) => api.put<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
 export const removeFromWatchlistGroup = (id: number, symbol: string) => api.del<WatchlistGroup>(`${wl(id)}/symbols/${sym(symbol)}`);
 export const restoreSectorWatchlists = () => api.post<WatchlistGroups>("/watchlists/restore-sectors");

@@ -4005,6 +4005,35 @@
     "title": "ExpectedMoveOut",
     "type": "object"
    },
+   "ExtendedHoursOut": {
+    "properties": {
+     "as_of": {
+      "description": "When the list was read from Cboe (or the launch date for the built-in list)",
+      "title": "As Of",
+      "type": "string"
+     },
+     "live": {
+      "description": "True = read from Cboe's reference file; False = the built-in launch list",
+      "title": "Live",
+      "type": "boolean"
+     },
+     "symbols": {
+      "description": "Stocks and ETFs whose options trade 7:30\u20139:25 a.m. and 4:00\u20134:15 p.m. ET on Cboe",
+      "items": {
+       "type": "string"
+      },
+      "title": "Symbols",
+      "type": "array"
+     }
+    },
+    "required": [
+     "symbols",
+     "as_of",
+     "live"
+    ],
+    "title": "ExtendedHoursOut",
+    "type": "object"
+   },
    "FactorHolding": {
     "properties": {
      "betas": {
@@ -20341,6 +20370,33 @@
      }
     ],
     "summary": "Create List",
+    "tags": [
+     "watchlists"
+    ]
+   }
+  },
+  "/api/v1/watchlists/extended-hours": {
+   "get": {
+    "description": "Cboe's extended-hours options list (stocks and ETFs), read from Cboe's reference file and refreshed every 12 h.",
+    "operationId": "extended_hours_api_v1_watchlists_extended_hours_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExtendedHoursOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Extended Hours",
     "tags": [
      "watchlists"
     ]

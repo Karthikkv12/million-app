@@ -10,19 +10,22 @@
  * so stepping feels instant. Lists come from /watchlists (the same lists as Portfolio → Watchlist), plus
  * "My stocks": every name you have a Robinhood position in, shares or options (bought or sold), largest exposure
  * first; it follows each Robinhood sync.
- * "My stocks" is the default until you pick another list.
+ * "My stocks" is the default until you pick another list. "Cboe extended hours" is Cboe's list of stocks and ETFs whose
+ * options trade 7:30–9:25 a.m. and 4:00–4:15 p.m. ET; the backend reads it from Cboe's reference file, so it follows
+ * Cboe's twice-yearly changes on its own.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Check, ChevronLeft, ChevronRight, ChevronsUpDown, Layers, Zap, Activity } from "lucide-react";
-import { BrokerPortfolio, fetchBrokerPortfolio, fetchGex, fetchWatchlistGroups, GexResult, WatchlistGroups } from "@/lib/api";
+import { BrokerPortfolio, ExtendedHours, fetchBrokerPortfolio, fetchExtendedHours, fetchGex, fetchWatchlistGroups, GexResult, WatchlistGroups } from "@/lib/api";
 import { useQuotes } from "@/components/dashboard/quotes";
 import type { Metric } from "./GexHeatmap";
 
 const LIST_KEY = "flow_dock_list";
 const ALL = -1;
 const HELD = -2;                                  // "My stocks": Robinhood holdings
+const EXT = -3;                                   // Cboe extended-hours options list
 
 const money = (v: number) => {
   const a = Math.abs(v), s = v < 0 ? "−" : "";
@@ -85,18 +88,21 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
     return [...exp.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
   }, [pfQ.data]);
 
+  const extQ = useQuery<ExtendedHours>({ queryKey: ["cboe-extended-hours"], queryFn: fetchExtendedHours, staleTime: 6 * 3600_000 });
+  const ext = useMemo(() => extQ.data?.symbols ?? [], [extQ.data]);
+
   const [listId, setListId] = useState<number>(HELD);
   useEffect(() => { try { const v = Number(localStorage.getItem(LIST_KEY)); if (v) setListId(v); } catch { /* storage off */ } }, []);
   const pickList = (id: number) => { setListId(id); try { localStorage.setItem(LIST_KEY, String(id)); } catch { /* storage off */ } };
 
   // A deleted list falls back to My stocks.
   const current = lists.find((g) => g.id === listId) ?? null;
-  const mode = listId === ALL ? "all" : current ? "list" : "held";
+  const mode = listId === ALL ? "all" : listId === EXT ? "ext" : current ? "list" : "held";
   const symbols = useMemo(() => {
-    const raw = mode === "held" ? held : mode === "all" ? lists.flatMap((g) => g.symbols) : current!.symbols;
+    const raw = mode === "held" ? held : mode === "ext" ? ext : mode === "all" ? lists.flatMap((g) => g.symbols) : current!.symbols;
     return [...new Set(raw.map((s) => s.toUpperCase()))];
-  }, [mode, held, lists, current]);
-  const listName = mode === "held" ? "My stocks" : mode === "all" ? "All lists" : current!.name;
+  }, [mode, held, ext, lists, current]);
+  const listName = mode === "held" ? "My stocks" : mode === "ext" ? "Cboe extended hours" : mode === "all" ? "All lists" : current!.name;
 
   const idx = symbols.indexOf(ticker.toUpperCase());
   const step = (d: 1 | -1) => {
@@ -153,9 +159,10 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
             </button>
             {listsOpen && (
               <div role="listbox" aria-label="Watchlists" className={clsx(POP, "left-0 w-60")}>
-                {[{ id: HELD, name: "My stocks", n: held.length }, { id: ALL, name: "All lists", n: new Set(lists.flatMap((g) => g.symbols)).size },
+                {[{ id: HELD, name: "My stocks", n: held.length }, { id: EXT, name: "Cboe extended hours", n: ext.length },
+                  { id: ALL, name: "All lists", n: new Set(lists.flatMap((g) => g.symbols)).size },
                   ...lists.map((g) => ({ id: g.id, name: g.name, n: g.symbols.length }))].map((g) => {
-                  const on = g.id === HELD ? mode === "held" : g.id === ALL ? mode === "all" : current?.id === g.id;
+                  const on = g.id === HELD ? mode === "held" : g.id === EXT ? mode === "ext" : g.id === ALL ? mode === "all" : current?.id === g.id;
                   return (
                     <button key={g.id} role="option" aria-selected={on} onClick={() => { pickList(g.id); setListsOpen(false); }} className={ROW}>
                       <span className="flex min-w-0 items-center gap-2"><Check size={13} className={on ? "text-accent" : "invisible"} /><span className="truncate">{g.name}</span></span>
@@ -195,13 +202,19 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
             {namesOpen && (
               <div role="listbox" aria-label={listName} className={clsx(POP, "left-0 right-0 min-w-[200px]")}>
                 <p className="px-2.5 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">{listName} · {symbols.length}</p>
+                {mode === "ext" && (
+                  <p className="px-2.5 pb-1.5 text-[11.5px] leading-snug text-foreground/50">
+                    Options trade 7:30–9:25 a.m. and 4:00–4:15 p.m. ET.{extQ.data?.live ? " From Cboe, updated automatically." : " Cboe launch list (couldn't reach Cboe)."}
+                  </p>
+                )}
                 {symbols.map((s) => (
                   <button key={s} role="option" aria-selected={s === ticker.toUpperCase()} onClick={() => { onTicker(s); setNamesOpen(false); }}
                     className={clsx(ROW, "font-mono", s === ticker.toUpperCase() && "bg-foreground/[0.06] text-foreground")}>
                     {s}{s === ticker.toUpperCase() && <Check size={13} className="text-accent" />}
                   </button>
                 ))}
-                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{mode === "held" ? (pfQ.isLoading ? "Loading your stocks…" : "No positions synced from Robinhood yet.") : "This list is empty."}</p>}
+                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{mode === "held" ? (pfQ.isLoading ? "Loading your stocks…" : "No positions synced from Robinhood yet.")
+                  : mode === "ext" ? (extQ.isLoading ? "Loading Cboe's list…" : "Couldn't load Cboe's list.") : "This list is empty."}</p>}
               </div>
             )}
           </div>

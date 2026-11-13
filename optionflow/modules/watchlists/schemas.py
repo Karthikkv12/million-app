@@ -26,6 +26,12 @@ class WatchlistGroupsOut(BaseModel):
     max_symbols: int
 
 
+class ExtendedHoursOut(BaseModel):
+    symbols: List[str] = Field(..., description="Stocks and ETFs whose options trade 7:30–9:25 a.m. and 4:00–4:15 p.m. ET on Cboe")
+    as_of: str = Field(..., description="When the list was read from Cboe (or the launch date for the built-in list)")
+    live: bool = Field(..., description="True = read from Cboe's reference file; False = the built-in launch list")
+
+
 class WatchlistCreateIn(BaseModel):
     name: str = NAME
     symbols: List[str] = Field(default_factory=list, max_length=100)
