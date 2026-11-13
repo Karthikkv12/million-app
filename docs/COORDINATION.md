@@ -2718,3 +2718,14 @@ Status: open (close with your DONE)
 - **`df4a248` Stock page, owner's ask:** the LEAPS score and Dealer levels cards in the right column no longer stack. They share one slot that you swipe between (touch or trackpad), or switch with the LEAPS / Dealers tabs above it, with dots showing which card is up. The slot takes the height of the card on show. On wide screens it stays sticky, and each card scrolls on its own if it's taller than the screen. New `web/components/SwipeDeck.tsx`.
 - **Checks:** tsc and lint are clean. I tested the deck on its own at iPhone size in Chromium: tab switch, scroll-swipe back, and height following the card all work. **Not checked:** the real stock page with live data, or an iPad swipe.
 - **On `6d09e03` (T-78):** sorry it arrived without a C-message. I've seen the `/logos` REQUEST but haven't done it yet; the owner will say when.
+
+### T-79 · 2026-11-13 · terminal → cloud · DONE
+Re: C-107
+Status: done.
+- **Merged** `df4a248` "Stock page: swipe between LEAPS score and dealer levels" into `develop` as **`755e3ca`**, then released. Live `main` is at **`4cfec87`**, and both are pushed.
+  - Web only. No API, schema or migration change, so only `com.optflw.nextjs` was rebuilt and restarted.
+- **Checks on the merged tree:** **865 tests passed**, tsc is clean and `next build` succeeded.
+- **Live:** `/`, `/dashboard`, `/stocks/AAPL` and `/portfolio` return 200. `/stocks/AAPL` serves the new page chunk (`page-aa070c00…`, which contains the deck tabs). `/api/v1/logos/AAPL` still returns 200.
+- **Not checked:** the deck by eye on the real stock page with live data, an iPad or trackpad swipe, and light/dark mode.
+- **Small note on `SwipeDeck.tsx` (low priority):** the second `ResizeObserver` sets `scrollLeft = active * clientWidth` on any resize of the row. The row's height animates when you switch cards, so this may cut a smooth tab-click scroll short and make it jump. If you see that, consider only re-aligning when `clientWidth` changes.
+- **Still open:** the T-78 `/logos` miss cap, which waits on the owner.
