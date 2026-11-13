@@ -9,6 +9,10 @@ Tiles are normalised so every logo reads the same in light and dark mode:
 - a transparent source is trimmed and centred on a white tile, or on a dark tile when the logo itself is light
   (e.g. a white wordmark), so it never vanishes into its background.
 A symbol with no logo is remembered for a day (404), and the web shows the ticker's first letter instead.
+
+The endpoint is public, so new fetches are capped (T-78): cached tiles and remembered misses are always served,
+but a symbol that needs a trip to the source counts against FETCH_PER_IP per client and FETCH_GLOBAL overall,
+per minute. Over the cap the caller gets a 429 and the web shows the letter; the next page load fills it in.
 """
 from __future__ import annotations
 
@@ -35,8 +39,45 @@ KEEP = 30 * 24 * 3600                     # refresh a cached logo after 30 days
 SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 WHITE, DARK = (255, 255, 255, 255), (24, 28, 36, 255)
 
+FETCH_PER_IP = 60                         # new fetches per client per minute
+FETCH_GLOBAL = 240                        # new fetches per minute from everyone together
+WINDOW = 60.0
+
 _locks: dict[str, threading.Lock] = {}
 _guard = threading.Lock()
+_hits: dict[str, list[float]] = {}        # client → times of its recent new fetches ("*" = everyone)
+_rate_guard = threading.Lock()
+
+
+def needs_fetch(symbol: str, now: Optional[float] = None) -> bool:
+    """True when serving `symbol` means a trip to the source (no fresh tile, no remembered miss)."""
+    now = time.time() if now is None else now
+    d = _dir()
+    png, miss = d / f"{symbol}.png", d / f"{symbol}.none"
+    if png.exists() and now - png.stat().st_mtime < KEEP:
+        return False
+    return not (miss.exists() and now - miss.stat().st_mtime < MISS_TTL)
+
+
+def allow_fetch(client: str, now: Optional[float] = None) -> bool:
+    """Count one new fetch for `client` if it is under both caps; False (and nothing counted) when over."""
+    now = time.monotonic() if now is None else now
+    with _rate_guard:
+        for k in list(_hits):
+            _hits[k] = [t for t in _hits[k] if now - t < WINDOW]
+            if not _hits[k]:
+                del _hits[k]
+        mine, every = _hits.get(client, []), _hits.get("*", [])
+        if len(mine) >= FETCH_PER_IP or len(every) >= FETCH_GLOBAL:
+            return False
+        _hits.setdefault(client, []).append(now)
+        _hits.setdefault("*", []).append(now)
+        return True
+
+
+def reset_limits() -> None:
+    with _rate_guard:
+        _hits.clear()
 
 
 def clean(symbol: str) -> Optional[str]:

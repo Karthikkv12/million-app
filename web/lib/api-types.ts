@@ -908,7 +908,8 @@ export interface paths {
         /**
          * Logo
          * @description A 64×64 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,
-         *     and logos are public. Cached on disk server-side; browsers may keep it for a week.
+         *     and logos are public. Cached on disk server-side; browsers may keep it for a week. Symbols not cached yet are
+         *     fetched at most logos.FETCH_PER_IP per client and logos.FETCH_GLOBAL overall per minute (429 above that).
          */
         get: operations["logo_api_v1_logos__symbol__get"];
         put?: never;

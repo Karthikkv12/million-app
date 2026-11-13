@@ -17075,7 +17075,7 @@
   },
   "/api/v1/logos/{symbol}": {
    "get": {
-    "description": "A 64\u00d764 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,\nand logos are public. Cached on disk server-side; browsers may keep it for a week.",
+    "description": "A 64\u00d764 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,\nand logos are public. Cached on disk server-side; browsers may keep it for a week. Symbols not cached yet are\nfetched at most logos.FETCH_PER_IP per client and logos.FETCH_GLOBAL overall per minute (429 above that).",
     "operationId": "logo_api_v1_logos__symbol__get",
     "parameters": [
      {
