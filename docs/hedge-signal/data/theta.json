@@ -1,0 +1,52 @@
+{
+"rows": [
+{
+"days_left": 60,
+"lost_per_20d": 10.26
+},
+{
+"days_left": 90,
+"lost_per_20d": 7.16
+},
+{
+"days_left": 120,
+"lost_per_20d": 5.58
+},
+{
+"days_left": 150,
+"lost_per_20d": 4.61
+},
+{
+"days_left": 180,
+"lost_per_20d": 3.96
+},
+{
+"days_left": 240,
+"lost_per_20d": 3.13
+},
+{
+"days_left": 365,
+"lost_per_20d": 2.24
+},
+{
+"days_left": 540,
+"lost_per_20d": 1.65
+},
+{
+"days_left": 730,
+"lost_per_20d": 1.31
+}
+],
+"meta": [
+{
+"label": "summary_data.py",
+"value": "\"\"\"Builds the data-summary tables from the backtest data (F.pkl: stock features + outcomes, O.pkl: simulated calls).\nEvery number is recomputed here; each output is {rows, meta} JSON whose meta carries this script.\"\"\"\nimport json, math, pandas as pd, numpy as np\nCODE = open(__file__).read()\nF = pd.read_pickle(\"F.pkl\"); O = pd.read_pickle(\"O.pkl\")\nETF = set(\"SPY QQQ IWM DIA XLK XLF XLE XLV XLY XLP XLI SMH ARKK GLD SLV TLT KRE\".split())\nF[\"per\"] = np.where(F.date < \"2015\", \"1995–2014\", \"2015–2026\"); O[\"per\"] = np.where(O.date < \"2015\", \"1995–2014\", \"2015–2026\")\nfor h in (\"fwd20\", \"fwd60\"): F[h + \"x\"] = F[h] - F.groupby([\"sym\", \"per\"])[h].transform(\"mean\")\nlow = F.groupby(\"sym\").dd52.min(); CR = set(low[low <= -.7].index) - ETF\nF[\"grp\"] = np.where(F.sym.isin(ETF), \"ETFs\", np.where(F.sym.isin(CR), \"Crashed stocks\", \"Other stocks\"))\nadd = (F.rsi14 < 40) & (F.vix_pct >= .8); calm = F.vix_pct < .6\ncaution = calm & ((F.dd52 <= -.10) | (F.d_ma50.between(.03, .15) & (F.rsi14 > 65)))\nF[\"rb\"] = 100 * (np.clip(F.vix_pct * 2 - 1, -1, 1) + np.clip((50 - F.rsi14) / 25, -1, 1) + np.clip(-F.d_ma50 / .15, -1, 1)) / 3\nlean = (F.rb.round() >= 50) & (F.rsi14 < 40) & (F.vix_pct < .8)\nG = F.dropna(subset=[\"fwd20\"])\nr2 = lambda x: None if x is None or (isinstance(x, float) and math.isnan(x)) else round(float(x), 2)\ndef write(name, rows, inputs):\n    json.dump({\"rows\": rows, \"meta\": [{\"label\": \"summary_data.py\", \"value\": CODE, \"type\": \"code\", \"lang\": \"python\"},\n                                      {\"label\": \"Input\", \"value\": inputs}]}, open(f\"summary/{name}.json\", \"w\"), ensure_ascii=False, indent=0)\n    print(name, len(rows))\n# 1 scope\nspy = G[G.sym == \"SPY\"].set_index(\"date\").vix_pct >= .8\nep = (spy & ~spy.shift(1, fill_value=False)).cumsum()[spy]\nwrite(\"scope\", [\n    {\"metric\": \"Symbol-days tested\", \"value\": int(len(F))},\n    {\"metric\": \"Symbol-days with a 20-day outcome\", \"value\": int(len(G))},\n    {\"metric\": \"Symbols\", \"value\": int(F.sym.nunique())},\n    {\"metric\": \"Stocks\", \"value\": int(F.sym.nunique() - len(ETF))},\n    {\"metric\": \"ETFs\", \"value\": len(ETF)},\n    {\"metric\": \"Stocks that crashed 70%+\", \"value\": len(CR)},\n    {\"metric\": \"Years of daily data\", \"value\": round((F.date.max() - F.date.min()).days / 365.25, 1)},\n    {\"metric\": \"Rule-setting days (1995–2014)\", \"value\": int((G.per == \"1995–2014\").sum())},\n    {\"metric\": \"Unseen test days (2015–2026)\", \"value\": int((G.per == \"2015–2026\").sum())},\n    {\"metric\": \"Separate market-fear episodes\", \"value\": int(ep.nunique())},\n    {\"metric\": \"Option-simulated symbol-days\", \"value\": int(len(O))},\n    {\"metric\": \"Option setups simulated\", \"value\": int(sum(c.startswith(\"o_\") for c in O.columns))},\n], \"F.pkl (148 symbols' daily prices from Yahoo, 1995-01 → 2026-11, with features and forward returns); O.pkl (simulated calls)\")\n# 2 old signal\nF[\"old\"] = np.select([F.p_score >= 25, F.p_score <= -25], [\"Add\", \"Trim\"], \"Hold\")\nrows = []\nfor (per, v), g in F[F.per == \"2015–2026\"].groupby([\"per\", \"old\"]):\n    rows.append({\"verdict\": v, \"next20\": r2(g.fwd20.mean() * 100), \"next60\": r2(g.fwd60.mean() * 100), \"worst_dip20\": r2(g.mdd20.mean() * 100), \"cases\": int(len(g))})\nwrite(\"old_signal\", sorted(rows, key=lambda r: [\"Add\", \"Hold\", \"Trim\"].index(r[\"verdict\"])), \"F.pkl, 2015–2026; the pre-backtest score (trend 20, volume 15, momentum 10)\")\n# 3 setups\nrows = []\nfor name, m in ((\"Add: oversold during market fear\", add), (\"Hold: oversold, VIX under 80th pct\", lean & ~add),\n                (\"Don't add: calm-market weakness\", caution & ~add), (\"Hold: every other day\", ~add & ~caution & ~lean)):\n    for per in (\"1995–2014\", \"2015–2026\"):\n        g = G[m & (G.per == per)]\n        rows.append({\"setup\": name, \"period\": per, \"excess20\": r2(g.fwd20x.mean() * 100), \"excess60\": r2(g.fwd60x.mean() * 100),\n                     \"up20\": r2((g.fwd20 > 0).mean() * 100), \"cases\": int(len(g))})\nwrite(\"setups\", rows, \"F.pkl; excess = the stock's return minus its own average over the same period\")\n# 4 add by year\ny = G[add].groupby(G.date.dt.year).agg(cases=(\"fwd20\", \"size\"), excess20=(\"fwd20x\", \"mean\"), excess60=(\"fwd60x\", \"mean\"), up20=(\"fwd20\", lambda x: (x > 0).mean()))\nwrite(\"add_years\", [{\"year\": int(i), \"cases\": int(r.cases), \"excess20\": r2(r.excess20 * 100), \"excess60\": r2(r.excess60 * 100), \"up20\": r2(r.up20 * 100)} for i, r in y.iterrows()], \"F.pkl, Add days (RSI14 < 40, VIX ≥ 80th percentile)\")\n# 5 robustness\nGa = G[add]; ea = Ga.assign(ep=Ga.date.map(ep)).dropna(subset=[\"ep\"]).groupby(\"ep\").fwd20x.mean()\nF[\"fwd20_openx\"] = F.fwd20_open - F.groupby([\"sym\", \"per\"]).fwd20.transform(\"mean\")\nrows = [{\"check\": \"Bought at the next open (2015–2026)\", \"value\": r2(F[add & (F.per == \"2015–2026\")].fwd20_openx.mean() * 100), \"unit\": \"% vs holding, 20 days\"}]\nfor grp in (\"ETFs\", \"Crashed stocks\", \"Other stocks\"):\n    rows.append({\"check\": f\"{grp}\", \"value\": r2(Ga[Ga.grp == grp].fwd20x.mean() * 100), \"unit\": \"% vs holding, 20 days\"})\nrows += [{\"check\": \"Fear episodes where Add beat holding\", \"value\": int((ea > 0).sum()), \"unit\": f\"of {len(ea)}\"},\n         {\"check\": \"Years Add beat holding\", \"value\": int((y.excess20 > 0).sum()), \"unit\": f\"of {len(y)}\"}]\nfor lab, a, b in ((\"2008 bear market\", \"2008-01-01\", \"2008-12-31\"), (\"2022 bear market\", \"2022-01-01\", \"2022-12-31\")):\n    g = Ga[Ga.date.between(a, b)]; rows.append({\"check\": lab, \"value\": r2(g.fwd60x.mean() * 100), \"unit\": \"% vs holding, 60 days\"})\nwrite(\"robustness\", rows, \"F.pkl, Add days\")\n# 6 options\nrows = []\nivr = O.iv30 / O.theta; oadd = (O.rsi14 < 40) & (O.vix_pct >= .8)\nfor name, m in ((\"Add: fear dip, stock IV ≥ 1.2× normal\", oadd & (ivr >= 1.2)), (\"Fear dip, stock IV normal\", oadd & (ivr < 1.2)), (\"Every day\", O.rsi14.notna())):\n    for h in (20, 60):\n        col = f\"o_365_0.8_stress_{h}\"; x = O[col] - O.groupby([\"sym\", \"per\"])[col].transform(\"mean\")\n        mm = m & (O.per == \"2015–2026\") & O[col].notna()\n        rows.append({\"setup\": name, \"hold_days\": h, \"excess\": r2(x[mm].mean() * 100), \"absolute\": r2(O.loc[mm, col].mean() * 100),\n                     \"made_money\": r2((O.loc[mm, col] > 0).mean() * 100), \"cases\": int(mm.sum())})\nwrite(\"options\", rows, \"O.pkl: 365-day 0.80Δ calls, Black-Scholes with the IV model, stress costs (+5 vol pts entry, 2% each way), 2015–2026\")\n# 7 theta curve (analytic)\ndef N(x): return 0.5 * (1 + math.erf(x / math.sqrt(2)))\ndef c(S, K, T, r, v):\n    d1 = (math.log(S / K) + (r + v * v / 2) * T) / (v * math.sqrt(T)); return S * N(d1) - K * math.exp(-r * T) * N(d1 - v * math.sqrt(T))\nrows = []\nfor D in (60, 90, 120, 150, 180, 240, 365, 540, 730):\n    T = D / 365; v = .35; K = 100 * math.exp(-(0.841621 * v * math.sqrt(T)) + (.04 + v * v / 2) * T)\n    rows.append({\"days_left\": D, \"lost_per_20d\": r2((1 - c(100, K, max(T - 20 / 252, 1e-4), .04, v) / c(100, K, T, .04, v)) * 100)})\nwrite(\"theta\", rows, \"Black-Scholes, 0.80Δ call, IV 35%, rate 4%, price and IV unchanged (the curve barely moves with IV)\")\n",
+"type": "code",
+"lang": "python"
+},
+{
+"label": "Input",
+"value": "Black-Scholes, 0.80Δ call, IV 35%, rate 4%, price and IV unchanged (the curve barely moves with IV)"
+}
+]
+}

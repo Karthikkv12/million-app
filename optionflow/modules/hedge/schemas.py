@@ -190,6 +190,36 @@ class SignalLegOut(BaseModel):
     iv_source: Literal["chain", "model", "atm"] = Field("chain", description="chain: the contract's quote; model: the backtest's IV model (no quote)")
 
 
+class SignalProbOut(BaseModel):
+    """Backtest odds for this setup, 2015–2026 (unseen when the rules were set)."""
+    case: Literal["ADD", "FEAR_IV_NORMAL", "LEAN", "CAUTION", "HOLD", "TRIM"]
+    cases: int
+    months: int
+    p_up_20: float
+    p_up_60: float = Field(..., description="Share of cases where the stock was up 60 trading days later")
+    p_beat_20: float
+    p_beat_60: float = Field(..., description="Share that beat simply holding the stock over 60 days")
+    p_option_profit_60: Optional[float] = Field(None, description="Share where a 365-day 0.80Δ call made money over 60 days (stress costs)")
+    edge_60: float = Field(..., description="Mean 60-day excess vs holding")
+    edge_lo: float = Field(..., description="5th percentile of the month-cluster bootstrap")
+    edge_hi: float
+    p_edge_positive: float = Field(..., description="Share of bootstrap draws with a positive mean edge")
+
+
+class SignalPnlOut(BaseModel):
+    """The holding's P&L and its tested 60-day risk. It never moves the verdict: P&L didn't predict the stock."""
+    kind: Literal["options", "shares"]
+    pct: float
+    dollars: float
+    cost: float
+    bucket: Optional[str] = None
+    p_lose_25_paid: Optional[float] = Field(None, description="Long options at this P&L: share that lost >25% of the original premium in 60 trading days (2015–2026)")
+    p_gain_25_paid: Optional[float] = None
+    p5_paid: Optional[float] = Field(None, description="Worst 1 in 20 over 60 trading days, as a share of the original premium")
+    cases: Optional[int] = None
+    note: str
+
+
 class SignalOut(BaseModel):
     """Levels and a directional read for a holding of long options only (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
@@ -211,6 +241,20 @@ class SignalOut(BaseModel):
     iv_normal: Optional[float] = Field(None, description="Its 5-year average")
     iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
     legs: List[SignalLegOut] = []
+    probability: Optional[SignalProbOut] = None
+    pnl: Optional[SignalPnlOut] = None
+
+
+class StockSignalOut(BaseModel):
+    """The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol})."""
+    symbol: str
+    held: Literal["none", "stock", "long_options"] = Field(..., description="long_options: the Hedge desk's own book signal")
+    label: Optional[str] = Field(None, description="Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held")
+    spot: Optional[float] = None
+    day_change: Optional[float] = None
+    signal: Optional[SignalOut] = None
+    reasons: List[str] = Field([], description="Why: backtest odds, evidence, levels, IV, legs and the reads")
+    error: Optional[str] = None
 
 
 class BookOut(BaseModel):

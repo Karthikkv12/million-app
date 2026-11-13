@@ -21,6 +21,7 @@ import { IvDriftCard } from "@/components/insight/IvDriftCard";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 import { TickerLogo } from "@/components/TickerLogo";
 import { SwipeDeck } from "@/components/SwipeDeck";
+import { StockSignal } from "@/components/signal/StockSignal";
 
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const bigUsd = (v?: number | null) => {
@@ -58,6 +59,7 @@ export default function StockPage() {
           {gex && !gex.error && <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[15px] text-foreground/60">{usd(gex.spot)} <SourceBadge data={gex} />{gex.stale && (
             <span className="text-[12px] text-foreground/40">{sourceName(gex)} is rate-limiting; levels from {gex.as_of ? new Date(gex.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "earlier"}</span>
           )}</p>}
+          <div className="mt-2"><StockSignal symbol={sym} /></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/options-flow?ticker=${sym}`} className="btn-ghost h-10"><Zap size={15} /> Flow board</Link>

@@ -122,3 +122,59 @@ def test_stream_sends_books_event(client):
     with c.stream("GET", f"/api/v1/hedge/stream?limit=1&access_token={tok}") as r:
         body = "".join(r.iter_text())
     assert "event: books" in body and '"symbol":"ABC"' in body and '"net_delta":2.0' in body
+
+
+def _daily(n=1600, start=100.0, drift=0.0004, seed=3):
+    import random
+    rnd = random.Random(seed)
+    idx = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=n)
+    px, p = [], start
+    for _ in range(n):
+        p *= 1 + rnd.gauss(drift, 0.015); px.append(p)
+    return pd.DataFrame({"open": px, "high": [x * 1.01 for x in px], "low": [x * 0.99 for x in px], "close": px,
+                         "volume": [1_000_000] * n}, index=idx)
+
+
+def _signal_market(fake, spot):
+    rows = [{"strike": float(k), "expiry": EXP, "otype": t, "oi": 100, "volume": 10, "iv": 0.30, "mid": 1.5,
+             "gamma": float("nan"), "T": 5.25 / 365} for k in range(80, 130, 5) for t in ("call", "put")]
+    fake.chain_fn = lambda s: OptionChain(spot, pd.DataFrame(rows, columns=CHAIN_COLUMNS))
+    fake.last_price = lambda s: spot
+    fake.quote = lambda s: {"symbol": s, "price": spot, "prev_close": spot, "change": 0.0, "change_pct": 0.0}
+    hist = _daily()
+    vix = _daily(seed=9) / 5
+    fake.price_history = lambda s, p, i: vix if s == "^VIX" else hist
+
+
+def test_signal_for_a_ticker_not_held_is_an_entry_decision(client):
+    c, fake = client
+    _signal_market(fake, 106.0)
+    r = c.get("/api/v1/hedge/signal/abc", headers=_login(c, "owner"))
+    assert r.status_code == 200
+    d = r.json()
+    assert d["symbol"] == "ABC" and d["held"] == "none" and d["error"] is None
+    assert d["label"] in {"Enter", "Wait", "Don't enter"}
+    assert not d["signal"]["headline"].startswith(("Hold", "Add", "Don't add"))
+    assert d["signal"]["probability"]["case"] in {"ADD", "FEAR_IV_NORMAL", "LEAN", "CAUTION", "HOLD"}
+    assert d["reasons"] and d["reasons"][0].startswith("Odds (2015–2026, unseen)")
+    assert c.get("/api/v1/hedge/signal/abc").status_code == 401
+    assert c.get("/api/v1/hedge/signal/a$b", headers=_login(c, "owner")).status_code == 400
+
+
+def test_signal_for_a_leaps_holding_is_the_hedge_desk_signal(client):
+    c, fake = client
+    _signal_market(fake, 106.0)
+    leaps = (date.today() + timedelta(days=400)).isoformat()
+    body = {"username": "owner", "positions": [{"account": "Trading ••8453", "symbol": "XYZ", "kind": "option", "quantity": 2,
+                                                "avg_price": 20.0, "option_type": "call", "strike": 90, "expiry": leaps}]}
+    assert c.post("/api/v1/hedge/ingest", json=body, headers={"X-Hedge-Ingest-Token": TOKEN}).status_code == 200
+    h = _login(c, "owner")
+    sig = c.get("/api/v1/hedge/signal/XYZ", headers=h).json()
+    book = next(b for b in c.get("/api/v1/hedge/books", headers=h).json()["books"] if b["symbol"] == "XYZ")
+    assert sig["held"] == "long_options" and book["strategy"] == "long_stock"
+    for k in ("verdict", "headline", "score", "probability", "legs"):           # the stock page reads the desk's own signal
+        assert sig["signal"][k] == book["signal"][k]
+    assert sig["label"] in {"Add", "Hold", "Don't add", "Roll"}
+    assert sig["reasons"] == book["suggestion"]["reasons"]
+    other = c.get("/api/v1/hedge/signal/XYZ", headers=_login(c, "other")).json()  # another user doesn't hold it
+    assert other["held"] == "none" and other["label"] in {"Enter", "Wait", "Don't enter"}

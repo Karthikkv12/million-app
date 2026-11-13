@@ -93,6 +93,47 @@ Live rules from this (conservative):
 Caveat: the 1.2× gate was chosen after seeing that the IV-normal fear dips were weak in 2015–2026 (they were fine in
 1995–2014), so it is partly hindsight. It is kept because it only removes adds; it never adds risk.
 
+## Probabilities per signal (2015–2026, unseen)
+
+From `scripts/backtest_signal/probs.py`. "Edge > 0" is the share of 4,000 month-cluster bootstrap draws in which the
+average 60-day excess over holding was positive. The desk shows these on every call.
+
+| Signal | Stock up 60d | Beats holding 60d | 365d call profits 60d | Avg edge 60d (90% range) | Edge > 0 |
+|---|---|---|---|---|---|
+| Add (shown conservatively: lower of gated / ungated) | 66% | 56% | 54% | +3.6% (+0.6 to +6.6) | 98% |
+| Add, IV-gated as backtested | 71% | 61% | 59% | +6.2% (+1.7 to +10.3) | 99% |
+| Fear dip, stock IV normal | 60% | 49% | 48% | +0.3% (−1.8 to +2.1) | 59% |
+| Oversold, VIX calm-ish | 60% | 49% | 48% | +0.1% (−2.2 to +2.6) | 55% |
+| Don't add | 58% | 46% | 46% | −1.2% (−2.5 to +0.1) | 6% |
+| Hold (everything else) | 61% | 48% | 48% | +0.3% (−0.9 to +1.4) | 67% |
+| Take profit on puts (fear dip) | 66% stock up | — | — | +3.6% | 98% |
+
+These are averages for each setup, not a forecast for one stock: a single Add still fails about 4 times in 10.
+
+## Your P&L on a holding (tested; weighed as risk, not direction)
+
+`scripts/backtest_signal/holdsim.py`: a 365-day 0.80Δ call bought every 21 trading days on every symbol and checked
+monthly — 39,294 positions, 275,058 checks — with the same IV model and costs. Findings (2015–2026, unseen):
+
+- **P&L does not predict the stock.** By P&L bucket (−50% … +200%), the stock's next-60-day excess over holding was
+  never significant (|t| < 1.2, both periods). So P&L never changes Add / Hold / Don't add.
+- **The fear-dip edge held at every P&L**, strongest for deep losers (+4.8% / 60 days) and big winners.
+- **Rolling a winner to lock gains didn't pay.** A delta-matched roll into a fresh 0.80Δ call, the difference banked,
+  lost to holding in every bucket after costs, and didn't shrink the worst case.
+- **What P&L changes is how much of what you paid is at risk:**
+
+| P&L on the calls | Lost >25% of what was paid in 60d | Gained >25% | Worst 1 in 20 | Time value left |
+|---|---|---|---|---|
+| below −50% | 12% | 21% | −32% | 90% |
+| −25% to 0 | 25% | 35% | −57% | 25% |
+| +25% to +50% | 26% | 40% | −76% | 8% |
+| +100% to +200% | 29% | 46% | −109% | 2% |
+| above +200% | 36% | 50% | −229% | 1% |
+
+The desk shows your P&L, these odds for your bucket, and a note: big winners can give back more than they cost
+(taking some off is a risk choice, not an edge); deep losers are mostly time value. Shares show P&L vs your average,
+for context only.
+
 ## Confidence
 
 | Claim | Confidence |

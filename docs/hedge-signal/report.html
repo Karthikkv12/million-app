@@ -1,0 +1,267 @@
+<title>Fear-Dip Signal Backtest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one reading column of findings, each a short claim + the numbers that back it */
+:root {
+  --bg: #fbfbf9; --surface: #ffffff; --fg: #121211; --muted: #5a5954; --faint: #8b8a84; --rule: #e4e3de;
+  --pos: #2a78d6; --neg: #d64545; --warn: #a86a00; --chip: #f0efec;
+  --display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161615; --surface: #1d1d1b; --fg: #f0efec; --muted: #b9b8af; --faint: #86857e; --rule: #2f2f2c;
+  --pos: #3987e5; --neg: #e5605a; --warn: #e0a43a; --chip: #2a2a27; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #161615; --surface: #1d1d1b; --fg: #f0efec; --muted: #b9b8af; --faint: #86857e; --rule: #2f2f2c;
+  --pos: #3987e5; --neg: #e5605a; --warn: #e0a43a; --chip: #2a2a27; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 64px }
+main { max-width: 860px; margin: 0 auto; display: grid; gap: 44px }
+h1, h2 { font-family: var(--display); letter-spacing: -0.02em; text-wrap: balance; margin: 0 }
+h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1 }
+h2 { font-size: 22px; line-height: 1.2 }
+p { margin: 0; max-width: 68ch }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--faint) }
+section { display: grid; gap: 14px; min-width: 0 }
+.lede { font-size: 17px; color: var(--muted) }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden }
+.tile { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px }
+.tile b { font: 600 22px/1.1 var(--display); font-variant-numeric: tabular-nums }
+.tile span { font-size: 12.5px; color: var(--muted) }
+.wrap { overflow-x: auto; min-width: 0 }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 180px }
+th { font: 500 11px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint) }
+.pos { color: var(--pos) } .neg { color: var(--neg) } .muted { color: var(--muted) }
+.verdict { display: inline-block; font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; background: var(--chip) }
+.verdict.add { color: var(--pos) } .verdict.cau { color: var(--warn) } .verdict.hold { color: var(--muted) }
+.callout { border-left: 3px solid var(--fg); padding: 2px 0 2px 14px; font-size: 16px }
+.callout.warn { border-color: var(--warn) }
+figure { margin: 0; display: grid; gap: 8px; min-width: 0 }
+figcaption { font-size: 12.5px; color: var(--muted) }
+svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted) }
+svg .val { fill: var(--fg); font-weight: 500 }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px }
+#tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--fg); border: 1px solid var(--rule); border-radius: 5px; padding: 6px 9px; font: 12px/1.4 var(--mono); box-shadow: 0 4px 14px rgb(0 0 0 / .12); z-index: 5 }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 68ch }
+.conf { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: baseline }
+.conf div:nth-child(even) { font: 600 13px var(--mono) }
+@media (prefers-reduced-motion: no-preference) { rect.bar { transition: opacity .15s } }
+rect.bar:hover { opacity: .75 }
+</style>
+
+<main>
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">OptionFlow · Hedge desk · backtest run 13 Nov 2026</div>
+    <h1>Buy the dip only when the whole market is scared</h1>
+    <p class="lede">I tested the Add / Hold / Trim signal for your LEAPS and long puts on 31.9 years of daily prices. The signal that was live had no edge. One pattern held up across every test, and the desk now runs on that pattern alone.</p>
+  </header>
+
+  <section aria-label="What was tested">
+    <div class="eyebrow">How much I looked at</div>
+    <div class="tiles">
+      <div class="tile"><b>827,892</b><span>symbol-days tested</span></div>
+      <div class="tile"><b>148</b><span>symbols: 131 stocks, 17 ETFs</span></div>
+      <div class="tile"><b>1995–2026</b><span>31.9 years of daily data</span></div>
+      <div class="tile"><b>241</b><span>separate market-fear episodes</span></div>
+      <div class="tile"><b>69</b><span>stocks that crashed 70%+ at some point</span></div>
+    </div>
+    <p class="muted" style="font-size:13.5px">Rules were chosen on 1995–2014 only (438,980 days), then checked untouched on 2015–2026 (385,952 days). Outcomes are the return over the next 20 and 60 trading days minus what simply holding that stock returned. Significance is clustered by month, because in a sell-off every stock dips on the same day. The live code reproduces the backtest's verdict on 3,000 of 3,000 random historical days.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Finding 1</div>
+    <h2>The old signal was worse than doing nothing</h2>
+    <p>After the old <span class="verdict">Trim</span> call, stocks went up more than after its <span class="verdict">Add</span> call. It was picking up volatility, not direction. Followed as a policy, it lowered both return and risk-adjusted return.</p>
+    <div class="wrap"><table>
+      <thead><tr><th>Old verdict, 2015–2026</th><th>Next 20 days</th><th>Next 60 days</th><th>Worst dip within 20d</th><th>Cases</th></tr></thead>
+      <tbody>
+        <tr><td>Add</td><td>+1.53%</td><td>+5.00%</td><td>−6.2%</td><td>143,131</td></tr>
+        <tr><td>Hold</td><td>+1.41%</td><td>+4.34%</td><td>−6.1%</td><td>166,042</td></tr>
+        <tr><td>Trim</td><td class="neg">+2.24%</td><td class="neg">+6.58%</td><td>−8.2%</td><td>79,739</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Finding 2 · the pattern</div>
+    <h2>Why a stock is down decides what happens next</h2>
+    <p>A dip while the whole market is afraid (VIX in the top 20% of its year) has rebounded. A dip while the market is calm is a problem with the stock, and it hasn't. Strength was never a reliable sell: trend, momentum and buying volume all pointed slightly the wrong way.</p>
+    <figure>
+      <div class="legend"><span><i style="background:var(--pos)"></i>beat holding</span><span><i style="background:var(--neg)"></i>lagged holding</span></div>
+      <div class="wrap"><svg id="setups" role="img" aria-label="60-day return versus holding, by setup, 2015 to 2026"></svg></div>
+      <figcaption>60-day return minus holding the same stock, out-of-sample 2015–2026. Table below.</figcaption>
+    </figure>
+    <div class="wrap"><table>
+      <thead><tr><th>Setup</th><th>20d vs hold<br>95–14 / 15–26</th><th>60d vs hold<br>95–14 / 15–26</th><th>Up after 20d</th><th>Cases 15–26</th></tr></thead>
+      <tbody>
+        <tr><td><span class="verdict add">Add</span> RSI(14) under 40 and VIX at or above its 80th percentile</td><td class="pos">+1.37 / +1.16%</td><td class="pos">+2.69 / +3.41%</td><td>62 / 60%</td><td>29,617</td></tr>
+        <tr><td><span class="verdict hold">Hold</span> oversold, but VIX under its 80th percentile</td><td>+0.09 / −0.01%</td><td>+2.06 / −0.91%</td><td>57 / 56%</td><td>13,059</td></tr>
+        <tr><td><span class="verdict cau">Don’t add</span> 10%+ off the high or stretched, market calm</td><td class="neg">−0.31 / −0.42%</td><td class="neg">−1.36 / −1.28%</td><td>57 / 55%</td><td>140,096</td></tr>
+        <tr><td><span class="verdict hold">Hold</span> every other day</td><td>+0.01 / +0.11%</td><td>+0.47 / +0.35%</td><td>58 / 58%</td><td>216,239</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout">Stops fail in fear. A close under the 20-day low during market fear came before a +1.8% to +2.7% rebound versus holding. The desk no longer shows a stop while the VIX is high.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Robustness</div>
+    <h2>The Add rule, year by year</h2>
+    <figure>
+      <div class="wrap"><svg id="years" role="img" aria-label="Add rule 20-day return versus holding by year"></svg></div>
+      <figcaption>Average 20-day return minus holding after an Add signal, per year (2023 had no Add days). Positive in 26 of 31 years.</figcaption>
+    </figure>
+    <ul class="plain">
+      <li>Buying at the next day’s open instead of the signal’s close: +1.22%, the same.</li>
+      <li>Holds in ETFs (+1.1%), in the 69 crashed stocks (+1.2%) and in the rest (+1.4%), so it is not only survivors bouncing.</li>
+      <li>Beat holding in <b>159 of 241</b> separate fear episodes (66%) over 20 days, and 156 over 60 days.</li>
+    </ul>
+    <p class="callout warn">It fails in long bear markets. 2008: −2.9% over 20 days and −6.5% over 60. 2022: −0.3% and −5.1%. The worst single episodes were 17–26% behind holding. None of the 6 filters I tried fixed this out of sample (SPY trend, a deeper VIX threshold, VIX easing off its peak and combinations). With LEAPS, add in pieces.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Finding 3</div>
+    <h2>No timing rule beat holding on risk</h2>
+    <p>Run as a full policy on every stock, each rule traded return for drawdown. Adding on fear dips earned more but went deeper. Cutting on weakness smoothed the ride but cost return. Sharpe stayed within 0.03 of buy-and-hold in both periods.</p>
+    <div class="wrap"><table>
+      <thead><tr><th>Policy (1.5× on Add, 0.5× on cuts)</th><th>Return / yr<br>95–14 / 15–26</th><th>Sharpe<br>95–14 / 15–26</th><th>Worst drawdown<br>95–14 / 15–26</th></tr></thead>
+      <tbody>
+        <tr><td>Buy and hold</td><td>22.2 / 23.1%</td><td>0.59 / 0.55</td><td>−66 / −60%</td></tr>
+        <tr><td>Old signal</td><td>22.4 / 22.4%</td><td class="neg">0.54 / 0.51</td><td>—</td></tr>
+        <tr><td>Add on fear dips</td><td class="pos">27.5 / 29.1%</td><td>0.60 / 0.55</td><td class="neg">−73 / −69%</td></tr>
+        <tr><td>Cut on calm-market weakness</td><td class="neg">16.9 / 18.5%</td><td>0.57 / 0.56</td><td class="pos">−57 / −49%</td></tr>
+        <tr><td>Cut below the 200-day average</td><td class="neg">17.9 / 18.2%</td><td>0.58 / 0.53</td><td class="pos">−56 / −49%</td></tr>
+      </tbody>
+    </table></div>
+    <p>So the signal tells you <b>when adding has paid</b>. It does not turn a holding into a risk-free better one.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Second pass · the options themselves</div>
+    <h2>The edge survives theta and IV, if you buy time and hold</h2>
+    <p>LEAPS lose value to time and move with IV, so I re-ran every symbol-day as a simulated long call priced with Black-Scholes: the real price path, a 30-day IV model, a long-dated term structure, T-bill rates, and stress costs of +5 vol points on entry and 2% of the option price each way. That is 808,838 symbol-days for each of 28 setups (90 to 540 days, 0.70 or 0.80&Delta;, held 20 or 60 days).</p>
+    <div class="tiles">
+      <div class="tile"><b>2.1&ndash;2.5 pts</b><span>IV model error on held-out indexes (5 for realised vol)</span></div>
+      <div class="tile"><b>6.7 pts</b><span>error on 35 single stocks vs today&rsquo;s live chains</span></div>
+      <div class="tile"><b>0.78</b><span>correlation with real 20-day IV changes, so it sees the crush</span></div>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th>365-day 0.80&Delta; call, stress costs, 2015&ndash;2026</th><th>20 days<br>vs avg day / absolute</th><th>60 days<br>vs avg day / absolute</th><th>Made money<br>after 60d</th></tr></thead>
+      <tbody>
+        <tr><td><span class="verdict add">Add</span> fear dip and stock IV &ge; 1.2&times; its 5-year normal</td><td class="pos">+5.5% / +0.6%</td><td class="pos">+13.7% / +17.1%</td><td>59%</td></tr>
+        <tr><td><span class="verdict hold">Hold</span> fear dip, stock IV normal</td><td>+1.1% / <span class="neg">&minus;3.7%</span></td><td>&minus;0.3% / +2.9%</td><td>48%</td></tr>
+        <tr><td>Every day (the bar to beat)</td><td>0 / <span class="neg">&minus;4.8%</span></td><td>0 / +3.6%</td><td>&mdash;</td></tr>
+      </tbody>
+    </table></div>
+    <ul class="plain">
+      <li><b>Rich IV did not hurt.</b> The richest-IV fear dips did best. A LEAPS is exposed to long-dated IV, which barely moves, and the rebound outweighs the crush.</li>
+      <li><b>Hold 60+ trading days.</b> Held only 20 days, LEAPS added on fear dips lost money after costs.</li>
+      <li><b>Even good adds win only 52&ndash;59% of the time over 60 days.</b> The edge comes from big rebounds, not from usually being right.</li>
+    </ul>
+    <div class="wrap"><table>
+      <thead><tr><th>Days left on a 0.80&Delta; call</th><th>365</th><th>240</th><th>180</th><th>120</th><th>90</th><th>60</th></tr></thead>
+      <tbody><tr><td>Value lost to time per 20 trading days</td><td>2.2%</td><td>3.1%</td><td class="neg">4.0%</td><td class="neg">5.6%</td><td class="neg">7.2%</td><td class="neg">10.3%</td></tr></tbody>
+    </table></div>
+    <p>The signal&rsquo;s edge is about 3.5% per 20 days, so it only beats decay on calls with more than about 240 days left. The desk now says <b>add with 365+ days at about 0.80&Delta;</b>, and shows <span class="verdict cau">Roll</span> once a leg loses 4% or more per 20 trading days (about 180 days left). Each leg shows its days left, IV, delta, time value, decay and dollars per day.</p>
+    <p class="callout warn">The 1.2&times; IV gate is partly hindsight: IV-normal fear dips were fine in 1995&ndash;2014 and weak only in 2015&ndash;2026. I kept it because it only removes adds. With a live chain the desk is stricter still and uses the lower of the model&rsquo;s IV and the market&rsquo;s.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Your holdings now</div>
+    <h2>All four read Hold: oversold, but the market isn’t scared enough</h2>
+    <p>On the close of 13 Nov the VIX was 19.3, at its 75th percentile for the year. The Add rule needs the 80th. Oversold without fear had no edge in the backtest.</p>
+    <div class="wrap"><table>
+      <thead><tr><th>Ticker</th><th>Price</th><th>RSI(14)</th><th>vs 50-day</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>NOW</td><td>102.25</td><td>13</td><td>−22.6%</td><td><span class="verdict hold">Hold</span></td></tr>
+        <tr><td>NVDA</td><td>162.85</td><td>19</td><td>−24.1%</td><td><span class="verdict hold">Hold</span></td></tr>
+        <tr><td>BABA</td><td>94.38</td><td>41</td><td>−11.7%</td><td><span class="verdict hold">Hold</span></td></tr>
+        <tr><td>NBIS</td><td>115.88</td><td>41</td><td>−40.5%</td><td><span class="verdict hold">Hold</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="font-size:13.5px">With the IV gate, a VIX spike alone won&rsquo;t turn these into Add. NVDA&rsquo;s IV is 0.93&times; its normal and BABA&rsquo;s 0.93&times;. NOW reads 1.79&times; on the model but only about 1.07&times; on its live chain, and the desk takes the lower. NBIS is at 1.15&times;. Any leg with about 180 days or less left shows Roll. A 100-day call on these names loses 5&ndash;9% of its value per 20 trading days.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Limits</div>
+    <h2>What this test cannot tell you</h2>
+    <ul class="plain">
+      <li><b>Options flow and dealer levels</b> (GEX walls, gamma flip) have no multi-year history, so they are untested. The desk shows them as context and keeps them out of the verdict.</li>
+      <li><b>Per-stock implied volatility</b> has no history here. The VIX stands in for fear.</li>
+      <li><b>Option prices are modelled, not real fills.</b> The IV model is validated on five real IV histories and today&rsquo;s chains, but it misses earnings premiums and ignores dividends and skew. Costs are set conservatively to cover part of that.</li>
+      <li><b>Survivorship.</b> All 148 symbols still trade. The ETF and crashed-stock checks limit this bias but don’t remove it.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="eyebrow">Confidence</div>
+    <h2>How much to trust each claim</h2>
+    <div class="conf">
+      <div>The old signal was useless to harmful</div><div class="pos">High</div>
+      <div>Fear dips beat holding over 20–60 days on average (t 2.7 out of sample, 66% of episodes, every group)</div><div>Moderate–high</div>
+      <div>Calm-market weakness means don’t add (small edge, t ≈ −2)</div><div>Moderate–low</div>
+      <div>The edge survives theta, IV and costs on 365-day calls held 60 days (t 1.8&ndash;1.9 at 60 days, 3.2 at 20)</div><div>Moderate</div>
+      <div>Rolling at about 180 days left (arithmetic: decay outruns the edge)</div><div class="pos">High</div>
+      <div>Any single Add call works out (a LEAPS add made money 52&ndash;59% of the time over 60 days)</div><div class="neg">Low</div>
+      <div>Flow and dealer reads add anything</div><div class="muted">Untested</div>
+    </div>
+  </section>
+</main>
+<div id="tip" hidden></div>
+
+<script>
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const tip = document.getElementById("tip");
+function hover(el, text) {
+  el.addEventListener("mousemove", (e) => { tip.hidden = false; tip.textContent = text; tip.style.left = Math.min(e.clientX + 12, innerWidth - 200) + "px"; tip.style.top = (e.clientY + 12) + "px"; });
+  el.addEventListener("mouseleave", () => { tip.hidden = true; });
+}
+const NS = "http://www.w3.org/2000/svg";
+function mk(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+
+// horizontal diverging bars
+function hbars(id, rows, fmt) {
+  const svg = document.getElementById(id), W = 620, rowH = 34, labW = 230, H = rows.length * rowH + 24;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.style.width = "100%"; svg.style.minWidth = "520px";
+  const max = Math.max(...rows.map((r) => Math.abs(r[1]))), plotL = labW + 50, plotR = W - 60;
+  const zero = plotL + (plotR - plotL) * (max / (2 * max)), sc = (plotR - plotL) / (2 * max);
+  mk("line", { x1: zero, x2: zero, y1: 4, y2: H - 18, stroke: css("--faint"), "stroke-width": 1 }, svg);
+  rows.forEach(([lab, v], i) => {
+    const y = 8 + i * rowH, w = Math.abs(v) * sc, x = v >= 0 ? zero : zero - w;
+    const t = mk("text", { x: 0, y: y + 15 }, svg); t.textContent = lab;
+    const b = mk("rect", { class: "bar", x, y: y + 3, width: Math.max(w, 1), height: 18, rx: 3, fill: v >= 0 ? css("--pos") : css("--neg") }, svg);
+    const vt = mk("text", { class: "val", x: v >= 0 ? x + w + 6 : x - 6, y: y + 16, "text-anchor": v >= 0 ? "start" : "end" }, svg); vt.textContent = fmt(v);
+    hover(b, `${lab}: ${fmt(v)}`);
+  });
+  const zt = mk("text", { x: zero, y: H - 4, "text-anchor": "middle" }, svg); zt.textContent = "0 = same as holding";
+}
+const pct = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2) + "%";
+function drawAll() {
+  for (const id of ["setups", "years"]) document.getElementById(id).replaceChildren();
+  hbars("setups", [["Add: oversold + market fear", 3.41], ["Every other day", 0.35], ["Oversold, VIX under 80th pct", -0.91], ["Don't add: calm-market weakness", -1.28]], pct);
+
+  // year columns
+  const Y = [[1995,2.99],[1996,3.71],[1997,.93],[1998,1.19],[1999,6.89],[2000,.91],[2001,7.08],[2002,1.48],[2003,.97],[2004,4.04],[2005,4.03],[2006,-1.00],[2007,-.11],[2008,-2.87],[2009,10.54],[2010,.54],[2011,1.05],[2012,5.68],[2013,4.31],[2014,3.49],[2015,.44],[2016,-.03],[2017,2.63],[2018,.53],[2019,5.71],[2020,2.49],[2021,1.12],[2022,-.28],[2024,2.72],[2025,1.20],[2026,3.45]];
+  const svg = document.getElementById("years"), W = 720, H = 240, L = 40, R = 10, T = 12, B = 30;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.style.width = "100%"; svg.style.minWidth = "560px";
+  const lo = -4, hi = 12, ys = (v) => T + (hi - v) / (hi - lo) * (H - T - B), bw = (W - L - R) / Y.length;
+  for (const g of [-4, 0, 4, 8, 12]) {
+    mk("line", { x1: L, x2: W - R, y1: ys(g), y2: ys(g), stroke: g === 0 ? css("--faint") : css("--rule"), "stroke-width": 1 }, svg);
+    const t = mk("text", { x: L - 6, y: ys(g) + 4, "text-anchor": "end" }, svg); t.textContent = (g > 0 ? "+" : "") + g + "%";
+  }
+  Y.forEach(([yr, v], i) => {
+    const x = L + i * bw + 2, y0 = ys(0), y1 = ys(v);
+    const b = mk("rect", { class: "bar", x, y: Math.min(y0, y1), width: bw - 4, height: Math.max(Math.abs(y1 - y0), 1), rx: 2, fill: v >= 0 ? css("--pos") : css("--neg") }, svg);
+    hover(b, `${yr}: ${pct(v)} vs holding over 20 days`);
+    if (yr % 5 === 0) { const t = mk("text", { x: x + (bw - 4) / 2, y: H - 10, "text-anchor": "middle" }, svg); t.textContent = yr; }
+  });
+}
+drawAll();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
+new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
