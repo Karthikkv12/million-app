@@ -51,6 +51,7 @@ export default function BottomNav() {
   return (
     <nav
       data-bottom-nav
+      data-hidden={hidden || undefined}
       className={clsx(
         "md:hidden fixed bottom-0 inset-x-0 z-40 pb-safe transition-transform duration-300 ease-in-out",
         hidden ? "translate-y-full" : "translate-y-0",

@@ -6,7 +6,7 @@
  *
  * ‹ / › (or the ← / → keys) step through the chosen list and wrap at the ends. The lists button picks which
  * watchlist to browse ("All lists" merges them); the ticker button opens that list to jump straight to a name.
- * Above it, a small pill sums the board's exposure above and below the price. The next name's GEX is prefetched
+ * Its top row sums the board's exposure above and below the price. The next name's GEX is prefetched
  * so stepping feels instant. Lists come from /watchlists (the same lists as Portfolio → Watchlist), plus
  * "My stocks": every name you have a Robinhood position in, shares or options (bought or sold), largest exposure
  * first; it follows each Robinhood sync.
@@ -143,16 +143,17 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
   const btn = "inline-flex h-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-foreground/70 transition hover:border-foreground/40 hover:text-foreground disabled:opacity-40";
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[88px] z-30 flex justify-start px-3 pr-[76px] md:bottom-6 md:justify-center md:pr-3">
-      <div className="pointer-events-auto flex w-full max-w-[600px] flex-col items-start gap-1.5">
+    // Phones: sits just above the bottom nav, and drops to the bottom edge when the nav slides away on scroll.
+    <div className="pointer-events-none fixed inset-x-0 bottom-[88px] z-30 flex justify-center px-3 transition-[bottom] duration-300 ease-in-out md:bottom-6 [body:has([data-bottom-nav][data-hidden])_&]:bottom-3 md:[body:has([data-bottom-nav][data-hidden])_&]:bottom-6">
+      <div className="pointer-events-auto w-full max-w-[600px] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)]">
         {split && (
-          <p className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 font-mono text-[11.5px] tabular-nums text-foreground/55 shadow-[var(--shadow-float)]">
-            Above <span className={split.above < 0 ? "text-loss" : "text-gain"}>{money(split.above)}</span>
-            {" · "}Below <span className={split.below < 0 ? "text-loss" : "text-gain"}>{money(split.below)}</span>
+          <p className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-1.5 font-mono text-[11px] tabular-nums text-foreground/50">
+            <span>Above spot <span className={split.above < 0 ? "text-loss" : "text-gain"}>{money(split.above)}</span></span>
+            <span>Below <span className={split.below < 0 ? "text-loss" : "text-gain"}>{money(split.below)}</span></span>
           </p>
         )}
         <div role="toolbar" aria-label="Browse watchlist"
-          className="flex w-full items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-float)] sm:gap-1.5">
+          className="flex w-full items-center gap-1 p-1.5 sm:gap-1.5">
           <div ref={listsRef} className="relative">
             <button type="button" onClick={() => setListsOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={listsOpen}
               title={`Watchlist: ${listName}`} aria-label={`Watchlist: ${listName}`} className={clsx(btn, "w-9 sm:w-10")}>
@@ -182,7 +183,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
 
           <div ref={namesRef} className="relative min-w-0 flex-1">
             <button type="button" onClick={() => setNamesOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={namesOpen}
-              className={clsx(btn, "w-full justify-between gap-1.5 px-2 sm:gap-2 sm:px-3")}>
+              className={clsx(btn, "w-full justify-between gap-1.5 overflow-hidden px-2 sm:gap-2 sm:px-3")}>
               {/* Phones: price and move under the ticker; wider: one line. */}
               <span className="flex min-w-0 items-center gap-2">
               <TickerLogo symbol={ticker} size={22} className="hidden min-[400px]:inline-block" />
