@@ -10,6 +10,7 @@ import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill, Change, SectionHeader } from "@/components/ui";
 import { rememberSymbol } from "@/lib/recent";
 import { TickerLink } from "@/components/TickerLink";
+import { TickerLogo } from "@/components/TickerLogo";
 
 // ── formatting ───────────────────────────────────────────────────────────────
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -104,7 +105,8 @@ export default function CatalystPage() {
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
               <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Catalyst</p>
-              <h1 className="flex flex-wrap items-baseline gap-x-3 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">
+              <h1 className="flex flex-wrap items-center gap-x-3 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">
+                <TickerLogo symbol={c.symbol} size={40} />
                 <TickerLink symbol={c.symbol} title={`Open the ${c.symbol} stock page and chart`} className="font-mono" />
                 <span className="text-lg font-normal tracking-normal text-foreground/55">{c.name}</span>
               </h1>

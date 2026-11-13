@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { TickerLogo } from "@/components/TickerLogo";
 import { clsx } from "clsx";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Check, Columns3, MoreHorizontal, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from "lucide-react";
@@ -296,12 +297,17 @@ export function WatchlistTab() {
                   return (
                     <tr key={symbol} className="group border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]">
                       <td className={clsx(TD, "sticky left-0 z-[1] bg-[var(--surface)] group-hover:bg-[var(--surface-2)]")}>
-                        <Link href={`/stocks/${symbol}`} className="font-medium text-foreground hover:text-accent">{symbol}</Link>
-                        {owned.has(symbol) && <span className="ml-2 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-sans text-[10px] text-foreground/55">Held</span>}
-                        <p className="max-w-[96px] truncate font-sans text-[11px] text-foreground/45 sm:max-w-[240px]">
-                          {q?.name ?? (quotes.isLoading ? "…" : q?.error ? "No quote" : "")}
-                          {!current && lists.length > 0 && <span className="text-foreground/35"> · {lists.join(", ")}</span>}
-                        </p>
+                        <div className="flex items-center gap-2.5">
+                          <TickerLogo symbol={symbol} size={26} />
+                          <div className="min-w-0">
+                            <Link href={`/stocks/${symbol}`} className="font-medium text-foreground hover:text-accent">{symbol}</Link>
+                            {owned.has(symbol) && <span className="ml-2 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-sans text-[10px] text-foreground/55">Held</span>}
+                            <p className="max-w-[96px] truncate font-sans text-[11px] text-foreground/45 sm:max-w-[240px]">
+                              {q?.name ?? (quotes.isLoading ? "…" : q?.error ? "No quote" : "")}
+                              {!current && lists.length > 0 && <span className="text-foreground/35"> · {lists.join(", ")}</span>}
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       {cols.map((c) => (
                         <td key={c.id} className={clsx(TD, "whitespace-nowrap", c.left ? "text-left" : "text-right", "text-foreground/85")}>

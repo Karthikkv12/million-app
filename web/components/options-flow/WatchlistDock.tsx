@@ -20,6 +20,7 @@ import { clsx } from "clsx";
 import { Check, ChevronLeft, ChevronRight, ChevronsUpDown, Layers, Zap, Activity } from "lucide-react";
 import { BrokerPortfolio, ExtendedHours, fetchBrokerPortfolio, fetchExtendedHours, fetchGex, fetchWatchlistGroups, GexResult, WatchlistGroups } from "@/lib/api";
 import { useQuotes } from "@/components/dashboard/quotes";
+import { TickerLogo } from "@/components/TickerLogo";
 import type { Metric } from "./GexHeatmap";
 
 const LIST_KEY = "flow_dock_list";
@@ -183,6 +184,8 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
             <button type="button" onClick={() => setNamesOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={namesOpen}
               className={clsx(btn, "w-full justify-between gap-1.5 px-2 sm:gap-2 sm:px-3")}>
               {/* Phones: price and move under the ticker; wider: one line. */}
+              <span className="flex min-w-0 items-center gap-2">
+              <TickerLogo symbol={ticker} size={22} className="hidden min-[400px]:inline-block" />
               <span className="flex min-w-0 flex-col items-start font-mono leading-tight tabular-nums sm:flex-row sm:items-baseline sm:gap-2">
                 <span className="text-[13.5px] font-semibold text-foreground sm:text-[14px]">{ticker.toUpperCase()}</span>
                 {quote?.price != null && (
@@ -193,6 +196,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
                     )}
                   </span>
                 )}
+              </span>
               </span>
               <span className="flex shrink-0 items-center gap-1 font-mono text-[10.5px] text-foreground/40">
                 {idx >= 0 && <span className="hidden sm:inline">{idx + 1}/{symbols.length}</span>}

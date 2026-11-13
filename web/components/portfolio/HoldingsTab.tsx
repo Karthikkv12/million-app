@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { TickerLogo } from "@/components/TickerLogo";
 import { useState } from "react";
 import { clsx } from "clsx";
 import { LeapsCell, useLeapsScores } from "@/components/insight/LeapsScore";
@@ -73,8 +74,13 @@ export function HoldingsTab() {
               return (
                 <tr key={symbol} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]">
                   <td className={TD}>
-                    <Link href={`/stocks/${symbol}`} className="font-medium text-foreground hover:text-accent">{symbol}</Link>
-                    <p className="font-sans text-[11px] text-foreground/45">{accounts.join(" · ")}</p>
+                    <div className="flex items-center gap-2.5">
+                      <TickerLogo symbol={symbol} size={26} />
+                      <div className="min-w-0">
+                        <Link href={`/stocks/${symbol}`} className="font-medium text-foreground hover:text-accent">{symbol}</Link>
+                        <p className="font-sans text-[11px] text-foreground/45">{accounts.join(" · ")}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className={`sensitive ${TD} text-right text-foreground/80`}>
                     {h ? h.shares : dash}
