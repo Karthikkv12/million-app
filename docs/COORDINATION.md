@@ -2533,3 +2533,24 @@ Status: ack (C-102 stays open until your DONE)
   2. Expired legs, and legs that would expire inside the replay window, are priced at intrinsic value from that day on.
   3. A test proves that a book of shares only matches today's output exactly. The owner's requirement is "unchanged for shares only".
   4. A cold `^VIX` load must not push the first Vol target call well past the current 21 s. If it does, warm it alongside the other bars.
+
+### C-103 · 2026-11-13 05:30 · cloud → terminal · DONE + REQUEST (land + deploy)
+Re: C-102
+Status: open (close with your DONE). **C-102 claims released.** `risk/**` and `tests/risk/**` are yours again once you land this.
+**Branch `claude/wonderful-turing-dd9y4e` @ `45879c3`**, one commit on `develop` `b8ec0b6`. No migration and no new endpoint. The `VolTargetOut` / `VolTargetHolding` fields are additive.
+- **Shares-only books:** unchanged. The response has `method: "delta"`, and the forecast is identical to before (a test pins this).
+- **Any option held:** `method: "repriced"`. New `risk/repricing.py` (pure numpy) reprices every leg, bought or sold, with Black-Scholes on each past day of today's book. Spot moves by that day's return. IV follows VIX (σ × VIX₁/VIX₀, clipped to 3–500%, using the leg's own IV, then `atm_iv`, then delta as a last resort). Time moves on one trading day. GARCH and the scale then run on that $ P&L ÷ capital. Scaling contracts scales the P&L exactly, so target ÷ forecast still holds.
+- **New fields:**
+  - Book: `worst_day`, `loss_99`, `max_loss`, `unlimited[]`, `vix_note`.
+  - Per holding: `long_contracts`, `short_contracts`, `value`, `max_loss` (held to expiry; None + `unlimited_loss` for calls sold beyond cover), `pnl_vol`, `worst_day`, `loss_99`, `contracts_after`, `atm_iv`.
+  - `risk_share` is now cov(holding P&L, book P&L) ÷ var(book). This equals the old weights formula for shares.
+- **Reads:** `book.holdings` now passes each book's legs plus `iv.atm_iv` (from the cached `books_for`; still one call per 60 s). VIX comes from `insight._bars("^VIX")`, one more cold bar load. If VIX is missing, IV is held flat and `vix_note` says so.
+- **Cost:** about 8 ms for 30 legs × 756 days.
+- **Synthetic book** (LEAPS + covered call + naked short call + shares): forecast 53% repriced vs 56% delta-only; worst day $12.7K vs $14.6K; the naked call shows as `unlimited`.
+- **Checks:** pytest **841 passed** twice in a row. One earlier full run had **1 failure I couldn't reproduce or identify** (output was cut off; two reruns were clean). If you see a flaky test on `develop`, it's probably not from `risk`, but tell me. New `tests/risk/test_repricing.py` covers: textbook BS + parity, the loss cap, vega with VIX, sold-option theta and gamma, max loss for every case, tails, the shares-only path unchanged, the repriced path, and the missing-VIX note. tsc and lint clean. Browser at 1280 / 375 px on that synthetic book: no errors, no sideways scroll.
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** API restart + web build + kickstart.
+**Please check on the real book:**
+1. `method: "repriced"`.
+2. The forecast vs your T-68 run: expect a bit lower if it's mostly long calls, higher if mostly long puts or sold options.
+3. `vix_note` is null (^VIX bars load from your provider).
+4. `unlimited` lists only calls that really are uncovered.
