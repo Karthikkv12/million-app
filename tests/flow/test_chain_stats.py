@@ -65,6 +65,20 @@ def test_atm_iv_near_skips_0dte_and_30d_interpolates_variance():
     assert out["d30"] == pytest.approx(math.sqrt(var / 30), abs=1e-4)
 
 
+def test_atm_iv_drops_todays_expiry_even_with_floored_T():
+    # providers floor T for 0DTE at about 1/365, i.e. "1 day": the calendar date has to rule it out (T-88)
+    import datetime as dt
+    rows = []
+    for e, T, iv in (("2026-11-13", 1 / 365, 3.89), ("2026-11-20", 7 / 365, 0.60), ("2026-12-18", 35 / 365, 0.55)):
+        for o in ("call", "put"):
+            rows += [_row(95, e, o, 1, iv=iv, T=T), _row(105, e, o, 1, iv=iv, T=T)]
+    out = cs.atm_iv(pd.DataFrame(rows, columns=CHAIN_COLUMNS), 100.0, today=dt.date(2026, 11, 13))
+    assert out["near_expiry"] == "2026-11-20" and out["near"] == pytest.approx(0.60)
+    assert 0.55 <= out["d30"] <= 0.60                       # the 389% 0DTE point is not in the 30-day blend either
+    late = cs.atm_iv(pd.DataFrame(rows, columns=CHAIN_COLUMNS), 100.0, today=dt.date(2026, 11, 12))
+    assert late["near_expiry"] == "2026-11-13"              # a day earlier it is a 1-DTE expiry, kept
+
+
 def test_atm_iv_empty_chain():
     assert cs.atm_iv(pd.DataFrame(columns=CHAIN_COLUMNS), 100.0) == {"near": None, "near_expiry": None, "d30": None}
 
@@ -88,7 +102,10 @@ class _Provider:
 
 @pytest.fixture
 def provider(monkeypatch):
+    import datetime as dt
     service.clear_cache()
+    real = cs.atm_iv
+    monkeypatch.setattr(cs, "atm_iv", lambda df, spot, today=None: real(df, spot, today or dt.date(2026, 11, 13)))
     monkeypatch.setattr(gamma, "get_market_data", lambda: _Provider())
     yield
     service.clear_cache()
