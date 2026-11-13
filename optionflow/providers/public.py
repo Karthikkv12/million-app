@@ -290,6 +290,7 @@ def parse_contracts(exp: str, payload: Dict[str, Any], T: float) -> List[Dict[st
                 "mid": mid,
                 "gamma": gamma if gamma and gamma > 0 else float("nan"),
                 "T": T,
+                "bid": bid, "ask": ask, "last": _f(c.get("last")),
             })
     return rows
 

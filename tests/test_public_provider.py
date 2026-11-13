@@ -113,7 +113,8 @@ class FakeYahoo:
 def test_parse_contracts_real_shape():
     rows = parse_contracts("2026-11-13", {"calls": [_contract(88)], "puts": []}, 0.02)
     assert rows == [{"strike": 88.0, "expiry": "2026-11-13", "otype": "call", "oi": 100, "volume": 19,
-                     "iv": 0.6437, "mid": 8.2, "gamma": 0.0287, "T": 0.02}]
+                     "iv": 0.6437, "mid": 8.2, "gamma": 0.0287, "T": 0.02,
+                     "bid": 7.6, "ask": 8.8, "last": 8.19}]
 
 
 def test_parse_contracts_filters_like_yahoo():
@@ -286,3 +287,15 @@ def test_poll_interval_follows_chain_source(public, monkeypatch):
     assert gex_poller.poll_interval() == 120                 # Public backing off → Yahoo pace
     from optionflow.modules.flow import service
     assert service.GEX_CACHE_TTL >= gex_poller.POLL_INTERVAL  # streams never trigger extra fetches
+
+
+def test_chain_rows_carry_quotes_for_flow_sides():
+    """The GEX chain must keep bid / ask / last: flow.traded.side files each refresh's volume by them, and without
+    them every print was 'mid' (all bought/sold zero on live, 2026-11-13)."""
+    from optionflow.modules.flow import traded
+    rows = parse_contracts("2026-11-20", {"calls": [_contract(92)], "puts": None}, 0.1)
+    df = pd.DataFrame(rows, columns=CHAIN_COLUMNS)
+    assert (df.loc[0, "bid"], df.loc[0, "ask"], df.loc[0, "last"]) == (7.60, 8.80, 8.19)
+    (key, vol, prem, bid, ask, last), = traded.contracts(df)
+    assert traded.side(bid, ask, last) == "mid"          # 8.19 is mid-spread
+    assert traded.side(bid, ask, 8.70) == "bought"
