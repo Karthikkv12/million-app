@@ -19,6 +19,7 @@ import { ExpiryPicker } from "./ExpiryPicker";
 import { DealerLadder, TradeIdeas } from "./DealerLadder";
 import { LeapsLine } from "@/components/insight/LeapsScore";
 import { sourceName } from "./SourceBadge";
+import { FlowTheory } from "./FlowTheory";
 
 // ── Slot type shared across the page ─────────────────────────────────────────
 export interface Slot {
@@ -140,6 +141,7 @@ export function TickerPanel({
             <span className="ml-auto" />
             <ExpiryPicker available={data.heatmap_expiries ?? []} chosen={slot.expiryFilter}
               onChange={(next) => onExpiriesChange?.(next)} compact={compact} />
+            <FlowTheory data={data} compact={compact} />
             <button onClick={() => setLadderOpen((o) => !o)} aria-pressed={ladderOpen} title="Dealer ladder with buy/sell call and put ideas" aria-label="Ladder"
               className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono uppercase tracking-[0.12em] hover:bg-foreground/[0.06] hover:text-foreground ${ladderOpen ? "text-foreground" : "text-foreground/60"}`}>
               <Ruler size={12} />{!compact && " Ladder"}

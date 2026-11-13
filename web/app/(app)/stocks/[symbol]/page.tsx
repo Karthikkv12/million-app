@@ -11,6 +11,7 @@ import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill } from "@/components/ui";
 import { GexReplay } from "@/components/options-flow/GexReplay";
 import { DealerLadder, TradeIdeas } from "@/components/options-flow/DealerLadder";
+import { FlowTheory } from "@/components/options-flow/FlowTheory";
 import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
 import { PoliticalCard } from "@/components/insight/PoliticalCard";
@@ -108,7 +109,7 @@ export default function StockPage() {
                 </Panel>
               ) },
               { key: "dealer", label: "Dealers", node: (
-                <Panel title="Dealer levels" actions={gex && !gex.error ? <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Pill> : null}>
+                <Panel title="Dealer levels" actions={gex && !gex.error ? <span className="flex items-center gap-2"><FlowTheory data={gex} compact /><Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Pill></span> : null}>
                   {gexLoading ? <div className="grid gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10" />)}</div>
                     : !gex || gex.error ? <p className="text-[13px] text-foreground/60">No options data for {sym}.</p> : (
                       <>

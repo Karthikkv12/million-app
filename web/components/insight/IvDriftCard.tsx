@@ -13,6 +13,7 @@ import { clsx } from "clsx";
 import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fetchNetFlowHistory, FlowSnapshot } from "@/lib/api";
 import { ChartTooltip, Legend, useChartStyle } from "@/components/chart/kit";
+import { H, P, Formula, Terms, Theory } from "@/components/hedge/Theory";
 
 const ET = "America/New_York";
 const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: ET });
@@ -81,7 +82,10 @@ export function IvDriftCard({ symbol }: { symbol: string }) {
             <p className="mt-1 text-[24px] font-semibold text-foreground/80">{pct(now?.near)}</p>
           </div>
         </div>
-        <div className="flex">
+        <div className="flex items-center gap-2">
+          <Theory title={`How to use ${symbol}'s volatility drift`}>
+            <IvTheory symbol={symbol} first={first} now={now} dIv={dIv} dPx={dPx} />
+          </Theory>
           {DAYS.map((d) => (
             <button key={d} onClick={() => setDays(d)} aria-pressed={days === d}
               className={clsx("h-7 px-2.5 font-mono text-[11.5px]", days === d ? "bg-[var(--surface-2)] text-foreground" : "text-foreground/50 hover:text-foreground")}>
@@ -140,5 +144,75 @@ export function IvDriftCard({ symbol }: { symbol: string }) {
         jump when an expiry rolls off; the nearest expiry reacts faster and is noisier.
       </p>
     </div>
+  );
+}
+
+/** Theory pop-up: what ATM IV is, how to turn it into a move, and what today's drift means, with today's numbers. */
+function IvTheory({ symbol, first, now, dIv, dPx }: { symbol: string; first?: Pt; now?: Pt; dIv: number | null; dPx: number | null }) {
+  const iv = now?.d30 ?? now?.near ?? null;
+  const spot = now?.price ?? null;
+  const day = iv != null && spot != null ? spot * iv / Math.sqrt(252) : null;
+  const term = now?.near != null && now?.d30 != null ? now.near - now.d30 : null;
+  return (
+    <>
+      {now ? (
+        <P>
+          Examples are {symbol}&apos;s readings today: from {first ? clock(first.ts) : "the first reading"} to {clock(now.ts)} ET.
+          They refresh every minute while this page is open.
+        </P>
+      ) : <P>{symbol} has no IV readings yet today, so the examples below are empty. They fill in while this page is open in market hours.</P>}
+
+      <H>What ATM IV is</H>
+      <P>
+        Implied volatility is the yearly move option prices assume. At the money (strike at spot) is the cleanest read
+        of it. 30-day IV blends the expiries around 30 days, so it is steady; the nearest expiry reacts first.
+      </P>
+      <Terms rows={[
+        ["30-day IV", now?.d30 != null ? <><b className="text-foreground">{pct(now.d30)}</b> now{first?.d30 != null ? `, ${pct(first.d30)} at ${clock(first.ts)}` : ""}.</> : "No reading yet."],
+        ["Nearest expiry IV", now?.near != null ? <><b className="text-foreground">{pct(now.near)}</b> now{first?.near != null ? `, ${pct(first.near)} at ${clock(first.ts)}` : ""}.</> : "No reading yet."],
+      ]} />
+
+      <H>From IV to a price move</H>
+      {iv != null && spot != null && day != null ? (
+        <>
+          <Formula>1-day move ≈ price × IV ÷ √252 = {spot.toFixed(2)} × {pct(iv)} ÷ 15.9 ≈ ${day.toFixed(2)}</Formula>
+          <P>So options price a typical {symbol} day at about ±${day.toFixed(2)} (±{(day / spot * 100).toFixed(2)}%). Each 1 point of IV is worth about ±${(spot * 0.01 / Math.sqrt(252)).toFixed(2)} of daily move.</P>
+        </>
+      ) : <P>Needs a reading with both IV and price.</P>}
+
+      <H>Reading the drift</H>
+      <Terms rows={[
+        ["IV ↑, price ↓", "Fear: protection is being bought. Normal for most stocks; selling puts gets richer."],
+        ["IV ↑, price ↑", "Calls being chased: event, squeeze or news. Moves can extend."],
+        ["IV ↓, price ↑", "Calm rally. Premium bleeds; long options lose value even when right on direction."],
+        ["IV ↓, price flat/↓", "Orderly drift. Cheap time to buy options if you expect a move."],
+      ]} />
+      {dIv != null && dPx != null ? (
+        <P>
+          Today {symbol}&apos;s IV is <b className="text-foreground">{pts(dIv)}</b> with price {dPx >= 0 ? "+" : "−"}{Math.abs(dPx * 100).toFixed(2)}%:{" "}
+          {read(dIv, dPx)}
+        </P>
+      ) : null}
+
+      {term != null && (
+        <>
+          <H>Near vs 30-day</H>
+          <P>
+            Nearest expiry is {pct(now!.near)} vs {pct(now!.d30)} for 30-day ({term >= 0 ? "+" : "−"}{Math.abs(term * 100).toFixed(1)} pts).{" "}
+            {term > 0.02 ? "Short-dated vol is higher than longer-dated: the market expects something soon (earnings, a release). It usually drops after the event."
+              : term < -0.02 ? "Short-dated vol is below 30-day: the next few days are priced calm."
+              : "About the same: no near-term event priced in."}
+          </P>
+        </>
+      )}
+
+      <H>How to use it</H>
+      <ul className="list-disc space-y-1 pl-5">
+        <li>Sell premium after IV has risen (you get paid more), buy options after it has fallen.</li>
+        <li>Before earnings, the nearest expiry&apos;s IV climbs; it collapses the morning after. Long options bought into that lose even on a correct guess.</li>
+        <li>Compare the expected 1-day move with the distance to the dealer walls to judge whether a wall is in reach today.</li>
+      </ul>
+      <P>Readings are saved only while this page or the Flow board has {symbol} open. Not advice.</P>
+    </>
   );
 }
