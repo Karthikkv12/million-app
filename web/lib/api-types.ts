@@ -787,26 +787,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/hedge/vol-target": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Vol Target
-         * @description Volatility targeting: exposure = target ÷ GARCH forecast, for the whole book and each holding.
-         */
-        get: operations["vol_target_api_v1_hedge_vol_target_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/holdings/{holding_id}": {
         parameters: {
             query?: never;
@@ -1758,6 +1738,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/risk/factors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Factors
+         * @description Factor exposure (APT): the book's betas to market, tech, size and rates, and its risk split by factor.
+         */
+        get: operations["factors_api_v1_risk_factors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk/vol-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vol Target
+         * @description Volatility targeting: exposure = target ÷ GARCH forecast, for the whole book and each holding.
+         */
+        get: operations["vol_target_api_v1_risk_vol_target_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search/tickers": {
         parameters: {
             query?: never;
@@ -2355,6 +2375,72 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** BookFactor */
+        BookFactor: {
+            /**
+             * Beta
+             * @description % of capital the book moves per 1% factor move
+             */
+            beta: number;
+            /**
+             * Dollar Per Pct
+             * @description $ the book makes per +1% factor move
+             */
+            dollar_per_pct?: number | null;
+            /**
+             * Factor Vol
+             * @description The factor's own annual vol
+             */
+            factor_vol: number;
+            /**
+             * Hedge
+             * @description ETF trades that take this beta to zero
+             * @default []
+             */
+            hedge: components["schemas"]["HedgeLeg"][];
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "market" | "tech" | "size" | "rates";
+            /**
+             * Risk
+             * @description Annual variance from this factor (can be negative when it offsets)
+             */
+            risk: number;
+            /**
+             * Risk Share
+             * @description Share of the book's variance
+             */
+            risk_share?: number | null;
+        };
+        /** BookFactors */
+        BookFactors: {
+            /** Factor Share */
+            factor_share?: number | null;
+            /** Factors */
+            factors: components["schemas"]["BookFactor"][];
+            /**
+             * R2
+             * @description Share of the book's daily moves the factors explain
+             */
+            r2?: number | null;
+            /**
+             * Specific
+             * @default 0
+             */
+            specific: number;
+            /**
+             * Specific Share
+             * @description Share of variance no factor explains
+             */
+            specific_share?: number | null;
+            /**
+             * Vol
+             * @description Book vol, annual, as % of capital
+             */
+            vol?: number | null;
         };
         /** BookOut */
         BookOut: {
@@ -3211,6 +3297,138 @@ export interface components {
             /** Strike */
             strike: number;
         };
+        /** FactorHolding */
+        FactorHolding: {
+            /**
+             * Betas
+             * @description factor key → beta of this stock
+             */
+            betas?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Dollar Betas
+             * @description factor key → $ per 1% factor move
+             */
+            dollar_betas?: {
+                [key: string]: number;
+            } | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Exposure
+             * @description Delta dollars: net Δ × 100 × spot
+             */
+            exposure: number;
+            /**
+             * Has Options
+             * @default false
+             */
+            has_options: boolean;
+            /** Net Delta */
+            net_delta?: number | null;
+            /**
+             * R2
+             * @description Share of this stock's moves the factors explain
+             */
+            r2?: number | null;
+            /**
+             * Risk Share
+             * @description Approximate share of the book's variance
+             */
+            risk_share?: number | null;
+            /**
+             * Shares
+             * @default 0
+             */
+            shares: number;
+            /**
+             * Specific Vol
+             * @description Annual vol no factor explains
+             */
+            specific_vol?: number | null;
+            /** Spot */
+            spot: number;
+            /** Symbol */
+            symbol: string;
+            /** Vol */
+            vol?: number | null;
+            /** Weight */
+            weight?: number | null;
+        };
+        /** FactorInfo */
+        FactorInfo: {
+            /**
+             * About
+             * @default
+             */
+            about: string;
+            /** Etf */
+            etf: string;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "market" | "tech" | "size" | "rates";
+            /** Label */
+            label: string;
+            /**
+             * Minus
+             * @description Subtracted ETF, e.g. QQQ − SPY for the tech tilt
+             */
+            minus?: string | null;
+        };
+        /** FactorWindow */
+        FactorWindow: {
+            /** End */
+            end: string;
+            /** Start */
+            start: string;
+        };
+        /** FactorsOut */
+        FactorsOut: {
+            /** Account Value */
+            account_value?: number | null;
+            /** As Of */
+            as_of: string;
+            book?: components["schemas"]["BookFactors"] | null;
+            /** Capital */
+            capital?: number | null;
+            /** Capital Source */
+            capital_source?: ("input" | "account" | "gross") | null;
+            /** Error */
+            error?: string | null;
+            /** Factors */
+            factors: components["schemas"]["FactorInfo"][];
+            /**
+             * Gross
+             * @default 0
+             */
+            gross: number;
+            /**
+             * Holdings
+             * @default []
+             */
+            holdings: components["schemas"]["FactorHolding"][];
+            /**
+             * Net
+             * @default 0
+             */
+            net: number;
+            /**
+             * Prices
+             * @default {}
+             */
+            prices: {
+                [key: string]: number;
+            };
+            /**
+             * Sessions
+             * @default 0
+             */
+            sessions: number;
+            window?: components["schemas"]["FactorWindow"] | null;
+        };
         /** FlowByExpiry */
         FlowByExpiry: {
             /** Call Prem */
@@ -3427,6 +3645,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HedgeLeg */
+        HedgeLeg: {
+            /**
+             * Dollars
+             * @description Buy (+) or sell (−) this many dollars of the ETF
+             */
+            dollars: number;
+            /** Shares */
+            shares?: number | null;
+            /** Symbol */
+            symbol: string;
         };
         /** HoldingEventOut */
         HoldingEventOut: {
@@ -7683,42 +7913,6 @@ export interface operations {
             };
         };
     };
-    vol_target_api_v1_hedge_vol_target_get: {
-        parameters: {
-            query?: {
-                /** @description Target annual vol, decimal (0.15 = 15%) */
-                target?: number;
-                /** @description Max gross delta dollars ÷ capital */
-                cap?: number;
-                /** @description Override the synced account value */
-                capital?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VolTargetOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     delete_account_holding_api_v1_holdings__holding_id__delete: {
         parameters: {
             query?: never;
@@ -9614,6 +9808,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    factors_api_v1_risk_factors_get: {
+        parameters: {
+            query?: {
+                /** @description Override the synced account value */
+                capital?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vol_target_api_v1_risk_vol_target_get: {
+        parameters: {
+            query?: {
+                /** @description Target annual vol, decimal (0.15 = 15%) */
+                target?: number;
+                /** @description Max gross delta dollars ÷ capital */
+                cap?: number;
+                /** @description Override the synced account value */
+                capital?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolTargetOut"];
                 };
             };
             /** @description Validation Error */

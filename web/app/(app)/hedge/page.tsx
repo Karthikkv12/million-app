@@ -14,7 +14,8 @@ import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
 import { StrategyPicker } from "@/components/strategy/StrategyPicker";
 import { useStrategy } from "@/components/strategy/useStrategy";
-import { VolTargetTab } from "@/components/hedge/VolTarget";
+import { VolTargetTab, VolTargetTheory } from "@/components/hedge/VolTarget";
+import { FactorsTab, FactorsTheory } from "@/components/hedge/Factors";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -390,16 +391,25 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-type HedgeTab = "desk" | "vol";
+type HedgeTab = "desk" | "vol" | "factors";
 const TABS: { id: HedgeTab; label: string; hash: string }[] = [
-  { id: "desk", label: "Delta desk", hash: "" }, { id: "vol", label: "Vol target", hash: "#vol-target" },
+  { id: "desk", label: "Delta desk", hash: "" },
+  { id: "vol", label: "Vol target", hash: "#vol-target" },
+  { id: "factors", label: "Factors", hash: "#factors" },
 ];
+/** The tool tabs: title, one line on what it does, the theory pop-up and the body. */
+const TOOLS: Record<Exclude<HedgeTab, "desk">, { title: string; line: string; theory: React.ReactNode; body: React.ReactNode }> = {
+  vol: { title: "Vol target", line: "Less exposure when markets get wild: target vol ÷ forecast vol, on your whole book.",
+    theory: <VolTargetTheory />, body: <VolTargetTab /> },
+  factors: { title: "Factor exposure", line: "Which broad risks your book is really betting on, and how to neutralise them.",
+    theory: <FactorsTheory />, body: <FactorsTab /> },
+};
 
 /** The tab from the URL hash (#vol-target), so a tab can be linked and survives a reload. */
 function useHedgeTab(): [HedgeTab, (t: HedgeTab) => void] {
   const [tab, setTab] = useState<HedgeTab>("desk");
   useEffect(() => {
-    const read = () => setTab(window.location.hash === "#vol-target" ? "vol" : "desk");
+    const read = () => setTab(TABS.find((t) => t.hash && t.hash === window.location.hash)?.id ?? "desk");
     read();
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
@@ -427,17 +437,22 @@ function TabBar({ tab, onChange }: { tab: HedgeTab; onChange: (t: HedgeTab) => v
 
 export default function HedgePage() {
   const [tab, setTab] = useHedgeTab();
-  return tab === "vol" ? (
+  if (tab === "desk") return <DeltaDesk tabs={<TabBar tab={tab} onChange={setTab} />} />;
+  const t = TOOLS[tab];
+  return (
     <DeskPage>
-      <div className="pb-5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
-        <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Vol target</h1>
-        <p className="mt-1 text-[13px] text-foreground/55">Less exposure when markets get wild: exposure = target vol ÷ forecast vol, on your whole book.</p>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 pb-5">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">{t.title}</h1>
+          <p className="mt-1 text-[13px] text-foreground/55">{t.line}</p>
+        </div>
+        {t.theory}
       </div>
       <TabBar tab={tab} onChange={setTab} />
-      <VolTargetTab />
+      {t.body}
     </DeskPage>
-  ) : <DeltaDesk tabs={<TabBar tab={tab} onChange={setTab} />} />;
+  );
 }
 
 function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {

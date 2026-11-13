@@ -1,4 +1,4 @@
-"""optionflow/modules/hedge/voltarget.py — volatility targeting on the synced book.
+"""optionflow/modules/risk/voltarget.py — volatility targeting on the synced book.
 
     exposure = σ_target / σ̂_forecast
 
@@ -23,7 +23,7 @@ import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-logger = logging.getLogger("optionflow.hedge.voltarget")
+logger = logging.getLogger("optionflow.risk.voltarget")
 
 ALPHA, BETA = 0.10, 0.85         # GARCH(1,1) reaction and persistence
 YEAR = 252                       # sessions a year
@@ -88,13 +88,8 @@ def scale_book(target: float, forecast: Optional[float], gross: float, capital: 
 
 
 def align(series: Dict[str, Dict[str, float]], days: int = HISTORY_DAYS) -> Tuple[List[str], Dict[str, List[float]]]:
-    """Daily log returns on the dates every symbol has, the last `days` of them. series: {sym: {date: close}}."""
-    if not series:
-        return [], {}
-    common = sorted(set.intersection(*(set(s) for s in series.values())))
-    common = common[-(days + 1):]
-    rets = {sym: [math.log(s[b] / s[a]) for a, b in zip(common, common[1:])] for sym, s in series.items()}
-    return common[1:], rets
+    from optionflow.modules.risk.book import align as _align
+    return _align(series, days)
 
 
 def risk_shares(weights: Dict[str, float], rets: Dict[str, List[float]]) -> Dict[str, Optional[float]]:
@@ -115,45 +110,21 @@ def risk_shares(weights: Dict[str, float], rets: Dict[str, List[float]]) -> Dict
 
 
 # ── Service ───────────────────────────────────────────────────────────────────
-def _closes(sym: str) -> Dict[str, float]:
-    """{date: close} from the insight module's cached 5-year daily bars, today's close = the live price."""
-    from optionflow.modules.insight import service as insight
-    bars, _ = insight._bars(sym, insight.SCORE_PERIOD)
-    bars = insight.with_live(bars, insight.live_price(sym)[0])
-    return {b["date"][:10]: float(b["close"]) for b in bars if b.get("close")}
-
-
-def _capital(user_id: int) -> Optional[float]:
-    try:
-        from optionflow.modules.hedge import portfolio as pf
-        return pf.portfolio(user_id, live=False).get("total_value")
-    except Exception as exc:
-        logger.info("vol target: no account value for user %s: %s", user_id, exc)
-        return None
-
-
 def _thin(points: List[Dict[str, Any]], n: int = CHART_DAYS) -> List[Dict[str, Any]]:
     return points[-n:]
 
 
 def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAULT_CAP,
                capital: Optional[float] = None) -> Dict[str, Any]:
-    from optionflow.modules.hedge import service
-    books = [b for b in service.books_for(user_id)["books"] if not b.get("error") and b.get("spot")]
-    account_value = _capital(user_id)
+    from optionflow.modules.risk import book
+    account_value = book.capital(user_id)
     rows: List[Dict[str, Any]] = []
     closes: Dict[str, Dict[str, float]] = {}
-    for b in books:
-        sym, spot = b["symbol"], float(b["spot"])
-        exposure = float(b.get("net_delta") or 0.0) * 100.0 * spot
-        row: Dict[str, Any] = {"symbol": sym, "spot": spot, "net_delta": b.get("net_delta"), "exposure": exposure,
-                               "has_options": any(leg.get("kind") == "option" for leg in b.get("legs") or []),
-                               "shares": b.get("shares") or 0.0, "error": None}
-        try:
-            c = _closes(sym)
-        except Exception as exc:
-            c = {}
-            row["error"] = str(exc)
+    for h in book.holdings(user_id):
+        sym = h["symbol"]
+        row: Dict[str, Any] = {**h, "error": None}
+        c, err = book.safe_closes(sym)
+        row["error"] = err
         if len(c) > MIN_HISTORY:
             closes[sym] = c
         f = garch_forecast(log_returns([c[d] for d in sorted(c)][-(HISTORY_DAYS + 1):]))

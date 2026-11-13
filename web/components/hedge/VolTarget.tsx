@@ -6,6 +6,7 @@
  * optionflow/modules/hedge/voltarget.py). Exposure is in delta dollars, so options count with shares.
  * The page shows the scale for the whole book, the forecast against the target over the last year, and what
  * each holding would be at that scale. Target and cap are remembered per browser.
+ * The theory is behind the Theory button (VolTargetTheory), not on the page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { fetchVolTarget, VolTarget as VT, VolTargetHolding } from "@/lib/api";
 import { DeskFigure, DeskFigures, DeskSection } from "@/components/desk";
+import { Formula, H, P, Terms, Theory } from "./Theory";
 
 const TARGETS = [0.10, 0.15, 0.20, 0.25] as const;
 const CAPS = [1, 1.5, 2] as const;
@@ -265,15 +267,41 @@ export function VolTargetTab() {
             )}
           </DeskSection>
 
-          <DeskSection label="How it works">
-            <div className="max-w-2xl space-y-2 text-[13px] leading-relaxed text-foreground/65">
-              <p><b className="font-medium text-foreground">exposure = target vol ÷ forecast vol.</b> When the market gets wild the forecast rises and you hold less; when it&apos;s calm you can hold more, up to the max exposure.</p>
-              <p>The forecast is a GARCH(1,1): tomorrow&apos;s variance = ω + 0.10 × today&apos;s move² + 0.85 × today&apos;s variance, with ω set so it drifts back to the 3-year average. It runs on your whole book (each holding&apos;s delta dollars ÷ capital, replayed over the past returns), so holdings that move together count as more risk than ones that offset.</p>
-              <p>Change in shares is in delta: for options, trim or add contracts (or hedge with shares) until the delta moves by that much. A forecast, not advice.</p>
-            </div>
-          </DeskSection>
         </>
       )}
     </>
+  );
+}
+
+/** The Theory pop-up for this tab. */
+export function VolTargetTheory() {
+  return (
+    <Theory title="Volatility targeting">
+      <P>Hold less when markets get wild, more when they&apos;re calm, so the risk you carry stays about the same.</P>
+      <Formula>exposure = σ_target ÷ σ̂_forecast</Formula>
+      <Terms rows={[
+        ["exposure", "how much of your capital is in the market"],
+        ["σ_target", "the risk you want, as annual volatility (the Target vol chips)"],
+        ["σ̂_forecast", "the forecast of market risk; the hat means it's an estimate"],
+      ]} />
+      <P>With a 15% target: a 10% forecast gives 150% (leverage, or 100% at the cap), 15% gives 100%, 30% gives 50%.</P>
+
+      <H>The forecast: GARCH(1,1)</H>
+      <Formula>var[t+1] = ω + α·move[t]² + β·var[t]</Formula>
+      <Terms rows={[
+        ["α = 0.10", "a big move today raises tomorrow's risk"],
+        ["β = 0.85", "risk fades slowly: volatility comes in clusters"],
+        ["ω", "set to (1 − α − β) × the 3-year average variance, so the forecast drifts back to normal"],
+      ]} />
+      <P>α + β = 0.95: a shock loses half its effect in about 13 trading days. Daily variance × 252 sessions, square-rooted, gives the annual vol shown.</P>
+
+      <H>How this tab uses it</H>
+      <P>Exposure is in delta dollars (net delta × 100 × price), so options count with shares. Your book as it is today is replayed over three years of daily returns and the forecast runs on that, so holdings that move together count as more risk than ones that offset.</P>
+      <P><b className="font-medium text-foreground">Scale</b> = target ÷ forecast, cut so gross exposure stays within max exposure × capital. Every position gets the same scale; <b className="font-medium text-foreground">Change</b> is what to add or cut to get there, in dollars and in shares of delta (for options: trim or add contracts, or hedge with shares, until delta moves that much).</P>
+
+      <H>Why it works, and what it costs</H>
+      <P>Big losses tend to come when volatility spikes, and that&apos;s when the rule has you holding less. It usually improves return per unit of risk. The cost: after a crash, volatility stays high while prices rebound, so you can be underweight for the recovery. It also trades more often.</P>
+      <p className="text-foreground/50">A forecast, not advice.</p>
+    </Theory>
   );
 }
