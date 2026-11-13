@@ -12044,6 +12044,18 @@
    },
    "VolTargetHolding": {
     "properties": {
+     "atm_iv": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The stock's ATM implied vol (decimal)",
+      "title": "Atm Iv"
+     },
      "change": {
       "anyOf": [
        {
@@ -12067,6 +12079,21 @@
       ],
       "description": "The change in share-equivalents (delta)",
       "title": "Change Shares"
+     },
+     "contracts_after": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "number"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Long / sold contracts at the target scale",
+      "title": "Contracts After"
      },
      "error": {
       "anyOf": [
@@ -12101,6 +12128,11 @@
       "title": "Has Options",
       "type": "boolean"
      },
+     "long_contracts": {
+      "default": 0,
+      "title": "Long Contracts",
+      "type": "number"
+     },
      "long_run": {
       "anyOf": [
        {
@@ -12111,6 +12143,30 @@
        }
       ],
       "title": "Long Run"
+     },
+     "loss_99": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "1-in-100 replayed day, $ lost",
+      "title": "Loss 99"
+     },
+     "max_loss": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Most it can lose held to expiry; None with unlimited_loss",
+      "title": "Max Loss"
      },
      "net_delta": {
       "anyOf": [
@@ -12124,6 +12180,18 @@
       "description": "Lots (100 shares = 1.00), shares and options together",
       "title": "Net Delta"
      },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this holding was priced when not fully (e.g. legs without IV)",
+      "title": "Note"
+     },
      "own_exposure": {
       "anyOf": [
        {
@@ -12135,6 +12203,18 @@
       ],
       "description": "target \u00f7 this stock's own forecast, capped",
       "title": "Own Exposure"
+     },
+     "pnl_vol": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Annual vol of its replayed daily P&L, as a fraction of capital",
+      "title": "Pnl Vol"
      },
      "realized_20d": {
       "anyOf": [
@@ -12164,6 +12244,12 @@
       "title": "Shares",
       "type": "number"
      },
+     "short_contracts": {
+      "default": 0,
+      "description": "Option contracts sold (positive number)",
+      "title": "Short Contracts",
+      "type": "number"
+     },
      "spot": {
       "title": "Spot",
       "type": "number"
@@ -12183,6 +12269,24 @@
       "title": "Symbol",
       "type": "string"
      },
+     "unlimited_loss": {
+      "default": false,
+      "description": "More calls sold than the shares and long calls cover",
+      "title": "Unlimited Loss",
+      "type": "boolean"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Worth now: shares at spot, options at mark (sold options negative)",
+      "title": "Value"
+     },
      "weight": {
       "anyOf": [
        {
@@ -12194,6 +12298,18 @@
       ],
       "description": "exposure \u00f7 capital",
       "title": "Weight"
+     },
+     "worst_day": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Worst replayed day, $ lost",
+      "title": "Worst Day"
      }
     },
     "required": [
@@ -12313,6 +12429,30 @@
       ],
       "title": "Long Run"
      },
+     "loss_99": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "1-in-100 replayed day for today's book, $ lost",
+      "title": "Loss 99"
+     },
+     "max_loss": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Most the book can lose held to expiry; None if any is unlimited",
+      "title": "Max Loss"
+     },
      "max_scale": {
       "anyOf": [
        {
@@ -12324,6 +12464,16 @@
       ],
       "description": "Largest scale the cap allows: cap \u00d7 capital \u00f7 gross",
       "title": "Max Scale"
+     },
+     "method": {
+      "default": "delta",
+      "description": "delta: shares only; repriced: every option leg repriced with Black-Scholes on each past day",
+      "enum": [
+       "delta",
+       "repriced"
+      ],
+      "title": "Method",
+      "type": "string"
      },
      "net": {
       "default": 0,
@@ -12361,6 +12511,39 @@
      "target": {
       "title": "Target",
       "type": "number"
+     },
+     "unlimited": {
+      "default": [],
+      "description": "Holdings with unlimited loss (calls sold beyond cover)",
+      "items": {
+       "type": "string"
+      },
+      "title": "Unlimited",
+      "type": "array"
+     },
+     "vix_note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set when implied vol couldn't follow VIX in the replay",
+      "title": "Vix Note"
+     },
+     "worst_day": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Worst replayed day for today's book, $ lost",
+      "title": "Worst Day"
      }
     },
     "required": [

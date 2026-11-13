@@ -5801,6 +5801,11 @@ export interface components {
         /** VolTargetHolding */
         VolTargetHolding: {
             /**
+             * Atm Iv
+             * @description The stock's ATM implied vol (decimal)
+             */
+            atm_iv?: number | null;
+            /**
              * Change
              * @description Delta dollars to add (+) or cut (−)
              */
@@ -5810,6 +5815,13 @@ export interface components {
              * @description The change in share-equivalents (delta)
              */
             change_shares?: number | null;
+            /**
+             * Contracts After
+             * @description Long / sold contracts at the target scale
+             */
+            contracts_after?: {
+                [key: string]: number;
+            } | null;
             /** Error */
             error?: string | null;
             /**
@@ -5827,18 +5839,43 @@ export interface components {
              * @default false
              */
             has_options: boolean;
+            /**
+             * Long Contracts
+             * @default 0
+             */
+            long_contracts: number;
             /** Long Run */
             long_run?: number | null;
+            /**
+             * Loss 99
+             * @description 1-in-100 replayed day, $ lost
+             */
+            loss_99?: number | null;
+            /**
+             * Max Loss
+             * @description Most it can lose held to expiry; None with unlimited_loss
+             */
+            max_loss?: number | null;
             /**
              * Net Delta
              * @description Lots (100 shares = 1.00), shares and options together
              */
             net_delta?: number | null;
             /**
+             * Note
+             * @description How this holding was priced when not fully (e.g. legs without IV)
+             */
+            note?: string | null;
+            /**
              * Own Exposure
              * @description target ÷ this stock's own forecast, capped
              */
             own_exposure?: number | null;
+            /**
+             * Pnl Vol
+             * @description Annual vol of its replayed daily P&L, as a fraction of capital
+             */
+            pnl_vol?: number | null;
             /** Realized 20D */
             realized_20d?: number | null;
             /**
@@ -5851,6 +5888,12 @@ export interface components {
              * @default 0
              */
             shares: number;
+            /**
+             * Short Contracts
+             * @description Option contracts sold (positive number)
+             * @default 0
+             */
+            short_contracts: number;
             /** Spot */
             spot: number;
             /** Suggested Exposure */
@@ -5858,10 +5901,26 @@ export interface components {
             /** Symbol */
             symbol: string;
             /**
+             * Unlimited Loss
+             * @description More calls sold than the shares and long calls cover
+             * @default false
+             */
+            unlimited_loss: boolean;
+            /**
+             * Value
+             * @description Worth now: shares at spot, options at mark (sold options negative)
+             */
+            value?: number | null;
+            /**
              * Weight
              * @description exposure ÷ capital
              */
             weight?: number | null;
+            /**
+             * Worst Day
+             * @description Worst replayed day, $ lost
+             */
+            worst_day?: number | null;
         };
         /** VolTargetOut */
         VolTargetOut: {
@@ -5908,10 +5967,27 @@ export interface components {
             /** Long Run */
             long_run?: number | null;
             /**
+             * Loss 99
+             * @description 1-in-100 replayed day for today's book, $ lost
+             */
+            loss_99?: number | null;
+            /**
+             * Max Loss
+             * @description Most the book can lose held to expiry; None if any is unlimited
+             */
+            max_loss?: number | null;
+            /**
              * Max Scale
              * @description Largest scale the cap allows: cap × capital ÷ gross
              */
             max_scale?: number | null;
+            /**
+             * Method
+             * @description delta: shares only; repriced: every option leg repriced with Black-Scholes on each past day
+             * @default delta
+             * @enum {string}
+             */
+            method: "delta" | "repriced";
             /**
              * Net
              * @default 0
@@ -5931,6 +6007,22 @@ export interface components {
             sessions: number;
             /** Target */
             target: number;
+            /**
+             * Unlimited
+             * @description Holdings with unlimited loss (calls sold beyond cover)
+             * @default []
+             */
+            unlimited: string[];
+            /**
+             * Vix Note
+             * @description Set when implied vol couldn't follow VIX in the replay
+             */
+            vix_note?: string | null;
+            /**
+             * Worst Day
+             * @description Worst replayed day for today's book, $ lost
+             */
+            worst_day?: number | null;
         };
         /** VolTargetPoint */
         VolTargetPoint: {

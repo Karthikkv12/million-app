@@ -9,7 +9,10 @@
 α and β are fixed (no fitting, so no optimiser that can fail on a short or odd history); ω is set so the
 forecast reverts to the sample variance. α + β = 0.95: a shock fades with a half-life of about 13 sessions.
 
-Exposure is measured in delta dollars, so shares and options count alike: Δ (lots) × 100 × spot. The portfolio's
+For shares, exposure is delta dollars and the book's daily returns are Σ wᵢ·rᵢ (exact for shares). With any
+option held, every leg is fully repriced on each past day instead (repricing.py): LEAPS vega, sold options'
+gamma and theta, and the cap on a long option's loss all enter the forecast. Exposure (for the cap and the
+table) is still measured in delta dollars, so shares and options count alike: Δ (lots) × 100 × spot. The portfolio's
 forecast is GARCH run on the daily returns of TODAY's book replayed over the history (Σ wᵢ·rᵢ, wᵢ = delta dollars
 ÷ capital), which keeps the correlation between holdings. The scale for the whole book is target ÷ forecast, cut
 so gross delta dollars stay within `cap` × capital; every holding is scaled by the same factor.
@@ -114,13 +117,29 @@ def _thin(points: List[Dict[str, Any]], n: int = CHART_DAYS) -> List[Dict[str, A
     return points[-n:]
 
 
+VIX = "^VIX"
+
+
 def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAULT_CAP,
                capital: Optional[float] = None) -> Dict[str, Any]:
+    """Shares only: delta dollars × daily returns (exact for shares). Any option held: every leg repriced with
+    Black-Scholes on each past day (repricing.py), so LEAPS vega, sold options' gamma and theta, and the cap on a
+    long option's loss are in the forecast. The scale multiplies every position (contracts too), which scales a
+    repriced P&L exactly, so the rule target ÷ forecast holds either way."""
+    import numpy as np
+    from concurrent.futures import ThreadPoolExecutor
     from optionflow.modules.risk import book
+    from optionflow.modules.risk import repricing as rp
+    # VIX is only needed when options are held, but that isn't known until the book is priced (the slow part,
+    # T-68): load it alongside so a cold VIX never adds to the wait. Cached for 15 min in insight.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        vix_job = pool.submit(book.safe_closes, VIX)
+        held = book.holdings(user_id)
+        vix_loaded = vix_job.result()
     account_value = book.capital(user_id)
     rows: List[Dict[str, Any]] = []
     closes: Dict[str, Dict[str, float]] = {}
-    for h in book.holdings(user_id):
+    for h in held:
         sym = h["symbol"]
         row: Dict[str, Any] = {**h, "error": None}
         c, err = book.safe_closes(sym)
@@ -129,42 +148,98 @@ def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAUL
             closes[sym] = c
         f = garch_forecast(log_returns([c[d] for d in sorted(c)][-(HISTORY_DAYS + 1):]))
         row.update(f)
-        row["own_exposure"] = exposure_for(target, f["forecast"], cap)
+        row["own_exposure"] = exposure_for(target, f["forecast"], cap) if not h.get("has_options") else None
         if f["forecast"] is None and not row["error"]:
             row["error"] = f"Not enough price history for {sym}."
+        legs = h.get("legs") or []
+        opts = [leg for leg in legs if leg.get("kind") == "option"]
+        row["long_contracts"] = sum(leg["quantity"] for leg in opts if (leg.get("quantity") or 0) > 0)
+        row["short_contracts"] = -sum(leg["quantity"] for leg in opts if (leg.get("quantity") or 0) < 0)
+        row["value"] = rp.value(legs, h["spot"]) if legs else None
+        row["max_loss"] = rp.max_loss(legs, h["spot"]) if legs else None
+        row["unlimited_loss"] = bool(legs) and row["max_loss"] is None
+        no_iv = [leg for leg in opts if rp.leg_iv(leg, h.get("atm_iv")) is None or not leg.get("strike")]
+        row["note"] = (f"{len(no_iv)} option leg{'s' if len(no_iv) > 1 else ''} without implied vol: priced on delta, "
+                       "without vega or the loss cap.") if no_iv else None
         rows.append(row)
 
+    method = "repriced" if any(r.get("has_options") for r in rows) else "delta"
+    vix_note = None
     gross = sum(abs(r["exposure"]) for r in rows)
     cap_base = capital or account_value or gross or 0.0
-    weights = {r["symbol"]: r["exposure"] / cap_base for r in rows if cap_base and r["symbol"] in closes}
-    dates, rets = align({s: closes[s] for s in weights})
-    port = [sum(weights[s] * rets[s][i] for s in weights) for i in range(len(dates))] if dates else []
+    syms = [r["symbol"] for r in rows if cap_base and r["symbol"] in closes]
+    series = {s: closes[s] for s in syms}
+    if method == "repriced" and syms:
+        vix, err = vix_loaded
+        if len(vix) > MIN_HISTORY:
+            series[VIX] = vix
+        else:
+            vix_note = f"No VIX history{f' ({err})' if err else ''}: implied vol held flat in the replay."
+    dates, rets = align(series)
+    if VIX in series and len(dates) < MIN_HISTORY:          # VIX shortened the window too much: replay without it
+        series.pop(VIX)
+        vix_note = "VIX history too short: implied vol held flat in the replay."
+        dates, rets = align(series)
+
+    pnl: Dict[str, Any] = {}                                 # $ per day for each holding (today's book)
+    if dates:
+        if method == "delta":
+            for s in syms:
+                exp = next(r["exposure"] for r in rows if r["symbol"] == s)
+                pnl[s] = exp * np.asarray(rets[s])            # exactly the previous weights × returns
+        else:
+            vr = rets.get(VIX)
+            for r in rows:
+                if r["symbol"] not in syms:
+                    continue
+                pnl[r["symbol"]] = rp.holding_pnl(r.get("legs") or [], r["spot"], rets[r["symbol"]], vr, r.get("atm_iv"))
+    port_d = sum(pnl.values()) if pnl else np.zeros(0)
+    port = list(np.asarray(port_d) / cap_base) if cap_base and len(dates) else []
     pf_f = garch_forecast(port)
     scale, capped = scale_book(target, pf_f["forecast"], gross, cap_base, cap)
-    shares = risk_shares(weights, rets) if dates else {}
+
+    # Each holding's share of the book's variance, on the same daily P&L the forecast uses.
+    shares: Dict[str, Optional[float]] = {}
+    if pnl and len(dates) >= MIN_HISTORY:
+        P = {s: np.asarray(v)[-YEAR:] for s, v in pnl.items()}
+        tot = np.asarray(port_d)[-YEAR:]
+        var = float(np.var(tot, ddof=1))
+        for s, v in P.items():
+            shares[s] = float(np.cov(v, tot, ddof=1)[0, 1] / var) if var > 0 else None
+    tails = rp.tail(port_d) if len(dates) else {"worst_day": None, "loss_99": None}
 
     for r in rows:
         r["weight"] = r["exposure"] / cap_base if cap_base else None
         r["risk_share"] = shares.get(r["symbol"])
+        p = pnl.get(r["symbol"])
+        r["pnl_vol"] = float(np.std(p[-YEAR:], ddof=1) * math.sqrt(YEAR) / cap_base) if p is not None and cap_base and len(p) > 2 else None
+        r.update({k: v for k, v in (rp.tail(p) if p is not None else {"worst_day": None, "loss_99": None}).items()})
+        r.pop("legs", None)
         if scale is not None:
             r["suggested_exposure"] = r["exposure"] * scale
             r["change"] = r["suggested_exposure"] - r["exposure"]
             r["change_shares"] = r["change"] / r["spot"] if r["spot"] else None
+            r["contracts_after"] = {"long": r["long_contracts"] * scale, "short": r["short_contracts"] * scale} if r.get("has_options") else None
         else:
-            r["suggested_exposure"] = r["change"] = r["change_shares"] = None
+            r["suggested_exposure"] = r["change"] = r["change_shares"] = r["contracts_after"] = None
 
     path = garch_path(port) if len(port) >= MIN_HISTORY else []
     chart = [{"date": d, "forecast": annual(v), "scale": scale_book(target, annual(v), gross, cap_base, cap)[0]}
              for d, v in zip(dates, path[:-1])]                 # path[i] is the forecast for dates[i]
     rows.sort(key=lambda r: -abs(r["exposure"]))
+    unlimited = [r["symbol"] for r in rows if r.get("unlimited_loss")]
+    limited = [r["max_loss"] for r in rows if r.get("max_loss") is not None]
     return {
         "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "target": target, "cap": cap, "capital": cap_base or None, "account_value": account_value,
         "capital_source": "input" if capital else "account" if account_value else "gross" if gross else None,
         "gross": gross, "net": sum(r["exposure"] for r in rows),
+        "method": method, "vix_note": vix_note,
         "forecast": pf_f["forecast"], "long_run": pf_f["long_run"], "realized_20d": pf_f["realized_20d"],
         "scale": scale, "capped": capped,
         "max_scale": cap * cap_base / gross if gross and cap_base else None,
+        "worst_day": tails["worst_day"], "loss_99": tails["loss_99"],
+        "max_loss": None if unlimited else (sum(limited) if limited else None), "unlimited": unlimited,
         "sessions": len(dates), "holdings": rows, "chart": _thin(chart),
         "error": None if rows else "No positions synced yet.",
     }

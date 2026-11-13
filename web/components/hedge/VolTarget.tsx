@@ -28,6 +28,7 @@ const money = (v?: number | null, signed = false) => {
   const a = Math.abs(v), s = v < 0 ? "−" : signed && v > 0 ? "+" : "";
   return a >= 1e6 ? `${s}$${(a / 1e6).toFixed(2)}M` : a >= 1e3 ? `${s}$${(a / 1e3).toFixed(1)}K` : `${s}$${a.toFixed(0)}`;
 };
+const ct = (v: number) => (Math.abs(v - Math.round(v)) < 0.05 ? Math.round(v).toString() : v.toFixed(1));
 const sh = (v?: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v) >= 10 ? Math.abs(v).toFixed(0) : Math.abs(v).toFixed(1)} sh`);
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
 
@@ -159,7 +160,10 @@ function Row({ h }: { h: VolTargetHolding }) {
     <tr className="border-b border-[var(--border)] last:border-0">
       <td className="py-2.5 pr-3">
         <Link href={`/stocks/${h.symbol}`} className="font-medium text-foreground hover:text-accent">{h.symbol}</Link>
-        <p className="font-sans text-[11px] text-foreground/45">{h.shares ? `${h.shares} sh` : "no shares"}{h.has_options ? " + opts" : ""}</p>
+        <p className="font-sans text-[11px] text-foreground/45">
+          {[h.shares ? `${h.shares} sh` : null, h.long_contracts ? `+${ct(h.long_contracts)} long` : null,
+            h.short_contracts ? `−${ct(h.short_contracts)} sold` : null].filter(Boolean).join(" · ") || "—"}
+        </p>
       </td>
       <td className="sensitive py-2.5 pr-3 text-right">{money(h.exposure)}<p className="text-[11px] text-foreground/45">{pct(h.weight, 1)}<span className="hidden sm:inline"> of capital</span></p></td>
       <td className="py-2.5 pr-3 text-right" title={`Long-run ${vol(h.long_run)} · last 20 days ${vol(h.realized_20d)}`}>
@@ -167,10 +171,21 @@ function Row({ h }: { h: VolTargetHolding }) {
         <p className="text-[11px] text-foreground/45">avg {vol(h.long_run, 0)}</p>
       </td>
       <td className="hidden sm:table-cell py-2.5 pr-3 text-right"><RiskBar v={h.risk_share} /></td>
-      <td className="hidden sm:table-cell py-2.5 pr-3 text-right text-foreground/70" title="Exposure this stock alone would get: target ÷ its own forecast, capped">{pct(h.own_exposure)}</td>
+      <td className="hidden sm:table-cell py-2.5 pr-3 text-right text-foreground/70"
+        title={h.has_options ? "Not shown with options: an option's risk isn't a share of capital" : "Exposure this stock alone would get: target ÷ its own forecast, capped"}>{pct(h.own_exposure)}</td>
+      <td className={clsx("hidden sensitive py-2.5 pr-3 text-right md:table-cell", h.unlimited_loss ? "text-loss" : "text-foreground/75")}
+        title={h.worst_day != null ? `Worst replayed day ${money(-h.worst_day, true)} · 1-in-100 day ${money(-(h.loss_99 ?? 0), true)}` : undefined}>
+        {h.unlimited_loss ? "unlimited" : money(h.max_loss)}
+      </td>
       <td className="hidden sm:table-cell sensitive py-2.5 pr-3 text-right">{money(h.suggested_exposure)}</td>
       <td className={clsx("sensitive py-2.5 text-right", (h.change ?? 0) > 0 ? "text-gain" : (h.change ?? 0) < 0 ? "text-loss" : "text-foreground/55")}>
-        {money(h.change, true)}<p className="text-[11px]">{sh(h.change_shares)} Δ</p>
+        {money(h.change, true)}
+        {h.contracts_after ? (
+          <p className="text-[11px]" title="Contracts at the target scale (every position scales the same)">
+            {[h.long_contracts ? `long ${ct(h.long_contracts)}→${ct(h.contracts_after.long)}` : null,
+              h.short_contracts ? `sold ${ct(h.short_contracts)}→${ct(h.contracts_after.short)}` : null].filter(Boolean).join(" · ")}
+          </p>
+        ) : <p className="text-[11px]">{sh(h.change_shares)} Δ</p>}
       </td>
     </tr>
   );
@@ -199,7 +214,7 @@ export function VolTargetTab() {
   const add = d?.scale != null ? d.scale - 1 : null;
   const verdict = d?.scale == null ? null
     : Math.abs(add!) < 0.05 ? "On target: keep the book as it is."
-    : add! < 0 ? `Too much risk: cut every position to ${pct(d.scale)} of its size.`
+    : add! < 0 ? `Too much risk: cut every position${d.method === "repriced" ? " (contracts too)" : ""} to ${pct(d.scale)} of its size.`
     : `Room for more: you could scale every position to ${pct(d.scale)}${d.capped ? " (held back by the cap)" : ""}.`;
 
   return (
@@ -207,8 +222,12 @@ export function VolTargetTab() {
       <div className="-mx-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-[var(--border-strong)] px-4 py-2 sm:mx-0 sm:px-0">
         <Chips label="Target vol" options={TARGETS} value={prefs.target as typeof TARGETS[number]} onChange={(t) => setPrefs((p) => ({ ...p, target: t }))} fmt={(v) => `${v * 100}%`} />
         <Chips label="Max exposure" options={CAPS} value={prefs.cap as typeof CAPS[number]} onChange={(c) => setPrefs((p) => ({ ...p, cap: c }))} fmt={(v) => `${v}×`} />
-        <p className="ml-auto font-mono text-[11px] text-foreground/45">
-          {d?.capital_source === "account" ? "capital = synced account value" : d?.capital_source === "gross" ? "capital = your gross exposure (no account value synced)" : ""}
+        <p className="ml-auto text-right font-mono text-[11px] text-foreground/45">
+          {d && <span className={clsx(d.method === "repriced" && "text-foreground/70")}
+            title={d.method === "repriced" ? "Every option leg repriced with Black-Scholes on each past day: vega, gamma, theta and the loss cap included" : "Shares only: delta dollars are exact"}>
+            {d.method === "repriced" ? "method: options fully repriced" : "method: shares (delta)"}
+          </span>}
+          {d?.capital_source && <span> · {d.capital_source === "account" ? "capital = synced account value" : d.capital_source === "gross" ? "capital = gross exposure (no account value synced)" : "capital set"}</span>}
         </p>
       </div>
 
@@ -222,7 +241,7 @@ export function VolTargetTab() {
             {verdict && <p className={clsx("mb-4 border-l-[3px] pl-3 text-[15px] font-medium", add! < -0.05 ? "border-loss text-foreground" : add! > 0.05 ? "border-gain text-foreground" : "border-accent text-foreground")}>{verdict}</p>}
             {d.scale != null && d.scale < 0.25 && (
               <p className="-mt-2 mb-4 pl-[15px] text-[12.5px] text-foreground/55">
-                A scale this small isn&apos;t an error: options carry far more delta than the cash they cost, so a leveraged, options-heavy book can run several times the target&apos;s risk. Theory explains it.
+                A scale this small isn&apos;t an error: options move like many more shares than the cash they cost, so an options-heavy book can carry several times the target&apos;s daily swings. Theory explains it.
               </p>
             )}
             <DeskFigures>
@@ -233,6 +252,16 @@ export function VolTargetTab() {
               <DeskFigure sensitive label="Gross exposure" value={money(d.gross)} sub={`→ ${money(d.scale != null ? d.gross * d.scale : null)} at target`} />
               <DeskFigure sensitive label="Capital" value={money(d.capital)} sub={`${pct(d.capital ? d.gross / d.capital : null)} invested`} />
             </DeskFigures>
+            <DeskFigures className="mt-4 border-t border-[var(--border)] pt-4">
+              <DeskFigure sensitive label="Worst day" value={money(d.worst_day != null ? -d.worst_day : null, true)} tone="text-loss"
+                sub={`replayed · ${pct(d.capital && d.worst_day != null ? d.worst_day / d.capital : null, 1)} of capital`} />
+              <DeskFigure sensitive label="1-in-100 day" value={money(d.loss_99 != null ? -d.loss_99 : null, true)}
+                sub={`${pct(d.capital && d.loss_99 != null ? d.loss_99 / d.capital : null, 1)} of capital`} />
+              <DeskFigure sensitive label="Max loss" value={d.unlimited.length ? "Unlimited" : money(d.max_loss)}
+                tone={d.unlimited.length ? "text-loss" : undefined}
+                sub={d.unlimited.length ? `calls sold beyond cover: ${d.unlimited.join(" · ")}` : "held to expiry"} />
+            </DeskFigures>
+            {d.vix_note && <p className="mt-3 font-mono text-[11px] text-warn">{d.vix_note}</p>}
           </div>
 
           <DeskSection label="Forecast vs target" meta={<>Your book as it is today,<br />replayed over the last year.<br />Above the dashed line:<br />hold less.</>}>
@@ -252,7 +281,7 @@ export function VolTargetTab() {
 
           <DeskSection label="By holding" meta={<>Exposure = delta dollars:<br />shares and options together.<br />Change = what to add or cut<br />to hit the target.</>}>
             <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-              <table className="w-full font-mono sm:min-w-[720px] text-[12.5px] tabular-nums">
+              <table className="w-full font-mono sm:min-w-[720px] md:min-w-[820px] text-[12.5px] tabular-nums">
                 <thead>
                   <tr className="border-b border-[var(--border-strong)] text-[10px] uppercase tracking-[0.14em] text-foreground/45">
                     <th className="pb-2 pr-3 text-left font-normal">Symbol</th>
@@ -260,6 +289,7 @@ export function VolTargetTab() {
                     <th className="pb-2 pr-3 text-right font-normal" title="GARCH forecast, annual; red above its own average, green below"><span className="sm:hidden">Vol</span><span className="hidden sm:inline">Forecast vol</span></th>
                     <th className="hidden sm:table-cell pb-2 pr-3 text-right font-normal" title="Share of the book's risk (variance)">Risk share</th>
                     <th className="hidden sm:table-cell pb-2 pr-3 text-right font-normal" title="target ÷ this stock's own forecast, capped">Alone</th>
+                    <th className="hidden pb-2 pr-3 text-right font-normal md:table-cell" title="Most it can lose if every leg is held to expiry">Max loss</th>
                     <th className="hidden sm:table-cell pb-2 pr-3 text-right font-normal">At target</th>
                     <th className="pb-2 text-right font-normal">Change</th>
                   </tr>
@@ -269,6 +299,9 @@ export function VolTargetTab() {
             </div>
             {d.holdings.some((h) => h.error) && (
               <p className="mt-2 font-mono text-[11px] text-foreground/45">Left out of the forecast: {d.holdings.filter((h) => h.error).map((h) => `${h.symbol} (${h.error})`).join(" · ")}</p>
+            )}
+            {d.holdings.some((h) => h.note) && (
+              <p className="mt-1 font-mono text-[11px] text-warn">{d.holdings.filter((h) => h.note).map((h) => `${h.symbol}: ${h.note}`).join(" · ")}</p>
             )}
           </DeskSection>
 
@@ -300,12 +333,26 @@ export function VolTargetTheory() {
       ]} />
       <P>α + β = 0.95: a shock loses half its effect in about 13 trading days. Daily variance × 252 sessions, square-rooted, gives the annual vol shown.</P>
 
-      <H>How this tab uses it</H>
-      <P>Exposure is in delta dollars (net delta × 100 × price), so options count with shares. Your book as it is today is replayed over three years of daily returns and the forecast runs on that, so holdings that move together count as more risk than ones that offset.</P>
-      <P><b className="font-medium text-foreground">Scale</b> = target ÷ forecast, cut so gross exposure stays within max exposure × capital. Every position gets the same scale; <b className="font-medium text-foreground">Change</b> is what to add or cut to get there, in dollars and in shares of delta (for options: trim or add contracts, or hedge with shares, until delta moves that much).</P>
+      <H>How this tab uses it: shares</H>
+      <P>For shares the daily P&amp;L is exact: shares × price × that day&apos;s move. Your book as it is today is replayed over three years of daily returns and the forecast runs on that, so holdings that move together count as more risk than ones that offset.</P>
+
+      <H>Options: every contract repriced</H>
+      <P>Delta alone is wrong for options. A LEAPS also moves with implied volatility, a long option can never lose more than it&apos;s worth, and sold options lose faster the further the stock runs at them while earning time decay. So as soon as you hold any option, every contract (bought or sold) is repriced with Black-Scholes on each past day:</P>
+      <Formula>P&amp;L = contracts × 100 × [ BS(S·eʳ, σ₁, T − 1 day) − BS(S, σ, T) ]</Formula>
+      <Terms rows={[
+        ["S·eʳ", "today's price moved by that day's actual return"],
+        ["σ₁", "the contract's implied vol moved with VIX that day: σ × VIX₁ ÷ VIX₀ (fear up → IV up)"],
+        ["T − 1 day", "one trading day of time decay"],
+        ["contracts", "signed: sold options are negative, so they earn theta and lose on big moves"],
+      ]} />
+      <P>What changes: a 1-year call gets about a quarter of its daily swing from implied vol, which delta ignored. For long calls IV usually rises when the stock falls, cushioning the loss, so the forecast is often lower than before; long puts the other way. Sold options show their real tail: <b className="font-medium text-foreground">Worst day</b> and <b className="font-medium text-foreground">1-in-100 day</b> are the replayed losses, and <b className="font-medium text-foreground">Max loss</b> is the most each holding can lose held to expiry: the premium for a long option, strike − credit for a sold put, unlimited for calls sold beyond the shares and long calls that cover them.</P>
+      <P><b className="font-medium text-foreground">Scale</b> = target ÷ forecast, cut so gross exposure stays within max exposure × capital. Every position gets the same scale, contracts included; scaling the contracts scales their repriced P&amp;L exactly, so the rule holds for options too. <b className="font-medium text-foreground">Change</b> shows the delta dollars to add or cut, and for option holdings the contract counts at the target (e.g. long 5→3.6).</P>
 
       <H>Why the scale can be tiny</H>
-      <P>Risk is measured on delta dollars against your capital. An option costs far less than the shares it moves like: a call worth $500 can carry $10,000 of delta. So a book of options can hold several times its capital in exposure, and its forecast can read 100–200% a year even though each stock is &quot;only&quot; 40–60% volatile. Then target ÷ forecast is small: 15% ÷ 200% = 0.075×, meaning that book carries about 13× the risk you asked for. It&apos;s consistent, not a bug: either raise the target or cut delta (fewer contracts, further out of the money, or short shares against them).</P>
+      <P>Risk is measured against your capital. An option costs far less than the shares it moves like: a call worth $500 can move like $10,000 of stock. So a book of options can swing many times more than its cash suggests, and the forecast can read 100% a year or more even though each stock is &quot;only&quot; 40–60% volatile. Then target ÷ forecast is small: 15% ÷ 200% = 0.075×, meaning that book carries about 13× the daily swings you asked for. It&apos;s consistent, not a bug. Remember the other side too: a long option&apos;s loss stops at its price (Max loss), so for a book of bought LEAPS the daily swings are big but the worst case is bounded.</P>
+
+      <H>Limits</H>
+      <P>Implied vol follows VIX in proportion; a single stock&apos;s IV can also jump on its own news (earnings), which the replay doesn&apos;t see. Prices use Black-Scholes, not the market&apos;s skew. The replay holds today&apos;s book fixed: it measures today&apos;s risk, not how you did.</P>
 
       <H>Why it works, and what it costs</H>
       <P>Big losses tend to come when volatility spikes, and that&apos;s when the rule has you holding less. It usually improves return per unit of risk. The cost: after a crash, volatility stays high while prices rebound, so you can be underweight for the recovery. It also trades more often.</P>
