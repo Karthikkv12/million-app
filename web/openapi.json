@@ -10887,6 +10887,371 @@
     "title": "ValidationError",
     "type": "object"
    },
+   "VolTargetHolding": {
+    "properties": {
+     "change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Delta dollars to add (+) or cut (\u2212)",
+      "title": "Change"
+     },
+     "change_shares": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The change in share-equivalents (delta)",
+      "title": "Change Shares"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "exposure": {
+      "description": "Delta dollars: net \u0394 \u00d7 100 \u00d7 spot",
+      "title": "Exposure",
+      "type": "number"
+     },
+     "forecast": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "GARCH(1,1) forecast vol, annualised (decimal)",
+      "title": "Forecast"
+     },
+     "has_options": {
+      "default": false,
+      "title": "Has Options",
+      "type": "boolean"
+     },
+     "long_run": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Long Run"
+     },
+     "net_delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Lots (100 shares = 1.00), shares and options together",
+      "title": "Net Delta"
+     },
+     "own_exposure": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "target \u00f7 this stock's own forecast, capped",
+      "title": "Own Exposure"
+     },
+     "realized_20d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Realized 20D"
+     },
+     "risk_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share of portfolio variance (sums to 1)",
+      "title": "Risk Share"
+     },
+     "shares": {
+      "default": 0,
+      "title": "Shares",
+      "type": "number"
+     },
+     "spot": {
+      "title": "Spot",
+      "type": "number"
+     },
+     "suggested_exposure": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suggested Exposure"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "exposure \u00f7 capital",
+      "title": "Weight"
+     }
+    },
+    "required": [
+     "symbol",
+     "spot",
+     "exposure"
+    ],
+    "title": "VolTargetHolding",
+    "type": "object"
+   },
+   "VolTargetOut": {
+    "properties": {
+     "account_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Value"
+     },
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "cap": {
+      "title": "Cap",
+      "type": "number"
+     },
+     "capital": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What weights and the cap are measured against",
+      "title": "Capital"
+     },
+     "capital_source": {
+      "anyOf": [
+       {
+        "enum": [
+         "input",
+         "account",
+         "gross"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capital Source"
+     },
+     "capped": {
+      "default": false,
+      "title": "Capped",
+      "type": "boolean"
+     },
+     "chart": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/VolTargetPoint"
+      },
+      "title": "Chart",
+      "type": "array"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "forecast": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Portfolio GARCH forecast vol, annualised",
+      "title": "Forecast"
+     },
+     "gross": {
+      "default": 0,
+      "title": "Gross",
+      "type": "number"
+     },
+     "holdings": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/VolTargetHolding"
+      },
+      "title": "Holdings",
+      "type": "array"
+     },
+     "long_run": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Long Run"
+     },
+     "max_scale": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Largest scale the cap allows: cap \u00d7 capital \u00f7 gross",
+      "title": "Max Scale"
+     },
+     "net": {
+      "default": 0,
+      "title": "Net",
+      "type": "number"
+     },
+     "realized_20d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Realized 20D"
+     },
+     "scale": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Multiply every holding's exposure by this",
+      "title": "Scale"
+     },
+     "sessions": {
+      "default": 0,
+      "title": "Sessions",
+      "type": "integer"
+     },
+     "target": {
+      "title": "Target",
+      "type": "number"
+     }
+    },
+    "required": [
+     "as_of",
+     "target",
+     "cap"
+    ],
+    "title": "VolTargetOut",
+    "type": "object"
+   },
+   "VolTargetPoint": {
+    "properties": {
+     "date": {
+      "title": "Date",
+      "type": "string"
+     },
+     "forecast": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forecast"
+     },
+     "scale": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What the rule would have scaled today's book by that day",
+      "title": "Scale"
+     }
+    },
+    "required": [
+     "date"
+    ],
+    "title": "VolTargetPoint",
+    "type": "object"
+   },
    "VolumeOut": {
     "properties": {
      "average": {
@@ -14634,6 +14999,92 @@
      }
     ],
     "summary": "Stream",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/vol-target": {
+   "get": {
+    "description": "Volatility targeting: exposure = target \u00f7 GARCH forecast, for the whole book and each holding.",
+    "operationId": "vol_target_api_v1_hedge_vol_target_get",
+    "parameters": [
+     {
+      "description": "Target annual vol, decimal (0.15 = 15%)",
+      "in": "query",
+      "name": "target",
+      "required": false,
+      "schema": {
+       "default": 0.15,
+       "description": "Target annual vol, decimal (0.15 = 15%)",
+       "exclusiveMinimum": 0.0,
+       "maximum": 2.0,
+       "title": "Target",
+       "type": "number"
+      }
+     },
+     {
+      "description": "Max gross delta dollars \u00f7 capital",
+      "in": "query",
+      "name": "cap",
+      "required": false,
+      "schema": {
+       "default": 1.0,
+       "description": "Max gross delta dollars \u00f7 capital",
+       "exclusiveMinimum": 0.0,
+       "maximum": 5.0,
+       "title": "Cap",
+       "type": "number"
+      }
+     },
+     {
+      "description": "Override the synced account value",
+      "in": "query",
+      "name": "capital",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "exclusiveMinimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Override the synced account value",
+       "title": "Capital"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VolTargetOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Vol Target",
     "tags": [
      "hedge"
     ]

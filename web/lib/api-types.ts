@@ -708,6 +708,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/vol-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vol Target
+         * @description Volatility targeting: exposure = target ÷ GARCH forecast, for the whole book and each holding.
+         */
+        get: operations["vol_target_api_v1_hedge_vol_target_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/holdings/{holding_id}": {
         parameters: {
             query?: never;
@@ -5205,6 +5225,152 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VolTargetHolding */
+        VolTargetHolding: {
+            /**
+             * Change
+             * @description Delta dollars to add (+) or cut (−)
+             */
+            change?: number | null;
+            /**
+             * Change Shares
+             * @description The change in share-equivalents (delta)
+             */
+            change_shares?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Exposure
+             * @description Delta dollars: net Δ × 100 × spot
+             */
+            exposure: number;
+            /**
+             * Forecast
+             * @description GARCH(1,1) forecast vol, annualised (decimal)
+             */
+            forecast?: number | null;
+            /**
+             * Has Options
+             * @default false
+             */
+            has_options: boolean;
+            /** Long Run */
+            long_run?: number | null;
+            /**
+             * Net Delta
+             * @description Lots (100 shares = 1.00), shares and options together
+             */
+            net_delta?: number | null;
+            /**
+             * Own Exposure
+             * @description target ÷ this stock's own forecast, capped
+             */
+            own_exposure?: number | null;
+            /** Realized 20D */
+            realized_20d?: number | null;
+            /**
+             * Risk Share
+             * @description Share of portfolio variance (sums to 1)
+             */
+            risk_share?: number | null;
+            /**
+             * Shares
+             * @default 0
+             */
+            shares: number;
+            /** Spot */
+            spot: number;
+            /** Suggested Exposure */
+            suggested_exposure?: number | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Weight
+             * @description exposure ÷ capital
+             */
+            weight?: number | null;
+        };
+        /** VolTargetOut */
+        VolTargetOut: {
+            /** Account Value */
+            account_value?: number | null;
+            /** As Of */
+            as_of: string;
+            /** Cap */
+            cap: number;
+            /**
+             * Capital
+             * @description What weights and the cap are measured against
+             */
+            capital?: number | null;
+            /** Capital Source */
+            capital_source?: ("input" | "account" | "gross") | null;
+            /**
+             * Capped
+             * @default false
+             */
+            capped: boolean;
+            /**
+             * Chart
+             * @default []
+             */
+            chart: components["schemas"]["VolTargetPoint"][];
+            /** Error */
+            error?: string | null;
+            /**
+             * Forecast
+             * @description Portfolio GARCH forecast vol, annualised
+             */
+            forecast?: number | null;
+            /**
+             * Gross
+             * @default 0
+             */
+            gross: number;
+            /**
+             * Holdings
+             * @default []
+             */
+            holdings: components["schemas"]["VolTargetHolding"][];
+            /** Long Run */
+            long_run?: number | null;
+            /**
+             * Max Scale
+             * @description Largest scale the cap allows: cap × capital ÷ gross
+             */
+            max_scale?: number | null;
+            /**
+             * Net
+             * @default 0
+             */
+            net: number;
+            /** Realized 20D */
+            realized_20d?: number | null;
+            /**
+             * Scale
+             * @description Multiply every holding's exposure by this
+             */
+            scale?: number | null;
+            /**
+             * Sessions
+             * @default 0
+             */
+            sessions: number;
+            /** Target */
+            target: number;
+        };
+        /** VolTargetPoint */
+        VolTargetPoint: {
+            /** Date */
+            date: string;
+            /** Forecast */
+            forecast?: number | null;
+            /**
+             * Scale
+             * @description What the rule would have scaled today's book by that day
+             */
+            scale?: number | null;
+        };
         /** VolumeOut */
         VolumeOut: {
             /** Average */
@@ -6984,6 +7150,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vol_target_api_v1_hedge_vol_target_get: {
+        parameters: {
+            query?: {
+                /** @description Target annual vol, decimal (0.15 = 15%) */
+                target?: number;
+                /** @description Max gross delta dollars ÷ capital */
+                cap?: number;
+                /** @description Override the synced account value */
+                capital?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolTargetOut"];
+                };
             };
             /** @description Validation Error */
             422: {
