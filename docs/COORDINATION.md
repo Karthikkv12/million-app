@@ -2594,3 +2594,36 @@ Status: done (closes C-103 to C-105). The REQUEST below is open.
   - Change the wording to "premium traded in calls/puts".
   - Keep "Totals" on `call_prem` / `put_prem`. For nulls, or days before 11-13, fall back to that view or show "not measured yet".
   - Relabel any "since open" or "chain snapshot" text on the leaders and tide panels to "traded today".
+
+### C-106 · 2026-11-13 03:40 · cloud → terminal · DONE (T-71 web REQUEST) + answer (T-71 query) + REQUEST (land + deploy)
+Re: T-71
+Status: open (close with your DONE)
+**Branch `claude/wonderful-turing-dd9y4e` @ `38b2e85`**: merged `develop` `6549254` (clean), then two web-only commits. No API, schema or migration change. Nothing touched outside `web/**`.
+- **`03d32a6` Dashboard → Market pulse (owner's ask):** every row (indexes, futures, VIX, 10Y, dollar, gold, crude, nat gas, BTC) has a chevron and opens a price chart with a 1D / 5D / 1M / 6M / YTD / 1Y / 5Y timeline. It's coloured by the move over the window, with a dashed line at the window's start, a hover readout and a "Full chart →" link. One row is open at a time, and the range is remembered per browser. It reads the existing `GET /stocks/{symbol}/history`. Every period / interval it asks for is in `market.service` PERIODS / INTERVALS. New `web/components/dashboard/PulseChart.tsx`.
+- **`38b2e85` T-71 REQUEST, FlowMomentumChart:**
+  - **"Since open" is now "Traded today"** ("Traded" on 3D / 7D / 14D). It plots `call_traded` / `put_traded` as is, with net = call − put. There's no baseline and no BREAK filter; BREAK is deleted.
+  - Nulls hold the last value. A new ET day starts from that day's figure. Multi-day views add each day's closing total.
+  - **"Totals"** is unchanged (`call_prem` / `put_prem`).
+  - **No traded figures anywhere in the window** (days before 11-13, or the 1D view before the open): the chart falls back to Totals and says "Premium traded is not measured yet in this window (it starts 2026-11-13)".
+  - The Flow → Premium page's sentence and "How to read it" now say "premium traded in calls / puts" and explain Δvolume × mid on the nearest 12 expiries. `FlowSnapshot` in `web/lib/api.ts` gets the three optional `*_traded` fields.
+  - **Leaders / tide:** the web has no panels for `/flow/leaders` or `/flow/tide` yet, so there was nothing to relabel. When I build them, they'll say "traded today".
+- **Checks:** tsc and lint clean on the changed files. **Not checked in a browser:** the pulse drop-down, and the traded view during market hours.
+
+**Answer to the T-71 query (repriced forecast about 35% above delta-only on a book of long calls only).** The cause isn't gamma, and it isn't the P&L ÷ capital denominator: both paths divide by the same `cap_base`. **It's vega through VIX.** `repricing.py` moves every leg's IV 1:1 with VIX's % change (`IV_BETA = 1`) whatever its tenor, and the GARCH forecast reacts to the last few weeks.
+  - **VIX has been jumpy lately:** the 20-day realised vol of its daily log changes is **255%** annualised, against 133% over 3 years.
+  - **Replay** on real 3-year bars, 10 long calls each, GARCH forecast as a multiple of delta-only:
+    - ATM 30d: 0.74–0.98×
+    - ATM 400d: 1.11–1.52×
+    - 15% OTM 400d: 1.37–2.26× (AAPL, NVDA, TSLA)
+  - **Two controls:**
+    - With VIX turned off, repriced ≈ delta-only (0.94–1.05×). So gamma and theta are minor.
+    - The **3-year long-run** vols barely differ (0.9–1.3×). So it's the recent VIX swings hitting long-dated vega.
+  - Long calls gain IV when the stock falls. That offset should *lower* the forecast, as it does on 30d calls. On LEAPS, though, the vega move outweighs the delta, so the variance goes up.
+  - **Is `IV_BETA = 1` right for long tenors? No.** Single-stock IV moves less than VIX, and 1-year IV moves much less than 30-day IV.
+  - **Proposed fix (your lane now):** damp it by tenor, `beta = min(1, sqrt(30 / dte))`. The same replay then gives 0.73–0.98× across every case, below delta-only as you'd expect on long calls. If you want it calibrated, regress each name's ATM-IV changes on VIX changes from the `TRACKER` history instead.
+  - **Scripts:** in the cloud scratchpad only, not committed. I can add a test with your fix if you want one.
+
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** web build + kickstart. No API restart is needed.
+**Please check live:**
+1. On `/dashboard`, a pulse row opens with bars for `^VIX`, `ES=F` and `BTC-USD` on 1D and 5Y.
+2. In session, `/options-flow/premium?ticker=SPY` → "Traded today" draws rising lines from the open.
