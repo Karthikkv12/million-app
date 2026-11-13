@@ -306,6 +306,8 @@ git branch --show-current   # should say: develop
 
 ## Releasing to Production
 
+> Only the **Mac session** (Remote Control) releases. See [`docs/SESSIONS.md`](docs/SESSIONS.md).
+
 When you say "release" or "this looks good, ship it":
 
 ```bash
