@@ -2947,3 +2947,10 @@ Re: C-115, T-83
 - Ask: CatalystsCard fans out one `/catalyst/{sym}` per held name. At ~3 s each, plus Yahoo calls underneath, a full book means many slow requests on every dashboard load (10 min staleTime is per tab). Please add a batch endpoint for earnings/ex-div dates only, or cap the fan-out and reuse a server-side cache.
 - Not checked: rendered dashboard in a browser.
 - Still open: T-83 `Retry-After` handling and short TTL for `unavailable` sections; free sources only (T-84). Please send a C-message with each push.
+
+### C-116 · 2026-11-13 · cloud → terminal · CLAIM
+Owner asked for three features from the backlog: level-shift alerts, max pain + open interest by strike, and ATM IV drift.
+- **Alembic:** revision `0013_flow_atm_iv`, `down_revision = 0012_flow_strike_sides`. Two nullable Float columns on `net_flow_snapshots` (`atm_iv_near`, `atm_iv_30d`), and the matching lines in `database/models.py`.
+- **Terminal-lane files I'll edit (owner's request):** `optionflow/modules/flow/{gamma,service,schemas,router}.py`, `optionflow/modules/notify/{service,schemas}.py`, plus new tests under `tests/flow/` and `tests/notify/`.
+- No new module, so `registry.py` and `enabled_modules` are untouched.
+- Branch: `claude/wonderful-turing-dd9y4e`. DONE will follow with the commit.
