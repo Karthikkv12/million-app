@@ -90,6 +90,11 @@ class NetFlowPoint(BaseModel):
     net_flow: Optional[float] = None
     total_prem: Optional[float] = None
     volume: Optional[int] = None
+    call_traded: Optional[float] = Field(None, description="Call premium traded today so far (Δvolume × mid per "
+                                         "contract, nearest 12 expiries); None outside the session and on rows "
+                                         "before 2026-11-13")
+    put_traded: Optional[float] = Field(None, description="Put premium traded today so far (as call_traded)")
+    net_traded: Optional[float] = Field(None, description="call_traded − put_traded")
 
 
 class WatchRequest(BaseModel):
@@ -116,7 +121,7 @@ class GexDayOut(BaseModel):
 
 class FlowLeader(BaseModel):
     symbol: str
-    net: float = Field(..., description="Call − put premium added since the 09:30 ET open (chain snapshot, not prints)")
+    net: float = Field(..., description="Call − put premium traded today (Δvolume × mid per contract at each refresh, not prints)")
     call_prem: float
     put_prem: float
     spot: Optional[float] = None

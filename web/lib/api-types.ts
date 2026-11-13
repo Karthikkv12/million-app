@@ -3451,7 +3451,7 @@ export interface components {
             change_pct?: number | null;
             /**
              * Net
-             * @description Call − put premium added since the 09:30 ET open (chain snapshot, not prints)
+             * @description Call − put premium traded today (Δvolume × mid per contract at each refresh, not prints)
              */
             net: number;
             /** Put Prem */
@@ -4085,12 +4085,27 @@ export interface components {
         NetFlowPoint: {
             /** Call Prem */
             call_prem?: number | null;
+            /**
+             * Call Traded
+             * @description Call premium traded today so far (Δvolume × mid per contract, nearest 12 expiries); None outside the session and on rows before 2026-11-13
+             */
+            call_traded?: number | null;
             /** Net Flow */
             net_flow?: number | null;
+            /**
+             * Net Traded
+             * @description call_traded − put_traded
+             */
+            net_traded?: number | null;
             /** Price */
             price?: number | null;
             /** Put Prem */
             put_prem?: number | null;
+            /**
+             * Put Traded
+             * @description Put premium traded today so far (as call_traded)
+             */
+            put_traded?: number | null;
             /** Total Prem */
             total_prem?: number | null;
             /** Ts */

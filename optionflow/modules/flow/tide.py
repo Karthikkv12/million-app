@@ -1,12 +1,13 @@
 """optionflow/modules/flow/tide.py — net premium leaders and market tide across the watched universe (C-98).
 
-Both read the net-flow snapshots the GEX poller already writes (one per refresh of a watched symbol): chain-snapshot
-premium (volume × price per contract, the same measure as /options/gamma-exposure), not a trade tape.
+Both read the net-flow snapshots the GEX poller already writes (one per refresh of a watched symbol), using the
+traded-premium columns (call_traded / put_traded, flow.traded): premium actually traded today, counted as
+Δvolume × mid per contract at each refresh. They are cumulative for the US-Eastern day, so a symbol's value is its
+latest snapshot's; they never fall. (Until 11-13 these views used Σ open interest × mid, whose change through the
+day was mostly repricing: NVDA showed +$3.1B "bullish" on a −4.3% day, T-67.)
 
-Baseline rule (as net-flow-history / FlowMomentumChart): per symbol and US-Eastern session day, premium is counted
-from the first snapshot at or after 09:30 ET; earlier snapshots still carry the previous session's chain and are left
-out, and so are snapshots after the close (CLOSE_MIN). The measure is Σ volume × current price, so a total can fall
-during the day (option prices drop); deltas are signed, not clamped. Backfill estimates are dropped on days with live snapshots (service.drop_estimates_where_live).
+Snapshots without traded columns (before the change, outside the session, backfill estimates) are left out, and so
+are snapshots outside 09:30–16:05 ET.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from optionflow.modules.flow import repo
-from optionflow.modules.flow.service import _parse_ts, drop_estimates_where_live
+from optionflow.modules.flow.service import _parse_ts
 from optionflow.workers.backfill import ET
 
 OPEN_MIN = 9 * 60 + 30
@@ -23,7 +24,7 @@ CLOSE_MIN = 16 * 60 + 5          # a refresh just after the bell still counts; l
                                  # (expired 0DTE drops out: NVDA's call total jumped $4.2B → $6.1B at 21:00 ET, 11-11)
 UNIVERSES = {"default"}           # every symbol with snapshots in the session (what the poller has watched)
 
-# (ts, price, call_prem, put_prem)
+# (ts, price, call_traded, put_traded)
 _Row = Tuple[datetime, Optional[float], float, float]
 
 
@@ -39,7 +40,7 @@ def _sessions(days: int) -> Dict[str, Dict[date, List[_Row]]]:
     all_days = set()
     for sym, rows in by_sym.items():
         per_day: Dict[date, List[_Row]] = defaultdict(list)
-        for ts, price, cp, pp, *_ in drop_estimates_where_live(rows):
+        for ts, price, _cp, _pp, _nf, _tp, _vol, cp, pp in rows:
             t = _parse_ts(ts)
             if t is None or cp is None or pp is None:
                 continue
@@ -49,7 +50,7 @@ def _sessions(days: int) -> Dict[str, Dict[date, List[_Row]]]:
             if not OPEN_MIN <= et.hour * 60 + et.minute <= CLOSE_MIN or et.weekday() >= 5:
                 continue
             per_day[et.date()].append((t, price, float(cp), float(pp)))
-        per_day = {d: _consistent(sorted(r, key=lambda x: x[0])) for d, r in per_day.items()}
+        per_day = {d: sorted(r, key=lambda x: x[0]) for d, r in per_day.items()}
         per_day = {d: r for d, r in per_day.items() if r}
         if per_day:
             out[sym] = per_day
@@ -58,34 +59,13 @@ def _sessions(days: int) -> Dict[str, Dict[date, List[_Row]]]:
     return {s: {d: r for d, r in dd.items() if d in keep} for s, dd in out.items() if any(d in keep for d in dd)}
 
 
-MIX_RATIO = 3.0
-
-
-def _consistent(rows: List[_Row]) -> List[_Row]:
-    """Drop snapshots from a different chain source than most of the day's. A symbol's live snapshots can switch
-    between Public (12 expiries) and Yahoo (every expiry, ~15× the premium): MU on 11-11 read $77B at 16:00:31 and
-    $4.9B two seconds later. Snapshots are seconds apart and premium builds gradually, so a > MIX_RATIO× jump between
-    neighbours is a source switch; each switch toggles the source, and the source with the most rows is kept."""
-    if len(rows) < 2:
-        return rows
-    side, sides = 0, [0]
-    for prev, cur in zip(rows, rows[1:]):
-        a, b = prev[2] + prev[3], cur[2] + cur[3]
-        if a > 0 and b > 0 and max(a, b) / min(a, b) > MIX_RATIO:
-            side ^= 1
-        sides.append(side)
-    keep = 0 if sides.count(0) >= sides.count(1) else 1
-    return [r for r, sd in zip(rows, sides) if sd == keep]
-
-
-def _delta(rows: List[_Row]) -> Tuple[float, float]:
-    """(call, put) premium added since the session's baseline row."""
-    base, last = rows[0], rows[-1]
-    return last[2] - base[2], last[3] - base[3]
+def _today(rows: List[_Row]) -> Tuple[float, float]:
+    """(call, put) premium traded in the session so far: the latest snapshot's cumulative totals."""
+    return rows[-1][2], rows[-1][3]
 
 
 def leaders(universe: str = "default", limit: int = 10) -> Dict[str, Any]:
-    """Top `limit` bullish and bearish symbols by net premium (calls − puts) added since today's open,
+    """Top `limit` bullish and bearish symbols by net premium (calls − puts) traded today,
     in the latest session that has snapshots."""
     limit = max(1, min(limit, 50))
     data = _sessions(1)
@@ -96,7 +76,7 @@ def leaders(universe: str = "default", limit: int = 10) -> Dict[str, Any]:
         r = dd.get(day)
         if not r:
             continue
-        call, put = _delta(r)
+        call, put = _today(r)
         as_of = max(as_of, r[-1][0]) if as_of else r[-1][0]
         rows.append({"symbol": sym, "net": round(call - put), "call_prem": round(call), "put_prem": round(put),
                      "spot": r[-1][1], "change_pct": None})
@@ -123,7 +103,7 @@ def _add_change_pct(rows: List[Dict[str, Any]]) -> None:
 
 
 def tide(days: int = 1, bucket_minutes: int = 5) -> List[Dict[str, Any]]:
-    """Summed premium added since each session's open across the universe, on a `bucket_minutes` grid:
+    """Summed premium traded since each session's open across the universe, on a `bucket_minutes` grid:
     [{ts, net, call_prem, put_prem, spy, symbols}]. Each symbol's last value carries forward until its next
     snapshot; the sum resets at each session's open. `spy` is SPY's price at that point (None until SPY has one)."""
     size = max(1, min(bucket_minutes, 60)) * 60
@@ -133,10 +113,9 @@ def tide(days: int = 1, bucket_minutes: int = 5) -> List[Dict[str, Any]]:
     spy: Dict[int, float] = {}
     for sym, dd in data.items():
         for day, rows in dd.items():
-            base_c, base_p = rows[0][2], rows[0][3]
             for t, price, cp, pp in rows:
                 b = int(t.timestamp()) // size * size
-                grid[day][b][sym] = (cp - base_c, pp - base_p)
+                grid[day][b][sym] = (cp, pp)
                 if sym == "SPY" and price is not None:
                     spy[b] = price
     out: List[Dict[str, Any]] = []
