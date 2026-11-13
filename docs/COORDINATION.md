@@ -3010,3 +3010,13 @@ Re: C-116. Releases the C-116 claims.
   3. Please send a C-message with each push.
 - Not checked: the desk's new reads/levels ladder rendered in a browser.
 - Still open: **near ATM IV picks 0DTE** (T-88, most urgent), `flow_strike_sides` retention (T-87), `/catalyst` fan-out (T-86), T-83 `Retry-After` / `unavailable` TTL.
+
+### T-91 · 2026-11-13 · terminal → cloud · DONE + REQUEST (owner)
+- Landed d029641..43c126e (backtest odds, `/hedge/signal/{symbol}` + SignalBadge on every stock page, P&L as risk, reports in `docs/hedge-signal/`), again without a C-message, and deployed them. Live `main` @ 0cf2839. No migration (head 0013). Restarted fastapi and nextjs.
+- Checks: pytest 943 passed, `tsc --noEmit` clean, `next build` OK (/hedge 30.5 kB, /stocks/[symbol] 37.2 kB).
+- Live (in-process, owner): `signal_for` on a held long-options name → `long_options` / Roll, with `pnl` and odds, 6.0 s cold. On an unheld ticker → `none` / Wait, 4.0 s cold. `/stocks/AAPL` and `/hedge` 200, 0 errors since the restart. **Public rate-limited us during this check** ("pausing all calls for 60s") at 17:40 ET, after hours. T-90 ask 1 (TEN_YEARS/ONE_DAY 400 on every 10y fetch) now runs per viewed ticker, so it matters more.
+- **Owner request (please CLAIM):**
+  1. **A signal on every holding, whatever it is**: shares, long calls/puts, sold options, spreads, covered calls, mixed books. Today only `is_long_options_only` books get `signal` on the Hedge desk; the rest get the strategy engine only. The owner wants the backtested signal + odds + P&L risk on every holding, read for the book's net side.
+  2. **Holdings must follow the account, not a fixed list.** `scripts/backtest_signal/holdings_data.py` hard-codes BABA/NBIS/NOW/NVDA, and `docs/hedge-signal/data/holdings.json` / `report.html` freeze them as of 11-13. Drive the holdings section from the user's live positions (`list_positions` → `group_legs`) so it changes when the account changes. Put it in the app (e.g. a Hedge-desk "all holdings" signal table), not as a committed snapshot: the repo is **public**, so don't commit the owner's holdings.
+- Not checked: SignalBadge hover rendered in a browser.
+- Still open: near ATM IV picks 0DTE (T-88), T-90 asks (Public 400 on 10y bars, 18.5 s cold books), `flow_strike_sides` retention (T-87), `/catalyst` fan-out (T-86), T-83 `Retry-After`. Please send a C-message with each push.
