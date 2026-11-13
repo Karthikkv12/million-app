@@ -11474,6 +11474,16 @@
       "title": "Levels",
       "type": "array"
      },
+     "pnl": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalPnlOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "probability": {
       "anyOf": [
        {
@@ -11581,6 +11591,101 @@
      "headline"
     ],
     "title": "SignalOut",
+    "type": "object"
+   },
+   "SignalPnlOut": {
+    "description": "The holding's P&L and its tested 60-day risk. It never moves the verdict: P&L didn't predict the stock.",
+    "properties": {
+     "bucket": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bucket"
+     },
+     "cases": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cases"
+     },
+     "cost": {
+      "title": "Cost",
+      "type": "number"
+     },
+     "dollars": {
+      "title": "Dollars",
+      "type": "number"
+     },
+     "kind": {
+      "enum": [
+       "options",
+       "shares"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "p5_paid": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Worst 1 in 20 over 60 trading days, as a share of the original premium",
+      "title": "P5 Paid"
+     },
+     "p_gain_25_paid": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P Gain 25 Paid"
+     },
+     "p_lose_25_paid": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Long options at this P&L: share that lost >25% of the original premium in 60 trading days (2015\u20132026)",
+      "title": "P Lose 25 Paid"
+     },
+     "pct": {
+      "title": "Pct",
+      "type": "number"
+     }
+    },
+    "required": [
+     "kind",
+     "pct",
+     "dollars",
+     "cost",
+     "note"
+    ],
+    "title": "SignalPnlOut",
     "type": "object"
    },
    "SignalProbOut": {

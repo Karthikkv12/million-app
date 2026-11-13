@@ -176,3 +176,22 @@ def test_each_setup_carries_its_backtest_odds():
     assert roll.verdict == "ROLL" and roll.probability["case"] == "HOLD"   # odds are the stock's setup; roll is decay
     assert sg.evaluate(tape(ramp(100, 0.1)), exposure=1.0).probability is None   # untested without VIX / history
 
+
+def test_pnl_is_a_risk_read_and_never_moves_the_verdict():
+    base = [{"otype": "call", "strike": 80.0, "expiry": "2027-12-17", "dte": 400, "iv": 0.4, "quantity": 2}]
+    def run(paid, mark):
+        legs = [dict(base[0], avg_price=paid, mark=mark)]
+        return sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), legs=legs), exposure=1.0)
+    win, flat, lose = run(10.0, 35.0), run(30.0, 33.0), run(40.0, 12.0)
+    assert win.verdict == flat.verdict == lose.verdict                      # P&L never changes the call
+    assert win.pnl["kind"] == "options" and win.pnl["pct"] == 2.5 and win.pnl["dollars"] == 5000.0
+    assert win.pnl["bucket"] == ">+200%" and "risk choice, not an edge" in win.pnl["note"]
+    assert lose.pnl["bucket"] == "<-50%" and "time value" in lose.pnl["note"]
+    assert "doesn't predict the stock" in flat.pnl["note"] and flat.pnl["p_lose_25_paid"] > 0
+    assert any(r == win.pnl["note"] for r in sg.reasons(win))
+    no_mark = sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), legs=[dict(base[0], avg_price=20.0)]), exposure=1.0)
+    assert no_mark.pnl is not None                                           # values the leg with the model without a quote
+    shares = sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), shares=100, avg_cost=80.0), exposure=1.0)
+    assert shares.pnl["kind"] == "shares" and shares.pnl["p5_paid"] is None and "didn't predict" in shares.pnl["note"]
+    assert sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0)), exposure=1.0).pnl is None
+

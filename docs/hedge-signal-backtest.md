@@ -110,6 +110,30 @@ average 60-day excess over holding was positive. The desk shows these on every c
 
 These are averages for each setup, not a forecast for one stock: a single Add still fails about 4 times in 10.
 
+## Your P&L on a holding (tested; weighed as risk, not direction)
+
+`scripts/backtest_signal/holdsim.py`: a 365-day 0.80Δ call bought every 21 trading days on every symbol and checked
+monthly — 39,294 positions, 275,058 checks — with the same IV model and costs. Findings (2015–2026, unseen):
+
+- **P&L does not predict the stock.** By P&L bucket (−50% … +200%), the stock's next-60-day excess over holding was
+  never significant (|t| < 1.2, both periods). So P&L never changes Add / Hold / Don't add.
+- **The fear-dip edge held at every P&L**, strongest for deep losers (+4.8% / 60 days) and big winners.
+- **Rolling a winner to lock gains didn't pay.** A delta-matched roll into a fresh 0.80Δ call, the difference banked,
+  lost to holding in every bucket after costs, and didn't shrink the worst case.
+- **What P&L changes is how much of what you paid is at risk:**
+
+| P&L on the calls | Lost >25% of what was paid in 60d | Gained >25% | Worst 1 in 20 | Time value left |
+|---|---|---|---|---|
+| below −50% | 12% | 21% | −32% | 90% |
+| −25% to 0 | 25% | 35% | −57% | 25% |
+| +25% to +50% | 26% | 40% | −76% | 8% |
+| +100% to +200% | 29% | 46% | −109% | 2% |
+| above +200% | 36% | 50% | −229% | 1% |
+
+The desk shows your P&L, these odds for your bucket, and a note: big winners can give back more than they cost
+(taking some off is a risk choice, not an edge); deep losers are mostly time value. Shares show P&L vs your average,
+for context only.
+
 ## Confidence
 
 | Claim | Confidence |

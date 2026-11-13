@@ -158,6 +158,19 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
           </p>
         </div>
       )}
+      {g.pnl && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Your P&amp;L · weighed as risk, not direction</p>
+          <p className="mt-1.5 font-mono text-[13px] tabular-nums">
+            <span className={clsx("sensitive", g.pnl.pct >= 0 ? "text-gain" : "text-loss")}>{pct(g.pnl.pct, 0)} · {usd(g.pnl.dollars, 0)}</span>
+            <span className="sensitive text-foreground/45"> on {usd(g.pnl.cost, 0)} paid</span>
+          </p>
+          {g.pnl.p_lose_25_paid != null && (
+            <p className="mt-1 font-mono text-[11.5px] text-foreground/55">Next 60 days at this P&amp;L (2015–2026): {Math.round((g.pnl.p_gain_25_paid ?? 0) * 100)}% gained and {Math.round(g.pnl.p_lose_25_paid * 100)}% lost more than 25% of what was paid; worst 1 in 20 {pct(g.pnl.p5_paid, 0)}.</p>
+          )}
+          <p className="mt-1 text-[12.5px] leading-snug text-foreground/65">{g.pnl.note}</p>
+        </div>
+      )}
       {g.evidence && <p className="border-l-2 border-[var(--border-strong)] pl-3 text-[12.5px] leading-snug text-foreground/65">{g.evidence}</p>}
       {g.reads.length > 0 && [true, false].map((tested) => g.reads.some((r) => !!r.tested === tested) && (
         <div key={String(tested)}>
@@ -251,7 +264,7 @@ function Detail({ b }: { b: HedgeBook }) {
             {b.signal && <SignalPanel g={b.signal} spot={b.spot} />}
             {!!s.reasons?.length && (
               <ol className="mt-4 space-y-1.5 border-l border-[var(--border-strong)] pl-3 text-[13px] leading-snug text-foreground/70">
-                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move|Odds)/.test(r)) : s.reasons)
+                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move|Odds)/.test(r) && r !== b.signal!.pnl?.note) : s.reasons)
                   .map((r) => <li key={r}>{r}</li>)}
               </ol>
             )}

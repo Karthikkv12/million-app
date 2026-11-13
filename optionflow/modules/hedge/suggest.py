@@ -266,7 +266,7 @@ def _stock_signal(ctx: Context, net: float, tape=None, legs: Optional[List[Leg]]
     t.iv_spike, t.iv_cooling = t.iv_spike or ctx.iv_spike, t.iv_cooling or ctx.iv_cooling
     if not t.legs and legs:
         t.legs = [{"otype": l.otype, "strike": l.strike, "expiry": l.expiry, "dte": l.dte, "iv": l.iv, "mark": l.mark,
-                   "quantity": l.quantity} for l in legs if l.kind == "option"]
+                   "quantity": l.quantity, "avg_price": l.avg_price} for l in legs if l.kind == "option"]
     return sg.evaluate(t, net)
 
 

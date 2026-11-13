@@ -87,6 +87,22 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
               Avg 60-day edge vs holding {sgn(p.edge_60)} (90% range {sgn(p.edge_lo)} to {sgn(p.edge_hi)}) · {p.cases.toLocaleString("en-US")} cases, 2015–2026, unseen
             </span>
           )}
+          {g.pnl && (
+            <span className="mt-3 block rounded-md border border-[var(--border)] px-2.5 py-2">
+              <span className="flex items-baseline justify-between gap-2 font-mono">
+                <span className="text-[9.5px] uppercase tracking-[0.1em] text-foreground/45">Your P&amp;L {g.pnl.kind === "options" ? "on the options" : "on the shares"}</span>
+                <span className={clsx("sensitive text-[13px] tabular-nums", g.pnl.pct >= 0 ? "text-gain" : "text-loss")}>
+                  {g.pnl.pct >= 0 ? "+" : "−"}{Math.abs(g.pnl.pct * 100).toFixed(0)}% · {g.pnl.dollars >= 0 ? "+" : "−"}${Math.abs(g.pnl.dollars).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                </span>
+              </span>
+              {g.pnl.p_lose_25_paid != null && (
+                <span className="mt-1 block font-mono text-[11px] text-foreground/55">
+                  Next 60d at this P&amp;L: {pct(g.pnl.p_gain_25_paid)} gained, {pct(g.pnl.p_lose_25_paid)} lost &gt;25% of what was paid · worst 1 in 20 {pct(g.pnl.p5_paid)}
+                </span>
+              )}
+              <span className="mt-1 block text-[11.5px] leading-snug text-foreground/65">{g.pnl.note}</span>
+            </span>
+          )}
           {why.length > 0 && (
             <>
               <span className="mt-3 block font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45">Why</span>

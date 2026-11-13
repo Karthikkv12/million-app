@@ -206,6 +206,20 @@ class SignalProbOut(BaseModel):
     p_edge_positive: float = Field(..., description="Share of bootstrap draws with a positive mean edge")
 
 
+class SignalPnlOut(BaseModel):
+    """The holding's P&L and its tested 60-day risk. It never moves the verdict: P&L didn't predict the stock."""
+    kind: Literal["options", "shares"]
+    pct: float
+    dollars: float
+    cost: float
+    bucket: Optional[str] = None
+    p_lose_25_paid: Optional[float] = Field(None, description="Long options at this P&L: share that lost >25% of the original premium in 60 trading days (2015–2026)")
+    p_gain_25_paid: Optional[float] = None
+    p5_paid: Optional[float] = Field(None, description="Worst 1 in 20 over 60 trading days, as a share of the original premium")
+    cases: Optional[int] = None
+    note: str
+
+
 class SignalOut(BaseModel):
     """Levels and a directional read for a holding of long options only (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
@@ -228,6 +242,7 @@ class SignalOut(BaseModel):
     iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
     legs: List[SignalLegOut] = []
     probability: Optional[SignalProbOut] = None
+    pnl: Optional[SignalPnlOut] = None
 
 
 class StockSignalOut(BaseModel):

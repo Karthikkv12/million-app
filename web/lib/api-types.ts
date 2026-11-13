@@ -5978,6 +5978,7 @@ export interface components {
              * @default []
              */
             levels: components["schemas"]["SignalLevelOut"][];
+            pnl?: components["schemas"]["SignalPnlOut"] | null;
             probability?: components["schemas"]["SignalProbOut"] | null;
             /**
              * Reads
@@ -6014,6 +6015,41 @@ export interface components {
              * @description VIX percentile over the last year (0–1)
              */
             vix_pct?: number | null;
+        };
+        /**
+         * SignalPnlOut
+         * @description The holding's P&L and its tested 60-day risk. It never moves the verdict: P&L didn't predict the stock.
+         */
+        SignalPnlOut: {
+            /** Bucket */
+            bucket?: string | null;
+            /** Cases */
+            cases?: number | null;
+            /** Cost */
+            cost: number;
+            /** Dollars */
+            dollars: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "options" | "shares";
+            /** Note */
+            note: string;
+            /**
+             * P5 Paid
+             * @description Worst 1 in 20 over 60 trading days, as a share of the original premium
+             */
+            p5_paid?: number | null;
+            /** P Gain 25 Paid */
+            p_gain_25_paid?: number | null;
+            /**
+             * P Lose 25 Paid
+             * @description Long options at this P&L: share that lost >25% of the original premium in 60 trading days (2015–2026)
+             */
+            p_lose_25_paid?: number | null;
+            /** Pct */
+            pct: number;
         };
         /**
          * SignalProbOut

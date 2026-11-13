@@ -486,7 +486,11 @@ def signal_for(user_id: int, sym: str) -> Dict[str, Any]:
     ctx = Context(sym, spot, avg, day["day_change"], _track_high(sym, spot), ivs.atm_iv or chain.get("atm_iv"), hv.get("hv20"),
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
     from optionflow.modules.hedge.suggest import stock_signal
-    sig = stock_signal(ctx, 1.0, _tape(sym, ivs, hv, gx), None)
+    tape = _tape(sym, ivs, hv, gx)
+    if tape is not None and held == "stock":
+        tape.shares = sum(l.quantity for l in legs if l.kind == "stock" and l.quantity > 0)
+        tape.avg_cost = avg
+    sig = stock_signal(ctx, 1.0, tape, None)
     from dataclasses import asdict
     from optionflow.modules.hedge import signal as sg
     out = _clean(asdict(sig))
