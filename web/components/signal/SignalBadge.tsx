@@ -4,7 +4,7 @@
  * the backtest is (hedge.signal). Used on the stock page (any ticker) and on the Hedge desk rows, so both read
  * the same verdict, words and odds.
  */
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Tag } from "@/components/desk";
 import type { HedgeBook } from "@/lib/api";
@@ -38,6 +38,8 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = useState(0);
   const id = useId();
   const c = confidenceOf(g);
   const p = g.probability;
@@ -48,6 +50,24 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
     document.addEventListener("pointerdown", off);
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("pointerdown", off); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  // keep the window on screen: anchored to the badge, then nudged left/right so it never runs past a 16px gutter
+  // (on the Hedge desk the badge sits in the last column, so a left-anchored window ran off the right edge)
+  useLayoutEffect(() => {
+    if (!open) { setShift(0); return; }
+    const fit = () => {
+      const el = pop.current;
+      if (!el) return;
+      const prev = Number(el.dataset.shift ?? 0);
+      const r = el.getBoundingClientRect();
+      const left = r.left - prev, right = r.right - prev, vw = document.documentElement.clientWidth, gap = 16;
+      const dx = right > vw - gap ? vw - gap - right : left < gap ? gap - left : 0;
+      el.dataset.shift = String(dx);
+      setShift(dx);
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [open]);
   const tested = g.reads.filter((r) => r.tested);
   // why: the read notes, the IV line, then roll lines; the odds and evidence have their own blocks
@@ -61,7 +81,8 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
         <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
       </button>
       {open && (
-        <span id={id} role="tooltip" onClick={(e) => e.stopPropagation()}
+        <span id={id} ref={pop} role="tooltip" onClick={(e) => e.stopPropagation()}
+          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
           className={clsx("absolute top-full z-50 mt-2 block w-[min(380px,calc(100vw-32px))] cursor-default rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-left shadow-xl",
             align === "right" ? "right-0" : "left-0")}>
           <span className="flex items-center justify-between gap-3">
