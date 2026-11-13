@@ -1,15 +1,19 @@
 "use client";
+/**
+ * Flow board — ONE ticker's dealer exposure (GEX / VEX by strike × expiry) with the ladder and trade ideas.
+ * The dock at the bottom browses a watchlist name by name (‹ ›, ← →) and switches GEX / VEX; the search in the
+ * panel header still jumps to any ticker. Trinity is the side-by-side view (SPX / SPY / QQQ).
+ */
 import { useState, useCallback, useEffect } from "react";
 import { watchSymbols } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
-import { Plus, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, strikeLabel, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
+import { WatchlistDock } from "@/components/options-flow/WatchlistDock";
 
-const MAX_TICKERS = 3;
 // One accent (matches --accent): light #2f5bea, dark #90bff9
 const ACCENT = { light: "#2f5bea", dark: "#90bff9" } as const;
-const DEFAULT_TICKERS = ["SPY", "QQQ", "AAPL"];
 const DEFAULT_STRIKES = 20;
 
 // ── Persistence helpers ───────────────────────────────────────────────────────
@@ -26,7 +30,7 @@ function loadLayout(): PersistedLayout {
     const slots = (Array.isArray(parsed.slots) ? parsed.slots : [])
       .filter((s) => typeof s.ticker === "string" && s.ticker.length > 0)
       .map((s) => makeSlot(s.ticker, s.metric, s.expiryFilter))
-      .slice(0, MAX_TICKERS);
+      .slice(0, 1);                                  // one ticker; older saved layouts had up to 3
     if (!slots.length) return fallback;
     const nStrikes = (STRIKE_OPTIONS as readonly number[]).includes(parsed.nStrikes) ? parsed.nStrikes : DEFAULT_STRIKES;
     const h = parsed.heat;
@@ -77,22 +81,13 @@ export default function OptionsFlowPage() {
     return () => clearInterval(id);
   }, [slots]);
 
-  const addSlot = () => {
-    if (slots.length >= MAX_TICKERS) return;
-    const next = DEFAULT_TICKERS.find((t) => !slots.some((s) => s.ticker === t)) ?? "IWM";
-    setSlots((prev) => [...prev, makeSlot(next)]);
-  };
-
-  const removeSlot = (idx: number) => setSlots((prev) => prev.filter((_, i) => i !== idx));
-
-  const updateSlot = useCallback((idx: number, patch: Partial<Slot>) => {
-    setSlots((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-  }, []);
-
-  const gridClass =
-    slots.length === 1 ? "grid-cols-1" :
-    slots.length === 2 ? "grid-cols-1 lg:grid-cols-2" :
-                         "grid-cols-1 lg:grid-cols-3";
+  const slot = slots[0];
+  const update = useCallback((patch: Partial<Slot>) => setSlots((prev) => [{ ...prev[0], ...patch }]), []);
+  // A new ticker gets its own expiries; the GEX / VEX choice carries over while browsing.
+  const goTo = useCallback((sym: string) => {
+    const t = sym.trim().toUpperCase();
+    if (t) update({ ticker: t, input: t, expiryFilter: null });
+  }, [update]);
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[var(--background)]">
@@ -103,7 +98,7 @@ export default function OptionsFlowPage() {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Flow</p>
             <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Dealer exposure board</h1>
           </div>
-          <p className="max-w-md text-right text-[12.5px] leading-relaxed text-foreground/50">Gamma (GEX) and vanna (VEX) by strike × expiry. ★ marks the king node. The ladder beside each board places the levels and a buy/sell call and put idea by strike; Details has flow.</p>
+          <p className="max-w-md text-right text-[12.5px] leading-relaxed text-foreground/50">Gamma (GEX) and vanna (VEX) by strike × expiry. ★ marks the king node. Browse your watchlist with the bar at the bottom (‹ › or ← →); the ladder places the levels and a buy/sell call and put idea by strike.</p>
         </div>
 
         <div className="-mx-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-[var(--border-strong)] px-4 py-2 sm:-mx-8 sm:px-8">
@@ -147,39 +142,29 @@ export default function OptionsFlowPage() {
             ))}
           </div>
 
-          {slots.length < MAX_TICKERS && (
-            <button onClick={addSlot}
-              className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
-              <Plus size={13} /> Add ticker
-            </button>
-          )}
         </div>
       </div>
 
-      {/* ── Ticker columns ──────────────────────────────────────────────── */}
-      <div className="pb-10 pt-2 sm:px-4">
-        <div className={`grid gap-y-8 lg:gap-x-0 ${gridClass} [&>*]:min-w-0 max-lg:[&>*+*]:border-t-2 max-lg:[&>*+*]:border-[var(--border-strong)] max-lg:[&>*+*]:pt-2 lg:[&>*+*]:border-l-2 lg:[&>*+*]:border-[var(--border-strong)] lg:[&>*]:px-3`}>
-          {slots.map((slot, i) => (
-            <TickerPanelWithQuery
-              key={slot.ticker + i}
-              slot={slot}
-              accentColor={accent}
-              nStrikes={nStrikes}
-              heatOpts={heat}
-              columns={slots.length}
-              canRemove={slots.length > 1}
-              onRemove={() => removeSlot(i)}
-              onInputChange={(v) => updateSlot(i, { input: v })}
-              onMetricChange={(m) => updateSlot(i, { metric: m })}
-              onExpiriesChange={(e) => updateSlot(i, { expiryFilter: e })}
-              onSelect={(sym) => {
-                const t = sym.trim().toUpperCase();
-                if (t) updateSlot(i, { ticker: t, input: t, expiryFilter: null });   // new ticker: its own expiries
-              }}
-            />
-          ))}
-        </div>
+      {/* ── The board (one ticker); bottom padding keeps its end clear of the dock ── */}
+      <div className="pb-48 pt-2 sm:px-4 md:pb-32">
+        <TickerPanelWithQuery
+          key={slot.ticker}
+          slot={slot}
+          accentColor={accent}
+          nStrikes={nStrikes}
+          heatOpts={heat}
+          columns={1}
+          canRemove={false}
+          onRemove={() => {}}
+          onInputChange={(v) => update({ input: v })}
+          onMetricChange={(m) => update({ metric: m })}
+          onExpiriesChange={(e) => update({ expiryFilter: e })}
+          onSelect={goTo}
+        />
       </div>
+
+      <WatchlistDock ticker={slot.ticker} metric={slot.metric} expiries={slot.expiryFilter}
+        onTicker={goTo} onMetric={(m) => update({ metric: m })} />
     </div>
   );
 }
