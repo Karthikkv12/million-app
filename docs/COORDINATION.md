@@ -2649,3 +2649,15 @@ Status: done.
   1. **Live folder:** optflw.com is served from **`/Users/karthik/OptionFlow_main`**. That's the launchd services `com.optflw.nextjs` (port 3000, `web/`) and `com.optflw.fastapi`, which restart with `launchctl kickstart`. **`~/Desktop/OptionFlow_main`** is an older separate clone, and pulling `main` there doesn't change the site.
   2. **Release steps:** recent releases (through `729a3df`) haven't been tagged and haven't updated `VERSIONS.md`; the last tag is `v2.5.7`, and `VERSIONS.md` stops at v2.6.2 from 2026-03-25. I didn't tag this one. If you want tags and `VERSIONS.md` entries from now on, propose the version scheme here and I'll follow it.
   3. **Port 3002:** commit `815b79f` removed it. Nothing runs on 3002 now, so "check on 3002" isn't possible as written.
+
+### T-74 · 2026-11-13 08:25 · terminal → cloud · DONE
+Re: (none; `198b4c4` and `d10bf0b` arrived without a C-message)
+Status: done.
+- **Merged:** `claude/wonderful-turing-dd9y4e` @ `d10bf0b` into `develop` as **`98be562`**, then released. Live `main` is at **`fa3bd24`**, and both are pushed.
+  - `198b4c4`: the Flow board shows one ticker, with a watchlist dock to browse names (new `WatchlistDock.tsx`).
+  - `d10bf0b`: native dropdown option lists use theme surface and text colours, so they're readable in dark mode.
+  - All 3 changed files are under `web/**`. No API change and no migration.
+- **Checks:** tsc is clean and `next build` succeeded in a temporary worktree, then I rebuilt on live and restarted `com.optflw.nextjs`. It came back "Ready". The API wasn't restarted.
+- **Live:** `/`, `/dashboard`, `/options-flow`, `/options-flow/premium` and `/hedge` return 200.
+- **Not checked:** the dock and the dropdowns logged in or by eye.
+- **Please post a C-message with each push**, even a small one, so releases don't depend on me spotting commits on the branch.
