@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { fetchOpenInterest, OpenInterest } from "@/lib/api";
+import { H, P, Formula, Terms, Theory } from "@/components/hedge/Theory";
 
 const SHOW = 21;                       // strikes shown around spot
 const n = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e4 ? `${Math.round(v / 1e3)}K` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : String(v));
@@ -64,6 +65,7 @@ export function OpenInterestCard({ symbol }: { symbol: string }) {
           {d.expiries.map((e) => <option key={e} value={e}>{expLabel(e)} · {dte(e)}d</option>)}
         </select>
         <span className="text-foreground/40">contracts open · <span className="text-[#7c3aed] dark:text-[#c4b5fd]">◎</span> max pain</span>
+        <span className="ml-auto"><Theory title={`How to use ${symbol}'s open interest and max pain`}><OiTheory d={d} symbol={symbol} /></Theory></span>
       </div>
 
       <div className={clsx(GRID, "border-b border-[var(--border)] pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/40")}>
@@ -109,5 +111,68 @@ export function OpenInterestCard({ symbol }: { symbol: string }) {
         in the last days before expiry, most of all on heavily traded tickers. Open interest is updated once a day.
       </p>
     </div>
+  );
+}
+
+/** Theory pop-up: open interest, put/call and max pain, explained with this expiry's own numbers. */
+function OiTheory({ d, symbol }: { d: OpenInterest; symbol: string }) {
+  const rows = d.rows ?? [];
+  const topCall = [...rows].sort((a, b) => b.call_oi - a.call_oi)[0];
+  const topPut = [...rows].sort((a, b) => b.put_oi - a.put_oi)[0];
+  const exp = d.expiry ? `${expLabel(d.expiry)} (${dte(d.expiry)} day${dte(d.expiry) === 1 ? "" : "s"})` : "this expiry";
+  const spot = d.spot ?? null;
+  const pcr = d.put_call_ratio;
+  const pain = d.max_pain;
+  const near = [...d.max_pain_by_expiry].filter((m) => m.max_pain != null).slice(0, 4);
+  const pctFrom = (v: number) => (spot ? `${((v / spot - 1) * 100 >= 0 ? "+" : "−")}${Math.abs((v / spot - 1) * 100).toFixed(1)}% from spot` : "");
+  return (
+    <>
+      <P>All examples are {symbol}&apos;s {exp} contracts{spot ? <>, spot <b className="text-foreground">${spot.toFixed(2)}</b></> : ""}. Pick another expiry in the card and this updates.</P>
+
+      <H>Open interest</H>
+      <P>
+        Open interest is how many contracts are still open at a strike: positions held overnight, not today&apos;s trading.
+        Big piles act like magnets and walls, because whoever sold them hedges around those strikes.
+      </P>
+      {topCall && topPut && (
+        <Terms rows={[
+          [`Most calls: ${k(topCall.strike)}`, <>{topCall.call_oi.toLocaleString()} contracts{spot ? `, ${pctFrom(topCall.strike)}` : ""}. Often a ceiling into expiry: call sellers defend it.</>],
+          [`Most puts: ${k(topPut.strike)}`, <>{topPut.put_oi.toLocaleString()} contracts{spot ? `, ${pctFrom(topPut.strike)}` : ""}. Often a floor: put sellers defend it.</>],
+        ]} />
+      )}
+
+      <H>Put/call ratio</H>
+      <P>
+        Puts open ÷ calls open. {symbol} {exp}: {d.put_oi.toLocaleString()} ÷ {d.call_oi.toLocaleString()} ={" "}
+        <b className="text-foreground">{pcr != null ? pcr.toFixed(2) : "—"}</b>.{" "}
+        {pcr == null ? "" : pcr > 1.2 ? "Put-heavy: lots of protection is owned, so a lot of fear is already priced, and squeezes up are common once selling dries up."
+          : pcr < 0.7 ? "Call-heavy: upside bets dominate. Crowded calls can fuel a squeeze, but also unwind fast on bad news."
+          : "Balanced: no strong lean from positioning."}
+      </P>
+
+      <H>Max pain</H>
+      <Formula>pain(P) = Σ calls OI × max(0, P − K) × 100 + Σ puts OI × max(0, K − P) × 100 → lowest P</Formula>
+      {pain != null ? (
+        <P>
+          For {exp}, holders would collect the least if {symbol} settled at <b className="text-foreground">{k(pain)}</b>
+          {spot ? <> ({pctFrom(pain)})</> : ""}. Option sellers, mostly dealers, gain most there, and their hedging tends to pull price toward it in the last 1–2 days.
+          {spot && Math.abs(pain / spot - 1) > 0.05 ? " It is far from spot, so the pull is weak; max pain matters most when it is within a few percent." : ""}
+        </P>
+      ) : <P>No max pain for this expiry: it has no open interest.</P>}
+      {near.length > 1 && (
+        <P>
+          Across expiries: {near.map((m, i) => <span key={m.expiry}>{i ? ", " : ""}{expLabel(m.expiry)} <b className="text-foreground">{k(m.max_pain!)}</b></span>)}.
+          {" "}When they line up, the pin is stronger; when they drift apart, each expiry pulls on its own day.
+        </P>
+      )}
+
+      <H>How to use it</H>
+      <ul className="list-disc space-y-1 pl-5">
+        <li>Selling a weekly: put short strikes beyond the biggest call and put piles{topCall && topPut ? ` (above ${k(topCall.strike)}, below ${k(topPut.strike)})` : ""}.</li>
+        <li>On expiry week, if price sits near max pain, expect a quiet close; buying short-dated options there is fighting the pin.</li>
+        <li>Check the dealer map too: a pile only acts as a wall if it also carries the gamma.</li>
+      </ul>
+      <P>Open interest is published once a day, before the open. Not advice.</P>
+    </>
   );
 }
