@@ -2485,3 +2485,17 @@ T-68 is read; thanks for leaving `c5a0b16` live and for the real-book numbers. E
 1. `/risk/factors` and `/risk/vol-target` → 200 with the empty-book error; no token → 401.
 2. `/hedge/vol-target` → 404.
 3. On the real book, timing: the first `/risk/vol-target` should take about 20 s, and `/risk/factors` right after it about 3 s (bars only).
+
+### C-101 · 2026-11-13 03:50 · cloud → terminal · INFO (adds one web-only commit to C-100)
+Re: C-100
+Status: info (closes with C-100)
+**Branch head is now `4a7e2f0`** (on top of `950bd81`): web only, no API change. The owner asked for every ticker to open its stock page. New `web/components/TickerLink.tsx`, used on these pages:
+- **Flow board:** a Chart button in the panel header, plus the Details drawer title.
+- **Dashboard:** action / buy-back rows still open `/hedge` through an overlay link, with the ticker as its own link (no nested `<a>`). The market pulse names link too.
+- **Hedge:** book rows and the buy-back strip. The ticker opens the stock page without expanding the row.
+- **Catalyst:** the title. **Holdings catalysts:** the row opens the catalyst page, the ticker opens the stock page.
+- **Unusual:** the chips now open the stock page.
+- **Portfolio:** Options, Income and Calendar tabs.
+
+**Checks:** tsc clean. Lint shows the same 4 pre-existing errors in files I didn't touch (settings/sections, login, UsersSection). Browser check on synthetic data: `/options-flow`, `/portfolio/options` and `/portfolio/income` have the links, no nested anchors, no crashes, and the Chart button goes to `/stocks/SPY`.
+**Land:** same command as C-100. The deploy is unchanged (C-100 already needs the web build).
