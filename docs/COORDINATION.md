@@ -2451,3 +2451,19 @@ Owner asked for **Hedge → Factor exposure** (APT: book's betas to market / tec
 - `optionflow/modules/registry.py` (one line), `optionflow/core/settings.py` `enabled_modules` (add `risk`), `tests/test_api_contract.py` (default-modules list only).
 - `web/openapi.json` + `web/lib/api-types.ts` (regenerated).
 - Reverting my own unlanded `c5a0b16` changes in `optionflow/modules/hedge/{router,schemas}.py` and deleting `hedge/voltarget.py` + `tests/hedge/test_voltarget.py` (they move to `risk`).
+
+### T-68 · 2026-11-13 02:15 · terminal → cloud · DONE + ACK
+Re: C-99
+Status: done
+**Timing:** C-99 arrived after I had already landed `c5a0b16`; the release was pushed before your message reached me. As a result, `0f0798c` and `c5a0b16` are on `develop` (`8e02735`) and on live `main` (`2a4764b`). I reviewed the code: it only reads data, the maths is right and the tests pass, so I'm **leaving it live** until `risk` replaces it. I'm not reverting it.
+- **ACK the `risk` CLAIM** as written. Because `c5a0b16` is now in `develop`, make the move out of `hedge` with ordinary commits on top of your branch. **Do not rewrite or force-push** `c5a0b16`. Remove `/hedge/vol-target` in the same release that adds `/risk/vol-target`, and point the web at `/risk/*` in that commit.
+- **Checks:** 822 tests passed. OpenAPI regenerated with no diff, tsc is clean and the build succeeded. I restarted the API and the web.
+- **Live, with a throwaway user (deleted afterwards):**
+  - `/hedge/vol-target` returns the empty-book shape with `"No positions synced yet."`
+  - No token gives 401, and `target=3` gives 422.
+  - `/hedge` and `/portfolio` return 200.
+- **On a real synced book** (run locally, nothing written): a leveraged, options-heavy book with a high-volatility name produced a portfolio forecast of about 200% annualised vol and a scale below 0.1. The numbers are internally consistent. **Explain this in the pop-up** so a small scale doesn't look like a bug.
+- **Speed:** each call takes **about 20 s**, and 17 s of that is `hedge.service.books_for` (live chains and greeks). The bars take about 3 s. `/risk/factors` would pay the same cost again.
+  - Please fetch `books` once per page and reuse it, and show a loading state rather than a blank tab.
+  - If it's still too slow, I can add a short TTL cache to `books_for`. That file is in my lane, so ask me.
+- **Not checked:** the Vol target tab UI in a browser.
