@@ -5850,6 +5850,48 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** SignalLegOut */
+        SignalLegOut: {
+            /**
+             * Decay 20D
+             * @description Share of the value lost to time over 20 trading days
+             */
+            decay_20d: number;
+            /** Delta */
+            delta: number;
+            /** Dte */
+            dte: number;
+            /**
+             * Extrinsic Pct
+             * @description Share of the value that is time value
+             */
+            extrinsic_pct: number;
+            /** Iv */
+            iv: number;
+            /**
+             * Iv Source
+             * @description chain: the contract's quote; model: the backtest's IV model (no quote)
+             * @default chain
+             * @enum {string}
+             */
+            iv_source: "chain" | "model" | "atm";
+            /** Label */
+            label: string;
+            /** Roll */
+            roll: boolean;
+            /**
+             * Theta Day
+             * @description $ lost per calendar day across the contracts held
+             */
+            theta_day: number;
+            /**
+             * Value
+             * @description Model value per share at today's price and IV
+             */
+            value: number;
+            /** Warn */
+            warn: boolean;
+        };
         /** SignalLevelOut */
         SignalLevelOut: {
             /**
@@ -5891,6 +5933,26 @@ export interface components {
             /** Headline */
             headline: string;
             /**
+             * Iv Model
+             * @description Modelled 30-day IV now (the backtest's model)
+             */
+            iv_model?: number | null;
+            /**
+             * Iv Normal
+             * @description Its 5-year average
+             */
+            iv_normal?: number | null;
+            /**
+             * Iv Ratio
+             * @description Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2
+             */
+            iv_ratio?: number | null;
+            /**
+             * Legs
+             * @default []
+             */
+            legs: components["schemas"]["SignalLegOut"][];
+            /**
              * Levels
              * @default []
              */
@@ -5921,10 +5983,10 @@ export interface components {
             target?: number | null;
             /**
              * Verdict
-             * @description Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD
+             * @description Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast
              * @enum {string}
              */
-            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM";
+            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM" | "ROLL";
             /**
              * Vix Pct
              * @description VIX percentile over the last year (0–1)

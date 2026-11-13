@@ -176,11 +176,25 @@ class ExpectedMoveOut(BaseModel):
     week: float = Field(..., description="±$ over 5 sessions")
 
 
+class SignalLegOut(BaseModel):
+    label: str
+    dte: int
+    iv: float
+    delta: float
+    value: float = Field(..., description="Model value per share at today's price and IV")
+    extrinsic_pct: float = Field(..., description="Share of the value that is time value")
+    theta_day: float = Field(..., description="$ lost per calendar day across the contracts held")
+    decay_20d: float = Field(..., description="Share of the value lost to time over 20 trading days")
+    roll: bool
+    warn: bool
+    iv_source: Literal["chain", "model", "atm"] = Field("chain", description="chain: the contract's quote; model: the backtest's IV model (no quote)")
+
+
 class SignalOut(BaseModel):
     """Levels and a directional read for a holding of long options only (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
     bias: Literal["bullish", "bearish", "neutral"]
-    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD")
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast")
     side: Literal["long", "short"]
     headline: str
     support: Optional[SignalLevelOut] = None
@@ -193,6 +207,10 @@ class SignalOut(BaseModel):
     expected_move: Optional[ExpectedMoveOut] = None
     vix_pct: Optional[float] = Field(None, description="VIX percentile over the last year (0–1)")
     evidence: str = Field("", description="Backtest result for this verdict")
+    iv_model: Optional[float] = Field(None, description="Modelled 30-day IV now (the backtest's model)")
+    iv_normal: Optional[float] = Field(None, description="Its 5-year average")
+    iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
+    legs: List[SignalLegOut] = []
 
 
 class BookOut(BaseModel):

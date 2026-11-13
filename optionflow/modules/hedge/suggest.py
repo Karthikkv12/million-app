@@ -222,7 +222,7 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
     key = getattr(strategy, "key", None) or "spike_wheel"
     sig = None
     if is_long_options_only(legs):                    # long calls / puts held as stock: no strategy, just the exposure
-        sig = _stock_signal(ctx, net, tape)
+        sig = _stock_signal(ctx, net, tape, legs)
         s, closes, key = _as_long_stock(legs, net, spot, warnings, sig), [], LONG_STOCK
     elif key == "spike_wheel":
         s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
@@ -254,7 +254,7 @@ def _plural(n: float, word: str) -> str:
     return f"{n:g} long {word}{'s' * (n != 1)}"
 
 
-def _stock_signal(ctx: Context, net: float, tape=None):
+def _stock_signal(ctx: Context, net: float, tape=None, legs: Optional[List[Leg]] = None):
     """hedge.signal for a holding tracked as stock. `tape`: a signal.Tape with history / flow (service); without
     one, a Tape from the context alone (dealer levels and IV, no history)."""
     from optionflow.modules.hedge import signal as sg
@@ -264,6 +264,9 @@ def _stock_signal(ctx: Context, net: float, tape=None):
         if getattr(t, k) is None:
             setattr(t, k, getattr(ctx, k))
     t.iv_spike, t.iv_cooling = t.iv_spike or ctx.iv_spike, t.iv_cooling or ctx.iv_cooling
+    if not t.legs and legs:
+        t.legs = [{"otype": l.otype, "strike": l.strike, "expiry": l.expiry, "dte": l.dte, "iv": l.iv, "mark": l.mark,
+                   "quantity": l.quantity} for l in legs if l.kind == "option"]
     return sg.evaluate(t, net)
 
 

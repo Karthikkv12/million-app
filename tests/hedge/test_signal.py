@@ -29,12 +29,62 @@ def test_vix_percentile_matches_the_backtest_rank():
     assert sg.vix_percentile([20.0] * 50) is None                    # under half a year: no read
 
 
-def test_dip_during_market_fear_is_add_with_the_backtest_evidence():
-    s = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)
+def long_history(n=1600, calm_vol=0.01, crash_days=15, seed=1):
+    """Years of quiet random-walk closes, then a sharp, volatile sell-off; a VIX that sits low then spikes."""
+    import random
+    rnd = random.Random(seed)
+    px, p = [], 100.0
+    for i in range(n - crash_days):
+        p *= 1 + rnd.gauss(0.0004, calm_vol); px.append(p)
+    for i in range(crash_days):
+        p *= 1 + (-0.03 if i % 3 else 0.035); px.append(p)
+    vx = [14.0 + 2 * ((i * 7919) % 10) / 10 for i in range(n - 10)] + [24, 27, 30, 33, 35, 36, 38, 37, 39, 40]
+    return px, vx
+
+
+def test_dip_during_market_fear_with_elevated_stock_iv_is_add():
+    px, vx = long_history()
+    s = sg.evaluate(tape(px, vix=vx), exposure=0.7)
+    assert s.iv_ratio and s.iv_ratio >= sg.IV_GATE
     assert s.verdict == "ADD" and s.side == "long" and s.vix_pct >= 0.8
-    assert s.headline.startswith("Add: dip during market fear") and "t = 2.7" in s.evidence
-    assert s.stop is None                                              # no stop during fear
+    assert s.headline.startswith("Add: fear dip with the stock's IV elevated") and "365+ days" in s.headline
+    assert "simulated 365-day" in s.evidence and s.stop is None        # no stop during fear
     assert any(r.startswith("No stop during market fear") for r in sg.reasons(s))
+    assert any(r.startswith("Stock IV") for r in sg.reasons(s))
+    low_live = tape(px, vix=vx, atm_iv=s.iv_normal * 1.05)             # the chain prices little fear: no add
+    assert sg.evaluate(low_live, exposure=0.7).verdict == "HOLD"
+
+
+def test_fear_dip_without_elevated_stock_iv_is_hold():
+    s = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)     # one year only: no IV history → no gate pass
+    assert s.verdict == "HOLD" and s.headline.startswith("Hold: fear dip, but the stock's own IV isn't elevated")
+    assert "thin edge" in s.evidence
+
+
+def test_iv_model_needs_history_and_matches_a_calm_stock():
+    assert sg.iv_model([100.0] * 300, [15.0] * 300) == (None, None, None)
+    px, _ = long_history(crash_days=0)
+    now, base, ratio = sg.iv_model(px, [14.0 + 2 * ((i * 7919) % 10) / 10 for i in range(len(px))])
+    assert 0.08 < now < 0.4 and 0.7 < ratio < 1.3                     # ~16% realised vol, nothing unusual
+
+
+def test_leg_decay_grows_as_time_runs_out_and_triggers_roll():
+    far = sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 400, "iv": 0.4, "quantity": 2}, None, 0.04)
+    near = sg.leg_decay(100.0, {"otype": "call", "strike": 85.0, "dte": 90, "iv": 0.4, "quantity": 2}, None, 0.04)
+    assert far["decay_20d"] < 0.03 and not far["roll"]
+    assert near["decay_20d"] >= sg.ROLL_DECAY and near["roll"] and near["theta_day"] > far["theta_day"]
+    assert sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 100}, None, 0.04) is None   # no IV at all
+    m = sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 400}, None, 0.04, (0.6, 0.4))  # no quote: model
+    assert m["iv_source"] == "model" and 0.4 < m["iv"] < 0.6                 # long-dated IV sits between IV30 and normal
+
+
+def test_a_short_dated_leg_turns_the_verdict_into_roll():
+    legs = [{"otype": "call", "strike": 120.0, "expiry": "2027-02-19", "dte": 95, "iv": 0.45, "quantity": 1}]
+    s = sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=legs), exposure=0.8)
+    assert s.verdict == "ROLL" and s.headline.startswith("Roll the 120C 2027-02-19") and s.legs[0]["roll"]
+    assert any("→ roll." in r for r in sg.reasons(s))
+    puts = [{"otype": "put", "strike": 150.0, "dte": 95, "iv": 0.5, "quantity": 1}]
+    assert sg.evaluate(tape(selloff(), vix=vix(35.0), legs=puts), exposure=-0.5).verdict == "TRIM"   # take profit first
 
 
 def test_same_dip_in_a_calm_market_is_dont_add_not_a_sell():
@@ -53,10 +103,15 @@ def test_quiet_uptrend_with_normal_vix_is_hold():
     assert s.verdict == "HOLD" and s.headline.startswith("Hold: no edge")
 
 
-def test_oversold_without_enough_fear_is_hold_with_the_vix_trigger():
-    s = sg.evaluate(tape(selloff(), vix=vix(25.0)), exposure=1.0)     # ~72nd percentile: under the 80th
-    assert s.verdict == "HOLD" and s.headline.startswith("Hold: oversold, but the market isn't scared") and "ADD if VIX closes ≥" in s.headline
+def test_oversold_without_enough_fear_is_hold_with_the_vix_trigger():  # noqa: D103
+    px, vx = long_history()
+    vx = vx[:-10] + [15.0] * 10                                      # VIX back to ~65th percentile
+    s = sg.evaluate(tape(px, vix=vx), exposure=1.0)
+    assert s.iv_ratio >= sg.IV_GATE and s.verdict == "HOLD"
+    assert s.headline.startswith("Hold: oversold, but the market isn't scared") and "ADD if VIX closes ≥" in s.headline
     assert "no edge" in s.evidence
+    short = sg.evaluate(tape(selloff(), vix=vix(25.0)), exposure=1.0)   # no IV history: no VIX trigger offered
+    assert "ADD if VIX" not in short.headline
 
 
 def test_long_puts_take_profit_on_the_fear_dip():

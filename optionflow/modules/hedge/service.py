@@ -32,6 +32,7 @@ logger = logging.getLogger("optionflow.hedge")
 SPOT_TTL, QUOTE_TTL, CHAIN_TTL, HV_TTL, BETA_TTL = 1.0, 300.0, 60.0, 3600.0, 6 * 3600.0
 BETA_BENCH = "SPY"
 VIX = "^VIX"              # market fear for hedge.signal (its 1-year percentile)
+IRX = "^IRX"              # 13-week T-bill yield, for option pricing
 
 
 def now_iso() -> str:
@@ -244,12 +245,25 @@ def _gex(sym: str) -> Dict[str, Optional[float]]:
 
 
 def _daily_bars(sym: str) -> List[Dict[str, Any]]:
-    """1 year of daily bars [{date, open, high, low, close, volume}], hourly."""
+    """10 years of daily bars [{date, open, high, low, close, volume}], hourly (the IV model needs 5 years of history
+    plus a year of warm-up)."""
     def load():
         from optionflow.providers.market_data import bars_from_history
-        df = get_market_data().price_history(sym, "1y", "1d")
+        df = get_market_data().price_history(sym, "10y", "1d")
         return bars_from_history(df, intraday=False) if df is not None and not df.empty else []
     return CACHE.get("bars", sym, HV_TTL, load) or []
+
+
+def _rate() -> float:
+    """13-week T-bill yield (decimal) for option pricing, hourly; R_DEFAULT if unavailable."""
+    def load():
+        bars = _daily_bars(IRX)
+        return bars[-1]["close"] / 100.0 if bars else None
+    try:
+        r = CACHE.get("rate", IRX, HV_TTL, load)
+    except Exception:
+        r = None
+    return r if r is not None and 0 <= r < 0.25 else bs.R_DEFAULT
 
 
 def _session_frac(now: Optional[datetime] = None) -> Tuple[date, float]:
@@ -266,6 +280,7 @@ def _tape(sym: str, ivs: Any, hv: Dict[str, Any], gx: Dict[str, Any]) -> Optiona
     """History, volume and today's option flow for hedge.signal (long-options holdings). None if it fails."""
     try:
         bars = _daily_bars(sym)
+        vix_bars = _daily_bars(VIX)
         today, frac = _session_frac()
         flow = None
         try:
@@ -278,7 +293,8 @@ def _tape(sym: str, ivs: Any, hv: Dict[str, Any], gx: Dict[str, Any]) -> Optiona
             [b.get("high") for b in bars], [b.get("low") for b in bars],
             today_bar=bool(bars) and bars[-1]["date"] == today.isoformat(), session_frac=frac,
             hv20=hv.get("hv20"), zero_gamma=gx.get("zero_gamma"), max_pain=gx.get("max_pain"), flow=flow,
-            vix=[b["close"] for b in _daily_bars(VIX)])
+            vix=[b["close"] for b in vix_bars], dates=[b["date"] for b in bars], vix_dates=[b["date"] for b in vix_bars],
+            rate=_rate())
     except Exception:
         logger.exception("signal tape for %s failed", sym)
         return None

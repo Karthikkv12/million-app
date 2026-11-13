@@ -11271,6 +11271,79 @@
     "title": "SeedHoldingsOut",
     "type": "object"
    },
+   "SignalLegOut": {
+    "properties": {
+     "decay_20d": {
+      "description": "Share of the value lost to time over 20 trading days",
+      "title": "Decay 20D",
+      "type": "number"
+     },
+     "delta": {
+      "title": "Delta",
+      "type": "number"
+     },
+     "dte": {
+      "title": "Dte",
+      "type": "integer"
+     },
+     "extrinsic_pct": {
+      "description": "Share of the value that is time value",
+      "title": "Extrinsic Pct",
+      "type": "number"
+     },
+     "iv": {
+      "title": "Iv",
+      "type": "number"
+     },
+     "iv_source": {
+      "default": "chain",
+      "description": "chain: the contract's quote; model: the backtest's IV model (no quote)",
+      "enum": [
+       "chain",
+       "model",
+       "atm"
+      ],
+      "title": "Iv Source",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "roll": {
+      "title": "Roll",
+      "type": "boolean"
+     },
+     "theta_day": {
+      "description": "$ lost per calendar day across the contracts held",
+      "title": "Theta Day",
+      "type": "number"
+     },
+     "value": {
+      "description": "Model value per share at today's price and IV",
+      "title": "Value",
+      "type": "number"
+     },
+     "warn": {
+      "title": "Warn",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "label",
+     "dte",
+     "iv",
+     "delta",
+     "value",
+     "extrinsic_pct",
+     "theta_day",
+     "decay_20d",
+     "roll",
+     "warn"
+    ],
+    "title": "SignalLegOut",
+    "type": "object"
+   },
    "SignalLevelOut": {
     "properties": {
      "distance": {
@@ -11349,6 +11422,50 @@
       "title": "Headline",
       "type": "string"
      },
+     "iv_model": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Modelled 30-day IV now (the backtest's model)",
+      "title": "Iv Model"
+     },
+     "iv_normal": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Its 5-year average",
+      "title": "Iv Normal"
+     },
+     "iv_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Stock IV \u00f7 its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs \u2265 1.2",
+      "title": "Iv Ratio"
+     },
+     "legs": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SignalLegOut"
+      },
+      "title": "Legs",
+      "type": "array"
+     },
      "levels": {
       "default": [],
       "items": {
@@ -11422,12 +11539,13 @@
       "title": "Target"
      },
      "verdict": {
-      "description": "Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD",
+      "description": "Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast",
       "enum": [
        "ADD",
        "HOLD",
        "CAUTION",
-       "TRIM"
+       "TRIM",
+       "ROLL"
       ],
       "title": "Verdict",
       "type": "string"

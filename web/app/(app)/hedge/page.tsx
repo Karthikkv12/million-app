@@ -75,6 +75,7 @@ const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neut
   HOLD: { tag: "neutral", label: "Hold", edge: null },
   CAUTION: { tag: "warn", label: "Don't add", edge: "warn" },
   TRIM: { tag: "loss", label: "Take profit", edge: "loss" },
+  ROLL: { tag: "warn", label: "Roll", edge: "warn" },
 };
 const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
   fear: "Market fear", momentum: "RSI", dip: "Dip", flow: "Options flow", trend: "Trend", dealers: "Dealers",
@@ -102,6 +103,7 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
         {[["Rebound score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score}</span>],
           ["VIX percentile", g.vix_pct != null ? `${Math.round(g.vix_pct * 100)}%` : "—"],
+          ["Stock IV vs normal", g.iv_ratio != null ? <span key="iv" className={g.iv_ratio >= 1.2 ? "text-gain" : undefined}>{g.iv_ratio.toFixed(2)}× <span className="text-foreground/40">({vol(g.iv_model)} / {vol(g.iv_normal)})</span></span> : "—"],
           ["Support", usd(g.support?.price)],
           ["Risk line", g.stop != null ? <span key="st" className="text-loss">{usd(g.stop)}</span> : (g.vix_pct ?? 0) >= 0.8 ? "none in fear" : "—"],
           ...(g.expected_move ? [["Move ±1σ", `${usd(g.expected_move.day)} d · ${usd(g.expected_move.week)} wk`]] : []),
@@ -110,6 +112,32 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
         ))}
       </dl>
 
+      {g.legs.length > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Your options · time decay</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full font-mono text-[12.5px] tabular-nums">
+              <thead><tr className="text-left text-[10px] uppercase tracking-[0.12em] text-foreground/45">
+                {["Contract", "Days", "IV", "Δ", "Time value", "Lost / 20d", "$ / day"].map((h) => <th key={h} className="py-1 pr-3 font-normal">{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {g.legs.map((l) => (
+                  <tr key={l.label} className="border-t border-[var(--border)]">
+                    <td className="py-1 pr-3 text-foreground">{l.label}</td>
+                    <td className="py-1 pr-3">{l.dte}</td>
+                    <td className="py-1 pr-3" title={l.iv_source === "model" ? "No quote: the backtest's IV model" : undefined}>{vol(l.iv)}{l.iv_source === "model" ? "*" : ""}</td>
+                    <td className="py-1 pr-3">{l.delta.toFixed(2)}</td>
+                    <td className="py-1 pr-3">{Math.round(l.extrinsic_pct * 100)}%</td>
+                    <td className={clsx("py-1 pr-3", l.roll ? "text-loss" : l.warn ? "text-warn" : "text-foreground/70")}>{(l.decay_20d * 100).toFixed(1)}%{l.roll ? " · roll" : l.warn ? " · soon" : ""}</td>
+                    <td className="sensitive py-1 pr-3">{usd(l.theta_day, 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-foreground/45">Roll once a leg loses 4%+ per 20 trading days (≈180 days left at 0.80Δ). Add with 365+ days.{g.legs.some((l) => l.iv_source === "model") ? " * IV from the model: no live quote." : ""}</p>
+        </div>
+      )}
       {g.evidence && <p className="border-l-2 border-[var(--border-strong)] pl-3 text-[12.5px] leading-snug text-foreground/65">{g.evidence}</p>}
       {g.reads.length > 0 && [true, false].map((tested) => g.reads.some((r) => !!r.tested === tested) && (
         <div key={String(tested)}>
@@ -315,7 +343,7 @@ function Legend() {
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
-          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Don&apos;t add</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock. The verdict uses only what held up in a 30-year backtest: market fear (VIX), oversold RSI and the dip under the 50-day. Flow, dealers, trend and volume are shown as context.</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Don&apos;t add / Roll</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock. The verdict uses only what held up in a 30-year backtest, priced on the options themselves (theta, IV, time left): market fear (VIX), oversold RSI, the dip under the 50-day, and the stock&apos;s own IV vs its 5-year normal. Roll fires when a leg loses 4%+ of its value per 20 trading days. Flow, dealers, trend and volume are shown as context.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
