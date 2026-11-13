@@ -154,6 +154,25 @@ def test_desk_attaches_the_signal_to_long_option_holdings_only():
     book = evaluate(ctx, legs, [], None, None, tape(ramp(120, 0.2), spot=162.0, vix=vix(20.0)))
     assert book.signal and book.signal["verdict"] in ("ADD", "HOLD", "CAUTION")
     assert book.suggestion.headline == book.signal["headline"]
-    assert book.suggestion.reasons[0] == book.signal["evidence"]
+    assert book.suggestion.reasons[1] == book.signal["evidence"]
     book = evaluate(ctx, [Leg("stock", 100, 150.0)], [], None)
     assert book.signal is None
+
+
+def test_each_setup_carries_its_backtest_odds():
+    px, vx = long_history()
+    add = sg.evaluate(tape(px, vix=vx), exposure=0.7)
+    assert add.probability["case"] == "ADD" and add.probability["p_edge_positive"] >= 0.9
+    assert add.probability["p_up_60"] <= sg.PROBS["TRIM"]["p_up_60"] + 1e-9        # conservative: never above ungated
+    assert sg.reasons(add)[0].startswith("Odds (2015–2026, unseen): stock up in 60 days")
+    calm = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
+    assert calm.probability["case"] == "CAUTION" and calm.probability["p_edge_positive"] < 0.1
+    fear_normal = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)
+    assert fear_normal.probability["case"] == "FEAR_IV_NORMAL"
+    puts = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=-0.7)
+    assert puts.probability["case"] == "TRIM" and "bad for the puts" in sg.reasons(puts)[0]
+    legs = [{"otype": "call", "strike": 120.0, "dte": 95, "iv": 0.45, "quantity": 1}]
+    roll = sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=legs), exposure=0.8)
+    assert roll.verdict == "ROLL" and roll.probability["case"] == "HOLD"   # odds are the stock's setup; roll is decay
+    assert sg.evaluate(tape(ramp(100, 0.1)), exposure=1.0).probability is None   # untested without VIX / history
+

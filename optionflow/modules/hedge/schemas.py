@@ -190,6 +190,22 @@ class SignalLegOut(BaseModel):
     iv_source: Literal["chain", "model", "atm"] = Field("chain", description="chain: the contract's quote; model: the backtest's IV model (no quote)")
 
 
+class SignalProbOut(BaseModel):
+    """Backtest odds for this setup, 2015–2026 (unseen when the rules were set)."""
+    case: Literal["ADD", "FEAR_IV_NORMAL", "LEAN", "CAUTION", "HOLD", "TRIM"]
+    cases: int
+    months: int
+    p_up_20: float
+    p_up_60: float = Field(..., description="Share of cases where the stock was up 60 trading days later")
+    p_beat_20: float
+    p_beat_60: float = Field(..., description="Share that beat simply holding the stock over 60 days")
+    p_option_profit_60: Optional[float] = Field(None, description="Share where a 365-day 0.80Δ call made money over 60 days (stress costs)")
+    edge_60: float = Field(..., description="Mean 60-day excess vs holding")
+    edge_lo: float = Field(..., description="5th percentile of the month-cluster bootstrap")
+    edge_hi: float
+    p_edge_positive: float = Field(..., description="Share of bootstrap draws with a positive mean edge")
+
+
 class SignalOut(BaseModel):
     """Levels and a directional read for a holding of long options only (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
@@ -211,6 +227,7 @@ class SignalOut(BaseModel):
     iv_normal: Optional[float] = Field(None, description="Its 5-year average")
     iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
     legs: List[SignalLegOut] = []
+    probability: Optional[SignalProbOut] = None
 
 
 class BookOut(BaseModel):

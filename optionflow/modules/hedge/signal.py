@@ -81,6 +81,19 @@ EVIDENCE = {
             "60; 13,059 cases). The edge appears only once the VIX joins in.",
     "TRIM": "Backtest (long side): the stock beat holding by +1.2% / 20 days after this setup: puts tend to give back.",
 }
+# Probabilities per signal, 2015–2026 (unseen when the rules were set); scripts/backtest_signal/probs.py.
+# p_up_N: stock up after N trading days · p_beat_N: beat simply holding it · p_option_profit_60: a 365-day 0.80Δ call
+# (stress costs) made money over 60 days · edge_60 / edge_lo / edge_hi: mean 60-day excess and its 90% range
+# (month-cluster bootstrap) · p_edge_positive: share of bootstrap draws with a positive mean edge.
+# ADD is conservative: the lower of the gated and the ungated fear-dip figures (the IV gate is partly hindsight).
+PROBS: Dict[str, Dict[str, Any]] = {
+    "ADD": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
+    "FEAR_IV_NORMAL": {"cases": 12717, "months": 67, "p_up_20": 0.571, "p_up_60": 0.603, "p_beat_20": 0.505, "p_beat_60": 0.489, "p_option_profit_60": 0.477, "edge_60": 0.0028, "edge_lo": -0.0176, "edge_hi": 0.0211, "p_edge_positive": 0.594},
+    "LEAN": {"cases": 9001, "months": 91, "p_up_20": 0.588, "p_up_60": 0.599, "p_beat_20": 0.522, "p_beat_60": 0.494, "p_option_profit_60": 0.484, "edge_60": 0.0014, "edge_lo": -0.0223, "edge_hi": 0.026, "p_edge_positive": 0.547},
+    "CAUTION": {"cases": 132692, "months": 117, "p_up_20": 0.549, "p_up_60": 0.579, "p_beat_20": 0.474, "p_beat_60": 0.461, "p_option_profit_60": 0.455, "edge_60": -0.0121, "edge_lo": -0.0253, "edge_hi": 0.0005, "p_edge_positive": 0.057},
+    "HOLD": {"cases": 200620, "months": 140, "p_up_20": 0.576, "p_up_60": 0.61, "p_beat_20": 0.496, "p_beat_60": 0.478, "p_option_profit_60": 0.475, "edge_60": 0.0028, "edge_lo": -0.009, "edge_hi": 0.0142, "p_edge_positive": 0.666},
+    "TRIM": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
+}
 MIN_FLOW = 250_000.0          # $ of option premium traded today before flow counts
 STOP_BUFFER = 0.01            # stop = 1% past the support / resistance
 NEAR = 0.015                  # within 1.5% of a wall counts as "at" it
@@ -150,6 +163,7 @@ class Signal:
     iv_normal: Optional[float] = None        # its 5-year average
     iv_ratio: Optional[float] = None
     legs: List[Dict[str, Any]] = field(default_factory=list)   # per held option: dte, iv, theta, decay, roll
+    probability: Optional[Dict[str, Any]] = None               # PROBS for this setup (`case`), from the backtest
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -479,6 +493,9 @@ def evaluate(t: Tape, exposure: float) -> Signal:
         verdict = "ADD" if (fear_dip and iv_ok) else "CAUTION" if (knife or stretched) else "HOLD"
     else:
         verdict = "TRIM" if fear_dip else "HOLD"
+    case = ("TRIM" if (not long and fear_dip) else "ADD" if verdict == "ADD" else
+            "FEAR_IV_NORMAL" if (long and fear_dip) else "CAUTION" if verdict == "CAUTION" else
+            "LEAN" if (long and score >= 50 and r14 is not None and r14 < ADD_RSI and vp is not None) else "HOLD")
     if rolls and verdict != "TRIM":
         verdict = "ROLL"
 
@@ -522,7 +539,8 @@ def evaluate(t: Tape, exposure: float) -> Signal:
                     "tested": r.key in TESTED} for r in reads], lv, em, _r(vp),
                   EVIDENCE["LEAN" if head.startswith("Hold: oversold") else
                            "FEAR_IV_NORMAL" if head.startswith("Hold: fear dip") else verdict],
-                  _r(iv_now), _r(iv_norm), _r(gate_ratio), legs)
+                  _r(iv_now), _r(iv_norm), _r(gate_ratio), legs,
+                  dict(PROBS[case], case=case) if (vp is not None and r14 is not None) else None)
 
 
 def _r(x: Optional[float]) -> Optional[float]:
@@ -532,6 +550,16 @@ def _r(x: Optional[float]) -> Optional[float]:
 def reasons(sig: Signal) -> List[str]:
     """Plain-language lines for the desk's ticket."""
     out = [sig.evidence] if sig.evidence else []
+    p = sig.probability
+    if p:
+        if sig.side == "long":
+            out.insert(0, f"Odds (2015–2026, unseen): stock up in 60 days {p['p_up_60']:.0%}, beats holding {p['p_beat_60']:.0%}"
+                          + (f", a 365-day call profits {p['p_option_profit_60']:.0%}" if p.get("p_option_profit_60") is not None else "")
+                          + f"; chance the average edge is above zero {p['p_edge_positive']:.0%} "
+                          f"(avg {p['edge_60']:+.1%}, 90% range {p['edge_lo']:+.1%} to {p['edge_hi']:+.1%}).")
+        else:
+            out.insert(0, f"Odds (2015–2026, unseen): stock up in 60 days {p['p_up_60']:.0%} (bad for the puts); "
+                          f"chance that tilt is real {p['p_edge_positive']:.0%}.")
     if sig.iv_ratio is not None:
         out.append(f"Stock IV {sig.iv_ratio:.2f}× its 5-year normal ({sig.iv_normal:.0%}; model now {sig.iv_model:.0%}, "
                    f"the lower of model and live chain counts); ADD needs ≥ {IV_GATE:.1f}×.")

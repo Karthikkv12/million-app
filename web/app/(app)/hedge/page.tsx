@@ -138,6 +138,25 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
           <p className="mt-1.5 text-[11.5px] text-foreground/45">Roll once a leg loses 4%+ per 20 trading days (≈180 days left at 0.80Δ). Add with 365+ days.{g.legs.some((l) => l.iv_source === "model") ? " * IV from the model: no live quote." : ""}</p>
         </div>
       )}
+      {g.probability && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Odds from the backtest · 2015–2026, unseen</p>
+          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Stock up in 60d", g.probability.p_up_60],
+              ...(g.side === "long" ? [["Beats holding", g.probability.p_beat_60], ...(g.probability.p_option_profit_60 != null ? [["365d call profits", g.probability.p_option_profit_60]] : [])] : []),
+              [g.side === "long" ? "Avg edge > 0" : "Rebound tilt > 0", g.probability.p_edge_positive],
+            ].map(([k, v]) => (
+              <div key={k as string}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt>
+                <dd className={clsx("mt-0.5 tabular-nums", (v as number) >= 0.9 || (v as number) <= 0.1 ? "text-foreground" : "text-foreground/60")}>{Math.round((v as number) * 100)}%</dd></div>
+            ))}
+          </dl>
+          <p className="mt-1.5 text-[11.5px] text-foreground/45">
+            Avg 60-day edge vs holding {pct(g.probability.edge_60)} (90% range {pct(g.probability.edge_lo)} to {pct(g.probability.edge_hi)}), {g.probability.cases.toLocaleString("en-US")} cases over {g.probability.months} months.
+            {g.probability.case === "ADD" ? " Conservative: the lower of the IV-gated and ungated results." : ""}
+          </p>
+        </div>
+      )}
       {g.evidence && <p className="border-l-2 border-[var(--border-strong)] pl-3 text-[12.5px] leading-snug text-foreground/65">{g.evidence}</p>}
       {g.reads.length > 0 && [true, false].map((tested) => g.reads.some((r) => !!r.tested === tested) && (
         <div key={String(tested)}>
@@ -231,7 +250,7 @@ function Detail({ b }: { b: HedgeBook }) {
             {b.signal && <SignalPanel g={b.signal} spot={b.spot} />}
             {!!s.reasons?.length && (
               <ol className="mt-4 space-y-1.5 border-l border-[var(--border-strong)] pl-3 text-[13px] leading-snug text-foreground/70">
-                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move)/.test(r)) : s.reasons)
+                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move|Odds)/.test(r)) : s.reasons)
                   .map((r) => <li key={r}>{r}</li>)}
               </ol>
             )}

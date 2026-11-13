@@ -11474,6 +11474,16 @@
       "title": "Levels",
       "type": "array"
      },
+     "probability": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalProbOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "reads": {
       "default": [],
       "items": {
@@ -11571,6 +11581,95 @@
      "headline"
     ],
     "title": "SignalOut",
+    "type": "object"
+   },
+   "SignalProbOut": {
+    "description": "Backtest odds for this setup, 2015\u20132026 (unseen when the rules were set).",
+    "properties": {
+     "case": {
+      "enum": [
+       "ADD",
+       "FEAR_IV_NORMAL",
+       "LEAN",
+       "CAUTION",
+       "HOLD",
+       "TRIM"
+      ],
+      "title": "Case",
+      "type": "string"
+     },
+     "cases": {
+      "title": "Cases",
+      "type": "integer"
+     },
+     "edge_60": {
+      "description": "Mean 60-day excess vs holding",
+      "title": "Edge 60",
+      "type": "number"
+     },
+     "edge_hi": {
+      "title": "Edge Hi",
+      "type": "number"
+     },
+     "edge_lo": {
+      "description": "5th percentile of the month-cluster bootstrap",
+      "title": "Edge Lo",
+      "type": "number"
+     },
+     "months": {
+      "title": "Months",
+      "type": "integer"
+     },
+     "p_beat_20": {
+      "title": "P Beat 20",
+      "type": "number"
+     },
+     "p_beat_60": {
+      "description": "Share that beat simply holding the stock over 60 days",
+      "title": "P Beat 60",
+      "type": "number"
+     },
+     "p_edge_positive": {
+      "description": "Share of bootstrap draws with a positive mean edge",
+      "title": "P Edge Positive",
+      "type": "number"
+     },
+     "p_option_profit_60": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Share where a 365-day 0.80\u0394 call made money over 60 days (stress costs)",
+      "title": "P Option Profit 60"
+     },
+     "p_up_20": {
+      "title": "P Up 20",
+      "type": "number"
+     },
+     "p_up_60": {
+      "description": "Share of cases where the stock was up 60 trading days later",
+      "title": "P Up 60",
+      "type": "number"
+     }
+    },
+    "required": [
+     "case",
+     "cases",
+     "months",
+     "p_up_20",
+     "p_up_60",
+     "p_beat_20",
+     "p_beat_60",
+     "edge_60",
+     "edge_lo",
+     "edge_hi",
+     "p_edge_positive"
+    ],
+    "title": "SignalProbOut",
     "type": "object"
    },
    "SignalReadOut": {

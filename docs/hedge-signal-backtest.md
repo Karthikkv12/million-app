@@ -93,6 +93,23 @@ Live rules from this (conservative):
 Caveat: the 1.2× gate was chosen after seeing that the IV-normal fear dips were weak in 2015–2026 (they were fine in
 1995–2014), so it is partly hindsight. It is kept because it only removes adds; it never adds risk.
 
+## Probabilities per signal (2015–2026, unseen)
+
+From `scripts/backtest_signal/probs.py`. "Edge > 0" is the share of 4,000 month-cluster bootstrap draws in which the
+average 60-day excess over holding was positive. The desk shows these on every call.
+
+| Signal | Stock up 60d | Beats holding 60d | 365d call profits 60d | Avg edge 60d (90% range) | Edge > 0 |
+|---|---|---|---|---|---|
+| Add (shown conservatively: lower of gated / ungated) | 66% | 56% | 54% | +3.6% (+0.6 to +6.6) | 98% |
+| Add, IV-gated as backtested | 71% | 61% | 59% | +6.2% (+1.7 to +10.3) | 99% |
+| Fear dip, stock IV normal | 60% | 49% | 48% | +0.3% (−1.8 to +2.1) | 59% |
+| Oversold, VIX calm-ish | 60% | 49% | 48% | +0.1% (−2.2 to +2.6) | 55% |
+| Don't add | 58% | 46% | 46% | −1.2% (−2.5 to +0.1) | 6% |
+| Hold (everything else) | 61% | 48% | 48% | +0.3% (−0.9 to +1.4) | 67% |
+| Take profit on puts (fear dip) | 66% stock up | — | — | +3.6% | 98% |
+
+These are averages for each setup, not a forecast for one stock: a single Add still fails about 4 times in 10.
+
 ## Confidence
 
 | Claim | Confidence |

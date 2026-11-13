@@ -5957,6 +5957,7 @@ export interface components {
              * @default []
              */
             levels: components["schemas"]["SignalLevelOut"][];
+            probability?: components["schemas"]["SignalProbOut"] | null;
             /**
              * Reads
              * @default []
@@ -5992,6 +5993,57 @@ export interface components {
              * @description VIX percentile over the last year (0–1)
              */
             vix_pct?: number | null;
+        };
+        /**
+         * SignalProbOut
+         * @description Backtest odds for this setup, 2015–2026 (unseen when the rules were set).
+         */
+        SignalProbOut: {
+            /**
+             * Case
+             * @enum {string}
+             */
+            case: "ADD" | "FEAR_IV_NORMAL" | "LEAN" | "CAUTION" | "HOLD" | "TRIM";
+            /** Cases */
+            cases: number;
+            /**
+             * Edge 60
+             * @description Mean 60-day excess vs holding
+             */
+            edge_60: number;
+            /** Edge Hi */
+            edge_hi: number;
+            /**
+             * Edge Lo
+             * @description 5th percentile of the month-cluster bootstrap
+             */
+            edge_lo: number;
+            /** Months */
+            months: number;
+            /** P Beat 20 */
+            p_beat_20: number;
+            /**
+             * P Beat 60
+             * @description Share that beat simply holding the stock over 60 days
+             */
+            p_beat_60: number;
+            /**
+             * P Edge Positive
+             * @description Share of bootstrap draws with a positive mean edge
+             */
+            p_edge_positive: number;
+            /**
+             * P Option Profit 60
+             * @description Share where a 365-day 0.80Δ call made money over 60 days (stress costs)
+             */
+            p_option_profit_60?: number | null;
+            /** P Up 20 */
+            p_up_20: number;
+            /**
+             * P Up 60
+             * @description Share of cases where the stock was up 60 trading days later
+             */
+            p_up_60: number;
         };
         /** SignalReadOut */
         SignalReadOut: {
