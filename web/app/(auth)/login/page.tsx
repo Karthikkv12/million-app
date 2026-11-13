@@ -56,10 +56,10 @@ function BrandPanel() {
 
       <div className="relative flex flex-1 flex-col justify-center px-10 xl:px-16">
         <h2 className="max-w-md text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.04em]">
-          Your desk is ready. <span className="text-white/45">Sign in to read today's positioning.</span>
+          Your desk is ready. <span className="text-white/45">Sign in to read today&apos;s positioning.</span>
         </h2>
         <ul className="mt-8 grid gap-3 text-[15px] text-white/75">
-          {["Every strike × expiry on one board", "King node, flip and walls marked for you", "Your Robinhood book, hedged to delta targets"].map((t) => (
+          {["Every strike × expiry, gamma and vanna", "Net premium: who's buying, who's selling", "Your Robinhood book, hedged to delta targets"].map((t) => (
             <li key={t} className="flex items-center gap-2.5"><Check size={16} className="text-gain" />{t}</li>
           ))}
         </ul>
@@ -76,7 +76,7 @@ function BrandPanel() {
           )} />
           {status === "up" ? "All systems normal" : status === "down" ? "Service is having trouble" : "Checking status…"}
         </span>
-        <span>Data delayed ~15 min</span>
+        <span>Real-time data · Public.com</span>
       </div>
     </aside>
   );

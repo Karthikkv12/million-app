@@ -65,13 +65,29 @@ function useDismiss(open: boolean, close: () => void) {
 const POP = "absolute bottom-full mb-2 max-h-[50vh] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]";
 const ROW = "flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition hover:bg-foreground/[0.06]";
 
-export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: {
+/** Flow pages share one "current ticker": stepping on the board or on Premium opens the same name on the other. */
+const BOARD_KEY = "optionsflow_layout", PREMIUM_KEY = "flow_premium_ticker";
+export function shareFlowTicker(symbol: string, from: "board" | "premium") {
+  const t = symbol.trim().toUpperCase();
+  if (!t) return;
+  try {
+    if (from === "board") localStorage.setItem(PREMIUM_KEY, t);
+    else {
+      const raw = JSON.parse(localStorage.getItem(BOARD_KEY) || "null");
+      const slot = { ...(raw?.slots?.[0] ?? { metric: "gex" }), ticker: t, input: t, expiryFilter: null };
+      localStorage.setItem(BOARD_KEY, JSON.stringify({ ...(raw ?? {}), slots: [slot] }));
+    }
+  } catch { /* storage off */ }
+}
+
+export function WatchlistDock({ ticker, metric = "gex", expiries = null, onTicker, onMetric }: {
   ticker: string;
-  metric: Metric;
+  metric?: Metric;
   /** The board's chosen expiry columns (null = all), so the above/below pill matches the table. */
-  expiries: string[] | null;
+  expiries?: string[] | null;
   onTicker: (symbol: string) => void;
-  onMetric: (m: Metric) => void;
+  /** Without it (Premium page) the dock has no GEX / VEX switch and no above / below row. */
+  onMetric?: (m: Metric) => void;
 }) {
   const qc = useQueryClient();
   const groupsQ = useQuery<WatchlistGroups>({ queryKey: ["watchlists"], queryFn: fetchWatchlistGroups, staleTime: 60_000 });
@@ -133,7 +149,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
 
   const quote = useQuotes([ticker.toUpperCase()]).data?.[ticker.toUpperCase()];
   const gex = useQuery<GexResult>({ queryKey: ["gex", ticker], queryFn: () => fetchGex(ticker), staleTime: 60_000 }).data;
-  const split = aboveBelow(gex, metric, expiries);
+  const split = onMetric ? aboveBelow(gex, metric, expiries) : null;
 
   const [listsOpen, setListsOpen] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
@@ -228,7 +244,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
             <ChevronRight size={18} />
           </button>
 
-          <div role="radiogroup" aria-label="Exposure" className="flex h-11 shrink-0 items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5">
+          {onMetric && <div role="radiogroup" aria-label="Exposure" className="flex h-11 shrink-0 items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5">
             {([["gex", "GEX", Zap], ["vex", "VEX", Activity]] as const).map(([m, label, Icon]) => (
               <button key={m} type="button" role="radio" aria-checked={metric === m} onClick={() => onMetric(m)}
                 title={m === "gex" ? "Gamma exposure, $ per 1% move" : "Vanna exposure, $ per 1 vol point"}
@@ -238,7 +254,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
                 <span className="hidden min-[400px]:inline">{label}</span>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
     </div>

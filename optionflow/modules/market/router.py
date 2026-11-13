@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 
 from optionflow.core.deps import get_current_user
@@ -49,13 +49,25 @@ def stock_history(symbol: str, period: str = "6mo", interval: str = "1d", prepos
     return service.price_history(symbol, period, interval, prepost)
 
 
+def _client(request: Request) -> str:
+    """The caller's address: the first hop the proxy saw (Cloudflare / X-Forwarded-For), else the socket peer.
+    A forged header only moves a caller into another bucket; the global cap still holds."""
+    h = request.headers
+    fwd = h.get("cf-connecting-ip") or (h.get("x-forwarded-for") or "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "?")
+
+
 @router.get("/logos/{symbol}", response_class=Response, responses={200: {"content": {"image/png": {}}}, 404: {}})
-async def logo(symbol: str) -> Response:
+async def logo(symbol: str, request: Request) -> Response:
     """A 64×64 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,
-    and logos are public. Cached on disk server-side; browsers may keep it for a week."""
+    and logos are public. Cached on disk server-side; browsers may keep it for a week. Symbols not cached yet are
+    fetched at most logos.FETCH_PER_IP per client and logos.FETCH_GLOBAL overall per minute (429 above that)."""
     sym = logos.clean(symbol)
     if sym is None:
         raise HTTPException(status_code=404, detail="Not a ticker")
+    if await run_in_threadpool(logos.needs_fetch, sym) and not logos.allow_fetch(_client(request)):
+        raise HTTPException(status_code=429, detail="Too many new logos; try again in a minute",
+                            headers={"Retry-After": "60", "Cache-Control": "no-store"})
     data = await run_in_threadpool(logos.get, sym)
     if data is None:
         raise HTTPException(status_code=404, detail="No logo", headers={"Cache-Control": "public, max-age=86400"})

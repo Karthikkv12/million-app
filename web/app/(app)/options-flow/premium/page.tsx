@@ -1,8 +1,9 @@
 "use client";
 /**
- * Flow → Premium: one ticker's option premium at full size. Its own ticker search (any symbol, not tied to the
- * board's columns): how call and put premium moved through the day, then where it sits by strike and expiry.
- * The ticker lives in ?s= (shareable) and is remembered for the next visit.
+ * Flow → Premium: one ticker's option premium at full size: how call and put premium moved through the day, then
+ * where it sits by strike and expiry. Like the board, the dock at the bottom browses a watchlist name by name
+ * (‹ ›, ← →), and the search jumps to any ticker. The ticker lives in ?s= (shareable) and is shared with the board:
+ * a name opened on one is open on the other.
  */
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,6 +17,7 @@ import { PremiumBreakdown } from "@/components/options-flow/PremiumBreakdown";
 import { anchorOf } from "@/lib/gex";
 import { useTheme } from "@/lib/theme";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
+import { WatchlistDock, shareFlowTicker } from "@/components/options-flow/WatchlistDock";
 
 const KEY = "flow_premium_ticker";
 const clean = (s?: string | null) => (s ?? "").trim().toUpperCase().replace(/[^A-Z0-9.\-^=]/g, "").slice(0, 12);
@@ -32,6 +34,7 @@ function PremiumPage() {
     const t = clean(s);
     if (!t) return;
     try { localStorage.setItem(KEY, t); } catch { /* storage off */ }
+    shareFlowTicker(t, "premium");
     setRemembered(t);
     setInput("");
     router.replace(`/options-flow/premium?s=${encodeURIComponent(t)}`);
@@ -88,6 +91,9 @@ function PremiumPage() {
       {d && (
         <PremiumBreakdown d={d} />
       )}
+      {/* room under the content for the dock (and the phone nav) */}
+      <div aria-hidden className="h-40 md:h-24" />
+      {symbol && <WatchlistDock ticker={symbol} onTicker={open} />}
     </DeskPage>
   );
 }
