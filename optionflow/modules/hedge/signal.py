@@ -77,10 +77,38 @@ EVIDENCE = {
     "CAUTION": "Backtest: −0.3% to −0.6% vs holding over 20 days, about −1.2% over 60; a weak edge (t ≈ −2): "
                "don't add, but it is not a sell.",
     "HOLD": "Backtest: no edge either way on these days (most days).",
-    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: −0.0% vs holding over 20 days, −0.9% over "
-            "60; 13,059 cases). The edge appears only once the VIX joins in.",
+    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: +0.1% vs holding over 60 days, 90% range "
+            "−2.2% to +2.6%; 9,001 cases). The edge appears only once the VIX joins in.",
     "TRIM": "Backtest (long side): the stock beat holding by +1.2% / 20 days after this setup: puts tend to give back.",
 }
+# Probabilities per signal, 2015–2026 (unseen when the rules were set); scripts/backtest_signal/probs.py.
+# p_up_N: stock up after N trading days · p_beat_N: beat simply holding it · p_option_profit_60: a 365-day 0.80Δ call
+# (stress costs) made money over 60 days · edge_60 / edge_lo / edge_hi: mean 60-day excess and its 90% range
+# (month-cluster bootstrap) · p_edge_positive: share of bootstrap draws with a positive mean edge.
+# ADD is conservative: the lower of the gated and the ungated fear-dip figures (the IV gate is partly hindsight).
+PROBS: Dict[str, Dict[str, Any]] = {
+    "ADD": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
+    "FEAR_IV_NORMAL": {"cases": 12717, "months": 67, "p_up_20": 0.571, "p_up_60": 0.603, "p_beat_20": 0.505, "p_beat_60": 0.489, "p_option_profit_60": 0.477, "edge_60": 0.0028, "edge_lo": -0.0176, "edge_hi": 0.0211, "p_edge_positive": 0.594},
+    "LEAN": {"cases": 9001, "months": 91, "p_up_20": 0.588, "p_up_60": 0.599, "p_beat_20": 0.522, "p_beat_60": 0.494, "p_option_profit_60": 0.484, "edge_60": 0.0014, "edge_lo": -0.0223, "edge_hi": 0.026, "p_edge_positive": 0.547},
+    "CAUTION": {"cases": 132692, "months": 117, "p_up_20": 0.549, "p_up_60": 0.579, "p_beat_20": 0.474, "p_beat_60": 0.461, "p_option_profit_60": 0.455, "edge_60": -0.0121, "edge_lo": -0.0253, "edge_hi": 0.0005, "p_edge_positive": 0.057},
+    "HOLD": {"cases": 200620, "months": 140, "p_up_20": 0.576, "p_up_60": 0.61, "p_beat_20": 0.496, "p_beat_60": 0.478, "p_option_profit_60": 0.475, "edge_60": 0.0028, "edge_lo": -0.009, "edge_hi": 0.0142, "p_edge_positive": 0.666},
+    "TRIM": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
+}
+# Held 365-day 0.80Δ calls by their P&L (scripts/backtest_signal/holdsim.py + pnl_risk.py: 39,294 simulated positions,
+# checked monthly; this table is 2015–2026). Next 60 trading days, in shares of the ORIGINAL premium: p_lose_25_paid =
+# lost more than 25% of what was paid, p5_paid = the worst 1 in 20. stock_excess_60 / t_stock: the stock vs holding it,
+# by the position's P&L — never significant (|t| < 1.2): P&L does not predict the stock, so it never moves the verdict.
+PNL_RISK: List[Dict[str, Any]] = [
+    {"lo": -1.0, "hi": -0.5, "label": "<-50%", "cases": 12952, "p_lose_25_paid": 0.116, "p_gain_25_paid": 0.205, "p5_paid": -0.318, "median_paid": -0.029, "time_value": 0.899, "stock_excess_60": 0.0066, "t_stock": -0.21},
+    {"lo": -0.5, "hi": -0.25, "label": "-50/-25", "cases": 16347, "p_lose_25_paid": 0.226, "p_gain_25_paid": 0.321, "p5_paid": -0.478, "median_paid": 0.025, "time_value": 0.464, "stock_excess_60": 0.0062, "t_stock": -0.13},
+    {"lo": -0.25, "hi": 0, "label": "-25/0", "cases": 23019, "p_lose_25_paid": 0.248, "p_gain_25_paid": 0.351, "p5_paid": -0.57, "median_paid": 0.052, "time_value": 0.245, "stock_excess_60": -0.0006, "t_stock": -0.43},
+    {"lo": 0, "hi": 0.25, "label": "0/+25", "cases": 22451, "p_lose_25_paid": 0.253, "p_gain_25_paid": 0.382, "p5_paid": -0.658, "median_paid": 0.085, "time_value": 0.137, "stock_excess_60": -0.0029, "t_stock": -0.57},
+    {"lo": 0.25, "hi": 0.5, "label": "+25/+50", "cases": 16157, "p_lose_25_paid": 0.262, "p_gain_25_paid": 0.403, "p5_paid": -0.759, "median_paid": 0.102, "time_value": 0.08, "stock_excess_60": -0.0067, "t_stock": -1.14},
+    {"lo": 0.5, "hi": 1.0, "label": "+50/+100", "cases": 16978, "p_lose_25_paid": 0.27, "p_gain_25_paid": 0.43, "p5_paid": -0.909, "median_paid": 0.126, "time_value": 0.046, "stock_excess_60": -0.0052, "t_stock": -0.9},
+    {"lo": 1.0, "hi": 2.0, "label": "+100/+200", "cases": 9225, "p_lose_25_paid": 0.293, "p_gain_25_paid": 0.464, "p5_paid": -1.093, "median_paid": 0.173, "time_value": 0.023, "stock_excess_60": 0.0003, "t_stock": 0.67},
+    {"lo": 2.0, "hi": 99, "label": ">+200%", "cases": 2501, "p_lose_25_paid": 0.363, "p_gain_25_paid": 0.499, "p5_paid": -2.291, "median_paid": 0.249, "time_value": 0.009, "stock_excess_60": -0.0134, "t_stock": 0.21},
+]
+PNL_BIG_GAIN, PNL_DEEP_LOSS = 1.0, -0.5
 MIN_FLOW = 250_000.0          # $ of option premium traded today before flow counts
 STOP_BUFFER = 0.01            # stop = 1% past the support / resistance
 NEAR = 0.015                  # within 1.5% of a wall counts as "at" it
@@ -117,7 +145,9 @@ class Tape:
     vix: Sequence[float] = ()                # VIX daily closes, oldest first (≥ 1 year), the last = now
     dates: Sequence[str] = ()                # dates of `closes` (YYYY-MM-DD); aligns the VIX for the IV model
     vix_dates: Sequence[str] = ()
-    legs: Sequence[Dict[str, Any]] = ()      # held options: otype, strike, expiry, dte, iv, mark, quantity
+    legs: Sequence[Dict[str, Any]] = ()      # held options: otype, strike, expiry, dte, iv, mark, quantity, avg_price
+    shares: float = 0.0                      # shares held (stock page), with their average cost
+    avg_cost: Optional[float] = None
     rate: float = 0.045
 
 
@@ -150,6 +180,8 @@ class Signal:
     iv_normal: Optional[float] = None        # its 5-year average
     iv_ratio: Optional[float] = None
     legs: List[Dict[str, Any]] = field(default_factory=list)   # per held option: dte, iv, theta, decay, roll
+    probability: Optional[Dict[str, Any]] = None               # PROBS for this setup (`case`), from the backtest
+    pnl: Optional[Dict[str, Any]] = None                       # the holding's P&L and its tested risk (never the verdict)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -403,6 +435,47 @@ def leg_decay(spot: float, leg: Dict[str, Any], iv_fallback: Optional[float], r:
             "iv_source": src}
 
 
+def position_pnl(t: Tape, pairs: List[tuple]) -> Optional[Dict[str, Any]]:
+    """The holding's P&L and, for long options, the backtest's 60-day risk for that P&L. Shares or long options.
+    `pairs`: (held leg, its leg_decay or None); a leg's value is its quote, else the model's."""
+    opts = []
+    for raw, d in pairs:
+        q, cost = raw.get("quantity") or 0, raw.get("avg_price")
+        if q <= 0 or not cost:
+            continue
+        value = raw.get("mark") if (raw.get("mark") or 0) > 0 else (d["value"] if d else None)
+        if value is not None:
+            opts.append((q, cost, value))
+    if opts:
+        paid = sum(q * c for q, c, _ in opts)
+        now = sum(q * v for q, _, v in opts)
+        pct = now / paid - 1.0
+        row = next((r for r in PNL_RISK if r["lo"] < pct <= r["hi"]), PNL_RISK[0] if pct <= -1 else PNL_RISK[-1])
+        if pct >= PNL_BIG_GAIN:
+            note = (f"Up {pct:.0%} on what you paid. Your P&L doesn't predict the stock (tested), but at this size a bad 60 days "
+                    f"has given back a lot: {row['p_lose_25_paid']:.0%} of such positions lost more than 25% of the original premium, "
+                    f"the worst 1 in 20 lost {-row['p5_paid']:.0%} of it. Taking some off is a risk choice, not an edge; "
+                    "same-delta rolls lost to holding after costs.")
+        elif pct <= PNL_DEEP_LOSS:
+            note = (f"Down {-pct:.0%} on what you paid. About {row['time_value']:.0%} of what's left is time value, which decays; "
+                    "your P&L doesn't predict the stock, and fear-dip adds still worked at this P&L.")
+        else:
+            note = (f"{'Up' if pct >= 0 else 'Down'} {abs(pct):.0%} on what you paid. Your P&L doesn't predict the stock (tested); "
+                    f"next 60 days at this P&L: {row['p_gain_25_paid']:.0%} gained and {row['p_lose_25_paid']:.0%} lost more than 25% "
+                    "of the original premium.")
+        return {"kind": "options", "pct": round(pct, 4), "dollars": round((now - paid) * 100, 2), "cost": round(paid * 100, 2),
+                "bucket": row["label"], "p_lose_25_paid": row["p_lose_25_paid"], "p_gain_25_paid": row["p_gain_25_paid"],
+                "p5_paid": row["p5_paid"], "cases": row["cases"], "note": note}
+    if t.shares > 0 and t.avg_cost:
+        pct = t.spot / t.avg_cost - 1.0
+        return {"kind": "shares", "pct": round(pct, 4), "dollars": round((t.spot - t.avg_cost) * t.shares, 2),
+                "cost": round(t.avg_cost * t.shares, 2), "bucket": None, "p_lose_25_paid": None, "p_gain_25_paid": None,
+                "p5_paid": None, "cases": None,
+                "note": f"{'Up' if pct >= 0 else 'Down'} {abs(pct):.0%} vs your average {t.avg_cost:,.2f}. Gains or losses since you "
+                        "bought didn't predict the stock in the backtest, so they don't change the verdict."}
+    return None
+
+
 # ── levels ───────────────────────────────────────────────────────────────────
 def levels(t: Tape, px: List[float]) -> tuple:
     """([{key, label, price, distance, strength}], expected move {day, week} in $ or None)."""
@@ -473,12 +546,16 @@ def evaluate(t: Tape, exposure: float) -> Signal:
     live_ratio = (t.atm_iv / iv_norm) if (t.atm_iv and iv_norm) else None
     gate_ratio = min(ivr, live_ratio) if (ivr is not None and live_ratio is not None) else ivr
     iv_ok = gate_ratio is not None and gate_ratio >= IV_GATE
-    legs = [d for d in (leg_decay(t.spot, l, t.atm_iv, t.rate, (iv_now, iv_norm)) for l in t.legs) if d]
+    pairs = [(l, leg_decay(t.spot, l, t.atm_iv, t.rate, (iv_now, iv_norm))) for l in t.legs]
+    legs = [d for _, d in pairs if d]
     rolls = [d for d in legs if d["roll"]]
     if long:
         verdict = "ADD" if (fear_dip and iv_ok) else "CAUTION" if (knife or stretched) else "HOLD"
     else:
         verdict = "TRIM" if fear_dip else "HOLD"
+    case = ("TRIM" if (not long and fear_dip) else "ADD" if verdict == "ADD" else
+            "FEAR_IV_NORMAL" if (long and fear_dip) else "CAUTION" if verdict == "CAUTION" else
+            "LEAN" if (long and score >= 50 and r14 is not None and r14 < ADD_RSI and vp is not None) else "HOLD")
     if rolls and verdict != "TRIM":
         verdict = "ROLL"
 
@@ -522,7 +599,9 @@ def evaluate(t: Tape, exposure: float) -> Signal:
                     "tested": r.key in TESTED} for r in reads], lv, em, _r(vp),
                   EVIDENCE["LEAN" if head.startswith("Hold: oversold") else
                            "FEAR_IV_NORMAL" if head.startswith("Hold: fear dip") else verdict],
-                  _r(iv_now), _r(iv_norm), _r(gate_ratio), legs)
+                  _r(iv_now), _r(iv_norm), _r(gate_ratio), legs,
+                  dict(PROBS[case], case=case) if (vp is not None and r14 is not None) else None,
+                  position_pnl(t, pairs))
 
 
 def _r(x: Optional[float]) -> Optional[float]:
@@ -532,6 +611,18 @@ def _r(x: Optional[float]) -> Optional[float]:
 def reasons(sig: Signal) -> List[str]:
     """Plain-language lines for the desk's ticket."""
     out = [sig.evidence] if sig.evidence else []
+    p = sig.probability
+    if p:
+        if sig.side == "long":
+            out.insert(0, f"Odds (2015–2026, unseen): stock up in 60 days {p['p_up_60']:.0%}, beats holding {p['p_beat_60']:.0%}"
+                          + (f", a 365-day call profits {p['p_option_profit_60']:.0%}" if p.get("p_option_profit_60") is not None else "")
+                          + f"; chance the average edge is above zero {p['p_edge_positive']:.0%} "
+                          f"(avg {p['edge_60']:+.1%}, 90% range {p['edge_lo']:+.1%} to {p['edge_hi']:+.1%}).")
+        else:
+            out.insert(0, f"Odds (2015–2026, unseen): stock up in 60 days {p['p_up_60']:.0%} (bad for the puts); "
+                          f"chance that tilt is real {p['p_edge_positive']:.0%}.")
+    if sig.pnl:
+        out.append(sig.pnl["note"])
     if sig.iv_ratio is not None:
         out.append(f"Stock IV {sig.iv_ratio:.2f}× its 5-year normal ({sig.iv_normal:.0%}; model now {sig.iv_model:.0%}, "
                    f"the lower of model and live chain counts); ADD needs ≥ {IV_GATE:.1f}×.")

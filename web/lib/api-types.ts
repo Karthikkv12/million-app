@@ -809,6 +809,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/signal/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Signal
+         * @description The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /
+         *     Don't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal.
+         */
+        get: operations["signal_api_v1_hedge_signal__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hedge/stream": {
         parameters: {
             query?: never;
@@ -5957,6 +5978,8 @@ export interface components {
              * @default []
              */
             levels: components["schemas"]["SignalLevelOut"][];
+            pnl?: components["schemas"]["SignalPnlOut"] | null;
+            probability?: components["schemas"]["SignalProbOut"] | null;
             /**
              * Reads
              * @default []
@@ -5992,6 +6015,92 @@ export interface components {
              * @description VIX percentile over the last year (0–1)
              */
             vix_pct?: number | null;
+        };
+        /**
+         * SignalPnlOut
+         * @description The holding's P&L and its tested 60-day risk. It never moves the verdict: P&L didn't predict the stock.
+         */
+        SignalPnlOut: {
+            /** Bucket */
+            bucket?: string | null;
+            /** Cases */
+            cases?: number | null;
+            /** Cost */
+            cost: number;
+            /** Dollars */
+            dollars: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "options" | "shares";
+            /** Note */
+            note: string;
+            /**
+             * P5 Paid
+             * @description Worst 1 in 20 over 60 trading days, as a share of the original premium
+             */
+            p5_paid?: number | null;
+            /** P Gain 25 Paid */
+            p_gain_25_paid?: number | null;
+            /**
+             * P Lose 25 Paid
+             * @description Long options at this P&L: share that lost >25% of the original premium in 60 trading days (2015–2026)
+             */
+            p_lose_25_paid?: number | null;
+            /** Pct */
+            pct: number;
+        };
+        /**
+         * SignalProbOut
+         * @description Backtest odds for this setup, 2015–2026 (unseen when the rules were set).
+         */
+        SignalProbOut: {
+            /**
+             * Case
+             * @enum {string}
+             */
+            case: "ADD" | "FEAR_IV_NORMAL" | "LEAN" | "CAUTION" | "HOLD" | "TRIM";
+            /** Cases */
+            cases: number;
+            /**
+             * Edge 60
+             * @description Mean 60-day excess vs holding
+             */
+            edge_60: number;
+            /** Edge Hi */
+            edge_hi: number;
+            /**
+             * Edge Lo
+             * @description 5th percentile of the month-cluster bootstrap
+             */
+            edge_lo: number;
+            /** Months */
+            months: number;
+            /** P Beat 20 */
+            p_beat_20: number;
+            /**
+             * P Beat 60
+             * @description Share that beat simply holding the stock over 60 days
+             */
+            p_beat_60: number;
+            /**
+             * P Edge Positive
+             * @description Share of bootstrap draws with a positive mean edge
+             */
+            p_edge_positive: number;
+            /**
+             * P Option Profit 60
+             * @description Share where a 365-day 0.80Δ call made money over 60 days (stress costs)
+             */
+            p_option_profit_60?: number | null;
+            /** P Up 20 */
+            p_up_20: number;
+            /**
+             * P Up 60
+             * @description Share of cases where the stock was up 60 trading days later
+             */
+            p_up_60: number;
         };
         /** SignalReadOut */
         SignalReadOut: {
@@ -6213,6 +6322,38 @@ export interface components {
             week_52_high?: number | null;
             /** Week 52 Low */
             week_52_low?: number | null;
+        };
+        /**
+         * StockSignalOut
+         * @description The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol}).
+         */
+        StockSignalOut: {
+            /** Day Change */
+            day_change?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Held
+             * @description long_options: the Hedge desk's own book signal
+             * @enum {string}
+             */
+            held: "none" | "stock" | "long_options";
+            /**
+             * Label
+             * @description Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held
+             */
+            label?: string | null;
+            /**
+             * Reasons
+             * @description Why: backtest odds, evidence, levels, IV, legs and the reads
+             * @default []
+             */
+            reasons: string[];
+            signal?: components["schemas"]["SignalOut"] | null;
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
         };
         /** StrategyInfo */
         StrategyInfo: {
@@ -9122,6 +9263,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokerPositionOut"][];
+                };
+            };
+        };
+    };
+    signal_api_v1_hedge_signal__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSignalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

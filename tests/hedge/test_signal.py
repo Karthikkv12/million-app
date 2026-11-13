@@ -154,6 +154,44 @@ def test_desk_attaches_the_signal_to_long_option_holdings_only():
     book = evaluate(ctx, legs, [], None, None, tape(ramp(120, 0.2), spot=162.0, vix=vix(20.0)))
     assert book.signal and book.signal["verdict"] in ("ADD", "HOLD", "CAUTION")
     assert book.suggestion.headline == book.signal["headline"]
-    assert book.suggestion.reasons[0] == book.signal["evidence"]
+    assert book.suggestion.reasons[1] == book.signal["evidence"]
     book = evaluate(ctx, [Leg("stock", 100, 150.0)], [], None)
     assert book.signal is None
+
+
+def test_each_setup_carries_its_backtest_odds():
+    px, vx = long_history()
+    add = sg.evaluate(tape(px, vix=vx), exposure=0.7)
+    assert add.probability["case"] == "ADD" and add.probability["p_edge_positive"] >= 0.9
+    assert add.probability["p_up_60"] <= sg.PROBS["TRIM"]["p_up_60"] + 1e-9        # conservative: never above ungated
+    assert sg.reasons(add)[0].startswith("Odds (2015–2026, unseen): stock up in 60 days")
+    calm = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
+    assert calm.probability["case"] == "CAUTION" and calm.probability["p_edge_positive"] < 0.1
+    fear_normal = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)
+    assert fear_normal.probability["case"] == "FEAR_IV_NORMAL"
+    puts = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=-0.7)
+    assert puts.probability["case"] == "TRIM" and "bad for the puts" in sg.reasons(puts)[0]
+    legs = [{"otype": "call", "strike": 120.0, "dte": 95, "iv": 0.45, "quantity": 1}]
+    roll = sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=legs), exposure=0.8)
+    assert roll.verdict == "ROLL" and roll.probability["case"] == "HOLD"   # odds are the stock's setup; roll is decay
+    assert sg.evaluate(tape(ramp(100, 0.1)), exposure=1.0).probability is None   # untested without VIX / history
+
+
+def test_pnl_is_a_risk_read_and_never_moves_the_verdict():
+    base = [{"otype": "call", "strike": 80.0, "expiry": "2027-12-17", "dte": 400, "iv": 0.4, "quantity": 2}]
+    def run(paid, mark):
+        legs = [dict(base[0], avg_price=paid, mark=mark)]
+        return sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), legs=legs), exposure=1.0)
+    win, flat, lose = run(10.0, 35.0), run(30.0, 33.0), run(40.0, 12.0)
+    assert win.verdict == flat.verdict == lose.verdict                      # P&L never changes the call
+    assert win.pnl["kind"] == "options" and win.pnl["pct"] == 2.5 and win.pnl["dollars"] == 5000.0
+    assert win.pnl["bucket"] == ">+200%" and "risk choice, not an edge" in win.pnl["note"]
+    assert lose.pnl["bucket"] == "<-50%" and "time value" in lose.pnl["note"]
+    assert "doesn't predict the stock" in flat.pnl["note"] and flat.pnl["p_lose_25_paid"] > 0
+    assert any(r == win.pnl["note"] for r in sg.reasons(win))
+    no_mark = sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), legs=[dict(base[0], avg_price=20.0)]), exposure=1.0)
+    assert no_mark.pnl is not None                                           # values the leg with the model without a quote
+    shares = sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0), shares=100, avg_cost=80.0), exposure=1.0)
+    assert shares.pnl["kind"] == "shares" and shares.pnl["p5_paid"] is None and "didn't predict" in shares.pnl["note"]
+    assert sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0)), exposure=1.0).pnl is None
+

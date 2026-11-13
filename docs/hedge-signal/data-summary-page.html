@@ -1,0 +1,285 @@
+<meta name="dash-one-writer">
+<style>
+.fd { display: grid; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.fd h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.fd h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; text-wrap: balance; }
+.fd p { margin: 0; max-width: 72ch; line-height: 1.5; }
+.fd .muted { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.fd .lede { font-size: var(--cds-font-size-body); }
+.fd section { display: grid; gap: var(--cds-gap-md); min-width: 0; }
+.fd .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--cds-gap-md); }
+.fd .tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); }
+.fd .tile b { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; }
+.fd .tile span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.fd .wrap { overflow-x: auto; min-width: 0; }
+.fd table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: var(--cds-font-size-caption); }
+.fd th, .fd td { padding: 6px 10px; border-bottom: 1px solid var(--color-border-line); text-align: right; white-space: nowrap; }
+.fd th:first-child, .fd td:first-child { text-align: left; white-space: normal; min-width: 170px; }
+.fd th { color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); }
+.fd .good { color: var(--color-ok); } .fd .bad { color: var(--color-bad); }
+.fd .chart { position: relative; min-height: 220px; }
+.fd .chart svg { display: block; width: 100%; }
+.fd .chart text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); }
+.fd .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 9px; font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+.fd .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.fd .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.fd .conf { display: grid; grid-template-columns: 1fr auto; gap: var(--cds-gap-sm) var(--cds-gap-lg); align-items: baseline; max-width: 820px; }
+.fd .conf b { font-weight: var(--cds-font-weight-medium); }
+.fd details summary { cursor: pointer; color: var(--color-fg-muted); }
+.fd details ul { margin: var(--cds-gap-sm) 0 0; padding-left: 18px; display: grid; gap: 6px; max-width: 72ch; }
+.fd [data-dash-source-state=refreshing] { opacity: .5; }
+</style>
+
+<div class="fd">
+  <header id="top" style="display:grid;gap:var(--cds-gap-sm)">
+    <h1>Fear-dip signal: the data</h1>
+    <p class="lede">On days it never saw while the rules were set (2015–2026), the Add signal beat simply holding by <b data-draw="addX60" data-source="setups" data-field="excess60" data-where="setup=Add: oversold during market fear&amp;period=2015–2026">—</b>% over 60 days on the stock and <b data-draw="optX60" data-source="options" data-field="excess" data-where="setup=Add: fear dip, stock IV ≥ 1.2× normal&amp;hold_days=60">—</b>% of premium on a 365-day call, while the old signal’s Trim calls rose <b data-draw="oldTrim" data-source="old_signal" data-field="next20" data-where="verdict=Trim">—</b>% over 20 days, more than its Add calls.</p>
+  </header>
+
+  <section id="scope">
+    <h2>How much was tested</h2>
+    <div class="tiles">
+      <div class="tile"><b data-draw="sc1" data-source="scope" data-field="value" data-where="metric=Symbol-days tested">—</b><span>symbol-days of daily prices</span></div>
+      <div class="tile"><b data-draw="sc2" data-source="scope" data-field="value" data-where="metric=Symbols">—</b><span>symbols (stocks and ETFs)</span></div>
+      <div class="tile"><b data-draw="sc3" data-source="scope" data-field="value" data-where="metric=Years of daily data">—</b><span>years, 1995 to 2026</span></div>
+      <div class="tile"><b data-draw="sc4" data-source="scope" data-field="value" data-where="metric=Separate market-fear episodes">—</b><span>separate market-fear episodes</span></div>
+      <div class="tile"><b data-draw="sc5" data-source="scope" data-field="value" data-where="metric=Option-simulated symbol-days">—</b><span>symbol-days re-priced as options, per setup</span></div>
+    </div>
+    <div class="wrap"><table id="scope-table" data-source="scope" data-row-key="metric">
+      <thead><tr><th data-field="metric">Measure</th><th data-field="value">Value</th></tr></thead>
+      <tbody data-draw="scopeRows"></tbody>
+    </table></div>
+    <p class="muted">Rules were set on 1995–2014 and checked untouched on 2015–2026. “Excess” is a stock’s return minus its own average over the same period, so it shows what the signal added over simply holding.</p>
+  </section>
+
+  <section id="old-signal">
+    <h2>The old signal: Trim calls rose more than Add calls (2015–2026)</h2>
+    <div class="wrap"><table data-source="old_signal" data-row-key="verdict">
+      <thead><tr><th data-field="verdict">Old verdict</th><th data-field="next20">Next 20 days %</th><th data-field="next60">Next 60 days %</th><th data-field="worst_dip20">Worst dip in 20 days %</th><th data-field="cases">Cases</th></tr></thead>
+      <tbody data-draw="oldRows"></tbody>
+    </table></div>
+  </section>
+
+  <section id="pattern">
+    <h2>The pattern: a dip during market fear rebounds, a calm-market dip doesn’t</h2>
+    <div class="legend"><span><i></i>1995–2014 (rules set)</span><span><i></i>2015–2026 (unseen)</span></div>
+    <div class="chart" id="setups-chart" data-source="setups" data-draw="setupsChart"></div>
+    <p class="muted">60-day excess vs holding, by setup. Add = RSI(14) under 40 while the VIX is in the top 20% of its year.</p>
+    <div class="wrap"><table data-source="setups" data-row-key="setup,period">
+      <thead><tr><th data-field="setup">Setup</th><th data-field="period">Period</th><th data-field="excess20">Excess 20d %</th><th data-field="excess60">Excess 60d %</th><th data-field="up20">Up after 20d %</th><th data-field="cases">Cases</th></tr></thead>
+      <tbody data-draw="setupRows"></tbody>
+    </table></div>
+  </section>
+
+  <section id="years">
+    <h2>Add, year by year</h2>
+    <div class="chart" id="years-chart" data-source="add_years" data-draw="yearsChart"></div>
+    <p class="muted">Average 20-day excess vs holding after an Add signal. Years with no Add days are missing.</p>
+  </section>
+
+  <section id="robustness">
+    <h2>Robustness checks on Add</h2>
+    <div class="wrap"><table data-source="robustness" data-row-key="check">
+      <thead><tr><th data-field="check">Check</th><th data-field="value">Result</th><th data-field="unit">Measured as</th></tr></thead>
+      <tbody data-draw="robRows"></tbody>
+    </table></div>
+    <p class="muted">It holds for ETFs, stocks that crashed and the rest, and at the next day’s open. It fails in long bear markets, so add in pieces.</p>
+  </section>
+
+  <section id="options">
+    <h2>On the options: theta, IV and costs included</h2>
+    <p>Every day was re-priced as a 365-day 0.80Δ call with a modelled IV, a term structure, T-bill rates and stress costs (+5 vol points on entry, 2% each way). Short holds lose after costs; 60-day holds kept the edge.</p>
+    <div class="wrap"><table data-source="options" data-row-key="setup,hold_days">
+      <thead><tr><th data-field="setup">Setup (2015–2026)</th><th data-field="hold_days">Held days</th><th data-field="excess">Excess %</th><th data-field="absolute">Return %</th><th data-field="made_money">Made money %</th><th data-field="cases">Cases</th></tr></thead>
+      <tbody data-draw="optRows"></tbody>
+    </table></div>
+    <h2 id="theta-h">Time decay by days left (0.80Δ call)</h2>
+    <div class="chart" id="theta-chart" data-source="theta" data-draw="thetaChart"></div>
+    <p class="muted">Share of the option’s value lost per 20 trading days with price and IV unchanged. The dashed line is the desk’s roll rule.</p>
+  </section>
+
+  <section id="policies">
+    <h2>As a full policy, no rule beat buy-and-hold on risk</h2>
+    <div class="wrap"><table data-source="policies" data-row-key="policy,period">
+      <thead><tr><th data-field="policy">Policy</th><th data-field="period">Period</th><th data-field="annual_return">Return / yr %</th><th data-field="sharpe">Sharpe</th><th data-field="worst_drawdown">Worst drawdown %</th></tr></thead>
+      <tbody data-draw="polRows"></tbody>
+    </table></div>
+    <p class="muted">Exposure 1.5× for 20 days after Add, 0.5× after a cut, averaged over all symbols. Adding raised return and drawdown together; cutting lowered both.</p>
+  </section>
+
+  <section id="holdings">
+    <h2>Your holdings at the last close</h2>
+    <div class="wrap"><table data-source="holdings" data-row-key="ticker">
+      <thead><tr><th data-field="ticker">Ticker</th><th data-field="price">Price</th><th data-field="rsi">RSI(14)</th><th data-field="vs_50day">vs 50-day %</th><th data-field="vix_pct">VIX pct</th><th data-field="iv_vs_normal">IV vs normal</th><th data-field="sample_leg_decay20">Decay / 20d % (400-day call)</th><th data-field="verdict">Verdict</th></tr></thead>
+      <tbody data-draw="holdRows"></tbody>
+    </table></div>
+    <p class="muted">Add needs RSI under 40, the VIX at its 80th percentile or higher, and the stock’s IV at 1.2× its normal or more. This is a snapshot, not live.</p>
+  </section>
+
+  <section id="confidence">
+    <h2>How far to trust it</h2>
+    <div class="conf">
+      <span>The old signal was useless to harmful</span><b class="good">High</b>
+      <span>Fear dips beat holding on average over 20–60 days, on the stock</span><b>Moderate–high</b>
+      <span>The edge survives theta, IV and costs on 365-day calls held 60 days</span><b>Moderate</b>
+      <span>Roll at about 180 days left (decay outruns the edge)</span><b class="good">High</b>
+      <span>Calm-market weakness means don’t add</span><b>Moderate–low</b>
+      <span>Any single Add works out</span><b class="bad">Low</b>
+      <span>Options flow and dealer levels help</span><b>Untested</b>
+    </div>
+    <details>
+      <summary>What this test can’t tell you</summary>
+      <ul>
+        <li>Options flow and dealer levels have no multi-year history, so they are shown on the desk as context only.</li>
+        <li>Option prices are modelled, not real fills. The IV model misses earnings premiums and ignores dividends and skew.</li>
+        <li>All symbols still trade today. The ETF and crashed-stock checks limit this survivorship bias but don’t remove it.</li>
+        <li>The 1.2× IV gate was chosen partly with hindsight. It only removes adds.</li>
+      </ul>
+    </details>
+  </section>
+</div>
+
+<script>
+window.fdFmt = {
+  num: (v) => v == null ? "—" : d3.format(",")(v),
+  pct: (v) => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2),
+  dec: (v) => v == null ? "—" : (+v).toFixed(2),
+  one: (v) => v == null ? "—" : (+v).toFixed(1),
+  raw: (v) => v == null ? "—" : String(v),
+};
+window.fdSign = (v) => v == null ? "" : v > 0 ? "good" : v < 0 ? "bad" : "";
+// one value from one row
+window.fdCell = (id, where, field, fmt) => (el) => {
+  const d = dash.data(id);
+  if (d.status !== "ok") { el.textContent = "—"; return; }
+  const row = d.data.find((r) => Object.entries(where).every(([k, v]) => String(r[k]) === String(v)));
+  el.textContent = row ? fmt(row[field]) : "—";
+};
+// a table body: cols = [[field, fmt, signed?]]
+window.fdRows = (id, keyCols, cols, filter) => (tb) => {
+  const d = dash.data(id);
+  tb.replaceChildren();
+  if (d.status !== "ok") return;
+  for (const r of d.data.filter(filter || (() => true))) {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-key", keyCols.map((k) => String(r[k]).replace(/%/g, "%25").replace(/&/g, "%26").replace(/=/g, "%3D").replace(/,/g, "%2C")).join(","));
+    for (const [f, fmt, signed] of cols) {
+      const td = document.createElement("td");
+      td.textContent = fmt(r[f]);
+      if (signed) td.className = fdSign(r[f]);
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  }
+};
+window.fdTip = (box) => {
+  let t = box.querySelector(".tip");
+  if (!t) { t = document.createElement("div"); t.className = "tip"; t.hidden = true; box.appendChild(t); }
+  return {
+    show(ev, text) { t.textContent = text; t.hidden = false; const b = box.getBoundingClientRect();
+      const x = Math.min(ev.clientX - b.left + 12, b.width - t.offsetWidth - 4); t.style.left = Math.max(0, x) + "px"; t.style.top = (ev.clientY - b.top + 12) + "px"; },
+    hide() { t.hidden = true; },
+  };
+};
+</script>
+
+<script>
+const F = window.fdFmt;
+dash.draw("addX60", fdCell("setups", {setup: "Add: oversold during market fear", period: "2015–2026"}, "excess60", F.pct));
+dash.draw("optX60", fdCell("options", {setup: "Add: fear dip, stock IV ≥ 1.2× normal", hold_days: 60}, "excess", F.pct));
+dash.draw("oldTrim", fdCell("old_signal", {verdict: "Trim"}, "next20", F.pct));
+dash.draw("sc1", fdCell("scope", {metric: "Symbol-days tested"}, "value", F.num));
+dash.draw("sc2", fdCell("scope", {metric: "Symbols"}, "value", F.num));
+dash.draw("sc3", fdCell("scope", {metric: "Years of daily data"}, "value", F.raw));
+dash.draw("sc4", fdCell("scope", {metric: "Separate market-fear episodes"}, "value", F.num));
+dash.draw("sc5", fdCell("scope", {metric: "Option-simulated symbol-days"}, "value", F.num));
+dash.draw("scopeRows", fdRows("scope", ["metric"], [["metric", F.raw], ["value", F.num]]));
+dash.draw("oldRows", fdRows("old_signal", ["verdict"], [["verdict", F.raw], ["next20", F.pct], ["next60", F.pct], ["worst_dip20", F.pct], ["cases", F.num]]));
+dash.draw("setupRows", fdRows("setups", ["setup", "period"], [["setup", F.raw], ["period", F.raw], ["excess20", F.pct, 1], ["excess60", F.pct, 1], ["up20", F.one], ["cases", F.num]]));
+dash.draw("robRows", fdRows("robustness", ["check"], [["check", F.raw], ["value", (v) => v == null ? "—" : Number.isInteger(v) ? String(v) : F.pct(v), 0], ["unit", F.raw]]));
+dash.draw("optRows", fdRows("options", ["setup", "hold_days"], [["setup", F.raw], ["hold_days", F.raw], ["excess", F.pct, 1], ["absolute", F.pct, 1], ["made_money", F.one], ["cases", F.num]]));
+dash.draw("polRows", fdRows("policies", ["policy", "period"], [["policy", F.raw], ["period", F.raw], ["annual_return", F.one], ["sharpe", F.dec], ["worst_drawdown", F.one]]));
+dash.draw("holdRows", fdRows("holdings", ["ticker"], [["ticker", F.raw], ["price", F.dec], ["rsi", F.raw], ["vs_50day", F.one], ["vix_pct", F.raw], ["iv_vs_normal", F.dec], ["sample_leg_decay20", F.one], ["verdict", F.raw]]));
+</script>
+
+<script>
+const F = window.fdFmt;
+document.querySelectorAll(".fd .legend i").forEach((i, k) => { i.style.background = dash.colors[k]; });
+// grouped horizontal bars: 60-day excess by setup, two periods
+dash.draw("setupsChart", (box) => {
+  const d = dash.data("setups");
+  box.querySelectorAll("svg").forEach((n) => n.remove());
+  if (d.status === "error") { box.textContent = "Failed to load"; return; }
+  if (d.status !== "ok") return;
+  const tip = fdTip(box), W = Math.max(box.clientWidth, 300), setups = [...new Set(d.data.map((r) => r.setup))];
+  const pers = ["1995–2014", "2015–2026"], rowH = 46, H = setups.length * rowH + 30;
+  const svg = d3.select(box).insert("svg", ":first-child").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
+    .attr("aria-label", "60-day excess return versus holding, by setup and period");
+  const ext = d3.max(d.data, (r) => Math.abs(r.excess60)) || 1;
+  const x = d3.scaleLinear().domain([-ext, ext]).range([10, W - 10]).nice();
+  svg.append("line").attr("x1", x(0)).attr("x2", x(0)).attr("y1", 0).attr("y2", H - 22).style("stroke", "var(--cds-chart-reference)");
+  setups.forEach((s, i) => {
+    const y0 = i * rowH;
+    svg.append("text").attr("x", 10).attr("y", y0 + 11).text(s);
+    pers.forEach((p, j) => {
+      const r = d.data.find((q) => q.setup === s && q.period === p); if (!r) return;
+      const v = r.excess60, y = y0 + 16 + j * 13;
+      svg.append("rect").attr("x", Math.min(x(0), x(v))).attr("y", y).attr("height", 11).attr("rx", 2)
+        .attr("width", Math.max(1, Math.abs(x(v) - x(0)))).style("fill", dash.colors[j])
+        .on("mousemove", (ev) => tip.show(ev, `${s} · ${p}: ${F.pct(v)}% over 60 days`)).on("mouseleave", tip.hide);
+      const lbl = svg.append("text").attr("y", y + 9).text(F.pct(v) + "%");
+      lbl.attr("x", v >= 0 ? x(v) + 4 : x(v) - 4).attr("text-anchor", v >= 0 ? "start" : "end");
+    });
+  });
+  svg.append("text").attr("x", x(0)).attr("y", H - 6).attr("text-anchor", "middle").text("0 = same as holding");
+});
+
+// columns: Add 20-day excess per year
+dash.draw("yearsChart", (box) => {
+  const d = dash.data("add_years");
+  box.querySelectorAll("svg").forEach((n) => n.remove());
+  if (d.status === "error") { box.textContent = "Failed to load"; return; }
+  if (d.status !== "ok") return;
+  const tip = fdTip(box), W = Math.max(box.clientWidth, 300), H = 240, m = {t: 10, r: 8, b: 26, l: 40};
+  const svg = d3.select(box).insert("svg", ":first-child").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
+    .attr("aria-label", "Add signal's 20-day excess return versus holding, per year");
+  const x = d3.scaleBand().domain(d.data.map((r) => r.year)).range([m.l, W - m.r]).padding(0.2);
+  const y = d3.scaleLinear().domain(d3.extent([0, ...d.data.map((r) => r.excess20)])).nice().range([H - m.b, m.t]);
+  const ya = svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat((v) => v + "%"));
+  ya.select(".domain").remove(); ya.selectAll("line").style("stroke", "var(--cds-chart-grid)").attr("x2", W - m.l - m.r);
+  svg.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(0)).attr("y2", y(0)).style("stroke", "var(--cds-chart-axis)");
+  svg.selectAll("rect.b").data(d.data).join("rect").attr("class", "b").attr("x", (r) => x(r.year)).attr("width", x.bandwidth())
+    .attr("y", (r) => Math.min(y(0), y(r.excess20))).attr("height", (r) => Math.max(1, Math.abs(y(r.excess20) - y(0)))).attr("rx", 2)
+    .style("fill", (r) => r.excess20 >= 0 ? dash.colors[0] : "var(--cds-chart-status-critical)")
+    .on("mousemove", (ev, r) => tip.show(ev, `${r.year}: ${F.pct(r.excess20)}% over 20 days · ${F.num(r.cases)} cases`)).on("mouseleave", tip.hide);
+  const step = W < 500 ? 10 : 5;
+  svg.append("g").selectAll("text").data(d.data.filter((r) => r.year % step === 0)).join("text")
+    .attr("x", (r) => x(r.year) + x.bandwidth() / 2).attr("y", H - 8).attr("text-anchor", "middle").text((r) => r.year);
+});
+
+// line: decay per 20 trading days by days left, with the roll rule
+const ROLL_RULE = 4;   // % per 20 trading days: the desk's roll line
+dash.draw("thetaChart", (box) => {
+  const d = dash.data("theta");
+  box.querySelectorAll("svg").forEach((n) => n.remove());
+  if (d.status === "error") { box.textContent = "Failed to load"; return; }
+  if (d.status !== "ok") return;
+  const tip = fdTip(box), W = Math.max(box.clientWidth, 300), H = 230, m = {t: 12, r: 16, b: 30, l: 40};
+  const svg = d3.select(box).insert("svg", ":first-child").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
+    .attr("aria-label", "Option value lost to time per 20 trading days, by days left");
+  const x = d3.scaleLinear().domain(d3.extent(d.data, (r) => r.days_left)).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([0, d3.max(d.data, (r) => r.lost_per_20d)]).nice().range([H - m.b, m.t]);
+  const ya = svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat((v) => v + "%"));
+  ya.select(".domain").remove(); ya.selectAll("line").style("stroke", "var(--cds-chart-grid)").attr("x2", W - m.l - m.r);
+  const xa = svg.append("g").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(d.data.map((r) => r.days_left).filter((v, i) => W > 520 || i % 2 === 0)).tickFormat((v) => v + "d"));
+  xa.select(".domain").style("stroke", "var(--cds-chart-axis)"); xa.selectAll("line").style("stroke", "var(--cds-chart-axis)");
+  svg.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(ROLL_RULE)).attr("y2", y(ROLL_RULE))
+    .style("stroke", "var(--cds-chart-reference)").attr("stroke-dasharray", "4 4");
+  svg.append("text").attr("x", W - m.r).attr("y", y(ROLL_RULE) - 5).attr("text-anchor", "end").text(`roll at ${ROLL_RULE}%`);
+  svg.append("path").datum(d.data).attr("d", d3.line().x((r) => x(r.days_left)).y((r) => y(r.lost_per_20d)))
+    .style("fill", "none").style("stroke", dash.colors[0]).attr("stroke-width", 2);
+  svg.selectAll("circle").data(d.data).join("circle").attr("cx", (r) => x(r.days_left)).attr("cy", (r) => y(r.lost_per_20d)).attr("r", 4)
+    .style("fill", dash.colors[0]).style("stroke", "var(--color-bg)").attr("stroke-width", 2)
+    .on("mousemove", (ev, r) => tip.show(ev, `${r.days_left} days left: loses ${r.lost_per_20d.toFixed(1)}% per 20 trading days`)).on("mouseleave", tip.hide);
+});
+</script>

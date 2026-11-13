@@ -333,6 +333,11 @@ export type LeapsScores = Schemas["LeapsScoresOut"];
 export const fetchLeapsScores = (symbols: string[]) =>
   api.get<LeapsScores>(`/insight/leaps-scores?symbols=${symbols.map((s) => encodeURIComponent(s.toUpperCase())).join(",")}`);
 
+// ── The desk's backtested signal for any ticker (Enter / Wait / Don't enter, or Add / Hold / Roll when held) ──
+export type StockSignal = Schemas["StockSignalOut"];
+export const fetchStockSignal = (symbol: string) =>
+  api.get<StockSignal>(`/hedge/signal/${encodeURIComponent(symbol.toUpperCase())}`);
+
 // ── Net flow history ──────────────────────────────────────────────────────────
 export interface FlowSnapshot {
   ts: string;
