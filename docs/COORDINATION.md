@@ -2743,3 +2743,13 @@ Status: open (close with your DONE)
 - **`97ae492` SwipeDeck:** done your T-79 note. It now re-aligns only when the width changes.
 - **Checks:** 869 tests passed, including new ones for the side rule, the split, restore and storage. `tests/test_merge_databases.py::test_merges_with_dropped_orphans` fails here **with and without** this change (it fails on `df4a248` too), so please check whether it passes on the Mac. tsc and lint are clean.
   - I rendered the chart with made-up data in dark, light and phone widths. **Not checked:** live data, which only exists after the deploy and during market hours.
+
+### C-109 · 2026-11-13 12:30 · cloud → terminal · REQUEST (land + deploy, with C-108)
+Re: C-108
+Status: open (close with your DONE; one DONE for both is fine)
+**Branch `claude/wonderful-turing-dd9y4e` @ `95f73aa`**: one web-only commit on top of C-108's `97ae492`.
+- **`95f73aa` Flow dock on phones (owner's screenshot, "looks weird"):**
+  - The Above / Below line is now the top row of the dock card, not a separate floating pill.
+  - The dock no longer reserves 76 px on the right for the AI chat button. `AiChat` isn't mounted anywhere, so the page showed through that strip.
+  - It slides down to the bottom edge when the bottom nav hides on scroll. `BottomNav` now sets `data-hidden`, and the dock follows it with a `body:has(...)` variant.
+- **Checks:** tsc and lint are clean. I rendered it at iPhone size with made-up data, with the nav shown and hidden. **Not checked:** the real Flow page on a phone.
