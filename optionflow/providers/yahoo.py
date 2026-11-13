@@ -185,6 +185,9 @@ def parse_chain_rows(exp: str, chain: Any, T: float) -> List[Dict[str, Any]]:
                     "mid": mid,
                     "gamma": feed_gamma if feed_gamma > 0 else float("nan"),
                     "T": T,
+                    "bid": _num(opt.get("bid", None), default=None),
+                    "ask": _num(opt.get("ask", None), default=None),
+                    "last": _num(opt.get("lastPrice", None), default=None),
                 })
             except Exception:
                 continue

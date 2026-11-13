@@ -19,8 +19,9 @@ import pandas as pd
 
 # Columns of OptionChain.rows (one row per contract with open interest):
 #   strike, expiry (YYYY-MM-DD), otype ("call"/"put"), oi, volume, iv, mid,
-#   gamma (from the feed; NaN when the feed has none), T (years to expiry)
-CHAIN_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "iv", "mid", "gamma", "T"]
+#   gamma (from the feed; NaN when the feed has none), T (years to expiry),
+#   bid / ask / last (quote and last trade price; None when the feed has none; flow.traded.side needs them)
+CHAIN_COLUMNS = ["strike", "expiry", "otype", "oi", "volume", "iv", "mid", "gamma", "T", "bid", "ask", "last"]
 
 
 # Columns of ContractChain.rows (every quoted contract, open interest or not):
