@@ -5847,6 +5847,11 @@ export interface components {
              */
             net_delta?: number | null;
             /**
+             * Note
+             * @description How this holding was priced when not fully (e.g. legs without IV)
+             */
+            note?: string | null;
+            /**
              * Own Exposure
              * @description target ÷ this stock's own forecast, capped
              */

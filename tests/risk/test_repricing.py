@@ -153,3 +153,60 @@ def test_naked_call_is_flagged_and_missing_vix_is_said(market, monkeypatch):
     out = vt.vol_target(1, 0.15, 1.0)
     assert out["method"] == "repriced" and out["unlimited"] == ["AAA"] and out["max_loss"] is None
     assert out["vix_note"].startswith("No VIX history (rate limited)") and out["forecast"] > 0
+
+
+# ── T-70 ──────────────────────────────────────────────────────────────────────
+def test_expired_and_expiring_legs_are_intrinsic():
+    S = 110.0
+    gone = rp.leg_pnl(call(1, 100, dte=0), S, [0.1], None)[0]                      # expired: intrinsic both sides
+    assert gone == pytest.approx(100 * (max(S * math.exp(0.1) - 100, 0) - 10))
+    tonight = rp.leg_pnl(put(-1, 100, dte=0.5), S, [math.log(0.8)], None)[0]       # expires before the next session
+    v0 = rp.bs_price(np.array([S]), 100, np.array([0.5 / 365]), np.array([0.35]), False)[0]
+    assert tonight == pytest.approx(-100 * (max(100 - S * 0.8, 0) - v0))
+
+
+def test_shares_only_output_is_exactly_the_old_method(market, monkeypatch):
+    c = market
+    a, b = c["AAA"][DATES[-1]], c["BBB"][DATES[-1]]
+    monkeypatch.setattr(book, "holdings", lambda uid: [holding("AAA", a, [shares(300)], 3.0), holding("BBB", b, [shares(-50)], -0.5)])
+    out = vt.vol_target(1, 0.2, 1.5)
+    # the previous implementation, step by step
+    w = {"AAA": 3.0 * 100 * a / 100_000, "BBB": -0.5 * 100 * b / 100_000}
+    dates, rets = vt.align({"AAA": c["AAA"], "BBB": c["BBB"]})
+    port = [w["AAA"] * x + w["BBB"] * y for x, y in zip(rets["AAA"], rets["BBB"])]
+    f = vt.garch_forecast(port)
+    gross = abs(3.0 * 100 * a) + abs(0.5 * 100 * b)
+    scale, capped = vt.scale_book(0.2, f["forecast"], gross, 100_000, 1.5)
+    assert out["method"] == "delta" and out["forecast"] == pytest.approx(f["forecast"], rel=1e-12)
+    assert (out["scale"], out["capped"]) == (pytest.approx(scale, rel=1e-12), capped)
+    old_shares = vt.risk_shares(w, rets)
+    for h in out["holdings"]:
+        assert h["risk_share"] == pytest.approx(old_shares[h["symbol"]], rel=1e-9)
+        assert h["change"] == pytest.approx(h["exposure"] * (scale - 1), rel=1e-12) and h["note"] is None
+    path = vt.garch_path(port)
+    assert [p["forecast"] for p in out["chart"]] == pytest.approx([vt.annual(v) for v in path[:-1]][-252:], rel=1e-12)
+
+
+def test_leg_without_iv_is_priced_on_delta_and_said(market, monkeypatch):
+    c = market
+    a = c["AAA"][DATES[-1]]
+    row = holding("AAA", a, [call(2, round(a), iv=None, mark=5.0, delta=0.6)], 1.2)
+    row["atm_iv"] = None
+    monkeypatch.setattr(book, "holdings", lambda uid: [row])
+    out = vt.vol_target(1, 0.15, 1.0)
+    h = out["holdings"][0]
+    assert out["method"] == "repriced" and h["note"].startswith("1 option leg without implied vol")
+    assert h["risk_share"] == pytest.approx(1.0) and out["forecast"] > 0                   # still in the book
+
+
+def test_vix_loads_while_the_book_is_priced(market, monkeypatch):
+    import time
+    c = market
+    a = c["AAA"][DATES[-1]]
+    slow_holdings = lambda uid: (time.sleep(0.4), [holding("AAA", a, [call(1, round(a), mark=5.0)], 0.6)])[1]   # noqa: E731
+    slow_closes = lambda s: (time.sleep(0.4) if s == "^VIX" else None, (c.get(s, {}), None))[1]                   # noqa: E731
+    monkeypatch.setattr(book, "holdings", slow_holdings)
+    monkeypatch.setattr(book, "safe_closes", slow_closes)
+    t = time.perf_counter()
+    out = vt.vol_target(1, 0.15, 1.0)
+    assert time.perf_counter() - t < 0.75 and out["vix_note"] is None                    # 0.4 + 0.4 in sequence

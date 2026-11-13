@@ -34,6 +34,7 @@ class VolTargetHolding(BaseModel):
     worst_day: Optional[float] = Field(None, description="Worst replayed day, $ lost")
     loss_99: Optional[float] = Field(None, description="1-in-100 replayed day, $ lost")
     contracts_after: Optional[Dict[str, float]] = Field(None, description="Long / sold contracts at the target scale")
+    note: Optional[str] = Field(None, description="How this holding was priced when not fully (e.g. legs without IV)")
     error: Optional[str] = None
 
 

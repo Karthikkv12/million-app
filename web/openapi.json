@@ -12144,6 +12144,18 @@
       "description": "Lots (100 shares = 1.00), shares and options together",
       "title": "Net Delta"
      },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this holding was priced when not fully (e.g. legs without IV)",
+      "title": "Note"
+     },
      "own_exposure": {
       "anyOf": [
        {

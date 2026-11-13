@@ -127,12 +127,19 @@ def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAUL
     long option's loss are in the forecast. The scale multiplies every position (contracts too), which scales a
     repriced P&L exactly, so the rule target ÷ forecast holds either way."""
     import numpy as np
+    from concurrent.futures import ThreadPoolExecutor
     from optionflow.modules.risk import book
     from optionflow.modules.risk import repricing as rp
+    # VIX is only needed when options are held, but that isn't known until the book is priced (the slow part,
+    # T-68): load it alongside so a cold VIX never adds to the wait. Cached for 15 min in insight.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        vix_job = pool.submit(book.safe_closes, VIX)
+        held = book.holdings(user_id)
+        vix_loaded = vix_job.result()
     account_value = book.capital(user_id)
     rows: List[Dict[str, Any]] = []
     closes: Dict[str, Dict[str, float]] = {}
-    for h in book.holdings(user_id):
+    for h in held:
         sym = h["symbol"]
         row: Dict[str, Any] = {**h, "error": None}
         c, err = book.safe_closes(sym)
@@ -151,6 +158,9 @@ def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAUL
         row["value"] = rp.value(legs, h["spot"]) if legs else None
         row["max_loss"] = rp.max_loss(legs, h["spot"]) if legs else None
         row["unlimited_loss"] = bool(legs) and row["max_loss"] is None
+        no_iv = [leg for leg in opts if rp.leg_iv(leg, h.get("atm_iv")) is None or not leg.get("strike")]
+        row["note"] = (f"{len(no_iv)} option leg{'s' if len(no_iv) > 1 else ''} without implied vol: priced on delta, "
+                       "without vega or the loss cap.") if no_iv else None
         rows.append(row)
 
     method = "repriced" if any(r.get("has_options") for r in rows) else "delta"
@@ -160,7 +170,7 @@ def vol_target(user_id: int, target: float = DEFAULT_TARGET, cap: float = DEFAUL
     syms = [r["symbol"] for r in rows if cap_base and r["symbol"] in closes]
     series = {s: closes[s] for s in syms}
     if method == "repriced" and syms:
-        vix, err = book.safe_closes(VIX)
+        vix, err = vix_loaded
         if len(vix) > MIN_HISTORY:
             series[VIX] = vix
         else:

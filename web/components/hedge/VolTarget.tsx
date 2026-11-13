@@ -300,6 +300,9 @@ export function VolTargetTab() {
             {d.holdings.some((h) => h.error) && (
               <p className="mt-2 font-mono text-[11px] text-foreground/45">Left out of the forecast: {d.holdings.filter((h) => h.error).map((h) => `${h.symbol} (${h.error})`).join(" · ")}</p>
             )}
+            {d.holdings.some((h) => h.note) && (
+              <p className="mt-1 font-mono text-[11px] text-warn">{d.holdings.filter((h) => h.note).map((h) => `${h.symbol}: ${h.note}`).join(" · ")}</p>
+            )}
           </DeskSection>
 
         </>
