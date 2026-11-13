@@ -151,6 +151,33 @@ def test_options_only_position_is_tracked_not_advised():
     assert book.net_delta > 0                                        # short put = long delta
 
 
+def test_leaps_only_holding_is_long_stock_under_any_strategy():
+    from optionflow.modules.strategy.catalog import get
+    ctx = Context("NVDA", 162.0, None, atm_iv=0.45, hv20=0.40)
+    leaps = [Leg("option", 1, 40.0, "call", 130.0, "2028-01-21", 434, 0.45)]
+    for rules in (None, get("diagonal").rules, get("leaps").rules, get("wheel").rules):
+        book = evaluate(ctx, [Leg(**vars(l)) for l in leaps], [], rules, chain())
+        assert book.suggestion.action == "TRACK" and book.strategy == "long_stock"
+        assert book.closes == [] and book.signal["side"] == "long"
+        assert any("tracked as long stock" in r for r in book.suggestion.reasons)
+    sold = leaps + [short_call(170.0, dte=30)]                       # a short call on it: back to the strategy
+    book = evaluate(ctx, sold, [], get("diagonal").rules, chain())
+    assert book.strategy == "diagonal"
+
+
+def test_long_put_only_holding_is_short_stock():
+    from optionflow.modules.strategy.catalog import get
+    ctx = Context("NBIS", 115.0, None, atm_iv=0.7, hv20=0.6)
+    puts = [Leg("option", 2, 9.0, "put", 110.0, "2027-06-17", 216, 0.7)]
+    book = evaluate(ctx, puts, [], get("wheel").rules, chain())
+    assert book.suggestion.action == "TRACK" and book.strategy == "long_stock" and book.net_delta < 0
+    assert book.signal["side"] == "short" and any("tracked as short stock" in r for r in book.suggestion.reasons)
+    mixed = [Leg(**vars(puts[0])), Leg("option", 1, 40.0, "call", 90.0, "2028-01-21", 434, 0.7)]
+    assert evaluate(ctx, mixed, [], None, chain()).strategy == "long_stock"
+    short_put = [Leg("option", -1, 3.0, "put", 100.0, EXP, 5, 0.7)]
+    assert evaluate(ctx, short_put, [], None, chain()).strategy != "long_stock"
+
+
 def test_pick_weekly_skips_0_1_dte():
     assert pick_weekly([("a", 0), ("b", 1), ("c", 4), ("d", 11)]) == "c"
     assert pick_weekly([("a", 1), ("d", 11)]) == "d"

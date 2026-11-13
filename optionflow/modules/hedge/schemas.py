@@ -151,6 +151,66 @@ class LevelsOut(BaseModel):
     call_wall: Optional[float] = None
     net_gex: Optional[float] = None
     zero_gamma: Optional[float] = None
+    max_pain: Optional[float] = None
+
+
+class SignalLevelOut(BaseModel):
+    key: str
+    label: str
+    price: float
+    distance: float = Field(..., description="price ÷ spot − 1")
+    strength: int = Field(..., description="0 (expected move) … 3 (dealer walls, gamma flip)")
+
+
+class SignalReadOut(BaseModel):
+    key: Literal["fear", "momentum", "dip", "flow", "trend", "dealers", "volume", "volatility"]
+    score: float = Field(..., description="−1 bearish … +1 bullish")
+    weight: int
+    value: str
+    note: str
+    tested: bool = Field(False, description="In the verdict (backtested); false = context only")
+
+
+class ExpectedMoveOut(BaseModel):
+    day: float = Field(..., description="±$ one standard deviation today, from ATM IV")
+    week: float = Field(..., description="±$ over 5 sessions")
+
+
+class SignalLegOut(BaseModel):
+    label: str
+    dte: int
+    iv: float
+    delta: float
+    value: float = Field(..., description="Model value per share at today's price and IV")
+    extrinsic_pct: float = Field(..., description="Share of the value that is time value")
+    theta_day: float = Field(..., description="$ lost per calendar day across the contracts held")
+    decay_20d: float = Field(..., description="Share of the value lost to time over 20 trading days")
+    roll: bool
+    warn: bool
+    iv_source: Literal["chain", "model", "atm"] = Field("chain", description="chain: the contract's quote; model: the backtest's IV model (no quote)")
+
+
+class SignalOut(BaseModel):
+    """Levels and a directional read for a holding of long options only (hedge.signal)."""
+    score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
+    bias: Literal["bullish", "bearish", "neutral"]
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast")
+    side: Literal["long", "short"]
+    headline: str
+    support: Optional[SignalLevelOut] = None
+    resistance: Optional[SignalLevelOut] = None
+    stop: Optional[float] = Field(None, description="Risk line, calm markets only: the 200-day average")
+    add_at: Optional[float] = None
+    target: Optional[float] = None
+    reads: List[SignalReadOut] = []
+    levels: List[SignalLevelOut] = []
+    expected_move: Optional[ExpectedMoveOut] = None
+    vix_pct: Optional[float] = Field(None, description="VIX percentile over the last year (0–1)")
+    evidence: str = Field("", description="Backtest result for this verdict")
+    iv_model: Optional[float] = Field(None, description="Modelled 30-day IV now (the backtest's model)")
+    iv_normal: Optional[float] = Field(None, description="Its 5-year average")
+    iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
+    legs: List[SignalLegOut] = []
 
 
 class BookOut(BaseModel):
@@ -173,6 +233,7 @@ class BookOut(BaseModel):
     suggestion: Optional[SuggestionOut] = None
     closes: List[CloseOut] = Field([], description="Short options worth buying back now (most of the premium captured)")
     strategy: Optional[str] = Field(None, description="Strategy key that produced the suggestion (GET /strategy)")
+    signal: Optional[SignalOut] = Field(None, description="Long options only (strategy long_stock): levels, reads, ADD/HOLD/TRIM")
     spot: Optional[float] = None
     prev_close: Optional[float] = Field(None, description="Yesterday's close in the regular session; outside it, the close "
                                         "before the last regular session (so day_change = that session's move)")
