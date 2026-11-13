@@ -14,6 +14,7 @@ import { DealerLadder, TradeIdeas } from "@/components/options-flow/DealerLadder
 import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
+import { TickerLogo } from "@/components/TickerLogo";
 
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const bigUsd = (v?: number | null) => {
@@ -47,7 +48,7 @@ export default function StockPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Stock</p>
-          <h1 className="font-mono text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[40px]">{sym}</h1>
+          <h1 className="flex items-center gap-3 font-mono text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[40px]"><TickerLogo symbol={sym} size={40} />{sym}</h1>
           {gex && !gex.error && <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[15px] text-foreground/60">{usd(gex.spot)} <SourceBadge data={gex} />{gex.stale && (
             <span className="text-[12px] text-foreground/40">{sourceName(gex)} is rate-limiting; levels from {gex.as_of ? new Date(gex.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "earlier"}</span>
           )}</p>}

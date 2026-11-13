@@ -17001,6 +17001,48 @@
     ]
    }
   },
+  "/api/v1/logos/{symbol}": {
+   "get": {
+    "description": "A 64\u00d764 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,\nand logos are public. Cached on disk server-side; browsers may keep it for a week.",
+    "operationId": "logo_api_v1_logos__symbol__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "image/png": {}
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Logo",
+    "tags": [
+     "market"
+    ]
+   }
+  },
   "/api/v1/market/quotes": {
    "get": {
     "description": "Up to 25 quotes. Unauthenticated: used by server-side renders.",
