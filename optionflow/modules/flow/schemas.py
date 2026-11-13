@@ -95,6 +95,14 @@ class NetFlowPoint(BaseModel):
                                          "before 2026-11-13")
     put_traded: Optional[float] = Field(None, description="Put premium traded today so far (as call_traded)")
     net_traded: Optional[float] = Field(None, description="call_traded − put_traded")
+    call_bought: Optional[float] = Field(None, description="Part of call_traded filled at or near the ask (buyer "
+                                         "started it). Mid fills and volume from before the first refresh have no "
+                                         "side, so bought + sold ≤ traded. None on rows before 2026-11-13 11:00 ET")
+    call_sold: Optional[float] = Field(None, description="Part of call_traded filled at or near the bid")
+    put_bought: Optional[float] = Field(None, description="Part of put_traded filled at or near the ask")
+    put_sold: Optional[float] = Field(None, description="Part of put_traded filled at or near the bid")
+    ncp: Optional[float] = Field(None, description="Net call premium: call_bought − call_sold")
+    npp: Optional[float] = Field(None, description="Net put premium: put_bought − put_sold")
 
 
 class WatchRequest(BaseModel):

@@ -6343,6 +6343,18 @@
    },
    "NetFlowPoint": {
     "properties": {
+     "call_bought": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Part of call_traded filled at or near the ask (buyer started it). Mid fills and volume from before the first refresh have no side, so bought + sold \u2264 traded. None on rows before 2026-11-13 11:00 ET",
+      "title": "Call Bought"
+     },
      "call_prem": {
       "anyOf": [
        {
@@ -6353,6 +6365,18 @@
        }
       ],
       "title": "Call Prem"
+     },
+     "call_sold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Part of call_traded filled at or near the bid",
+      "title": "Call Sold"
      },
      "call_traded": {
       "anyOf": [
@@ -6365,6 +6389,18 @@
       ],
       "description": "Call premium traded today so far (\u0394volume \u00d7 mid per contract, nearest 12 expiries); None outside the session and on rows before 2026-11-13",
       "title": "Call Traded"
+     },
+     "ncp": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Net call premium: call_bought \u2212 call_sold",
+      "title": "Ncp"
      },
      "net_flow": {
       "anyOf": [
@@ -6389,6 +6425,18 @@
       "description": "call_traded \u2212 put_traded",
       "title": "Net Traded"
      },
+     "npp": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Net put premium: put_bought \u2212 put_sold",
+      "title": "Npp"
+     },
      "price": {
       "anyOf": [
        {
@@ -6400,6 +6448,18 @@
       ],
       "title": "Price"
      },
+     "put_bought": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Part of put_traded filled at or near the ask",
+      "title": "Put Bought"
+     },
      "put_prem": {
       "anyOf": [
        {
@@ -6410,6 +6470,18 @@
        }
       ],
       "title": "Put Prem"
+     },
+     "put_sold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Part of put_traded filled at or near the bid",
+      "title": "Put Sold"
      },
      "put_traded": {
       "anyOf": [

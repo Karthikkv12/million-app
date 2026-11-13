@@ -190,7 +190,32 @@ def test_record_snapshot_stores_traded_premium_and_history_returns_it(db_engine_
     rows = service.net_flow_history("NVDA", days=1)
     assert [(x["call_traded"], x["put_traded"], x["net_traded"]) for x in rows] == [(2000, 400, 1600),
                                                                                    (4700, 400, 4300)]
-    assert repo.last_traded("NVDA", "2026-11-12T05:00:00Z", "2026-11-12T05:00:00+00:00") == (4700, 400)
+    assert repo.last_traded("NVDA", "2026-11-12T05:00:00Z", "2026-11-12T05:00:00+00:00")[:2] == (4700, 400)
+    traded.clear()
+
+
+def test_record_snapshot_stores_premium_sides(db_engine_and_session, monkeypatch):
+    from optionflow.modules.flow import traded
+    traded.clear()
+    service.clear_cache()
+    t0, t1 = datetime(2026, 11, 12, 15, 0, 5, tzinfo=timezone.utc), datetime(2026, 11, 12, 15, 1, 5, tzinfo=timezone.utc)
+    clock = iter([t0, t1])
+    real_update, real_sides = traded.update, traded.sides
+    monkeypatch.setattr(traded, "update", lambda *a, **kw: real_update(*a, now=next(clock), **kw))
+    monkeypatch.setattr(traded, "sides", lambda sym: real_sides(sym, now=t1))
+    stamps = iter(["2026-11-12T15:00:05Z", "2026-11-12T15:01:05Z"])
+    monkeypatch.setattr(service, "now_iso", lambda: next(stamps))
+    C, P = ("2026-12-18", 100.0, "call"), ("2026-12-18", 100.0, "put")
+    r = _result("NVDA")
+    r.contracts = [(C, 10, 100.0, 0.9, 1.1, 1.0), (P, 4, 100.0, 0.9, 1.1, 1.0)]
+    service.record_snapshot(r)                                   # volume so far: no side
+    r.contracts = [(C, 13, 100.0, 0.9, 1.1, 1.1), (P, 6, 100.0, 0.9, 1.1, 0.9)]   # calls at the ask, puts at the bid
+    service.record_snapshot(r)
+    monkeypatch.setattr(service, "datetime", _FixedNow)
+    last = service.net_flow_history("NVDA", days=1)[-1]
+    assert (last["call_bought"], last["call_sold"], last["put_bought"], last["put_sold"]) == (300, 0, 0, 200)
+    assert (last["ncp"], last["npp"]) == (300, -200)
+    assert repo.last_traded("NVDA", "2026-11-12T05:00:00Z", "2026-11-12T05:00:00+00:00") == (1300, 600, 300, 0, 0, 200)
     traded.clear()
 
 
