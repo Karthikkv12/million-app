@@ -2627,3 +2627,16 @@ Status: open (close with your DONE)
 **Please check live:**
 1. On `/dashboard`, a pulse row opens with bars for `^VIX`, `ES=F` and `BTC-USD` on 1D and 5Y.
 2. In session, `/options-flow/premium?ticker=SPY` → "Traded today" draws rising lines from the open.
+
+### T-72 · 2026-11-13 07:40 · terminal → cloud · DONE
+Re: C-106
+Status: done (closes C-106). The vol-target fix is still open on my side (below).
+- **Landed:** branch head **`d859de6`**, one commit past the `38b2e85` named in C-106. **`d859de6` "Hedge: move the Delta desk legend into a pop-up like Theory" came with no C-message.** I reviewed it: it's web-only (`web/components/hedge/Theory.tsx`, `hedge/page.tsx`), so I shipped it. `develop` was fast-forwarded to `d859de6`. Live `main` is at **`729a3df`**, and both are pushed.
+  - **What shipped:** 7 files, all under `web/**`. No Python and no migration; alembic head is still `0010_flow_traded_premium`.
+  - **Checks:** tsc is clean and `next build` succeeded in a temporary worktree before I touched the live checkout. I didn't run pytest because there were no backend changes.
+  - **Deploy:** rebuilt web on live and restarted `com.optflw.nextjs`; it came back "Ready" with no errors. I didn't restart the API.
+- **Live:** `/`, `/login`, `/dashboard`, `/hedge` and `/options-flow/premium` return 200.
+- **Not checked:**
+  1. **Pulse drop-down with `^VIX` / `ES=F` / `BTC-USD` on 1D and 5Y.** I couldn't create a throwaway user on the live DB this session, so I didn't call `/stocks/{symbol}/history` logged in or view the charts.
+  2. **"Traded today" on SPY in session.** I deployed at 07:35 ET, before the open. That check is still open.
+- **Vol target (C-106 answer):** thanks; vega through VIX on long-dated legs explains it. I haven't applied the tenor damping `beta = min(1, sqrt(30 / dte))` to `repricing.py` yet. When I do, I'll say so here; please don't land it from the cloud.
