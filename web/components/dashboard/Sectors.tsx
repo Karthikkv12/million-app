@@ -3,8 +3,14 @@
  * Sectors — ranked sector rows (SPDR ETF move, diverging bar) that expand in place into a
  * heat strip of the sector's key stocks (tile width ∝ market cap), with the sector's drawdown and
  * upside-spike charts and a one-line LEAPS score with its entry price underneath. Replaces the old Markets page.
+ * An open sector also shows a political line (congressional trades, lobbying and federal contracts summed over its
+ * stocks), from /politics/summary: cached figures only, the rest fill in as the server fetches them.
  */
 import { Fragment, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Landmark } from "lucide-react";
+import { fetchPoliticsSummary, PoliticalSummary } from "@/lib/api";
+import { usdShort } from "@/components/insight/PoliticalCard";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
@@ -21,6 +27,30 @@ const SYMBOLS = [...ETFS, ...STOCKS];
 
 const pctTxt = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
 
+type Compact = PoliticalSummary["items"][number];
+
+/** Congress buys / sells (90 days), lobbying (latest quarter) and federal contracts (12 months) over a basket. */
+function SectorPolitics({ stocks, by, pending }: { stocks: StockTile[]; by: Map<string, Compact>; pending: Set<string> }) {
+  const have = stocks.map((s) => by.get(s.symbol)).filter((x): x is Compact => !!x);
+  const waiting = stocks.filter((s) => pending.has(s.symbol)).length;
+  const sum = (f: (c: Compact) => number | null | undefined) => have.reduce((a, c) => a + (f(c) ?? 0), 0);
+  const buys = sum((c) => c.congress_buys_90d), sells = sum((c) => c.congress_sells_90d);
+  const tradesKnown = have.some((c) => c.congress_buys_90d != null);
+  const lobby = sum((c) => c.lobbying_last_q), lobbyers = have.filter((c) => (c.lobbying_last_q ?? 0) > 0).length;
+  const contracts = sum((c) => c.contracts_12m);
+  const period = have.find((c) => c.lobbying_period)?.lobbying_period;
+  if (!have.length && !waiting) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-[var(--border)] px-4 py-2.5 font-mono text-[11.5px] text-foreground/60">
+      <span className="flex items-center gap-1.5 text-foreground/45"><Landmark size={12} />Political</span>
+      {tradesKnown && <span>Congress 90d <span className="text-gain">{buys} buy{buys === 1 ? "" : "s"}</span> · <span className="text-loss">{sells} sell{sells === 1 ? "" : "s"}</span></span>}
+      {have.length > 0 && <span>Lobbying {period ?? "last quarter"} <span className="text-foreground">{usdShort(lobby)}</span> <span className="text-foreground/40">({lobbyers} of {stocks.length} companies)</span></span>}
+      {contracts > 0 && <span>Federal contracts 12m <span className="text-foreground">{usdShort(contracts)}</span></span>}
+      {waiting > 0 && <span className="text-foreground/40">fetching {waiting} more…</span>}
+    </div>
+  );
+}
+
 function SectorSwings({ symbol, label }: { symbol: string; label: string }) {
   return (
     <div className="border-t border-[var(--border)] px-4 py-4">
@@ -33,6 +63,14 @@ function SectorSwings({ symbol, label }: { symbol: string; label: string }) {
 export function Sectors() {
   const { data: q } = useQuotes(SYMBOLS);          // 5 s, like the rest of the dashboard
   const [open, setOpen] = useState<string | null>(null);
+  // Political figures for every basket stock: served from the server's cache; missing ones are fetched there in
+  // the background (a few seconds apart), so poll more often while anything is pending.
+  const pol = useQuery<PoliticalSummary>({
+    queryKey: ["politics-summary", "sectors"], queryFn: () => fetchPoliticsSummary(STOCKS), staleTime: 60_000,
+    refetchInterval: (query) => (query.state.data?.pending?.length ? 30_000 : 30 * 60_000),
+  });
+  const polBy = useMemo(() => new Map((pol.data?.items ?? []).map((c) => [c.symbol, c])), [pol.data]);
+  const polPending = useMemo(() => new Set(pol.data?.pending ?? []), [pol.data]);
 
   const rows = useMemo(() => {
     const basketMove = (stocks: StockTile[]) => {
@@ -92,6 +130,7 @@ export function Sectors() {
                     );
                   })}
                 </div>
+                <SectorPolitics stocks={r.stocks} by={polBy} pending={polPending} />
                 {/* Drawdown and upside spikes of the sector's ETF (or its largest stock when there is none), 1M to all time */}
                 <SectorSwings symbol={r.etf ?? r.stocks[0].symbol} label={r.etf ? `${r.label} (${r.etf})` : `${r.stocks[0].name} (${r.stocks[0].symbol}), the largest in ${r.label}`} />
               </div>

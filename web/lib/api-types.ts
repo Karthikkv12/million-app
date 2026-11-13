@@ -1168,6 +1168,67 @@ export interface paths {
         patch: operations["update_trade_api_v1_paper_trades__trade_id__patch"];
         trace?: never;
     };
+    "/api/v1/politics/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feed
+         * @description The newest congressional trade disclosures and, for `symbols`, their latest lobbying quarter.
+         */
+        get: operations["feed_api_v1_politics_feed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/politics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summary
+         * @description Compact political figures for many tickers (sector rows). Never waits on the sources: tickers without
+         *     a cached profile come back in `pending` and are fetched in the background.
+         */
+        get: operations["summary_api_v1_politics_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/politics/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Political Profile
+         * @description Congressional trades, lobbying and federal contracts for one ticker (cached 12 h).
+         */
+        get: operations["political_profile_api_v1_politics__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/account-balances": {
         parameters: {
             query?: never;
@@ -2183,6 +2244,13 @@ export interface components {
             user_id: number;
             /** Username */
             username: string;
+        };
+        /** Amount */
+        Amount: {
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
         };
         /** AnalystAction */
         AnalystAction: {
@@ -3209,6 +3277,122 @@ export interface components {
             /** Strike */
             strike: number;
         };
+        /** CongressSection */
+        CongressSection: {
+            /**
+             * Buys 90D
+             * @default 0
+             */
+            buys_90d: number;
+            /**
+             * Members 90D
+             * @default 0
+             */
+            members_90d: number;
+            /** Message */
+            message?: string | null;
+            /**
+             * Sells 90D
+             * @default 0
+             */
+            sells_90d: number;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "none" | "unknown_company" | "not_configured" | "unavailable";
+            /**
+             * Trades
+             * @default []
+             */
+            trades: components["schemas"]["CongressTrade"][];
+            /**
+             * Trades 12M
+             * @default 0
+             */
+            trades_12m: number;
+        };
+        /** CongressTrade */
+        CongressTrade: {
+            /**
+             * Amount
+             * @description Disclosed range, e.g. '$1,001 - $15,000'
+             */
+            amount?: string | null;
+            /** Asset */
+            asset?: string | null;
+            /** Chamber */
+            chamber: string;
+            /**
+             * Days Late
+             * @description Days between the trade and its disclosure
+             */
+            days_late?: number | null;
+            /** Disclosure Date */
+            disclosure_date?: string | null;
+            /** District */
+            district?: string | null;
+            /** Link */
+            link?: string | null;
+            /** Member */
+            member: string;
+            /**
+             * Owner
+             * @description Self, Spouse, Joint, Child … as disclosed
+             */
+            owner?: string | null;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell" | "exchange" | "other";
+            /** Symbol */
+            symbol?: string | null;
+            /** Transaction Date */
+            transaction_date?: string | null;
+            /**
+             * Type
+             * @description As disclosed, e.g. 'Purchase', 'Sale (Partial)'
+             */
+            type?: string | null;
+        };
+        /** ContractsSection */
+        ContractsSection: {
+            /**
+             * Agencies
+             * @default []
+             */
+            agencies: components["schemas"]["Amount"][];
+            /** Message */
+            message?: string | null;
+            /**
+             * Recipients
+             * @default []
+             */
+            recipients: components["schemas"]["Amount"][];
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "none" | "unknown_company" | "not_configured" | "unavailable";
+            /**
+             * Total 12M
+             * @default 0
+             */
+            total_12m: number;
+            /** Window */
+            window?: string | null;
+        };
         /** CreatedOut */
         CreatedOut: {
             /** Id */
@@ -3488,6 +3672,39 @@ export interface components {
              */
             sessions: number;
             window?: components["schemas"]["FactorWindow"] | null;
+        };
+        /** FeedCongress */
+        FeedCongress: {
+            /** Message */
+            message?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "none" | "unknown_company" | "not_configured" | "unavailable";
+            /**
+             * Trades
+             * @default []
+             */
+            trades: components["schemas"]["CongressTrade"][];
+        };
+        /** FeedLobbying */
+        FeedLobbying: {
+            /** Amount */
+            amount: number;
+            /** Company */
+            company?: string | null;
+            /**
+             * Issues
+             * @default []
+             */
+            issues: string[];
+            /** Period */
+            period: string;
+            /** Symbol */
+            symbol: string;
+            /** Total 4Q */
+            total_4q?: number | null;
         };
         /** FlowByExpiry */
         FlowByExpiry: {
@@ -4141,6 +4358,68 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** LobbyIssue */
+        LobbyIssue: {
+            /** Count */
+            count: number;
+            /** Name */
+            name: string;
+        };
+        /** LobbyQuarter */
+        LobbyQuarter: {
+            /** Amount */
+            amount: number;
+            /** Filings */
+            filings: number;
+            /** Period */
+            period: string;
+        };
+        /** LobbyingSection */
+        LobbyingSection: {
+            /**
+             * Agencies
+             * @default []
+             */
+            agencies: string[];
+            /**
+             * Firms
+             * @default []
+             */
+            firms: string[];
+            /**
+             * In House
+             * @default false
+             */
+            in_house: boolean;
+            /**
+             * Issues
+             * @default []
+             */
+            issues: components["schemas"]["LobbyIssue"][];
+            latest?: components["schemas"]["LobbyQuarter"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Quarters
+             * @default []
+             */
+            quarters: components["schemas"]["LobbyQuarter"][];
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "none" | "unknown_company" | "not_configured" | "unavailable";
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** NetFlowPoint */
         NetFlowPoint: {
             /**
@@ -4457,6 +4736,65 @@ export interface components {
             stop?: number | null;
             /** Target */
             target?: number | null;
+        };
+        /** PoliticalCompact */
+        PoliticalCompact: {
+            /** Congress Buys 90D */
+            congress_buys_90d?: number | null;
+            /** Congress Sells 90D */
+            congress_sells_90d?: number | null;
+            /** Contracts 12M */
+            contracts_12m?: number | null;
+            /** Lobbying 4Q */
+            lobbying_4q?: number | null;
+            /** Lobbying Last Q */
+            lobbying_last_q?: number | null;
+            /** Lobbying Period */
+            lobbying_period?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** PoliticalFeed */
+        PoliticalFeed: {
+            /** As Of */
+            as_of: string;
+            congress: components["schemas"]["FeedCongress"];
+            /** Lobbying */
+            lobbying: components["schemas"]["FeedLobbying"][];
+            /**
+             * Pending
+             * @default []
+             */
+            pending: string[];
+        };
+        /** PoliticalProfile */
+        PoliticalProfile: {
+            /** As Of */
+            as_of: string;
+            /** Company */
+            company?: string | null;
+            congress: components["schemas"]["CongressSection"];
+            contracts: components["schemas"]["ContractsSection"];
+            lobbying: components["schemas"]["LobbyingSection"];
+            /**
+             * Matched Names
+             * @description Normalised names matched in lobbying and contract records
+             * @default []
+             */
+            matched_names: string[];
+            /** Symbol */
+            symbol: string;
+        };
+        /** PoliticalSummary */
+        PoliticalSummary: {
+            /** Items */
+            items: components["schemas"]["PoliticalCompact"][];
+            /**
+             * Pending
+             * @description Symbols queued for a first fetch; ask again in a minute
+             * @default []
+             */
+            pending: string[];
         };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
@@ -8780,6 +9118,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaperTradeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feed_api_v1_politics_feed_get: {
+        parameters: {
+            query?: {
+                /** @description Only these tickers (comma-separated, max 200) */
+                symbols?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoliticalFeed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_v1_politics_summary_get: {
+        parameters: {
+            query: {
+                /** @description Comma-separated tickers (max 200) */
+                symbols: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoliticalSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    political_profile_api_v1_politics__symbol__get: {
+        parameters: {
+            query?: {
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoliticalProfile"];
                 };
             };
             /** @description Validation Error */

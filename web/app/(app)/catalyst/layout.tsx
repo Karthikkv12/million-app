@@ -1,15 +1,16 @@
 "use client";
-/** Catalyst shell: Stocks · Unusual activity · Economic calendar · Reports. Stock pages count as "Stocks". */
+/** Catalyst shell: Stocks · Unusual activity · Economic calendar · Reports · Congress. Stock pages count as "Stocks". */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { CalendarDays, FileText, Flame, Search } from "lucide-react";
+import { CalendarDays, FileText, Flame, Landmark, Search } from "lucide-react";
 
 const TABS = [
-  { href: "/catalyst", label: "Catalysts", icon: Search, match: (p: string) => !["/catalyst/unusual", "/catalyst/calendar", "/catalyst/reports"].some((x) => p.startsWith(x)) },
+  { href: "/catalyst", label: "Catalysts", icon: Search, match: (p: string) => !["/catalyst/unusual", "/catalyst/calendar", "/catalyst/reports", "/catalyst/congress"].some((x) => p.startsWith(x)) },
   { href: "/catalyst/unusual", label: "Unusual activity", icon: Flame, match: (p: string) => p.startsWith("/catalyst/unusual") },
   { href: "/catalyst/calendar", label: "Economic calendar", icon: CalendarDays, match: (p: string) => p.startsWith("/catalyst/calendar") },
   { href: "/catalyst/reports", label: "Reports", icon: FileText, match: (p: string) => p.startsWith("/catalyst/reports") },
+  { href: "/catalyst/congress", label: "Congress", icon: Landmark, match: (p: string) => p.startsWith("/catalyst/congress") },
 ];
 
 export default function CatalystLayout({ children }: { children: React.ReactNode }) {
