@@ -1,7 +1,8 @@
 """optionflow/modules/risk/book.py — the inputs every risk view shares, read from other modules (no writes).
 
 - holdings: the hedge desk's books → one row per underlying with its delta-dollar exposure
-  (net Δ in lots × 100 × spot), so shares and options count alike.
+  (net Δ in lots × 100 × spot), so shares and options count alike, plus its legs (shares and every long
+  or sold option with strike, expiry, IV and mark) for full repricing, and the stock's ATM IV.
 - closes:   the insight module's cached 5-year daily bars, today's close = the live price.
 - capital:  the synced account value (sum of accounts), None when nothing has synced.
 
@@ -55,6 +56,9 @@ def _load_holdings(user_id: int) -> List[Dict[str, Any]]:
             "exposure": float(b.get("net_delta") or 0.0) * 100.0 * spot,
             "shares": b.get("shares") or 0.0,
             "has_options": any(leg.get("kind") == "option" for leg in b.get("legs") or []),
+            "legs": [{k: leg.get(k) for k in ("kind", "quantity", "otype", "strike", "expiry", "dte", "iv", "mark", "delta")}
+                     for leg in b.get("legs") or []],
+            "atm_iv": (b.get("iv") or {}).get("atm_iv"),
         })
     return rows
 

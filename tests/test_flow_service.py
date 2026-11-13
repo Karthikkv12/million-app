@@ -118,7 +118,7 @@ def test_bars_from_history_formats_daily_and_intraday():
 
 # ── T-41: backfill estimates vs live snapshots ─────────────────────────────────
 def _row(ts, cp, pp=0.0):
-    return (ts, 100.0, cp, pp, cp - pp, cp + pp, 1)
+    return (ts, 100.0, cp, pp, cp - pp, cp + pp, 1, None, None)
 
 
 def test_history_drops_estimates_on_days_with_live_rows():
@@ -167,3 +167,42 @@ def test_record_snapshot_once_per_second(monkeypatch):
     monkeypatch.setattr(service, "now_iso", lambda: "2026-11-10T01:45:11Z")
     service.record_snapshot(r)
     assert len(calls) == 2
+
+
+# ── Traded premium (flow.traded, migration 0010) ──────────────────────────────
+def test_record_snapshot_stores_traded_premium_and_history_returns_it(db_engine_and_session, monkeypatch):
+    from optionflow.modules.flow import traded
+    traded.clear()
+    service.clear_cache()
+    clock = iter([datetime(2026, 11, 12, 15, 0, 5, tzinfo=timezone.utc),       # 10:00 ET
+                  datetime(2026, 11, 12, 15, 1, 5, tzinfo=timezone.utc)])
+    real_update = traded.update
+    monkeypatch.setattr(traded, "update", lambda *a, **kw: real_update(*a, now=next(clock), **kw))
+    stamps = iter(["2026-11-12T15:00:05Z", "2026-11-12T15:01:05Z"])
+    monkeypatch.setattr(service, "now_iso", lambda: next(stamps))
+    C, P = ("2026-12-18", 100.0, "call"), ("2026-12-18", 100.0, "put")
+    r = _result("NVDA")
+    r.contracts = [(C, 10, 200.0), (P, 4, 100.0)]
+    service.record_snapshot(r)                                   # 10:00 ET first refresh: counts volume so far
+    r.contracts = [(C, 13, 900.0), (P, 4, 50.0)]                  # repricing alone adds nothing
+    service.record_snapshot(r)
+    monkeypatch.setattr(service, "datetime", _FixedNow)
+    rows = service.net_flow_history("NVDA", days=1)
+    assert [(x["call_traded"], x["put_traded"], x["net_traded"]) for x in rows] == [(2000, 400, 1600),
+                                                                                   (4700, 400, 4300)]
+    assert repo.last_traded("NVDA", "2026-11-12T05:00:00Z", "2026-11-12T05:00:00+00:00") == (4700, 400)
+    traded.clear()
+
+
+class _FixedNow(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 11, 12, 20, 0, tzinfo=timezone.utc)
+
+
+def test_snapshot_without_contracts_has_no_traded_premium(db_engine_and_session, monkeypatch):
+    service.clear_cache()
+    calls = []
+    monkeypatch.setattr(service.repo, "add_snapshot", lambda **row: calls.append(row))
+    service.record_snapshot(_result("ZZZ"))
+    assert calls[0]["call_traded"] is None and calls[0]["put_traded"] is None

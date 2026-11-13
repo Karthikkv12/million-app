@@ -429,6 +429,9 @@ class NetFlowSnapshot(Base):
     net_flow   = Column(Float, nullable=True)
     total_prem = Column(Float, nullable=True)
     volume     = Column(Integer, nullable=True)
+    # premium traded today so far (Δvolume × mid per contract, flow.traded); None outside the session / old rows
+    call_traded = Column(Float, nullable=True)
+    put_traded  = Column(Float, nullable=True)
 
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"

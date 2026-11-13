@@ -141,6 +141,8 @@ class GEXResult:
     error: Optional[str] = None
     as_of: Optional[str] = None    # ISO UTC time this result was computed
     stale: bool = False            # True when served from cache because the data source is rate-limiting
+    # [(key, volume, premium per contract)] for flow.traded; not part of the API payload
+    contracts: List[tuple] = field(default_factory=list, repr=False)
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +331,11 @@ def compute_gamma_exposure(symbol: str) -> GEXResult:
         result.put_premium  = float(put_df["premium"].sum())
         result.net_flow     = result.call_premium - result.put_premium
         result.total_volume = int(df["volume"].sum())
+        try:
+            from optionflow.modules.flow.traded import contracts
+            result.contracts = contracts(df, lot_size)
+        except Exception:
+            result.contracts = []
 
         try:
             from optionflow.modules.flow.ideas import outlook

@@ -23,6 +23,18 @@ class VolTargetHolding(BaseModel):
     suggested_exposure: Optional[float] = None
     change: Optional[float] = Field(None, description="Delta dollars to add (+) or cut (−)")
     change_shares: Optional[float] = Field(None, description="The change in share-equivalents (delta)")
+    # Options (full repricing)
+    atm_iv: Optional[float] = Field(None, description="The stock's ATM implied vol (decimal)")
+    long_contracts: float = 0
+    short_contracts: float = Field(0, description="Option contracts sold (positive number)")
+    value: Optional[float] = Field(None, description="Worth now: shares at spot, options at mark (sold options negative)")
+    max_loss: Optional[float] = Field(None, description="Most it can lose held to expiry; None with unlimited_loss")
+    unlimited_loss: bool = Field(False, description="More calls sold than the shares and long calls cover")
+    pnl_vol: Optional[float] = Field(None, description="Annual vol of its replayed daily P&L, as a fraction of capital")
+    worst_day: Optional[float] = Field(None, description="Worst replayed day, $ lost")
+    loss_99: Optional[float] = Field(None, description="1-in-100 replayed day, $ lost")
+    contracts_after: Optional[Dict[str, float]] = Field(None, description="Long / sold contracts at the target scale")
+    note: Optional[str] = Field(None, description="How this holding was priced when not fully (e.g. legs without IV)")
     error: Optional[str] = None
 
 
@@ -41,6 +53,13 @@ class VolTargetOut(BaseModel):
     capital_source: Optional[Literal["input", "account", "gross"]] = None
     gross: float = 0
     net: float = 0
+    method: Literal["delta", "repriced"] = Field("delta", description="delta: shares only; repriced: every option leg "
+                                                 "repriced with Black-Scholes on each past day")
+    vix_note: Optional[str] = Field(None, description="Set when implied vol couldn't follow VIX in the replay")
+    worst_day: Optional[float] = Field(None, description="Worst replayed day for today's book, $ lost")
+    loss_99: Optional[float] = Field(None, description="1-in-100 replayed day for today's book, $ lost")
+    max_loss: Optional[float] = Field(None, description="Most the book can lose held to expiry; None if any is unlimited")
+    unlimited: List[str] = Field([], description="Holdings with unlimited loss (calls sold beyond cover)")
     forecast: Optional[float] = Field(None, description="Portfolio GARCH forecast vol, annualised")
     long_run: Optional[float] = None
     realized_20d: Optional[float] = None
