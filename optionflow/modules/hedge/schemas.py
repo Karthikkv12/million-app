@@ -271,6 +271,8 @@ class BrokerIncomeBucket(BaseModel):
     premium: float = 0.0
     collected: float = 0.0
     bought_back: float = 0.0
+    long_paid: float = 0.0       # bought long options (buy to open): not premium
+    long_received: float = 0.0   # sold long options (sell to close)
     realized: float = 0.0
     trades: int = 0
     wins: int = 0
@@ -293,6 +295,8 @@ class BrokerIncomeOut(BaseModel):
     collected_total: float = 0.0
     bought_back_total: float = 0.0
     realized_total: float = 0.0
+    long_paid_total: float = 0.0
+    this_week: Optional[str] = None   # Monday (ET) of the current week, to match against weekly[].period
     trades: int = 0
     win_rate: Optional[float] = None
     since: Optional[str] = None

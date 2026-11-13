@@ -12,12 +12,12 @@ import { clsx } from "clsx";
 import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import TickerSearchInput from "@/components/TickerSearchInput";
-import { fetchBrokerIncome, fetchBrokerPortfolio, fetchGex, fetchReports, BrokerIncome, BrokerPortfolio, GexResult } from "@/lib/api";
+import { fetchBrokerPortfolio, fetchGex, fetchReports, BrokerPortfolio, GexResult } from "@/lib/api";
 import { useGexStream } from "@/lib/useGexStream";
 import { ANCHOR_TONE, anchorOf } from "@/lib/gex";
 import { rank, reportName, reportWhen } from "@/lib/reports";
-import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
-import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
+import { DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
+import { bookBeta, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
@@ -101,18 +101,13 @@ export default function DashboardPage() {
   const [openPulse, setOpenPulse] = useState<string | null>(null);
   const quotes = useQuotes(ALL);
   const pf = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 30_000 });
-  const inc = useQuery<BrokerIncome>({ queryKey: ["broker", "income", null], queryFn: () => fetchBrokerIncome(null) });
   const reports = useQuery({ queryKey: ["reports"], queryFn: fetchReports, refetchInterval: 5 * 60_000 });
   const hedge = useLiveBooks();
   const spyLive = useGexStream("SPY");
   const spy = useQuery<GexResult>({ queryKey: ["gex", "SPY"], queryFn: () => fetchGex("SPY"), refetchInterval: spyLive ? false : 30_000 });
 
   const p = useLivePortfolio(pf.data);
-  const week = inc.data?.weekly.at(-1);
   const books = okBooks(hedge.data);
-  const today = dayPnl(books);
-  const acct = liveAccount(p, books);
-  const unreal = p?.unrealized != null ? p.unrealized + (acct?.optionsUnrealized ?? 0) : null;
   const { beta } = bookBeta(books);
   const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
   const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
@@ -151,30 +146,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Your book ─────────────────────────────────────────────────── */}
+      {/* ── Your book: hedge gauges only; account figures live on /portfolio/overview ── */}
       <div className="py-6">
         {hasBook ? (
           <>
-          <DeskFigures>
-            <DeskFigure sensitive size="lg" label={acct ? "Account value · live" : "Account value"}
-              value={<Tick value={acct ? Math.round(acct.value) : null}>{usd(acct?.value ?? p!.total_value, 0)}</Tick>}
-              sub={<>at sync {usd(p!.total_value, 0)}{p!.synced_at ? ` · ${new Date(p!.synced_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</>} />
-            {today && (
-              <DeskFigure sensitive size="lg"
-                label={today.ext ? `Today · ${today.closeDate ? new Date(today.closeDate + "T12:00").toLocaleDateString(undefined, { weekday: "short" }) : "last close"}` : "Today · live"}
-                value={<Tick value={Math.round(today.total)}>{signed(today.total, 0)}</Tick>} tone={tone(today.total)}
-                sub={today.ext
-                  ? <><span className={tone(today.ext.total)}><Tick value={Math.round(today.ext.total)}>{signed(today.ext.total, 0)}</Tick></span> {SESSION_LABEL[today.session ?? "closed"].toLowerCase()} · live</>
-                  : <>stocks {signed(today.stocks, 0)} · options {signed(today.options, 0)}</>} />
-            )}
-            <DeskFigure sensitive size="lg" label="Unrealized" value={<Tick value={unreal != null ? Math.round(unreal) : null}>{signed(unreal, 0)}</Tick>} tone={tone(unreal)}
-              sub={<>stocks {signed(p!.unrealized, 0)}{acct ? <> · options {signed(acct.optionsUnrealized, 0)}</> : null}</>} />
-            <DeskFigure sensitive size="lg" label="Net premium · this week" value={signed(week?.premium ?? 0, 0)} tone={tone(week?.premium ?? 0)}
-              sub={`sold ${usd(week?.collected ?? 0, 0)} · bought back ${usd(week?.bought_back ?? 0, 0)}`} />
-            <DeskFigure sensitive size="lg" label="Cash" value={usd(p!.cash, 0)} sub={`margin buying power ${usd(p!.buying_power, 0)}`} />
-          </DeskFigures>
+          <Link href="/portfolio/overview" className="mb-4 inline-block font-mono text-[11.5px] uppercase tracking-[0.14em] text-accent">Account value, P&amp;L and premium → Portfolio</Link>
           {(perLot != null || beta != null) && (
-            <Link href="/hedge" className="mt-5 grid gap-x-12 gap-y-2 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
+            <Link href="/hedge" className="grid gap-x-12 gap-y-2 sm:grid-cols-2">
               {perLot != null && (
                 <div className="min-w-0">
                   <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>

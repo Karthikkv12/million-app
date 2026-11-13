@@ -212,21 +212,39 @@ def _week(ts: str) -> str:
     return (d - timedelta(days=d.weekday())).isoformat()
 
 
+def _is_long_leg(a: Any) -> bool:
+    """A fill on a long option: buy to open, or sell to close."""
+    if a.side in ("buy", "sell") and a.position_effect in ("open", "close"):
+        return (a.side == "buy") == (a.position_effect == "open")
+    return (a.strategy or "").startswith("long_")
+
+
 def income(user_id: int, account: Optional[str] = None) -> Dict[str, Any]:
     """Option premium and realized P&L by week, month and symbol.
 
-    premium = net cash from option fills (collected − bought back), open AND closed contracts.
+    premium = net cash from SHORT option premium: credits from selling to open, minus debits from
+    buying those shorts back. Buying long options (calls/puts you own) is not a buy-back and is
+    kept out of premium; that cash shows separately as `long_paid` (and `long_received` on sales).
+    A buy-to-open filled alongside a sell-to-open on the same symbol, expiry and time is a spread's
+    long leg and stays in premium (it is part of the credit).
     realized = the broker's realized P&L on closing trades (stocks and options); it already contains
     closed options' premium, so premium and realized must never be added together.
     """
-    blank = lambda: {"premium": 0.0, "collected": 0.0, "bought_back": 0.0, "realized": 0.0, "trades": 0, "wins": 0}
+    blank = lambda: {"premium": 0.0, "collected": 0.0, "bought_back": 0.0, "long_paid": 0.0, "long_received": 0.0,
+                     "realized": 0.0, "trades": 0, "wins": 0}
     weekly: Dict[str, Dict[str, Any]] = defaultdict(blank)
     monthly: Dict[str, Dict[str, Any]] = defaultdict(blank)
     sym: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"premium": 0.0, "collected": 0.0, "bought_back": 0.0, "realized": 0.0, "trades": 0})
     rows = _activity(user_id, account)
+    short_opens = {(a.symbol, a.expiry, a.ts[:16]) for a in rows
+                   if a.kind == "option_fill" and a.side == "sell" and a.position_effect == "open"}
     for a in rows:
         w, m = _week(a.ts), a.ts[:7]
         if a.kind == "option_fill" and a.amount is not None:
+            if _is_long_leg(a) and (a.symbol, a.expiry, a.ts[:16]) not in short_opens:
+                for b in (weekly[w], monthly[m]):
+                    b["long_paid" if a.amount < 0 else "long_received"] += abs(a.amount)
+                continue
             for b in (weekly[w], monthly[m], sym[a.symbol]):
                 b["premium"] += a.amount
                 if a.amount >= 0:
@@ -253,6 +271,8 @@ def income(user_id: int, account: Optional[str] = None) -> Dict[str, Any]:
         "collected_total": round(sum(b["collected"] for b in monthly.values()), 2),
         "bought_back_total": round(sum(b["bought_back"] for b in monthly.values()), 2),
         "realized_total": round(sum(b["realized"] for b in monthly.values()), 2),
+        "long_paid_total": round(sum(b["long_paid"] for b in monthly.values()), 2),
+        "this_week": _week(datetime.now(ET).isoformat()),
         "trades": trades, "win_rate": (wins / trades) if trades else None,
         "since": rows[-1].ts if rows else None,
     }
