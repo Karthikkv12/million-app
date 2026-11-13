@@ -1000,6 +1000,11 @@ export type HedgeSuggestion = Schemas["SuggestionOut"];
 export type BrokerPosition = Schemas["BrokerPositionOut"];
 
 export const fetchHedgeBooks = () => api.get<HedgeBooks>("/hedge/books");
+export type VolTarget = Schemas["VolTargetOut"];
+export type VolTargetHolding = Schemas["VolTargetHolding"];
+/** Volatility targeting on the synced book: target and cap are decimals (0.15 = 15%, 1 = never more than all-in). */
+export const fetchVolTarget = (target: number, cap: number, capital?: number | null) =>
+  api.get<VolTarget>(`/hedge/vol-target?target=${target}&cap=${cap}${capital ? `&capital=${capital}` : ""}`);
 
 // ── Strategy (drives the desk's actions) ─────────────────────────────────────
 export type StrategyState = Schemas["StrategyOut"];

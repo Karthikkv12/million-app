@@ -14,6 +14,7 @@ import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
 import { StrategyPicker } from "@/components/strategy/StrategyPicker";
 import { useStrategy } from "@/components/strategy/useStrategy";
+import { VolTargetTab } from "@/components/hedge/VolTarget";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -389,7 +390,57 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+type HedgeTab = "desk" | "vol";
+const TABS: { id: HedgeTab; label: string; hash: string }[] = [
+  { id: "desk", label: "Delta desk", hash: "" }, { id: "vol", label: "Vol target", hash: "#vol-target" },
+];
+
+/** The tab from the URL hash (#vol-target), so a tab can be linked and survives a reload. */
+function useHedgeTab(): [HedgeTab, (t: HedgeTab) => void] {
+  const [tab, setTab] = useState<HedgeTab>("desk");
+  useEffect(() => {
+    const read = () => setTab(window.location.hash === "#vol-target" ? "vol" : "desk");
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  const go = (t: HedgeTab) => {
+    setTab(t);
+    history.replaceState(null, "", `${window.location.pathname}${TABS.find((x) => x.id === t)!.hash}`);
+  };
+  return [tab, go];
+}
+
+function TabBar({ tab, onChange }: { tab: HedgeTab; onChange: (t: HedgeTab) => void }) {
+  return (
+    <nav role="tablist" aria-label="Hedge" className="-mx-4 mb-5 flex gap-1 border-b border-[var(--border)] px-4 sm:mx-0 sm:px-0">
+      {TABS.map((t) => (
+        <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => onChange(t.id)}
+          className={clsx("-mb-px border-b-2 px-3 py-2.5 text-[13.5px] transition",
+            tab === t.id ? "border-foreground font-medium text-foreground" : "border-transparent text-foreground/55 hover:text-foreground")}>
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export default function HedgePage() {
+  const [tab, setTab] = useHedgeTab();
+  return tab === "vol" ? (
+    <DeskPage>
+      <div className="pb-5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Vol target</h1>
+        <p className="mt-1 text-[13px] text-foreground/55">Less exposure when markets get wild: exposure = target vol ÷ forecast vol, on your whole book.</p>
+      </div>
+      <TabBar tab={tab} onChange={setTab} />
+      <VolTargetTab />
+    </DeskPage>
+  ) : <DeltaDesk tabs={<TabBar tab={tab} onChange={setTab} />} />;
+}
+
+function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
   const live = useLive();
   const { data, isLoading, error } = useLiveBooks();
   const [open, setOpen] = useState<string | null>(null);
@@ -431,6 +482,7 @@ export default function HedgePage() {
           </div>
         </div>
       </div>
+      {tabs}
 
       {error && !data && <p className="border-t border-[var(--border-strong)] py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't load your positions."}</p>}
       {isLoading && <div className="h-40 animate-pulse border-t border-[var(--border-strong)] bg-foreground/[0.03]" />}
