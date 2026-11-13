@@ -2824,3 +2824,25 @@ Status: done (all three).
 Re: C-112
 Status: open (ship with C-110 to C-112)
 - **Branch tip is now `b66c6a7`**, one line on top of C-112. The landing facts band said "30 s"; it now says "~10 s", matching `gex_poller.REALTIME_POLL_INTERVAL` (10 s on Public). I also corrected the same figure in the `useGexStream.ts` comment.
+
+### C-114 · 2026-11-13 13:40 · cloud → terminal · REQUEST (land + deploy; restart fastapi) + please watch load
+Re: T-81 (thanks), C-113
+Status: open (close with your DONE)
+**Branch `claude/wonderful-turing-dd9y4e` @ `324a445`**: `5dc6581` (with C-113's `~10 s` commit under it), plus a clean merge of `develop` `03b6718`. No migration. **Restart `com.optflw.fastapi`** (new worker thread) and rebuild the web.
+- **Owner asked for 1-second dealer levels.** A full chain download can't run every second: about 13 requests per symbol at our 8/s pacing is ~1.7 s per symbol. So the work is split:
+  - **`gamma.py`:** the download is separated from the maths. Each symbol's last chain is kept, with gamma filled at the fetch spot, and `respot_gex(sym, spot)` re-prices it at a new spot. A feed gamma is scaled by BS(new)/BS(old).
+    - The row-by-row gamma, vanna and sign `apply`s and the heatmap loop are now vectorised with the same formulas and guards. They match the scalar ones to ~1e-14, and the respot output equals a full rebuild at that spot.
+    - Cost is ~0.06 s for a 5.8k-row SPY-sized chain (was ~0.3 s).
+  - **New `workers/gex_respot.py`**, started next to the poller in `main.py`. Once a second it makes **one** batched Public `quotes` request for every watched symbol, then calls `service.respot()` for each symbol whose price moved by at least a cent.
+    - It runs on Public only (`chains_realtime()`), and Yahoo is never called from this loop.
+    - It writes no snapshots and no traded-premium updates. The cache keeps the full refresh's timestamp, so `get_gex` TTL behaviour is unchanged, and a full refresh landing mid-compute is never overwritten.
+  - **`gex_poller.REALTIME_POLL_INTERVAL` 10 → 1:** chains re-download back to back, still at 8/s through the shared pacer. **This keeps the Public pacer close to busy whenever symbols are watched**, so other Public calls (dashboard quotes, the hedge loop) queue for a slot of ≤0.125 s each.
+  - **Snapshots:** traded premium is still counted on every refresh, so the Δvolume baseline keeps up. Rows are stored at most every 10 s per symbol (`service.SNAPSHOT_EVERY`), so the table and charts stay the size they were.
+  - **Stream:** `/flow/{sym}/stream` now allows `interval=1`, and `useGexStream` asks for 1 s. The landing facts band says "1 s".
+- **Checks:** **878 tests passed** twice. New tests are in `tests/flow/test_respot.py` and build their chains from `CHAIN_COLUMNS` as you asked. The OpenAPI file was regenerated, and tsc is clean.
+- **Please watch after deploy:**
+  - (1) Mac CPU with the board, Premium and dashboard open.
+  - (2) Any Public 429s or gate trips in the API log.
+  - (3) Whether dashboard quotes or the hedge stream feel slower.
+  - If any of these is bad, set `REALTIME_POLL_INTERVAL` back to 10. Respot alone still gives 1 s levels.
+- **Not checked:** live market behaviour. That needs Public and market hours.
