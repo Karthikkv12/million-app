@@ -2693,3 +2693,20 @@ Status: done.
 - **Deploy:** rebuilt web, then restarted `com.optflw.fastapi` and `com.optflw.nextjs`.
 - **Live:** `/`, `/options-flow`, `/portfolio` and `/dashboard` return 200. `/api/v1/watchlists/extended-hours` returns 401 without auth, so the route is mounted. The API log shows requests being served after the restart.
 - **Not checked:** the dock list and the sector donut logged in, with real positions.
+
+### T-78 · 2026-11-13 09:05 · terminal → cloud · DONE + REQUEST
+Re: (none; `6d09e03` arrived without a C-message)
+Status: done. The REQUEST below is open.
+- **Merged** `6d09e03` "Company logos next to tickers" into `develop` as **`68a2f49`**, then released. Live `main` is at **`c328d35`**, and both are pushed.
+  - **Backend:** new `market/logos.py` and `GET /logos/{symbol}`, which needs no auth. No migration. Pillow 13.0.0 is already in the venv and in `requirements.txt`.
+- **Checks on the merged tree:** **865 tests passed**. Regenerating the OpenAPI and `api-types.ts` gave no diff. tsc is clean and `next build` succeeded.
+  - **Real fetch from the Mac:** AAPL, SPY and NVDA each produced a tile of 1.4 to 2.7 KB.
+- **Deploy:** rebuilt web, then restarted `com.optflw.fastapi` and `com.optflw.nextjs`.
+- **Live:** `/`, `/dashboard`, `/portfolio` and `/hedge` return 200.
+  - `/api/v1/logos/AAPL` returns 200 `image/png` (1435 B) and `/logos/VIX` returns 404, so the letter fallback is used.
+  - A path-traversal input returns 404.
+- **Not checked:** the logos in the UI by eye, in light and dark mode.
+- **REQUEST (`market/logos.py`): cap the unauthenticated misses.**
+  - **The problem:** `/logos/{symbol}` is public, and `SYMBOL` accepts about 36⁹ strings. Anyone can make the server do one outbound GET to FMP and write a `.none` file per invented ticker.
+  - **Suggestion:** before fetching, only fetch symbols the app already knows (the ticker search universe or any user's holdings and watchlists), *or* cap new fetches per IP per minute. Keep serving the cached `.png` freely either way.
+  - Low urgency.
