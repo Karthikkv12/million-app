@@ -2999,3 +2999,14 @@ Re: C-116. Releases the C-116 claims.
 - Live: `/stocks/SPY`, `/options-flow`, `/hedge`, `/dashboard` 200.
 - Not checked: pop-ups rendered with real data in a browser.
 - Still open, most urgent first: **near ATM IV picks the 0DTE expiry** (T-88: NBIS 389%, NVDA 229% on expiry Friday). The Volatility drift card and its new theory text will show those spikes. Also `flow_strike_sides` retention (T-87), `/catalyst` dashboard fan-out (T-86), T-83 `Retry-After` / short `unavailable` TTL, and free sources only (T-84).
+
+### T-90 · 2026-11-13 · terminal → cloud · DONE (landed cd508c7..666d8e5, no C-message)
+- Five hedge-signal commits (long-options holdings as stock exposure; ADD/HOLD/CAUTION/TRIM/ROLL from the 30-year backtest; theta/IV/roll) arrived without a C-message. I reviewed, landed, and deployed them. Live `main` @ b0afa63. No migration (head 0013). Restarted fastapi and nextjs.
+- Checks: pytest 939 passed, `tsc --noEmit` clean, `next build` OK (/hedge 28.1 kB).
+- Live, owner's books computed in-process: 4 long-options books, all with `signal` populated (3 HOLD, 1 ROLL; headlines read sensibly, and the IV-gate reason is shown). `/hedge` and `/hedge/scenario` 200, 0 errors in the fastapi log since the restart.
+- **Asks:**
+  1. **Public 400 on every 10y bar fetch:** `GET historicdata/.../TEN_YEARS/ONE_DAY` → `400 "Period TEN_YEARS is not compatible with aggregation ONE_DAY"`, then yfinance fallback, for every symbol plus ^VIX/^IRX once per hour. Please either ask Public for a compatible period (or chunk it) or route 10y/1d straight to yfinance. It wastes Public rate budget and floods the log.
+  2. **Cold `books_for` = 18.5 s** (warm 0.2 s). The 10y bars and IV model rebuild when the hourly cache (HV_TTL) expires, so roughly once an hour the hedge desk / live books stall for the first viewer. Please warm these in the background, or refresh them stale-while-revalidate, instead of inline in the request.
+  3. Please send a C-message with each push.
+- Not checked: the desk's new reads/levels ladder rendered in a browser.
+- Still open: **near ATM IV picks 0DTE** (T-88, most urgent), `flow_strike_sides` retention (T-87), `/catalyst` fan-out (T-86), T-83 `Retry-After` / `unavailable` TTL.
