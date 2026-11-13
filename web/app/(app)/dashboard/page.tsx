@@ -1,8 +1,9 @@
 "use client";
 /**
  * Dashboard — the morning desk (owner, 2026-11-08: no cards, more usable, US only).
- * Tape · your book · what to do (hedge signals, expiring options) · SPY dealer map ·
- * movers in your holdings · US market pulse · sectors (the old Markets page). The economic calendar lives on /catalyst.
+ * Tape · what to do (hedge signals, expiring options) · movers, earnings / ex-div and unusual options in
+ * your holdings · SPY dealer map · money-flow leaders · US market pulse · sectors. Account figures live on
+ * /portfolio/overview (owner, 2026-11-13) (the old Markets page). The economic calendar lives on /catalyst.
  */
 import { useState } from "react";
 import Link from "next/link";
@@ -16,8 +17,9 @@ import { fetchBrokerPortfolio, fetchGex, fetchReports, BrokerPortfolio, GexResul
 import { useGexStream } from "@/lib/useGexStream";
 import { ANCHOR_TONE, anchorOf } from "@/lib/gex";
 import { rank, reportName, reportWhen } from "@/lib/reports";
-import { DeskPage, DeskRow, DeskSection, Ladder, Scale, Tag } from "@/components/desk";
-import { bookBeta, okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
+import { DeskPage, DeskRow, DeskSection, Ladder, Tag } from "@/components/desk";
+import { ComingUp, FlowLeadersPanel, UnusualInHoldings } from "@/components/dashboard/DeskExtras";
+import { okBooks, Tick, useLiveBooks, useLivePortfolio } from "@/lib/live";
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
@@ -108,10 +110,6 @@ export default function DashboardPage() {
 
   const p = useLivePortfolio(pf.data);
   const books = okBooks(hedge.data);
-  const { beta } = bookBeta(books);
-  const lotBooks = books.filter((b) => (b.lots ?? 0) >= 1);
-  const lots = lotBooks.reduce((a, b) => a + Math.floor(b.lots ?? 0), 0);
-  const perLot = lots ? lotBooks.reduce((a, b) => a + (b.net_delta ?? 0), 0) / lots : null;
   const signals = books.filter((b) => b.suggestion && ["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK"].includes(b.suggestion.action));
   const ORDER = ["SELL_CALL", "SELL_PUT", "BUY_CALL", "BUY_STOCK", "WAIT", "HOLD", "TRACK"];
   const buybacks = books.flatMap((b) => (b.closes ?? []).map((c) => ({ b, c })));
@@ -121,7 +119,9 @@ export default function DashboardPage() {
   const movers = [...(p?.holdings ?? [])].filter((h) => h.day_change_pct != null).sort((a, b) => Math.abs(b.day_change_pct ?? 0) - Math.abs(a.day_change_pct ?? 0)).slice(0, 6);
   const g = spy.data && !spy.data.error ? spy.data : null;
   const longGamma = (g?.net_gex ?? 0) >= 0;
-  const hasBook = !!p && (p.accounts.length > 0 || p.holdings.length > 0);
+  const held = Array.from(new Set([...(p?.holdings ?? []).map((h) => h.symbol), ...(p?.options ?? []).map((o) => o.symbol)])).sort();
+  const shortExp: Record<string, string> = {};
+  for (const o of p?.options ?? []) if (o.contracts < 0 && o.expiry && (!shortExp[o.symbol] || o.expiry < shortExp[o.symbol])) shortExp[o.symbol] = o.expiry;
 
   return (
     <DeskPage>
@@ -146,37 +146,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Your book: hedge gauges only; account figures live on /portfolio/overview ── */}
-      <div className="py-6">
-        {hasBook ? (
-          <>
-          <Link href="/portfolio/overview" className="mb-4 inline-block font-mono text-[11.5px] uppercase tracking-[0.14em] text-accent">Account value, P&amp;L and premium → Portfolio</Link>
-          {(perLot != null || beta != null) && (
-            <Link href="/hedge" className="grid gap-x-12 gap-y-2 sm:grid-cols-2">
-              {perLot != null && (
-                <div className="min-w-0">
-                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Book Δ per lot · +1 = stock alone</p>
-                  <Scale min={-0.5} max={1.5} value={perLot} tips={{ value: `Book now: ${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)} per lot · +1 = stock alone` }} label={`${perLot >= 0 ? "+" : ""}${perLot.toFixed(2)}`}
-                    pin={perLot >= 0.85 ? "bg-gain" : perLot >= 0.4 ? "bg-accent" : "bg-warn"}
-                    zones={[{ from: -0.5, to: 0.4, cls: "bg-warn/25" }, { from: 0.4, to: 0.85, cls: "bg-accent/20" }, { from: 0.85, to: 1.5, cls: "bg-gain/25" }]}
-                    marks={[{ at: 0, label: "0", strong: true }, { at: 1, label: "+1", strong: true }]} />
-                </div>
-              )}
-              {beta != null && (
-                <div className="min-w-0">
-                  <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Portfolio beta vs SPY</p>
-                  <Scale min={0} max={3} value={beta} label={beta.toFixed(2)} tips={{ value: `Portfolio beta ${beta.toFixed(2)} · 1 = moves with the market` }} pin={beta >= 1.5 ? "bg-loss" : beta >= 1.1 ? "bg-warn" : "bg-gain"}
-                    zones={[{ from: 0, to: 1.1, cls: "bg-gain/20" }, { from: 1.1, to: 1.5, cls: "bg-warn/25" }, { from: 1.5, to: 3, cls: "bg-loss/20" }]}
-                    marks={[{ at: 0, label: "0" }, { at: 1, label: "1 market", strong: true }, { at: 3, label: "3" }]} />
-                </div>
-              )}
-            </Link>
-          )}
-          </>
-        ) : (
-          <p className="text-[14px] text-foreground/55">Your Robinhood book shows here after the first Robinhood sync. <Link href="/portfolio" className="text-accent">Portfolio →</Link></p>
-        )}
-      </div>
+      <div className="h-2" />
 
       <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="min-w-0">
@@ -280,6 +250,12 @@ export default function DashboardPage() {
               </div>
             </DeskSection>
           )}
+
+          {/* ── Earnings / ex-div in your names ─────────────────────── */}
+          <ComingUp symbols={held} shortExp={shortExp} />
+
+          {/* ── Unusual options in your names ───────────────────────── */}
+          <UnusualInHoldings symbols={held} />
         </div>
 
         <div className="min-w-0">
@@ -306,6 +282,9 @@ export default function DashboardPage() {
               </div>
             ) : <p className="text-[13px] text-foreground/50">{spy.isLoading ? "Loading SPY levels…" : "SPY levels unavailable right now."}</p>}
           </DeskSection>
+
+          {/* ── Money flow: net premium leaders today ───────────────── */}
+          <FlowLeadersPanel held={held} />
 
           {/* ── Market pulse (US) ───────────────────────────────────── */}
           <DeskSection label="Market pulse" className="lg:grid-cols-1" meta="US · live">
