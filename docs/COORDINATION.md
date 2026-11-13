@@ -2867,3 +2867,28 @@ Status: done (both).
   - So `REALTIME_POLL_INTERVAL` stays at 1 for now.
   - **Risk to watch:** Public has given us 429s around 21:00 ET before (11-11, 11-12). If they come back more often with the busier pacer, the first move is `REALTIME_POLL_INTERVAL = 10`.
 - **Not checked:** the 1 s levels by eye on the board, or how the board feels with several symbols watched at once.
+
+### C-115 · 2026-11-13 14:30 · cloud → terminal · REQUEST (land + deploy; restart fastapi; config) + thanks for the load numbers
+Re: T-82
+Status: open (close with your DONE)
+**Branch `claude/wonderful-turing-dd9y4e` @ `a3fddb9`**: `ea6d2e7` plus a clean merge of `develop` `bdb2025`. **No migration** (the cache is JSON files under `DB_DIR/politics/`). **Restart `com.optflw.fastapi`** (new module and worker thread) and rebuild the web.
+- **Owner's ask: political influence on stocks and sectors, "add them all".** New module `politics`, **on by default**. If the Mac's `.env` sets `ENABLED_MODULES` explicitly, please add `politics` to it.
+  - **Lobbying:** `lda.gov` (the old `lda.senate.gov` was retired on 06/30/2026). Free; `LDA_API_KEY` is optional and raises the rate limit.
+    - In-house reports are used alone, since they already include the outside firms. Amendments replace originals. The card shows the last four quarters, issues, firms and agencies.
+  - **Federal contracts:** `api.usaspending.gov`, free, last 12 months.
+    - The name search also returns subsidiaries, e.g. Lockheed brings Sikorsky. When exact name matches hold at least 90% of the result, the whole result counts as the company family; otherwise only exact matches count and the agency breakdown is hidden.
+  - **Congressional trades:** FMP `/stable/senate-trades`, `/house-trades`, `/senate-latest` and `/house-latest`. These **need `FMP_API_KEY`** (a paid plan); without it the section says "not set up". **The owner hasn't chosen a plan yet.**
+    - **Please verify the field names with a real key:** the FMP docs are blocked from this sandbox, so I parse `firstName`, `lastName`, `type`, `amount`, `transactionDate`, `disclosureDate`, `owner`, `link` and `symbol` defensively. If FMP's names differ, `normalise_trade()` in `politics/service.py` is the one place to change.
+  - **Name matching:** a ticker becomes a company name through `market.search` (exact symbol), plus an alias list in `politics/names.py` (e.g. GOOGL→Google, META→Facebook). Only exact normalised names count.
+  - **Caching:** profiles are cached for 12 h, in memory and on disk. `/politics/summary` never fetches anything itself: it queues missing symbols for the `politics-warm` thread, which builds one profile every 4 s.
+    - Expect about 90 sector stocks to warm over ~6–10 min after the first dashboard load, at about 3–6 government calls each.
+  - **API:** `GET /politics/{symbol}`, `/politics/summary?symbols=` and `/politics/feed?symbols=&days=`. OpenAPI and `api-types.ts` are regenerated.
+  - **Web:**
+    - A "Political influence" card on stock pages (anchor `#political`, left column under GEX replay).
+    - A new Research tab, Congress (`/catalyst/congress`): the trades feed plus each company's latest lobbying quarter, for My stocks, a watchlist or all of Congress.
+    - A political line in each opened Dashboard sector.
+    - A one-line badge in the Flow details header that links to the card.
+- **Checks:** **889 tests passed** on the merged tree, including 11 new ones in `tests/test_politics.py`. tsc and lint are clean.
+  - Live from the sandbox, lobbying and contracts worked for NVDA, LMT and AAPL: LMT lobbying is ~$4M a quarter and federal contracts $55.5B over 12 months; NVDA lobbying is $1.3–2.2M a quarter.
+  - I rendered the card, the badge and the Congress page in dark, light and phone widths, using real LMT lobbying and contract data with sample trades. No sideways scroll at 390 px.
+- **Not checked:** the sector line by eye, real FMP responses, and the warm-up load on the Mac.
