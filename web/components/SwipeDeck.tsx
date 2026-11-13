@@ -47,7 +47,14 @@ export function SwipeDeck({ slides, label, className, slideClassName }: {
   useEffect(() => {
     const el = row.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => { el.scrollLeft = active * el.clientWidth; });
+    // Only on a width change: the row's height animates on every switch, and re-aligning then would cut a smooth
+    // tab-click scroll short.
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      el.scrollLeft = active * width;
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [active]);
