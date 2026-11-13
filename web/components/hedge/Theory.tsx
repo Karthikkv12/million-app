@@ -2,19 +2,22 @@
 /**
  * Theory — a small "Theory" button that opens the explanation behind a Hedge tool in a pop-up.
  * The theory stays hidden until asked for; the page itself only shows numbers and what to do.
+ * Also used for other reference pop-ups (the Delta desk's Legend) via `label` and `icon`.
  * Text helpers (H, P, Formula, Terms) keep every theory pop-up in the same voice and layout.
  */
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
 import { Dialog } from "@/components/portfolio/kit";
 
-export function Theory({ title, children }: { title: string; children: React.ReactNode }) {
+export function Theory({ title, children, label = "Theory", icon = <BookOpen size={13} /> }: {
+  title: string; children: React.ReactNode; label?: string; icon?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/70 transition hover:border-foreground/50 hover:text-foreground">
-        <BookOpen size={13} /> Theory
+        {icon} {label}
       </button>
       {open && (
         <Dialog title={title} onClose={() => setOpen(false)} wide>
