@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from optionflow.modules.flow import repo
+from optionflow.modules.flow import gamma
 from optionflow.modules.flow.gamma import GEXResult, compute_gamma_exposure
 from optionflow.providers.market_data import MarketDataRateLimited
 
@@ -21,6 +22,9 @@ logger = logging.getLogger("optionflow.flow")
 
 GEX_CACHE_TTL = 120     # seconds a cached GEX result is served to the API (board refetches every 60s)
 WATCH_TTL = 120         # seconds a symbol stays watched after the last heartbeat
+RESPOT_MAX_CHAIN_AGE = 120   # re-price a cached chain at the live spot only while the chain is this fresh
+SNAPSHOT_EVERY = 10     # seconds between stored flow snapshots per symbol (refreshes run every ~2 s on Public;
+                        # traded premium is still counted on every refresh, the row just stores the running total)
 
 _gex_cache: Dict[str, Tuple[float, GEXResult]] = {}
 _watched_ttl: Dict[str, float] = {}
@@ -34,10 +38,39 @@ def cached_gex(symbol: str) -> Optional[GEXResult]:
     return hit[1] if hit else None
 
 
+_cache_lock = threading.Lock()
+
+
 def compute_and_cache(symbol: str) -> GEXResult:
     """Compute GEX now and cache it (no snapshot)."""
     result = compute_gamma_exposure(symbol)
-    _gex_cache[symbol.upper()] = (time.monotonic(), result)
+    with _cache_lock:
+        _gex_cache[symbol.upper()] = (time.monotonic(), result)
+    return result
+
+
+def respot(symbol: str, spot: float) -> Optional[GEXResult]:
+    """Re-price `symbol`'s cached chain at a live `spot` and cache it (workers.gex_respot, every second).
+
+    Nothing is fetched and no snapshot is stored. Skipped (None) when nothing good is cached, the chain is older
+    than RESPOT_MAX_CHAIN_AGE, or the spot hasn't moved a cent. The cache keeps the full refresh's time, so
+    get_gex still refetches on its own schedule; a full refresh that lands meanwhile is never overwritten.
+    """
+    sym = symbol.upper()
+    hit = _gex_cache.get(sym)
+    if hit is None or hit[1].error or not spot or spot <= 0 or round(spot, 2) == hit[1].spot:
+        return None
+    age = gamma.chain_age(sym)
+    if age is None or age > RESPOT_MAX_CHAIN_AGE:
+        return None
+    result = gamma.respot_gex(sym, spot)
+    if result is None or result.error:
+        return None
+    result = dataclasses.replace(result, stale=hit[1].stale)
+    with _cache_lock:
+        if _gex_cache.get(sym) is not hit:       # a full refresh landed while we computed
+            return None
+        _gex_cache[sym] = (hit[0], result)
     return result
 
 
@@ -67,6 +100,7 @@ def get_gex(symbol: str, max_age: float = GEX_CACHE_TTL) -> GEXResult:
 
 def clear_cache() -> None:
     _gex_cache.clear()
+    gamma.clear_chains()
     with _snapshot_lock:
         _last_snapshot.clear()
 
@@ -114,15 +148,19 @@ _snapshot_lock = threading.Lock()
 
 
 def record_snapshot(result: GEXResult) -> None:
-    """Store the premium/flow totals of a GEX result, at most once per symbol per second. Never raises.
-    (Concurrent refreshes — the poller and a page — used to write the same second 2–3 times; T-41.)"""
+    """Count this refresh's traded premium, and store the flow totals at most once per SNAPSHOT_EVERY seconds
+    per symbol. Never raises. (Concurrent refreshes used to write the same second 2–3 times, T-41; refreshes
+    now run every ~2 s on Public, and a row every 10 s keeps the table and the charts the size they were.)"""
     ts = now_iso()
     sym = (result.symbol or "").upper()
+    traded = _traded(result)                       # every refresh: the Δvolume baseline must keep up
+    t = _parse_ts(ts)
     with _snapshot_lock:
-        if _last_snapshot.get(sym) == ts:
+        prev = _last_snapshot.get(sym)
+        p = _parse_ts(prev) if prev else None
+        if prev == ts or (t is not None and p is not None and 0 <= (t - p).total_seconds() < SNAPSHOT_EVERY):
             return
         _last_snapshot[sym] = ts
-    traded = _traded(result)
     split = _sides(result.symbol) if traded else None
     try:
         repo.add_snapshot(

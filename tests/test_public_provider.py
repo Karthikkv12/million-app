@@ -282,7 +282,7 @@ def test_poll_interval_follows_chain_source(public, monkeypatch):
     monkeypatch.setattr(market_data, "_override", FakeYahoo())
     assert gex_poller.poll_interval() == 120                 # Yahoo only
     monkeypatch.setattr(market_data, "_override", ChainFallbackMarketData(chains, FakeYahoo()))
-    assert gex_poller.poll_interval() == gex_poller.REALTIME_POLL_INTERVAL == 10   # Public serving
+    assert gex_poller.poll_interval() == gex_poller.REALTIME_POLL_INTERVAL == 1    # Public serving
     chains.gate.trip()
     assert gex_poller.poll_interval() == 120                 # Public backing off → Yahoo pace
     from optionflow.modules.flow import service

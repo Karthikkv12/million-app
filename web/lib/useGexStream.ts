@@ -8,15 +8,16 @@
  * key re-renders from. Returns whether the stream is currently connected, so
  * callers can fall back to slow polling while it isn't.
  *
- * Interval is 2 s, the backend's minimum. A check only reads the server's GEX cache (the poller refreshes it:
- * every ~10 s on Public's real-time chains (gex_poller.REALTIME_POLL_INTERVAL), 120 s on Yahoo), so a faster check costs no extra upstream calls; it
- * just delivers each refresh within 2 s instead of up to a minute later. Frames are sent only when GEX changed.
+ * Interval is 1 s, the backend's minimum. A check only reads the server's GEX cache, so it costs no upstream
+ * calls. On Public the cache moves every second: workers.gex_respot re-prices the levels at the live price, and
+ * the poller re-downloads each chain as fast as the rate limit allows (~2 s per watched symbol). On Yahoo it moves
+ * every 120 s. Frames are sent only when GEX changed.
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { BASE, getTokens } from "@/lib/api";
 
-const INTERVAL_S = 2;
+const INTERVAL_S = 1;
 
 export function useGexStream(symbol: string | undefined): boolean {
   const qc = useQueryClient();

@@ -14,7 +14,7 @@ import { useTheme } from "@/lib/theme";
 
 const FACTS = [
   { value: "Live", label: "real-time option chains from Public.com" },
-  { value: "~10 s", label: "levels recomputed and pushed to the page" },
+  { value: "1 s", label: "levels re-priced at the live price and pushed to the page" },
   { value: "GEX + VEX", label: "gamma and vanna by strike × expiry" },
   { value: "9:30", label: "net premium counted from the bell" },
 ];

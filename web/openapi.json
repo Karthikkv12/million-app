@@ -16427,7 +16427,7 @@
        "default": 10.0,
        "description": "Seconds between checks",
        "maximum": 60.0,
-       "minimum": 2.0,
+       "minimum": 1.0,
        "title": "Interval",
        "type": "number"
       }

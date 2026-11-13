@@ -18,9 +18,11 @@ from optionflow.workers import backfill
 logger = logging.getLogger("optionflow.poller")
 
 POLL_INTERVAL = 120          # seconds; Yahoo data is ~15 min delayed, and every refresh fetches up to 12 chains
-REALTIME_POLL_INTERVAL = 10  # seconds while Public.com (real-time) serves chains: ~13 requests per symbol at the
-                             # provider's 8/s pacing (~1.6 s/symbol). The sleep comes after each cycle, so with many
-                             # watched symbols the cycle just runs longer; Public is never asked for more than 8/s (C-88)
+REALTIME_POLL_INTERVAL = 1   # seconds while Public.com (real-time) serves chains: ~13 requests per symbol at the
+                             # provider's 8/s pacing (~1.7 s/symbol), so a cycle refreshes each watched symbol about
+                             # every 1.7 s × symbols. The pause is just a breather between cycles; Public is never
+                             # asked for more than 8/s (C-88). Between cycles workers.gex_respot re-prices the levels
+                             # at the live price every second.
 
 
 def poll_interval() -> int:
