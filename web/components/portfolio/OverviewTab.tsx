@@ -5,7 +5,7 @@ import { clsx } from "clsx";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip, useChartStyle } from "@/components/chart/kit";
 import { Panel, SkeletonCard } from "@/components/ui";
-import { dayPnl, okBooks, Tick, useLiveBooks } from "@/lib/live";
+import { dayPnl, liveAccount, okBooks, Tick, useLiveBooks } from "@/lib/live";
 import { SectorDonut } from "./SectorDonut";
 import { compactUsd, Metric, NoData, pct, shortDate, signedUsd, TD, TH, tone, useHistory, useIncome, usePortfolio, usd } from "./broker";
 
@@ -17,20 +17,29 @@ export function OverviewTab() {
   const { data: inc } = useIncome();
   const s = useChartStyle();
   const live = useLiveBooks();
-  const today = p && !p.account_filter ? dayPnl(okBooks(live.data)) : null;
+  const books = okBooks(live.data);
+  const today = p && !p.account_filter ? dayPnl(books) : null;
+  const acct = liveAccount(p, books);
   if (isLoading) return <SkeletonCard rows={6} />;
   if (!p || (!p.accounts.length && !p.holdings.length)) return <NoData />;
   const thisMonth = inc?.monthly.at(-1);
+  // Only the current ET week counts: weekly.at(-1) is the last week with any fills, which may be weeks ago.
+  const week = inc?.weekly.find((w) => w.period === inc.this_week);
+  const unreal = p.unrealized != null ? p.unrealized + (acct?.optionsUnrealized ?? 0) : null;
   const dayPct = p.day_change != null && p.total_value ? p.day_change / (p.total_value - p.day_change) : null;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {today && (
           <Metric label="Today · live" value={<Tick value={Math.round(today.total)}><span className={tone(today.total)}>{signedUsd(today.total)}</span></Tick>}
             sub={<span>stocks <span className={tone(today.stocks)}>{signedUsd(today.stocks, 0)}</span> · options <span className={tone(today.options)}>{signedUsd(today.options, 0)}</span> est.</span>} />
         )}
-        <Metric label="Account value" value={usd(p.total_value)} sub={<span className={tone(p.day_change)}>{signedUsd(p.day_change)} {dayPct != null && `(${pct(dayPct)})`} since last sync</span>} />
-        <Metric label="Unrealized P&L" value={<Tick value={p.unrealized != null ? Math.round(p.unrealized) : null}><span className={tone(p.unrealized)}>{signedUsd(p.unrealized)}</span></Tick>} sub={`stocks ${usd(p.stock_value, 0)}`} />
+        <Metric label={acct ? "Account value · live" : "Account value"} value={<Tick value={acct ? Math.round(acct.value) : null}>{usd(acct?.value ?? p.total_value)}</Tick>}
+          sub={<span>{acct && <>at sync {usd(p.total_value, 0)} · </>}<span className={tone(p.day_change)}>{signedUsd(p.day_change)} {dayPct != null && `(${pct(dayPct)})`}</span> since last sync</span>} />
+        <Metric label="Unrealized P&L" value={<Tick value={unreal != null ? Math.round(unreal) : null}><span className={tone(unreal)}>{signedUsd(unreal)}</span></Tick>}
+          sub={<span>stocks <span className={tone(p.unrealized)}>{signedUsd(p.unrealized, 0)}</span>{acct && <> · options <span className={tone(acct.optionsUnrealized)}>{signedUsd(acct.optionsUnrealized, 0)}</span></>}</span>} />
+        <Metric label="Net premium · this week" value={<span className={tone(week?.premium ?? 0)}>{signedUsd(week?.premium ?? 0, 0)}</span>}
+          sub={<span>sold {usd(week?.collected ?? 0, 0)} · bought back {usd(week?.bought_back ?? 0, 0)}{week?.long_paid ? <> · long options bought {usd(week.long_paid, 0)} (not counted)</> : null}</span>} />
         <Metric label="Premium collected · month" value={<span className="text-gain">{signedUsd(thisMonth?.collected ?? 0)}</span>} sub={<span>realized P&L <span className={tone(thisMonth?.realized)}>{signedUsd(thisMonth?.realized ?? 0)}</span></span>} />
         <Metric label="Cash · buying power" value={usd(p.cash)} sub={`BP ${usd(p.buying_power)}`} />
       </div>

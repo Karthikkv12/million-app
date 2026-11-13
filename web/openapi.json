@@ -2081,6 +2081,16 @@
       "title": "Collected",
       "type": "number"
      },
+     "long_paid": {
+      "default": 0.0,
+      "title": "Long Paid",
+      "type": "number"
+     },
+     "long_received": {
+      "default": 0.0,
+      "title": "Long Received",
+      "type": "number"
+     },
      "period": {
       "title": "Period",
       "type": "string"
@@ -2131,6 +2141,11 @@
       "title": "Collected Total",
       "type": "number"
      },
+     "long_paid_total": {
+      "default": 0.0,
+      "title": "Long Paid Total",
+      "type": "number"
+     },
      "monthly": {
       "items": {
        "$ref": "#/components/schemas/BrokerIncomeBucket"
@@ -2158,6 +2173,17 @@
        }
       ],
       "title": "Since"
+     },
+     "this_week": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "This Week"
      },
      "trades": {
       "default": 0,
