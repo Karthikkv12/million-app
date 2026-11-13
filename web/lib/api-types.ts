@@ -898,6 +898,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/logos/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Logo
+         * @description A 64×64 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,
+         *     and logos are public. Cached on disk server-side; browsers may keep it for a week.
+         */
+        get: operations["logo_api_v1_logos__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/market/quotes": {
         parameters: {
             query?: never;
@@ -8225,6 +8246,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LedgerEntryOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logo_api_v1_logos__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -23,6 +23,7 @@ import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
 import { PulseChart } from "@/components/dashboard/PulseChart";
 import { TickerLink } from "@/components/TickerLink";
+import { TickerLogo } from "@/components/TickerLogo";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const signed = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${usd(v, d)}`);
@@ -211,8 +212,8 @@ export default function DashboardPage() {
                   <div key={`bb-${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} className="relative">
                     <Link href="/hedge" className="absolute inset-0 z-[1]" aria-label={`${b.symbol}: open the hedge desk`} />
                     <DeskRow edge="loss">
-                      <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
-                        <TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" />
+                      <div className="grid grid-cols-[76px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
+                        <span className="flex min-w-0 items-center gap-2"><TickerLogo symbol={b.symbol} size={18} /><TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" /></span>
                         <span><Tag tone="solid">Buy back</Tag></span>
                         <span className="min-w-0 truncate text-[13px] text-foreground" title={c.headline}>
                           {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · {Math.round(c.profit_pct * 100)}% in
@@ -232,8 +233,8 @@ export default function DashboardPage() {
                     <div key={b.symbol} className="relative">
                       <Link href="/hedge" className="absolute inset-0 z-[1]" aria-label={`${b.symbol}: open the hedge desk`} />
                       <DeskRow edge={a.edge}>
-                        <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
-                          <TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" />
+                        <div className="grid grid-cols-[76px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
+                          <span className="flex min-w-0 items-center gap-2"><TickerLogo symbol={b.symbol} size={18} /><TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" /></span>
                           <span><Tag tone={a.tone}>{a.label}</Tag></span>
                           <span className={clsx("min-w-0 truncate text-[13px]", a.edge ? "text-foreground" : "text-foreground/50")} title={s.headline}>{what}</span>
                           <span className="text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{a.edge && s.credit ? usd(Math.abs(s.credit), 0) : ""}</span>
@@ -252,8 +253,8 @@ export default function DashboardPage() {
               <div className="border-t border-[var(--border)]">
                 {spikes.map((b) => (
                   <DeskRow key={`s-${b.symbol}`} edge="loss">
-                    <div className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)]">
-                      <TickerLink symbol={b.symbol} className="font-mono text-[14px] font-semibold text-foreground" />
+                    <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[80px_auto_minmax(0,1fr)]">
+                      <span className="flex min-w-0 items-center gap-2"><TickerLogo symbol={b.symbol} size={18} /><TickerLink symbol={b.symbol} className="font-mono text-[14px] font-semibold text-foreground" /></span>
                       <span><Tag tone="loss">IV spike</Tag></span>
                       <span className="col-span-2 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">ATM IV {pct(b.iv?.iv_roc_day, 0)} today. Premium is rich: a call near your average.</span>
                     </div>
@@ -261,8 +262,8 @@ export default function DashboardPage() {
                 ))}
                 {expiring.map((o, i) => (
                   <DeskRow key={`e-${i}`} edge={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : null}>
-                    <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
-                      <TickerLink symbol={o.symbol} className="font-mono text-[14px] font-semibold text-foreground" />
+                    <div className="grid grid-cols-[76px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[80px_auto_minmax(0,1fr)_auto]">
+                      <span className="flex min-w-0 items-center gap-2"><TickerLogo symbol={o.symbol} size={18} /><TickerLink symbol={o.symbol} className="font-mono text-[14px] font-semibold text-foreground" /></span>
                       <span><Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag></span>
                       <span className={clsx("text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
                       <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">

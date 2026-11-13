@@ -5,6 +5,7 @@ import { ChartTooltip, useChartStyle } from "@/components/chart/kit";
 import { Panel, Segmented, SkeletonCard } from "@/components/ui";
 import { compactUsd, Metric, NoData, shortDate, signedUsd, TD, TH, tone, useIncome, usd } from "./broker";
 import { TickerLink } from "@/components/TickerLink";
+import { TickerLogo } from "@/components/TickerLogo";
 
 export function IncomeTab() {
   const { data: inc, isLoading } = useIncome();
@@ -52,7 +53,7 @@ export function IncomeTab() {
             <tbody>
               {inc.by_symbol.map((r) => (
                 <tr key={r.symbol} className="border-b border-[var(--border)] last:border-0">
-                  <td className={`${TD} font-medium text-foreground`}><TickerLink symbol={r.symbol} /></td>
+                  <td className={`${TD} font-medium text-foreground`}><span className="inline-flex items-center gap-2"><TickerLogo symbol={r.symbol} size={18} /><TickerLink symbol={r.symbol} /></span></td>
                   <td className={`sensitive ${TD} text-right ${r.collected ? "text-gain" : "text-foreground/40"}`}>{signedUsd(r.collected, 0)}</td>
                   <td className={`sensitive ${TD} text-right text-foreground/60`}>{r.bought_back ? usd(r.bought_back, 0) : "—"}</td>
                   <td className={`sensitive ${TD} text-right ${tone(r.premium)}`}>{signedUsd(r.premium, 0)}</td>

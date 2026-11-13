@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.concurrency import run_in_threadpool
 
 from optionflow.core.deps import get_current_user
-from optionflow.modules.market import service
+from optionflow.modules.market import logos, service
 from optionflow.modules.market.schemas import (
     LiveQuoteOut, PriceHistoryOut, QuoteOut, StockInfoOut, TickerSearchResult, WatchlistRowOut,
 )
@@ -46,3 +47,16 @@ def stock_info(symbol: str, _user=Depends(get_current_user)) -> StockInfoOut:
 def stock_history(symbol: str, period: str = "6mo", interval: str = "1d", prepost: bool = False,
                   _user=Depends(get_current_user)) -> PriceHistoryOut:
     return service.price_history(symbol, period, interval, prepost)
+
+
+@router.get("/logos/{symbol}", response_class=Response, responses={200: {"content": {"image/png": {}}}, 404: {}})
+async def logo(symbol: str) -> Response:
+    """A 64×64 PNG tile of the company / fund logo (404 when there is none). No auth: <img> tags can't send a token,
+    and logos are public. Cached on disk server-side; browsers may keep it for a week."""
+    sym = logos.clean(symbol)
+    if sym is None:
+        raise HTTPException(status_code=404, detail="Not a ticker")
+    data = await run_in_threadpool(logos.get, sym)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No logo", headers={"Cache-Control": "public, max-age=86400"})
+    return Response(data, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
