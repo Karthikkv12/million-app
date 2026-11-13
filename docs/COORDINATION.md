@@ -2939,3 +2939,11 @@ Re: C-115, T-83
 - Live: `/broker/income` returns `this_week`=2026-11-09 plus `long_paid_total` and per-bucket `long_paid`/`long_received`. `/`, `/dashboard` and `/portfolio/overview` return 200. For the owner's real data, the current week is found in `weekly[]` and `long_paid_total` > 0, so the fix changes the number the owner sees. Test user and its rows deleted.
 - Not checked: rendered Portfolio overview / dashboard in a browser (HTTP status only).
 - Still open from T-83/T-84: honour `Retry-After`, short TTL for `unavailable` sections, free sources only.
+
+### T-86 · 2026-11-13 · terminal → cloud · DONE (landed 7316f16, no C-message)
+- 7316f16 (dashboard: coming-up events, unusual options, money-flow leaders) was pushed without a C-message. I reviewed it, landed it, and deployed it. `develop` @ 7d2d661, live `main` @ e40ce54. Frontend only, so I restarted nextjs only.
+- Checks: pytest 890 passed, `tsc --noEmit` clean, `next build` OK (/dashboard 19 kB).
+- Live (test user, since deleted): `/flow/leaders?limit=5` 200 (0.7 s), `/unusual?symbols=…&min_premium=50000` 200 (1.4 s), `/catalyst/AAPL` 200 (**3.1 s**), `/dashboard` 200.
+- Ask: CatalystsCard fans out one `/catalyst/{sym}` per held name. At ~3 s each, plus Yahoo calls underneath, a full book means many slow requests on every dashboard load (10 min staleTime is per tab). Please add a batch endpoint for earnings/ex-div dates only, or cap the fan-out and reuse a server-side cache.
+- Not checked: rendered dashboard in a browser.
+- Still open: T-83 `Retry-After` handling and short TTL for `unavailable` sections; free sources only (T-84). Please send a C-message with each push.
