@@ -67,7 +67,7 @@ function PremiumPage() {
         <TickerSearchInput value={input} onChange={setInput} onSelect={open} placeholder="Any ticker or company" actionLabel="Open" className="w-full sm:w-80" />
       </div>
 
-      <DeskSection label="Through the day" meta={<>Money in open calls and puts,<br />and the stock price.</>}>
+      <DeskSection label="Through the day" meta={<>Premium traded in calls and puts,<br />and the stock price.</>}>
         {symbol && <FlowMomentumChart key={symbol} symbol={symbol} variant="page" levels={[
           { label: "⚓ Anchor", price: anchor?.price, color: dark ? "#67e8f9" : "#0e7490" },
           { label: "Flip", price: d?.zero_gamma, color: dark ? "#90bff9" : "#2f5bea" },
@@ -76,10 +76,10 @@ function PremiumPage() {
 
       <DeskSection label="How to read it">
         <ul className="grid max-w-3xl gap-2 text-[14px] leading-relaxed text-foreground/75">
-          <li><b className="font-medium text-gain">Calls</b> and <b className="font-medium text-loss">puts</b>: how much the money sitting in open call and put contracts has changed since the 9:30 ET open on the 1-day view (&ldquo;Since open&rdquo;), since the first reading on longer views (&ldquo;Since start&rdquo;), or the full amount (&ldquo;Totals&rdquo;).</li>
+          <li><b className="font-medium text-gain">Calls</b> and <b className="font-medium text-loss">puts</b>: premium traded in calls and puts since the 9:30 ET open (&ldquo;Traded today&rdquo;; longer views add the days up), or the money sitting in open contracts (&ldquo;Totals&rdquo;).</li>
           <li><b className="font-medium text-accent">Net</b> = calls − puts. Rising means call money is growing faster than put money (bullish tilt); falling means the opposite.</li>
           <li><b className="font-medium text-foreground">Price</b> is the stock, on the right-hand scale, with the ⚓ Anchor and the GEX Flip dashed on the same scale. Net rising while price falls (or the reverse) is the disagreement worth noticing.</li>
-          <li className="text-foreground/55">It is contracts × the option&apos;s current price, so it also moves when option prices move with the stock, not only when new trades come in. Hover for exact values; click to pin a moment and measure from there.</li>
+          <li className="text-foreground/55">Traded is each contract&apos;s new volume × its mid price at every refresh (nearest 12 expiries), so repricing doesn&apos;t count; it is measured from 2026-11-13 on. Totals are open contracts × the option&apos;s current price, so they also move when option prices move. Hover for exact values; click to pin a moment and measure from there.</li>
         </ul>
       </DeskSection>
 

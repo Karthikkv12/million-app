@@ -342,6 +342,11 @@ export interface FlowSnapshot {
   net_flow: number;
   total_prem: number;
   volume: number;
+  /** Premium traded today so far (Δvolume × mid per contract, cumulative since the ET open). Null outside the
+   *  session and on rows before 2026-11-13. */
+  call_traded?: number | null;
+  put_traded?: number | null;
+  net_traded?: number | null;
 }
 
 export const fetchNetFlowHistory = (symbol: string, days = 1) =>

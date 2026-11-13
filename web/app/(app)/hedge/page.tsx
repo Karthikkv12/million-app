@@ -8,7 +8,7 @@
  */
 import { Fragment, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { AlertTriangle, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, Shapes } from "lucide-react";
 import { HedgeBook, HedgeSuggestion } from "@/lib/api";
 import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
@@ -17,6 +17,7 @@ import { useStrategy } from "@/components/strategy/useStrategy";
 import { VolTargetTab, VolTargetTheory } from "@/components/hedge/VolTarget";
 import { FactorsTab, FactorsTheory } from "@/components/hedge/Factors";
 import { TickerLink } from "@/components/TickerLink";
+import { Theory } from "@/components/hedge/Theory";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -206,10 +207,11 @@ function Edge({ cls }: { cls: string }) {
   return <Sym><span className={clsx("h-5 w-[3px]", cls)} /></Sym>;
 }
 
+/** The Legend pop-up: same button and dialog as the Theory pop-ups on the other Hedge tabs. */
 function Legend() {
   return (
-    <DeskSection label="Legend" meta="What the symbols on this page mean.">
-      <div className="grid gap-x-10 gap-y-6 md:grid-cols-2 xl:grid-cols-3">
+    <Theory title="Legend · what the symbols on this page mean" label="Legend" icon={<Shapes size={13} />}>
+      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground/45">Net Δ per lot (−0.5 … +1.5)</p>
           <Item title="Near the stock (≥ 0.85)" sym={<Sym><span className="h-3 w-3 rounded-full bg-gain" /></Sym>}>Little is sold against the lot: you carry nearly the full stock move.</Item>
@@ -237,8 +239,8 @@ function Legend() {
           <Item title="Γ $/1%" sym={<Sym><span className="font-mono text-[12px] text-loss">−$24</span></Sym>}>How much your delta-dollars change for a 1% move. Negative = short gamma (your short options).</Item>
         </div>
       </div>
-      <p className="mt-6 text-[12px] leading-relaxed text-foreground/45">Greeks are Black-Scholes from the live price and each contract&apos;s IV. Suggestions are not orders; check the live quote before trading.</p>
-    </DeskSection>
+      <p className="text-[12px] leading-relaxed text-foreground/45">Greeks are Black-Scholes from the live price and each contract&apos;s IV. Suggestions are not orders; check the live quote before trading.</p>
+    </Theory>
   );
 }
 
@@ -489,6 +491,7 @@ function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
         </div>
         <div className="flex w-full flex-wrap items-end justify-between gap-x-5 gap-y-3 sm:w-auto sm:flex-nowrap">
           <div className="w-full sm:w-auto"><StrategyPicker /></div>
+          <Legend />
           <div className="text-right font-mono text-[11px] leading-relaxed text-foreground/55 max-sm:ml-auto">
             <p className="flex items-center justify-end gap-1.5">
               <span className={clsx("h-1.5 w-1.5 rounded-full", live ? "animate-pulse bg-gain" : "bg-warn")} />
@@ -561,7 +564,6 @@ function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
             </div>
           </DeskSection>
 
-          <Legend />
         </>
       )}
 

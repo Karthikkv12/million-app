@@ -1,9 +1,10 @@
 "use client";
 /**
  * FlowMomentumChart — premium flow through the day, interactive.
- *  - Mode: "Since open" / "Since start" (premium added since the baseline) or "Totals". On the 1-day view the
- *    baseline is the first snapshot at or after the 09:30 ET open: earlier snapshots still carry the previous
- *    session's chain, so they are left out. Longer views start at the first snapshot in the window.
+ *  - Mode: "Traded" (premium traded in calls / puts: Δvolume × mid per contract at each refresh, counted from the
+ *    09:30 ET open by the server and reset each ET day; longer views add the days up) or "Totals" (money sitting in
+ *    open contracts, OI × mid). Snapshots from before 2026-11-13 have no traded figures: a window with none falls
+ *    back to Totals and says "not measured yet".
  *  - Series chips toggle calls / puts / net / price (price on its own right axis).
  *  - A readout bar follows the cursor; click the chart to pin a moment and the readout shows
  *    the change from the pin to the cursor. Drag the brush under the chart to zoom.
@@ -30,8 +31,6 @@ const DAYS = [1, 3, 7, 14] as const;
 type Day = (typeof DAYS)[number];
 type Mode = "since" | "total";
 type Key = "call" | "put" | "net" | "price";
-/** A jump in total open premium bigger than this between two snapshots is a change of measurement, not flow. */
-const BREAK = 0.25;
 
 const m = (v: number | null | undefined, d = 1) => {
   if (v == null) return "—";
@@ -84,7 +83,9 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
     if (next) setDays(next);
   }, [picked, isLoading, all.length, days]);
   // 1-day "since" view: count from the open, not from the overnight snapshots (they repeat the previous close).
-  const fromOpen = mode === "since" && days === 1;
+  const measured = all.some((s) => s.call_traded != null || s.put_traded != null);
+  const eff: Mode = measured ? mode : "total";
+  const fromOpen = eff === "since" && days === 1;
   const snaps = useMemo(() => {
     if (!fromOpen) return all;
     const cut = all.slice(openIndex(all));
@@ -94,26 +95,26 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
 
   const rows = useMemo(() => {
     if (!snaps.length) return [];
-    // "Since start" adds up the change between snapshots. A snapshot whose total premium jumps by more than BREAK against
-    // the one before it is a different measurement (another data source or expiry window, e.g. the first read of the day),
-    // not flow: that step counts as zero, so one odd snapshot can't flatten the whole chart.
-    let dc = 0, dp = 0;
+    // "Traded": the server's figures are already cumulative since that ET day's open, so they're plotted as is.
+    // Across days, earlier days' closing totals are carried in; a null (outside the session) holds the last value.
+    let day = "", doneC = 0, doneP = 0, tc = 0, tp = 0;
     return snaps.map((s, i) => {
       const call = s.call_prem / 1e6, put = s.put_prem / 1e6, net = s.net_flow / 1e6;
-      if (i > 0) {
-        const q = snaps[i - 1], was = q.call_prem + q.put_prem, now = s.call_prem + s.put_prem;
-        if (!(Math.abs(now - was) > BREAK * Math.max(was, now))) { dc += (s.call_prem - q.call_prem) / 1e6; dp += (s.put_prem - q.put_prem) / 1e6; }
-      }
+      const d = et(s.ts).day;
+      if (d !== day) { doneC += tc; doneP += tp; tc = 0; tp = 0; day = d; }
+      if (s.call_traded != null) tc = s.call_traded / 1e6;
+      if (s.put_traded != null) tp = s.put_traded / 1e6;
+      const dc = doneC + tc, dp = doneP + tp;
       return {
         i, ts: s.ts, price: s.price,
-        call: mode === "since" ? dc : call,
-        putVal: mode === "since" ? dp : put,          // real value (readout)
-        put: mode === "since" ? dp : -put,           // plotted: totals mirror puts below zero
-        net: mode === "since" ? dc - dp : net,
+        call: eff === "since" ? dc : call,
+        putVal: eff === "since" ? dp : put,          // real value (readout)
+        put: eff === "since" ? dp : -put,           // plotted: totals mirror puts below zero
+        net: eff === "since" ? dc - dp : net,
         raw: { call, put, net, volume: s.volume },
       };
     });
-  }, [snaps, mode]);
+  }, [snaps, eff]);
 
   const last = rows.length - 1;
   const cur = rows[hover ?? last];
@@ -134,11 +135,14 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">{page ? "" : "Through the day"}</h3>
         <div className="flex items-center gap-4">
-          <div className="flex">{seg<Mode>("since", mode, (x) => { setMode(x); setPin(null); setHover(null); }, days === 1 ? "Since open" : "Since start")}{seg<Mode>("total", mode, (x) => { setMode(x); setPin(null); setHover(null); }, "Totals")}</div>
+          <div className="flex">{seg<Mode>("since", mode, (x) => { setMode(x); setPin(null); setHover(null); }, days === 1 ? "Traded today" : "Traded")}{seg<Mode>("total", mode, (x) => { setMode(x); setPin(null); setHover(null); }, "Totals")}</div>
           <div className="flex">{DAYS.map((d) => seg<Day>(d, days, (x) => { setPicked(true); setDays(x); setPin(null); setHover(null); }, `${d}D`))}</div>
         </div>
       </div>
 
+      {!measured && mode === "since" && !isLoading && all.length > 0 && (
+        <p className="mb-2 font-mono text-[11px] text-foreground/55">Premium traded is not measured yet in this window (it starts 2026-11-13); showing totals.</p>
+      )}
       {widened && (
         <p className="mb-2 font-mono text-[11px] text-warn">No flow yet today (market closed); showing the last {days} days.</p>
       )}
@@ -151,13 +155,13 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
         </div>
       ) : (
         <>
-          {page && mode === "since" && (() => {
+          {page && eff === "since" && (() => {
             const e = rows[last], lead = Math.abs(e.net) < 0.02 * Math.max(Math.abs(e.call), Math.abs(e.putVal), 1) ? null : e.net > 0;
-            const moved = (v: number) => `${v >= 0 ? "grew" : "shrank"} by ${m(Math.abs(v)).replace("+", "")}`;
+            const amt = (v: number) => m(Math.abs(v)).replace("+", "");
             return (
               <p className="mb-3 max-w-3xl text-[15px] leading-relaxed text-foreground/80">
-                Since {when(rows[0].ts, days)}, money in open <span className="text-gain">calls</span> {moved(e.call)} and
-                in open <span className="text-loss">puts</span> {moved(e.putVal)}.{" "}
+                {days === 1 ? "Since the 9:30 ET open" : `Over the last ${days} days`}, <b className="font-medium text-foreground">{amt(e.call)}</b> of premium traded
+                in <span className="text-gain">calls</span> and <b className="font-medium text-foreground">{amt(e.putVal)}</b> in <span className="text-loss">puts</span>.{" "}
                 {lead == null ? "The two moved about the same, so there is no clear tilt."
                   : <>The gap between them (<span className="text-accent">net</span>) is <b className="font-medium text-foreground">{m(e.net)}</b>: the tilt is toward <b className="font-medium text-foreground">{lead ? "calls (bullish)" : "puts (bearish)"}</b>.</>}
               </p>
