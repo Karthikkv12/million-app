@@ -3,6 +3,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import { Panel, Pill, SkeletonCard } from "@/components/ui";
 import { NoData, pct, signedUsd, TD, TH, usePortfolio, usd } from "./broker";
+import { TickerLink } from "@/components/TickerLink";
 
 export function OptionsTab() {
   const { data: p, isLoading } = usePortfolio();
@@ -26,7 +27,7 @@ export function OptionsTab() {
             {p.options.map((o, i) => (
               <tr key={i} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]">
                 <td className={TD}>
-                  <span className="font-medium text-foreground">{o.symbol} {o.strike}{o.option_type === "call" ? "C" : "P"}</span>
+                  <span className="font-medium text-foreground"><TickerLink symbol={o.symbol} /> {o.strike}{o.option_type === "call" ? "C" : "P"}</span>
                   <span className={clsx("ml-2 text-[11px]", o.contracts < 0 ? "text-foreground/50" : "text-accent")}>{o.contracts < 0 ? "short" : "long"}</span>
                 </td>
                 <td className={`sensitive ${TD} text-right text-foreground/80`}>{Math.abs(o.contracts)}</td>

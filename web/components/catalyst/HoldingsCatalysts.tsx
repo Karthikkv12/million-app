@@ -12,6 +12,7 @@ import { clsx } from "clsx";
 import { ChevronRight } from "lucide-react";
 import { fetchBrokerPortfolio, fetchCatalysts, BrokerPortfolio, Catalysts } from "@/lib/api";
 import { DeskRow, Tag } from "@/components/desk";
+import { TickerLink } from "@/components/TickerLink";
 
 const pct = (v?: number | null, d = 1) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`);
 const shortDate = (iso?: string | null) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—");
@@ -69,11 +70,12 @@ export function HoldingsCatalysts() {
           const c = r.c;
           const worst = r.flags.find((f) => f.tone === "loss") ? "loss" : r.flags.find((f) => f.tone === "warn") ? "warn" : null;
           return (
-            <Link key={r.symbol} href={`/catalyst/${r.symbol}`} className="block">
+            <div key={r.symbol} className="relative">
+              <Link href={`/catalyst/${r.symbol}`} className="absolute inset-0 z-[1]" aria-label={`${r.symbol} catalysts`} />
               <DeskRow edge={worst as "loss" | "warn" | null}>
                 <div className="grid grid-cols-[84px_84px_96px_116px_84px_112px_56px_minmax(180px,1fr)_16px] items-center gap-3 px-4 py-3 font-mono text-[12.5px] tabular-nums">
                   <div className="min-w-0">
-                    <p className="text-[14.5px] font-semibold tracking-tight text-foreground">{r.symbol}</p>
+                    <p className="text-[14.5px] font-semibold tracking-tight text-foreground"><TickerLink symbol={r.symbol} className="relative z-[2]" /></p>
                     <p className="truncate font-sans text-[11px] text-foreground/45">
                       <span className="sensitive">{r.shares ? `${r.shares} sh` : ""}</span>{r.shares && r.options ? " · " : ""}{r.options ? `${r.options} opt` : ""}
                     </p>
@@ -121,7 +123,7 @@ export function HoldingsCatalysts() {
                   <ChevronRight size={15} className="text-foreground/35" />
                 </div>
               </DeskRow>
-            </Link>
+            </div>
           );
         })}
       </div>

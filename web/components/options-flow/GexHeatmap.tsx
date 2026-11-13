@@ -15,6 +15,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { GexResult } from "@/lib/api";
 import { okBooks, useLiveBooks } from "@/lib/live";
+import { TickerLink } from "@/components/TickerLink";
 
 // ── Palettes ─────────────────────────────────────────────────────────────────
 type RGB = [number, number, number];
@@ -290,7 +291,7 @@ export const GexHeatmap = forwardRef<BoardHandle, Props>(function GexHeatmap({ d
     <>
       {mine && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--border)] px-3 py-1.5 font-mono text-[10.5px] text-foreground/55">
-          <span className="text-foreground/75">Your {mine.symbol}:</span>
+          <span className="text-foreground/75">Your <TickerLink symbol={mine.symbol} />:</span>
           <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SC", n: 1, strike: 0, expiry: "" }} />sold call</span>
           <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "SP", n: 1, strike: 0, expiry: "" }} />sold put</span>
           <span className="inline-flex items-center gap-1"><Badge ps={{ kind: "BC", n: 1, strike: 0, expiry: "" }} />bought call</span>

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { stockHref } from "@/components/TickerLink";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Columns3, Download, Keyboard, Search } from "lucide-react";
 import { clsx } from "clsx";
@@ -225,7 +226,7 @@ export default function UnusualPage() {
                 {rows.slice(0, 200).map((r) => (
                   <tr key={`${r.symbol}-${r.type}-${r.strike}-${r.expiry}`} className="transition hover:bg-[var(--surface-2)]">
                     <td className="px-3 py-2 pl-4">
-                      <Link href={`/catalyst/${r.symbol}`} title={`Catalysts for ${r.symbol}`}
+                      <Link href={stockHref(r.symbol)} title={`Open ${r.symbol}: chart, LEAPS score, catalysts`}
                         className={clsx("inline-flex min-w-[56px] justify-center rounded-md border px-2 py-0.5 text-[12px] font-medium",
                           r.type === "call" ? "border-gain/40 bg-gain/10 text-gain" : "border-loss/40 bg-loss/10 text-loss")}>
                         {r.symbol}
