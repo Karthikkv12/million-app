@@ -1079,3 +1079,19 @@ export const fetchReports = () => api.get<ReportMeta[]>("/reports");
 /** One day's page (YYYY-MM-DD); without a day, the latest. */
 export const fetchReport = (slug: string, day?: string | null) =>
   api.get<ReportPage>(`/reports/${encodeURIComponent(slug)}${day ? `?day=${encodeURIComponent(day)}` : ""}`);
+
+// ── Political influence (modules/politics) ───────────────────────────────────
+export type PoliticalProfile = Schemas["PoliticalProfile"];
+export type PoliticalSummary = Schemas["PoliticalSummary"];
+export type PoliticalFeed = Schemas["PoliticalFeed"];
+export type CongressTrade = Schemas["CongressTrade"];
+
+export const fetchPolitics = (symbol: string) =>
+  api.get<PoliticalProfile>(`/politics/${encodeURIComponent(symbol.toUpperCase())}`);
+export const fetchPoliticsSummary = (symbols: string[]) =>
+  api.get<PoliticalSummary>(`/politics/summary?symbols=${encodeURIComponent(symbols.join(","))}`);
+export const fetchPoliticsFeed = (symbols: string[] = [], days = 30) => {
+  const q = new URLSearchParams({ days: String(days) });
+  if (symbols.length) q.set("symbols", symbols.join(","));
+  return api.get<PoliticalFeed>(`/politics/feed?${q}`);
+};

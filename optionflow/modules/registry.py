@@ -86,6 +86,11 @@ def _risk() -> List[APIRouter]:
     return [router]
 
 
+def _politics() -> List[APIRouter]:
+    from optionflow.modules.politics.router import router
+    return [router]
+
+
 def _notify() -> List[APIRouter]:
     from optionflow.modules.notify.router import router
     return [router]
@@ -108,4 +113,5 @@ MODULES: Dict[str, Callable[[], List[APIRouter]]] = {
     "pulse": _pulse,            # server-side price alerts + paper trades for the Pulse chart (C-98)
     "insight": _insight,        # drawdown / spike series and the LEAPS score
     "risk": _risk,              # volatility targeting and factor exposure of the synced book (Hedge tabs)
+    "politics": _politics,      # congressional trades, lobbying and federal contracts per stock / sector
 }

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     db_pool_timeout: int = 30
 
     # ── AI assistant (ai module) ────────────────────────────────────────────
+    # ── Political data (modules/politics) ───────────────────────────────────
+    fmp_api_key: Optional[str] = None           # Financial Modeling Prep: congressional trades (paid plan)
+    lda_api_key: Optional[str] = None           # lda.gov lobbying API: optional, raises the rate limit
     gemini_api_key: Optional[str] = None        # free tier; _2 and _3 are tried when a key is over quota
     gemini_api_key_2: Optional[str] = None
     gemini_api_key_3: Optional[str] = None
@@ -81,7 +84,7 @@ class Settings(BaseSettings):
     public_account_id: Optional[str] = None     # default: first options-enabled BROKERAGE account
 
     # ── Feature modules (used from plan step 4) ─────────────────────────────
-    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget,hedge,notify,watchlists,strategy,insight,pulse,risk"
+    enabled_modules: str = "auth,market,flow,watchlist,catalyst,unusual,portfolio,budget,hedge,notify,watchlists,strategy,insight,pulse,risk,politics"
     # Phone notifications (notify module): VAPID key pair (base64url P-256) + contact sent to push services.
     # Empty private key = push disabled. Read from .env like every other setting.
     push_vapid_private_key: str = ""
