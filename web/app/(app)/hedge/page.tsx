@@ -68,6 +68,86 @@ const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? 
 const actionOf = (s?: HedgeSuggestion | null) => !s ? null
   : s.long_strike != null ? { ...ACTION.SELL_PUT, label: "Put spread" } : ACTION[s.action];
 
+// ── Long options tracked as stock: levels + reads (hedge.signal) ─────────────
+type Signal = NonNullable<HedgeBook["signal"]>;
+const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "neutral"; label: string; edge: "gain" | "loss" | null }> = {
+  ADD: { tag: "gain", label: "Add", edge: "gain" },
+  HOLD: { tag: "neutral", label: "Hold", edge: null },
+  TRIM: { tag: "loss", label: "Trim", edge: "loss" },
+};
+const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
+  flow: "Options flow", trend: "Trend", dealers: "Dealers", volume: "Volume", momentum: "Momentum", volatility: "Volatility",
+};
+
+function ScoreBar({ v }: { v: number }) {
+  const w = Math.min(Math.abs(v), 1) * 50;
+  return (
+    <span className="relative inline-block h-1.5 w-16 shrink-0 rounded-full bg-foreground/10">
+      <span className="absolute inset-y-[-2px] left-1/2 w-px bg-foreground/30" />
+      <span className={clsx("absolute inset-y-0 rounded-full", v >= 0 ? "bg-gain" : "bg-loss")}
+        style={v >= 0 ? { left: "50%", width: `${w}%` } : { right: "50%", width: `${w}%` }} />
+    </span>
+  );
+}
+
+function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
+  const rows = g.levels.filter((l) => !l.key.startsWith("em_day"));
+  const above = rows.filter((l) => spot == null || l.price > spot);
+  const below = rows.filter((l) => spot != null && l.price <= spot);
+  const mark = (k: string) => k === g.support?.key || k === g.resistance?.key;
+  return (
+    <div className="mt-4 space-y-5">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+        {[["Score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score} · {g.bias}</span>],
+          [g.side === "long" ? "Add near" : "Add short near", usd(g.add_at)],
+          ["Stop (close)", <span key="st" className="text-loss">{usd(g.stop)}</span>],
+          ["Target", usd(g.target)],
+          ...(g.expected_move ? [["Move ±1σ", `${usd(g.expected_move.day)} d · ${usd(g.expected_move.week)} wk`]] : []),
+        ].map(([k, v]) => (
+          <div key={k as string}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className="mt-0.5 tabular-nums text-foreground">{v}</dd></div>
+        ))}
+      </dl>
+
+      {g.reads.length > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Reads</p>
+          <ul className="mt-2 space-y-2.5">
+            {g.reads.map((r) => (
+              <li key={r.key} className="text-[13px] leading-snug">
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="w-24 shrink-0 text-foreground/80">{READ_LABEL[r.key]}</span>
+                  <ScoreBar v={r.score} />
+                  <span className={clsx("w-11 shrink-0 text-right tabular-nums", tone(r.score))}>{sd(r.score)}</span>
+                  <span className="min-w-0 truncate text-[11.5px] text-foreground/45">{r.value}</span>
+                </div>
+                <p className="mt-0.5 text-foreground/60">{r.note}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Levels</p>
+          <ul className="mt-2 font-mono text-[12.5px] tabular-nums">
+            {[...above, null, ...below].map((l) => l == null ? (
+              <li key="spot" className="my-1 flex justify-between border-y border-[var(--border-strong)] py-1 text-foreground">
+                <span>Price</span><span>{usd(spot)}</span>
+              </li>
+            ) : (
+              <li key={l.key} className={clsx("flex items-baseline justify-between gap-3 py-0.5", mark(l.key) ? "text-foreground" : "text-foreground/55")}>
+                <span className="min-w-0 truncate">{mark(l.key) && <span className={l.price > (spot ?? 0) ? "text-loss" : "text-gain"}>● </span>}{l.label}{l.strength >= 3 && <span className="text-foreground/35"> ★</span>}</span>
+                <span className="shrink-0">{usd(l.price)} <span className="text-foreground/40">{pct(l.distance)}</span></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Expanded detail: ticket · legs · ladder ──────────────────────────────────
 function Detail({ b }: { b: HedgeBook }) {
   const s = b.suggestion;
@@ -117,9 +197,11 @@ function Detail({ b }: { b: HedgeBook }) {
                 ))}
               </dl>
             )}
+            {b.signal && <SignalPanel g={b.signal} spot={b.spot} />}
             {!!s.reasons?.length && (
               <ol className="mt-4 space-y-1.5 border-l border-[var(--border-strong)] pl-3 text-[13px] leading-snug text-foreground/70">
-                {s.reasons.map((r) => <li key={r}>{r}</li>)}
+                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => x.note === r) && !/^(Levels|Stop|Expected move)/.test(r)) : s.reasons)
+                  .map((r) => <li key={r}>{r}</li>)}
               </ol>
             )}
             {!!s.warnings?.length && (
@@ -230,7 +312,7 @@ function Legend() {
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
-          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Long / Short</b>: long calls (LEAPS) or long puts with nothing sold, treated as stock (puts = short).</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Trim</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock (puts = short) and read from options flow, trend, dealer levels, volume, momentum and volatility; tap for the levels and the stop.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
@@ -340,7 +422,7 @@ function Scales({ books }: { books: HedgeBook[] }) {
 function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle: () => void }) {
   const s = b.suggestion;
   const asStock = b.strategy === "long_stock";               // long calls / puts only: tracked as stock, no strategy
-  const a = asStock ? { ...ACTION.TRACK, label: (b.net_delta ?? 0) < 0 ? "Short" : "Long" } : actionOf(s);
+  const a = asStock ? (b.signal ? VERDICT[b.signal.verdict] : { ...ACTION.TRACK, label: (b.net_delta ?? 0) < 0 ? "Short" : "Long" }) : actionOf(s);
   const per = perLot(b);
   const lots = Math.max(Math.floor(b.lots ?? 0), 1);
   const after = s?.net_delta_after != null && TRADE.has(s.action) ? s.net_delta_after / lots : null;

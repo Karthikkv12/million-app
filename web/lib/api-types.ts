@@ -2686,6 +2686,8 @@ export interface components {
             session?: ("pre" | "regular" | "post" | "overnight" | "closed") | null;
             /** Shares */
             shares?: number | null;
+            /** @description Long options only (strategy long_stock): levels, reads, ADD/HOLD/TRIM */
+            signal?: components["schemas"]["SignalOut"] | null;
             /** Spot */
             spot?: number | null;
             /**
@@ -3286,7 +3288,7 @@ export interface components {
              * @default []
              */
             earnings_history: components["schemas"]["EarningsHistoryRow"][];
-            expected_move?: components["schemas"]["ExpectedMoveOut"] | null;
+            expected_move?: components["schemas"]["optionflow__modules__catalyst__schemas__ExpectedMoveOut"] | null;
             /** Name */
             name: string;
             /**
@@ -3581,26 +3583,6 @@ export interface components {
             revenue_low?: number | null;
             /** Timing */
             timing?: string | null;
-        };
-        /**
-         * ExpectedMoveOut
-         * @description ATM straddle on the first expiry covering earnings (else the nearest).
-         */
-        ExpectedMoveOut: {
-            /** Covers Earnings */
-            covers_earnings: boolean;
-            /** Dollars */
-            dollars: number;
-            /** Expiry */
-            expiry: string;
-            /** High */
-            high: number;
-            /** Low */
-            low: number;
-            /** Pct */
-            pct: number;
-            /** Strike */
-            strike: number;
         };
         /** ExtendedHoursOut */
         ExtendedHoursOut: {
@@ -4438,6 +4420,8 @@ export interface components {
             call_wall?: number | null;
             /** King */
             king?: number | null;
+            /** Max Pain */
+            max_pain?: number | null;
             /** Net Gex */
             net_gex?: number | null;
             /** Put Wall */
@@ -5866,6 +5850,95 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** SignalLevelOut */
+        SignalLevelOut: {
+            /**
+             * Distance
+             * @description price ÷ spot − 1
+             */
+            distance: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Price */
+            price: number;
+            /**
+             * Strength
+             * @description 0 (expected move) … 3 (dealer walls, gamma flip)
+             */
+            strength: number;
+        };
+        /**
+         * SignalOut
+         * @description Levels and a directional read for a holding of long options only (hedge.signal).
+         */
+        SignalOut: {
+            /** Add At */
+            add_at?: number | null;
+            /**
+             * Bias
+             * @enum {string}
+             */
+            bias: "bullish" | "bearish" | "neutral";
+            expected_move?: components["schemas"]["optionflow__modules__hedge__schemas__ExpectedMoveOut"] | null;
+            /** Headline */
+            headline: string;
+            /**
+             * Levels
+             * @default []
+             */
+            levels: components["schemas"]["SignalLevelOut"][];
+            /**
+             * Reads
+             * @default []
+             */
+            reads: components["schemas"]["SignalReadOut"][];
+            resistance?: components["schemas"]["SignalLevelOut"] | null;
+            /**
+             * Score
+             * @description −100 bearish … +100 bullish
+             */
+            score: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Stop
+             * @description A close past this confirms TRIM / exit
+             */
+            stop?: number | null;
+            support?: components["schemas"]["SignalLevelOut"] | null;
+            /** Target */
+            target?: number | null;
+            /**
+             * Verdict
+             * @description For the holder's side (long calls: long; long puts: short)
+             * @enum {string}
+             */
+            verdict: "ADD" | "HOLD" | "TRIM";
+        };
+        /** SignalReadOut */
+        SignalReadOut: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "flow" | "trend" | "dealers" | "volume" | "momentum" | "volatility";
+            /** Note */
+            note: string;
+            /**
+             * Score
+             * @description −1 bearish … +1 bullish
+             */
+            score: number;
+            /** Value */
+            value: string;
+            /** Weight */
+            weight: number;
+        };
         /** StatusOut */
         StatusOut: {
             /**
@@ -7219,6 +7292,26 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * ExpectedMoveOut
+         * @description ATM straddle on the first expiry covering earnings (else the nearest).
+         */
+        optionflow__modules__catalyst__schemas__ExpectedMoveOut: {
+            /** Covers Earnings */
+            covers_earnings: boolean;
+            /** Dollars */
+            dollars: number;
+            /** Expiry */
+            expiry: string;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+            /** Pct */
+            pct: number;
+            /** Strike */
+            strike: number;
+        };
         /** BrokerAccountOut */
         optionflow__modules__hedge__schemas__BrokerAccountOut: {
             /** Account */
@@ -7241,6 +7334,19 @@ export interface components {
             prev_total?: number | null;
             /** Total Value */
             total_value?: number | null;
+        };
+        /** ExpectedMoveOut */
+        optionflow__modules__hedge__schemas__ExpectedMoveOut: {
+            /**
+             * Day
+             * @description ±$ one standard deviation today, from ATM IV
+             */
+            day: number;
+            /**
+             * Week
+             * @description ±$ over 5 sessions
+             */
+            week: number;
         };
         /** BrokerAccountOut */
         optionflow__modules__portfolio__schemas__BrokerAccountOut: {

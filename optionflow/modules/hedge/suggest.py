@@ -171,6 +171,7 @@ class Book:
     units: List[Unit] = field(default_factory=list)
     closes: List[Close] = field(default_factory=list)
     strategy: str = "spike_wheel"           # the owner's strategy that produced `suggestion` (strategy module)
+    signal: Optional[dict] = None           # long options only: levels + directional read (hedge.signal)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -197,7 +198,7 @@ def _r(x: Optional[float], n: int = 3) -> Optional[float]:
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
-             chain: Optional[List[Quote]] = None) -> Book:
+             chain: Optional[List[Quote]] = None, tape=None) -> Book:
     """`strategy`: a strategy.catalog.Rules; None or "spike_wheel" runs the playbook below on `weekly`.
     Any other strategy picks from `chain` (every expiry the desk has), via strategy.engine."""
     spot = ctx.spot
@@ -219,8 +220,10 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
 
     warnings = _gamma_warnings(legs)
     key = getattr(strategy, "key", None) or "spike_wheel"
+    sig = None
     if is_long_options_only(legs):                    # long calls / puts held as stock: no strategy, just the exposure
-        s, closes, key = _as_long_stock(legs, net, spot, warnings), [], LONG_STOCK
+        sig = _stock_signal(ctx, net, tape)
+        s, closes, key = _as_long_stock(legs, net, spot, warnings, sig), [], LONG_STOCK
     elif key == "spike_wheel":
         s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
         closes = buybacks(legs)
@@ -233,7 +236,8 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
         s = decide(ctx, legs, quotes, net, shares, full_lots, warnings, strategy)
         closes = buybacks(legs, strategy.take_profit, strategy.early_profit)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
-                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), closes, key)
+                _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), closes, key,
+                asdict(sig) if sig is not None else None)
 
 
 LONG_STOCK = "long_stock"   # Book.strategy for a holding of long options only (owner, 2026-11-13)
@@ -250,7 +254,20 @@ def _plural(n: float, word: str) -> str:
     return f"{n:g} long {word}{'s' * (n != 1)}"
 
 
-def _as_long_stock(legs: List[Leg], net: float, spot: float, warnings: List[str]) -> Suggestion:
+def _stock_signal(ctx: Context, net: float, tape=None):
+    """hedge.signal for a holding tracked as stock. `tape`: a signal.Tape with history / flow (service); without
+    one, a Tape from the context alone (dealer levels and IV, no history)."""
+    from optionflow.modules.hedge import signal as sg
+    t = tape or sg.Tape(ctx.spot)
+    t.spot = ctx.spot
+    for k in ("day_change", "atm_iv", "hv20", "net_gex", "put_wall", "call_wall", "king"):
+        if getattr(t, k) is None:
+            setattr(t, k, getattr(ctx, k))
+    t.iv_spike, t.iv_cooling = t.iv_spike or ctx.iv_spike, t.iv_cooling or ctx.iv_cooling
+    return sg.evaluate(t, net)
+
+
+def _as_long_stock(legs: List[Leg], net: float, spot: float, warnings: List[str], sig=None) -> Suggestion:
     calls = sum(l.quantity for l in legs if l.otype == "call")
     puts = sum(l.quantity for l in legs if l.otype == "put")
     eq = net * 100.0
@@ -262,7 +279,10 @@ def _as_long_stock(legs: List[Leg], net: float, spot: float, warnings: List[str]
     near = min(legs, key=lambda l: l.dte if l.dte is not None else 1e9)
     if near.dte is not None:
         reasons.append(f"Nearest expiry {near.strike:g}{'C' if near.otype == 'call' else 'P'} {near.expiry}, {near.dte:.0f} days left.")
-    return Suggestion("TRACK", f"{side.capitalize()} stock via {via}: ~{eq:+,.0f} sh", reasons, warnings=warnings)
+    if sig is None:
+        return Suggestion("TRACK", f"{side.capitalize()} stock via {via}: ~{eq:+,.0f} sh", reasons, warnings=warnings)
+    from optionflow.modules.hedge import signal as sg
+    return Suggestion("TRACK", sig.headline, sg.reasons(sig) + reasons, warnings=warnings)
 
 
 def buybacks(legs: List[Leg], take_profit: float = TAKE_PROFIT, early_profit: float = EARLY_PROFIT) -> List[Close]:

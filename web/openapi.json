@@ -1495,6 +1495,17 @@
       ],
       "title": "Shares"
      },
+     "signal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Long options only (strategy long_stock): levels, reads, ADD/HOLD/TRIM"
+     },
      "spot": {
       "anyOf": [
        {
@@ -3385,7 +3396,7 @@
      "expected_move": {
       "anyOf": [
        {
-        "$ref": "#/components/schemas/ExpectedMoveOut"
+        "$ref": "#/components/schemas/optionflow__modules__catalyst__schemas__ExpectedMoveOut"
        },
        {
         "type": "null"
@@ -4278,50 +4289,6 @@
      }
     },
     "title": "EarningsOut",
-    "type": "object"
-   },
-   "ExpectedMoveOut": {
-    "description": "ATM straddle on the first expiry covering earnings (else the nearest).",
-    "properties": {
-     "covers_earnings": {
-      "title": "Covers Earnings",
-      "type": "boolean"
-     },
-     "dollars": {
-      "title": "Dollars",
-      "type": "number"
-     },
-     "expiry": {
-      "title": "Expiry",
-      "type": "string"
-     },
-     "high": {
-      "title": "High",
-      "type": "number"
-     },
-     "low": {
-      "title": "Low",
-      "type": "number"
-     },
-     "pct": {
-      "title": "Pct",
-      "type": "number"
-     },
-     "strike": {
-      "title": "Strike",
-      "type": "number"
-     }
-    },
-    "required": [
-     "dollars",
-     "pct",
-     "low",
-     "high",
-     "expiry",
-     "strike",
-     "covers_earnings"
-    ],
-    "title": "ExpectedMoveOut",
     "type": "object"
    },
    "ExtendedHoursOut": {
@@ -6726,6 +6693,17 @@
        }
       ],
       "title": "King"
+     },
+     "max_pain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Pain"
      },
      "net_gex": {
       "anyOf": [
@@ -11293,6 +11271,213 @@
     "title": "SeedHoldingsOut",
     "type": "object"
    },
+   "SignalLevelOut": {
+    "properties": {
+     "distance": {
+      "description": "price \u00f7 spot \u2212 1",
+      "title": "Distance",
+      "type": "number"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "strength": {
+      "description": "0 (expected move) \u2026 3 (dealer walls, gamma flip)",
+      "title": "Strength",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "price",
+     "distance",
+     "strength"
+    ],
+    "title": "SignalLevelOut",
+    "type": "object"
+   },
+   "SignalOut": {
+    "description": "Levels and a directional read for a holding of long options only (hedge.signal).",
+    "properties": {
+     "add_at": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Add At"
+     },
+     "bias": {
+      "enum": [
+       "bullish",
+       "bearish",
+       "neutral"
+      ],
+      "title": "Bias",
+      "type": "string"
+     },
+     "expected_move": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/optionflow__modules__hedge__schemas__ExpectedMoveOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "headline": {
+      "title": "Headline",
+      "type": "string"
+     },
+     "levels": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SignalLevelOut"
+      },
+      "title": "Levels",
+      "type": "array"
+     },
+     "reads": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SignalReadOut"
+      },
+      "title": "Reads",
+      "type": "array"
+     },
+     "resistance": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalLevelOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "score": {
+      "description": "\u2212100 bearish \u2026 +100 bullish",
+      "title": "Score",
+      "type": "integer"
+     },
+     "side": {
+      "enum": [
+       "long",
+       "short"
+      ],
+      "title": "Side",
+      "type": "string"
+     },
+     "stop": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "A close past this confirms TRIM / exit",
+      "title": "Stop"
+     },
+     "support": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalLevelOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
+     },
+     "verdict": {
+      "description": "For the holder's side (long calls: long; long puts: short)",
+      "enum": [
+       "ADD",
+       "HOLD",
+       "TRIM"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     }
+    },
+    "required": [
+     "score",
+     "bias",
+     "verdict",
+     "side",
+     "headline"
+    ],
+    "title": "SignalOut",
+    "type": "object"
+   },
+   "SignalReadOut": {
+    "properties": {
+     "key": {
+      "enum": [
+       "flow",
+       "trend",
+       "dealers",
+       "volume",
+       "momentum",
+       "volatility"
+      ],
+      "title": "Key",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "score": {
+      "description": "\u22121 bearish \u2026 +1 bullish",
+      "title": "Score",
+      "type": "number"
+     },
+     "value": {
+      "title": "Value",
+      "type": "string"
+     },
+     "weight": {
+      "title": "Weight",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "key",
+     "score",
+     "weight",
+     "value",
+     "note"
+    ],
+    "title": "SignalReadOut",
+    "type": "object"
+   },
    "StatusOut": {
     "properties": {
      "status": {
@@ -15590,6 +15775,50 @@
     "title": "WeekUpdateRequest",
     "type": "object"
    },
+   "optionflow__modules__catalyst__schemas__ExpectedMoveOut": {
+    "description": "ATM straddle on the first expiry covering earnings (else the nearest).",
+    "properties": {
+     "covers_earnings": {
+      "title": "Covers Earnings",
+      "type": "boolean"
+     },
+     "dollars": {
+      "title": "Dollars",
+      "type": "number"
+     },
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "high": {
+      "title": "High",
+      "type": "number"
+     },
+     "low": {
+      "title": "Low",
+      "type": "number"
+     },
+     "pct": {
+      "title": "Pct",
+      "type": "number"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "dollars",
+     "pct",
+     "low",
+     "high",
+     "expiry",
+     "strike",
+     "covers_earnings"
+    ],
+    "title": "ExpectedMoveOut",
+    "type": "object"
+   },
    "optionflow__modules__hedge__schemas__BrokerAccountOut": {
     "properties": {
      "account": {
@@ -15700,6 +15929,26 @@
      "account"
     ],
     "title": "BrokerAccountOut",
+    "type": "object"
+   },
+   "optionflow__modules__hedge__schemas__ExpectedMoveOut": {
+    "properties": {
+     "day": {
+      "description": "\u00b1$ one standard deviation today, from ATM IV",
+      "title": "Day",
+      "type": "number"
+     },
+     "week": {
+      "description": "\u00b1$ over 5 sessions",
+      "title": "Week",
+      "type": "number"
+     }
+    },
+    "required": [
+     "day",
+     "week"
+    ],
+    "title": "ExpectedMoveOut",
     "type": "object"
    },
    "optionflow__modules__portfolio__schemas__BrokerAccountOut": {

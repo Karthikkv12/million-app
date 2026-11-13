@@ -158,7 +158,8 @@ def test_leaps_only_holding_is_long_stock_under_any_strategy():
     for rules in (None, get("diagonal").rules, get("leaps").rules, get("wheel").rules):
         book = evaluate(ctx, [Leg(**vars(l)) for l in leaps], [], rules, chain())
         assert book.suggestion.action == "TRACK" and book.strategy == "long_stock"
-        assert book.closes == [] and "~" in book.suggestion.headline
+        assert book.closes == [] and book.signal["side"] == "long"
+        assert any("tracked as long stock" in r for r in book.suggestion.reasons)
     sold = leaps + [short_call(170.0, dte=30)]                       # a short call on it: back to the strategy
     book = evaluate(ctx, sold, [], get("diagonal").rules, chain())
     assert book.strategy == "diagonal"
@@ -170,7 +171,7 @@ def test_long_put_only_holding_is_short_stock():
     puts = [Leg("option", 2, 9.0, "put", 110.0, "2027-06-17", 216, 0.7)]
     book = evaluate(ctx, puts, [], get("wheel").rules, chain())
     assert book.suggestion.action == "TRACK" and book.strategy == "long_stock" and book.net_delta < 0
-    assert book.suggestion.headline.startswith("Short stock via puts: ~-")
+    assert book.signal["side"] == "short" and any("tracked as short stock" in r for r in book.suggestion.reasons)
     mixed = [Leg(**vars(puts[0])), Leg("option", 1, 40.0, "call", 90.0, "2028-01-21", 434, 0.7)]
     assert evaluate(ctx, mixed, [], None, chain()).strategy == "long_stock"
     short_put = [Leg("option", -1, 3.0, "put", 100.0, EXP, 5, 0.7)]
