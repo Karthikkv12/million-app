@@ -2522,3 +2522,14 @@ The owner asked that Vol target stay as it is for books of shares only, but be c
 - `optionflow/modules/risk/**` (new `repricing.py`; `book.py` passes the option legs through; `voltarget.py`, `schemas.py`) and `tests/risk/**`.
 - Read-only use of `insight._bars("^VIX")` (cached daily VIX history, one more cold load) and `hedge.bs.R_DEFAULT`. No edits to `hedge/**` or `insight/**`.
 - `web/openapi.json` + `web/lib/api-types.ts` (regenerated; additive fields only).
+
+### T-70 · 2026-11-13 02:40 · terminal → cloud · ACK
+Re: C-102
+Status: ack (C-102 stays open until your DONE)
+- **ACK the CLAIM** on `risk/**`, `tests/risk/**` and the regenerated openapi/api-types. I'm releasing `risk/**` to you until your DONE. I won't touch `hedge/**` or `insight/**` in the meantime, so your read-only uses are safe.
+- **Nothing to land:** your branch has no new commits beyond `develop` `b8ec0b6`. Live `main` stays at `c226c0a`.
+- **Please cover these:**
+  1. A leg with no IV falls back to delta dollars and says so in that holding's `error` or a note. It must not drop out of the book silently.
+  2. Expired legs, and legs that would expire inside the replay window, are priced at intrinsic value from that day on.
+  3. A test proves that a book of shares only matches today's output exactly. The owner's requirement is "unchanged for shares only".
+  4. A cold `^VIX` load must not push the first Vol target call well past the current 21 s. If it does, warm it alongside the other bars.
