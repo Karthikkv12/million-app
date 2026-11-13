@@ -70,13 +70,15 @@ const actionOf = (s?: HedgeSuggestion | null) => !s ? null
 
 // ── Long options tracked as stock: levels + reads (hedge.signal) ─────────────
 type Signal = NonNullable<HedgeBook["signal"]>;
-const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "neutral"; label: string; edge: "gain" | "loss" | null }> = {
+const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neutral"; label: string; edge: "gain" | "loss" | "warn" | null }> = {
   ADD: { tag: "gain", label: "Add", edge: "gain" },
   HOLD: { tag: "neutral", label: "Hold", edge: null },
-  TRIM: { tag: "loss", label: "Trim", edge: "loss" },
+  CAUTION: { tag: "warn", label: "Don't add", edge: "warn" },
+  TRIM: { tag: "loss", label: "Take profit", edge: "loss" },
 };
 const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
-  flow: "Options flow", trend: "Trend", dealers: "Dealers", volume: "Volume", momentum: "Momentum", volatility: "Volatility",
+  fear: "Market fear", momentum: "RSI", dip: "Dip", flow: "Options flow", trend: "Trend", dealers: "Dealers",
+  volume: "Volume", volatility: "Volatility",
 };
 
 function ScoreBar({ v }: { v: number }) {
@@ -98,21 +100,22 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
   return (
     <div className="mt-4 space-y-5">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
-        {[["Score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score} · {g.bias}</span>],
-          [g.side === "long" ? "Add near" : "Add short near", usd(g.add_at)],
-          ["Stop (close)", <span key="st" className="text-loss">{usd(g.stop)}</span>],
-          ["Target", usd(g.target)],
+        {[["Rebound score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score}</span>],
+          ["VIX percentile", g.vix_pct != null ? `${Math.round(g.vix_pct * 100)}%` : "—"],
+          ["Support", usd(g.support?.price)],
+          ["Risk line", g.stop != null ? <span key="st" className="text-loss">{usd(g.stop)}</span> : (g.vix_pct ?? 0) >= 0.8 ? "none in fear" : "—"],
           ...(g.expected_move ? [["Move ±1σ", `${usd(g.expected_move.day)} d · ${usd(g.expected_move.week)} wk`]] : []),
         ].map(([k, v]) => (
           <div key={k as string}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className="mt-0.5 tabular-nums text-foreground">{v}</dd></div>
         ))}
       </dl>
 
-      {g.reads.length > 0 && (
-        <div>
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Reads</p>
-          <ul className="mt-2 space-y-2.5">
-            {g.reads.map((r) => (
+      {g.evidence && <p className="border-l-2 border-[var(--border-strong)] pl-3 text-[12.5px] leading-snug text-foreground/65">{g.evidence}</p>}
+      {g.reads.length > 0 && [true, false].map((tested) => g.reads.some((r) => !!r.tested === tested) && (
+        <div key={String(tested)}>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">{tested ? "Verdict inputs (backtested)" : "Context (not in the verdict)"}</p>
+          <ul className={clsx("mt-2 space-y-2.5", !tested && "opacity-70")}>
+            {g.reads.filter((r) => !!r.tested === tested).map((r) => (
               <li key={r.key} className="text-[13px] leading-snug">
                 <div className="flex items-center gap-2 font-mono">
                   <span className="w-24 shrink-0 text-foreground/80">{READ_LABEL[r.key]}</span>
@@ -125,7 +128,7 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
             ))}
           </ul>
         </div>
-      )}
+      ))}
 
       {rows.length > 0 && (
         <div>
@@ -200,7 +203,7 @@ function Detail({ b }: { b: HedgeBook }) {
             {b.signal && <SignalPanel g={b.signal} spot={b.spot} />}
             {!!s.reasons?.length && (
               <ol className="mt-4 space-y-1.5 border-l border-[var(--border-strong)] pl-3 text-[13px] leading-snug text-foreground/70">
-                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => x.note === r) && !/^(Levels|Stop|Expected move)/.test(r)) : s.reasons)
+                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move)/.test(r)) : s.reasons)
                   .map((r) => <li key={r}>{r}</li>)}
               </ol>
             )}
@@ -312,7 +315,7 @@ function Legend() {
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
-          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Trim</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock (puts = short) and read from options flow, trend, dealer levels, volume, momentum and volatility; tap for the levels and the stop.</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Don&apos;t add</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock. The verdict uses only what held up in a 30-year backtest: market fear (VIX), oversold RSI and the dip under the 50-day. Flow, dealers, trend and volume are shown as context.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">

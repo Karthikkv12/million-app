@@ -5881,6 +5881,12 @@ export interface components {
              * @enum {string}
              */
             bias: "bullish" | "bearish" | "neutral";
+            /**
+             * Evidence
+             * @description Backtest result for this verdict
+             * @default
+             */
+            evidence: string;
             expected_move?: components["schemas"]["optionflow__modules__hedge__schemas__ExpectedMoveOut"] | null;
             /** Headline */
             headline: string;
@@ -5897,7 +5903,7 @@ export interface components {
             resistance?: components["schemas"]["SignalLevelOut"] | null;
             /**
              * Score
-             * @description −100 bearish … +100 bullish
+             * @description Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)
              */
             score: number;
             /**
@@ -5907,7 +5913,7 @@ export interface components {
             side: "long" | "short";
             /**
              * Stop
-             * @description A close past this confirms TRIM / exit
+             * @description Risk line, calm markets only: the 200-day average
              */
             stop?: number | null;
             support?: components["schemas"]["SignalLevelOut"] | null;
@@ -5915,10 +5921,15 @@ export interface components {
             target?: number | null;
             /**
              * Verdict
-             * @description For the holder's side (long calls: long; long puts: short)
+             * @description Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD
              * @enum {string}
              */
-            verdict: "ADD" | "HOLD" | "TRIM";
+            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM";
+            /**
+             * Vix Pct
+             * @description VIX percentile over the last year (0–1)
+             */
+            vix_pct?: number | null;
         };
         /** SignalReadOut */
         SignalReadOut: {
@@ -5926,7 +5937,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "flow" | "trend" | "dealers" | "volume" | "momentum" | "volatility";
+            key: "fear" | "momentum" | "dip" | "flow" | "trend" | "dealers" | "volume" | "volatility";
             /** Note */
             note: string;
             /**
@@ -5934,6 +5945,12 @@ export interface components {
              * @description −1 bearish … +1 bullish
              */
             score: number;
+            /**
+             * Tested
+             * @description In the verdict (backtested); false = context only
+             * @default false
+             */
+            tested: boolean;
             /** Value */
             value: string;
             /** Weight */

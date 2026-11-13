@@ -1,29 +1,35 @@
-"""optionflow/modules/hedge/signal.py — levels and a directional read for a holding tracked as stock (pure, no I/O).
+"""optionflow/modules/hedge/signal.py — levels and a tested ADD / HOLD / CAUTION read for a holding tracked as stock.
 
 Used for holdings of long calls / long puts only (owner, 2026-11-13): no option strategy, the position is stock
-exposure (calls long, puts short), and the desk says whether to ADD, HOLD or TRIM it and at which prices.
+exposure (calls long, puts short). Pure, no I/O.
 
-Six reads, each scored −1 (bearish) … +1 (bullish) and weighted; a read without data is left out and the weights
-re-normalised:
+What the verdict is built on (backtest 2026-11-13: 148 US stocks and ETFs, 1995-01 → 2026-11, 827,892 symbol-days;
+rules picked on 1995–2014, checked untouched on 2015–2026; see docs/hedge-signal-backtest.md):
 
-  flow        25  today's traded option premium by side: (calls bought + puts sold − calls sold − puts bought) ÷ all,
-                  from flow.traded (only when ≥ MIN_FLOW of premium has traded)
-  trend       20  price vs the 20 / 50 / 200-day averages, 50 over 200
-  dealers     20  above / below the gamma flip (zero gamma), net GEX sign, and how close the put / call wall is
-  volume      15  relative volume (today, projected to the full session, ÷ 20-day average) signed by the day's move,
-                  plus the 20-day on-balance-volume slope: heavy volume up = accumulation, down = distribution
-  momentum    10  RSI(14) and the 20-day return; overbought / oversold fade it
-  volatility  10  IV vs realised and the IV tracker: an IV spike on a down day = fear (bearish), IV cooling on an up
-                  day = relief (bullish), rich IV on an up-move = the rally is being hedged
+  The pattern: WHY a stock is down decides what comes next.
+  - Down while the whole market is scared (VIX in the top 20% of its year) → it rebounds: RSI(14) < 40 with VIX ≥ 80th
+    percentile beat simply holding by +1.2% over 20 days and +3.4% over 60 (2015–2026), up 60% of the time.
+  - Down while the market is calm (a stock-specific problem) → no rebound edge; 60-day excess −1.2%.
+  - Strength is NOT a sell: no bucket of trend / momentum / volume predicted a fall. Being above the averages,
+    RSI high, buying volume all predicted slightly LOWER returns for the same stock (mean reversion).
+  - A close under support during market fear came before a +1.8–2.7% rebound: a stop there sells the low.
 
-Score = 100 × Σ w·s ÷ Σ w. Aligned with the position (× +1 long, × −1 short):
-  ≥ +ADD_AT  → ADD   (add near the nearest support for a long / resistance for a short)
-  ≤ −TRIM_AT → TRIM  (cut or protect; a close past the stop level confirms it)
-  otherwise  → HOLD
+  Verdict (long side; long puts read it mirrored):
+    ADD      RSI(14) < ADD_RSI and VIX percentile ≥ ADD_VIX      (fear dip: the one tested buy edge)
+    CAUTION  VIX percentile < CALM_VIX and (≥ KNIFE_DD under the 52-week high, or 3–15% over the 50-day with RSI > 65)
+             → don't add here (stock-specific weakness, or stretched in a calm tape); not a sell signal
+    HOLD     otherwise (most days: no edge either way)
+  For long puts: the fear-dip is TRIM (take profit: the stock tends to rebound), everything else HOLD.
 
-Levels: the dealer walls (put wall, call wall, king strike, zero gamma), max pain, the 20 / 50 / 200-day averages,
-the 20-day high and low, and the 1-day and 1-week expected move (spot × IV × √t). Support = the strongest close
-level under the price, resistance = above it; the stop sits just past the support (long) or resistance (short).
+  score: the rebound score −100 … +100 = mean of [VIX percentile, oversold RSI, depth under the 50-day]; it ranked
+  60-day excess from −1.4% (bottom) to +3.0% (top) out of sample.
+
+Reads that are shown for context but NOT in the verdict: options flow and dealer levels (no history to test them),
+trend and volume (tested: no edge, or the wrong sign), IV vs realised (per-stock IV history not available).
+
+Levels: the dealer walls, max pain, the 20 / 50 / 200-day averages, the 20-day high and low, the 1-day / 1-week
+expected move. The risk line (calm markets only) is the 200-day average: a calm-market close under it came before a
+−1.2% 60-day excess; during fear there is no stop.
 """
 from __future__ import annotations
 
@@ -31,8 +37,22 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence
 
-WEIGHTS = {"flow": 25, "trend": 20, "dealers": 20, "volume": 15, "momentum": 10, "volatility": 10}
-ADD_AT, TRIM_AT = 25, 25
+WEIGHTS = {"fear": 1, "momentum": 1, "dip": 1, "flow": 0, "trend": 0, "dealers": 0, "volume": 0, "volatility": 0}
+TESTED = {"fear", "momentum", "dip"}       # the only reads in the verdict / score
+ADD_RSI, ADD_VIX = 40.0, 0.80
+CALM_VIX, KNIFE_DD = 0.60, -0.10
+# Backtest evidence per verdict (2015–2026, out of sample): excess vs holding over 20 / 60 days, share up after 20.
+EVIDENCE = {
+    "ADD": "Backtest (2015–2026, unseen when the rule was set): +1.2% vs holding over 20 days, +3.4% over 60, "
+           "up 60% of the time after 20 days; 29,617 cases, t = 2.7. It beat holding in 159 of 241 separate fear "
+           "episodes since 1995, but failed in long bear markets (2008: −6.5%, 2022: −5.1% over 60 days): add in pieces.",
+    "CAUTION": "Backtest: −0.3% to −0.6% vs holding over 20 days, about −1.2% over 60; a weak edge (t ≈ −2): "
+               "don't add, but it is not a sell.",
+    "HOLD": "Backtest: no edge either way on these days (most days).",
+    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: −0.0% vs holding over 20 days, −0.9% over "
+            "60; 13,059 cases). The edge appears only once the VIX joins in.",
+    "TRIM": "Backtest (long side): the stock beat holding by +1.2% / 20 days after this setup: puts tend to give back.",
+}
 MIN_FLOW = 250_000.0          # $ of option premium traded today before flow counts
 STOP_BUFFER = 0.01            # stop = 1% past the support / resistance
 NEAR = 0.015                  # within 1.5% of a wall counts as "at" it
@@ -66,6 +86,7 @@ class Tape:
     king: Optional[float] = None
     max_pain: Optional[float] = None
     flow: Optional[Sequence[float]] = None   # (call bought, call sold, put bought, put sold) premium today
+    vix: Sequence[float] = ()                # VIX daily closes, oldest first (≥ 1 year), the last = now
 
 
 @dataclass
@@ -80,17 +101,19 @@ class Read:
 class Signal:
     score: int                               # −100 … +100, bullish positive
     bias: str                                # bullish | bearish | neutral
-    verdict: str                             # ADD | HOLD | TRIM (for the holder's side)
+    verdict: str                             # ADD | HOLD | CAUTION (long) · TRIM | HOLD (long puts)
     side: str                                # long | short
     headline: str
     support: Optional[Dict[str, Any]] = None
     resistance: Optional[Dict[str, Any]] = None
-    stop: Optional[float] = None             # a close past this confirms TRIM / exit
+    stop: Optional[float] = None             # risk line (calm markets only): the 200-day average
     add_at: Optional[float] = None
     target: Optional[float] = None
     reads: List[Dict[str, Any]] = field(default_factory=list)
     levels: List[Dict[str, Any]] = field(default_factory=list)
     expected_move: Optional[Dict[str, float]] = None
+    vix_pct: Optional[float] = None
+    evidence: str = ""
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -206,23 +229,13 @@ def _volume(t: Tape, px: List[float]) -> Optional[Read]:
 
 
 def _momentum(t: Tape, px: List[float]) -> Optional[Read]:
+    """RSI(14) the way the backtest scored it: oversold leans bullish (mean reversion), overbought bearish."""
     r = rsi(px)
     if r is None:
         return None
-    if r >= 75:
-        s, tag = -0.4, "overbought: stretched, a pullback is likely"
-    elif r >= 60:
-        s, tag = 0.6, "strong"
-    elif r >= 45:
-        s, tag = (r - 52.5) / 15.0, "neutral"
-    elif r >= 30:
-        s, tag = -0.6, "weak"
-    else:
-        s, tag = 0.3, "oversold: a bounce is likely"
+    tag = "oversold" if r < 30 else "weak" if r < ADD_RSI else "overbought" if r > 70 else "strong" if r > 60 else "neutral"
     roc = px[-1] / px[-21] - 1.0 if len(px) > 21 else None
-    if roc is not None:
-        s = _clip(0.7 * s + 0.3 * _clip(roc / 0.10))
-    return Read("momentum", _clip(s), f"RSI {r:.0f}",
+    return Read("momentum", _clip((50.0 - r) / 25.0), f"RSI {r:.0f}",
                 f"RSI(14) {r:.0f}, {tag}" + (f"; {roc:+.1%} over 20 days." if roc is not None else "."))
 
 
@@ -249,6 +262,41 @@ def _volatility(t: Tape) -> Optional[Read]:
             notes.append(f"IV {ratio:.2f}× realised: normal")
     return Read("volatility", _clip(s), f"IV {t.atm_iv:.0%}" + (f" / HV {t.hv20:.0%}" if _ok(t.hv20) else ""),
                 "Volatility: " + "; ".join(notes) + ".")
+
+
+def vix_percentile(vix: Sequence[float]) -> Optional[float]:
+    """Share of the last 252 VIX closes at or below the latest (the backtest's rolling rank)."""
+    v = [float(x) for x in vix if _ok(x)][-252:]
+    if len(v) < 126:
+        return None
+    return sum(1 for x in v if x <= v[-1]) / len(v)
+
+
+def vix_add_level(vix: Sequence[float]) -> Optional[float]:
+    """The VIX close that would reach the ADD_VIX percentile against the current year (approximate)."""
+    v = sorted(float(x) for x in list(vix)[-252:] if _ok(x))
+    if len(v) < 126:
+        return None
+    return v[min(len(v) - 1, math.ceil(ADD_VIX * len(v)) - 1)]
+
+
+def _fear(t: Tape) -> Optional[Read]:
+    p = vix_percentile(t.vix)
+    if p is None:
+        return None
+    tag = ("market scared: dips have rebounded" if p >= ADD_VIX else
+           "market calm: a dip here is about the stock itself" if p < CALM_VIX else "market normal")
+    return Read("fear", _clip(p * 2 - 1), f"VIX {t.vix[-1]:.1f} · {p:.0%} pct",
+                f"VIX {t.vix[-1]:.1f}, higher than {p:.0%} of the last year: {tag}.")
+
+
+def _dip(t: Tape, px: List[float]) -> Optional[Read]:
+    m50 = sma(px, 50)
+    if not m50:
+        return None
+    d = t.spot / m50 - 1.0
+    return Read("dip", _clip(-d / 0.15), f"{d:+.1%} vs 50-day",
+                f"{abs(d):.1%} {'under' if d < 0 else 'over'} the 50-day average ({_px(m50)}).")
 
 
 # ── levels ───────────────────────────────────────────────────────────────────
@@ -297,44 +345,64 @@ def evaluate(t: Tape, exposure: float) -> Signal:
                 hist[i] = hist[i - 1] if i else next((x for x in hist if not math.isnan(x)), t.spot)
     if hist and t.today_bar:
         hist[-1] = t.spot                                  # today's bar closes at the live price
-    px = hist if t.today_bar else hist + [t.spot]          # closes up to now, for trend / momentum / levels
-    reads = [r for r in (_flow(t), _trend(t, px), _dealers(t), _volume(t, hist), _momentum(t, px), _volatility(t)) if r]
-    wsum = sum(WEIGHTS[r.key] for r in reads)
-    score = round(100 * sum(WEIGHTS[r.key] * r.score for r in reads) / wsum) if wsum else 0
-    bias = "bullish" if score >= 15 else "bearish" if score <= -15 else "neutral"
+    px = hist if t.today_bar else hist + [t.spot]          # closes up to now
+    reads = [r for r in (_fear(t), _momentum(t, px), _dip(t, px), _flow(t), _trend(t, px), _dealers(t),
+                         _volume(t, hist), _volatility(t)) if r]
+    tested = [r for r in reads if r.key in TESTED]
+    score = round(100 * sum(r.score for r in tested) / 3) if len(tested) == 3 else 0
+    bias = "bullish" if score >= 25 else "bearish" if score <= -25 else "neutral"
+
+    vp = vix_percentile(t.vix)
+    r14 = rsi(px)
+    m50 = sma(px, 50)
+    hi52 = max(px[-252:]) if px else None
+    dd52 = t.spot / hi52 - 1.0 if hi52 else None
+    fear_dip = vp is not None and r14 is not None and r14 < ADD_RSI and vp >= ADD_VIX
+    calm = vp is not None and vp < CALM_VIX
+    knife = calm and dd52 is not None and dd52 <= KNIFE_DD
+    stretched = calm and m50 is not None and r14 is not None and 0.03 <= t.spot / m50 - 1.0 <= 0.15 and r14 > 65
     long = exposure >= 0
-    aligned = score if long else -score
-    verdict = "ADD" if aligned >= ADD_AT else "TRIM" if aligned <= -TRIM_AT else "HOLD"
+    if long:
+        verdict = "ADD" if fear_dip else "CAUTION" if (knife or stretched) else "HOLD"
+    else:
+        verdict = "TRIM" if fear_dip else "HOLD"
 
     lv, em = levels(t, px)
     sup, res = _nearest(lv, t.spot, True), _nearest(lv, t.spot, False)
-    if long:
-        stop = round(sup["price"] * (1 - STOP_BUFFER), 2) if sup else None
-        add_at, target = (sup["price"] if sup else None), (res["price"] if res else None)
-    else:
-        stop = round(res["price"] * (1 + STOP_BUFFER), 2) if res else None
-        add_at, target = (res["price"] if res else None), (sup["price"] if sup else None)
+    m200 = sma(px, 200)
+    stop = round(m200, 2) if (calm and m200 and long and t.spot > m200) else None
+    add_at, target = ((sup["price"] if sup else None), (res["price"] if res else None)) if long else \
+                     ((res["price"] if res else None), (sup["price"] if sup else None))
 
     def at(x):
         return f"{_px(x['price'])} ({x['label']})"
-    side = "long" if long else "short"
     if verdict == "ADD":
-        lvl = sup if long else res
-        head = f"Add on {'a dip to' if long else 'a pop to'} {at(lvl)}" if lvl else "Add: the tape is with you"
+        head = "Add: dip during market fear" + (f", support {at(sup)}" if sup else "")
+    elif verdict == "CAUTION":
+        head = ("Don't add: stock-specific weakness in a calm market" if knife else "Don't add: stretched in a calm market")
     elif verdict == "TRIM":
-        head = f"Trim: tape against the {side}" + (f"; out on a close {'under' if long else 'over'} {_px(stop)}" if stop else "")
+        head = "Take profit on the puts: fear dip, rebounds are likely"
+    elif long and score >= 50 and r14 is not None and r14 < ADD_RSI and vp is not None:
+        lvl = vix_add_level(t.vix)
+        head = "Hold: oversold, but the market isn't scared" + (f"; ADD if VIX closes ≥ {lvl:.1f}" if lvl else "")
     else:
-        head = "Hold" + (f": support {_px(sup['price'])}" if sup else "") + (f", resistance {_px(res['price'])}" if res else "")
-    head += f" · {bias} {score:+d}"
+        head = "Hold: no edge right now" + (f" · support {_px(sup['price'])}" if sup else "") + (f", resistance {_px(res['price'])}" if res else "")
+    if vp is None or r14 is None:
+        head += " (no VIX / history: verdict not tested)"
 
-    return Signal(score, bias, verdict, side, head, sup, res, stop, add_at, target,
-                  [{"key": r.key, "score": round(r.score, 2), "weight": WEIGHTS[r.key], "value": r.value, "note": r.note}
-                   for r in reads], lv, em)
+    return Signal(score, bias, verdict, "long" if long else "short", head, sup, res, stop, add_at, target,
+                  [{"key": r.key, "score": round(r.score, 2), "weight": WEIGHTS[r.key], "value": r.value, "note": r.note,
+                    "tested": r.key in TESTED} for r in reads], lv, em, _r(vp),
+                  EVIDENCE["LEAN" if head.startswith("Hold: oversold") else verdict])
+
+
+def _r(x: Optional[float]) -> Optional[float]:
+    return None if x is None else round(x, 3)
 
 
 def reasons(sig: Signal) -> List[str]:
     """Plain-language lines for the desk's ticket."""
-    out = []
+    out = [sig.evidence] if sig.evidence else []
     if sig.support or sig.resistance:
         parts = []
         if sig.support:
@@ -343,9 +411,11 @@ def reasons(sig: Signal) -> List[str]:
             parts.append(f"resistance {_px(sig.resistance['price'])} ({sig.resistance['label']}, {sig.resistance['distance']:+.1%})")
         out.append("Levels: " + "; ".join(parts) + ".")
     if sig.stop:
-        out.append(f"Stop: a close {'under' if sig.side == 'long' else 'over'} {_px(sig.stop)} → cut the {sig.side}."
-                   + (f" Target {_px(sig.target)}." if sig.target else ""))
+        out.append(f"Risk line: a calm-market close under the 200-day average ({_px(sig.stop)}) has come before weaker returns.")
+    elif sig.vix_pct is not None and sig.vix_pct >= ADD_VIX:
+        out.append("No stop during market fear: closes under support in fear have rebounded (+1.8–2.7% vs holding over 20 days).")
     if sig.expected_move:
         out.append(f"Expected move from IV: ±{_px(sig.expected_move['day'])} today, ±{_px(sig.expected_move['week'])} this week.")
-    out += [r["note"] for r in sorted(sig.reads, key=lambda r: -r["weight"])]
+    out += [r["note"] for r in sig.reads if r["tested"]]
+    out += [r["note"] + " (context, not in the verdict)" for r in sig.reads if not r["tested"]]
     return out

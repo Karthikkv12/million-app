@@ -163,11 +163,12 @@ class SignalLevelOut(BaseModel):
 
 
 class SignalReadOut(BaseModel):
-    key: Literal["flow", "trend", "dealers", "volume", "momentum", "volatility"]
+    key: Literal["fear", "momentum", "dip", "flow", "trend", "dealers", "volume", "volatility"]
     score: float = Field(..., description="−1 bearish … +1 bullish")
     weight: int
     value: str
     note: str
+    tested: bool = Field(False, description="In the verdict (backtested); false = context only")
 
 
 class ExpectedMoveOut(BaseModel):
@@ -177,19 +178,21 @@ class ExpectedMoveOut(BaseModel):
 
 class SignalOut(BaseModel):
     """Levels and a directional read for a holding of long options only (hedge.signal)."""
-    score: int = Field(..., description="−100 bearish … +100 bullish")
+    score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
     bias: Literal["bullish", "bearish", "neutral"]
-    verdict: Literal["ADD", "HOLD", "TRIM"] = Field(..., description="For the holder's side (long calls: long; long puts: short)")
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD")
     side: Literal["long", "short"]
     headline: str
     support: Optional[SignalLevelOut] = None
     resistance: Optional[SignalLevelOut] = None
-    stop: Optional[float] = Field(None, description="A close past this confirms TRIM / exit")
+    stop: Optional[float] = Field(None, description="Risk line, calm markets only: the 200-day average")
     add_at: Optional[float] = None
     target: Optional[float] = None
     reads: List[SignalReadOut] = []
     levels: List[SignalLevelOut] = []
     expected_move: Optional[ExpectedMoveOut] = None
+    vix_pct: Optional[float] = Field(None, description="VIX percentile over the last year (0–1)")
+    evidence: str = Field("", description="Backtest result for this verdict")
 
 
 class BookOut(BaseModel):

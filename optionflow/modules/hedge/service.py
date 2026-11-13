@@ -31,6 +31,7 @@ logger = logging.getLogger("optionflow.hedge")
 
 SPOT_TTL, QUOTE_TTL, CHAIN_TTL, HV_TTL, BETA_TTL = 1.0, 300.0, 60.0, 3600.0, 6 * 3600.0
 BETA_BENCH = "SPY"
+VIX = "^VIX"              # market fear for hedge.signal (its 1-year percentile)
 
 
 def now_iso() -> str:
@@ -276,7 +277,8 @@ def _tape(sym: str, ivs: Any, hv: Dict[str, Any], gx: Dict[str, Any]) -> Optiona
             0.0, [b["close"] for b in bars], [b.get("volume") for b in bars],
             [b.get("high") for b in bars], [b.get("low") for b in bars],
             today_bar=bool(bars) and bars[-1]["date"] == today.isoformat(), session_frac=frac,
-            hv20=hv.get("hv20"), zero_gamma=gx.get("zero_gamma"), max_pain=gx.get("max_pain"), flow=flow)
+            hv20=hv.get("hv20"), zero_gamma=gx.get("zero_gamma"), max_pain=gx.get("max_pain"), flow=flow,
+            vix=[b["close"] for b in _daily_bars(VIX)])
     except Exception:
         logger.exception("signal tape for %s failed", sym)
         return None

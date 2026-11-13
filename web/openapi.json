@@ -11329,6 +11329,12 @@
       "title": "Bias",
       "type": "string"
      },
+     "evidence": {
+      "default": "",
+      "description": "Backtest result for this verdict",
+      "title": "Evidence",
+      "type": "string"
+     },
      "expected_move": {
       "anyOf": [
        {
@@ -11370,7 +11376,7 @@
       ]
      },
      "score": {
-      "description": "\u2212100 bearish \u2026 +100 bullish",
+      "description": "Rebound score \u2212100 \u2026 +100 (VIX percentile, oversold RSI, depth under the 50-day)",
       "title": "Score",
       "type": "integer"
      },
@@ -11391,7 +11397,7 @@
         "type": "null"
        }
       ],
-      "description": "A close past this confirms TRIM / exit",
+      "description": "Risk line, calm markets only: the 200-day average",
       "title": "Stop"
      },
      "support": {
@@ -11416,14 +11422,27 @@
       "title": "Target"
      },
      "verdict": {
-      "description": "For the holder's side (long calls: long; long puts: short)",
+      "description": "Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD",
       "enum": [
        "ADD",
        "HOLD",
+       "CAUTION",
        "TRIM"
       ],
       "title": "Verdict",
       "type": "string"
+     },
+     "vix_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VIX percentile over the last year (0\u20131)",
+      "title": "Vix Pct"
      }
     },
     "required": [
@@ -11440,11 +11459,13 @@
     "properties": {
      "key": {
       "enum": [
+       "fear",
+       "momentum",
+       "dip",
        "flow",
        "trend",
        "dealers",
        "volume",
-       "momentum",
        "volatility"
       ],
       "title": "Key",
@@ -11458,6 +11479,12 @@
       "description": "\u22121 bearish \u2026 +1 bullish",
       "title": "Score",
       "type": "number"
+     },
+     "tested": {
+      "default": false,
+      "description": "In the verdict (backtested); false = context only",
+      "title": "Tested",
+      "type": "boolean"
      },
      "value": {
       "title": "Value",
