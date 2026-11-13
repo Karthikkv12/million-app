@@ -7,18 +7,21 @@
  * ‹ / › (or the ← / → keys) step through the chosen list and wrap at the ends. The lists button picks which
  * watchlist to browse ("All lists" merges them); the ticker button opens that list to jump straight to a name.
  * Above it, a small pill sums the board's exposure above and below the price. The next name's GEX is prefetched
- * so stepping feels instant. Lists come from /watchlists (the same lists as Portfolio → Watchlist).
+ * so stepping feels instant. Lists come from /watchlists (the same lists as Portfolio → Watchlist), plus
+ * "My stocks": the stocks you hold on Robinhood (largest position first), which follows each Robinhood sync.
+ * "My stocks" is the default until you pick another list.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Check, ChevronLeft, ChevronRight, ChevronsUpDown, Layers, Zap, Activity } from "lucide-react";
-import { fetchGex, fetchWatchlistGroups, GexResult, WatchlistGroups } from "@/lib/api";
+import { BrokerPortfolio, fetchBrokerPortfolio, fetchGex, fetchWatchlistGroups, GexResult, WatchlistGroups } from "@/lib/api";
 import { useQuotes } from "@/components/dashboard/quotes";
 import type { Metric } from "./GexHeatmap";
 
 const LIST_KEY = "flow_dock_list";
 const ALL = -1;
+const HELD = -2;                                  // "My stocks": Robinhood holdings
 
 const money = (v: number) => {
   const a = Math.abs(v), s = v < 0 ? "−" : "";
@@ -69,17 +72,25 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
   const groupsQ = useQuery<WatchlistGroups>({ queryKey: ["watchlists"], queryFn: fetchWatchlistGroups, staleTime: 60_000 });
   const lists = useMemo(() => groupsQ.data?.lists ?? [], [groupsQ.data]);
 
-  const [listId, setListId] = useState<number | null>(null);
+  // Same query (and cache) as Portfolio; the holdings refresh with every Robinhood sync.
+  const pfQ = useQuery<BrokerPortfolio>({ queryKey: ["broker", "portfolio", null], queryFn: () => fetchBrokerPortfolio(null), refetchInterval: 60_000 });
+  const held = useMemo(() => [...(pfQ.data?.holdings ?? [])]
+    .filter((h) => h.shares > 0)
+    .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
+    .map((h) => h.symbol.toUpperCase()), [pfQ.data]);
+
+  const [listId, setListId] = useState<number>(HELD);
   useEffect(() => { try { const v = Number(localStorage.getItem(LIST_KEY)); if (v) setListId(v); } catch { /* storage off */ } }, []);
   const pickList = (id: number) => { setListId(id); try { localStorage.setItem(LIST_KEY, String(id)); } catch { /* storage off */ } };
 
-  // Default: the first list; a deleted list falls back to it too.
-  const current = lists.find((g) => g.id === listId) ?? (listId === ALL ? null : lists[0] ?? null);
+  // A deleted list falls back to My stocks.
+  const current = lists.find((g) => g.id === listId) ?? null;
+  const mode = listId === ALL ? "all" : current ? "list" : "held";
   const symbols = useMemo(() => {
-    const raw = listId === ALL || !current ? lists.flatMap((g) => g.symbols) : current.symbols;
+    const raw = mode === "held" ? held : mode === "all" ? lists.flatMap((g) => g.symbols) : current!.symbols;
     return [...new Set(raw.map((s) => s.toUpperCase()))];
-  }, [lists, current, listId]);
-  const listName = listId === ALL || !current ? "All lists" : current.name;
+  }, [mode, held, lists, current]);
+  const listName = mode === "held" ? "My stocks" : mode === "all" ? "All lists" : current!.name;
 
   const idx = symbols.indexOf(ticker.toUpperCase());
   const step = (d: 1 | -1) => {
@@ -136,8 +147,9 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
             </button>
             {listsOpen && (
               <div role="listbox" aria-label="Watchlists" className={clsx(POP, "left-0 w-60")}>
-                {[{ id: ALL, name: "All lists", n: new Set(lists.flatMap((g) => g.symbols)).size }, ...lists.map((g) => ({ id: g.id, name: g.name, n: g.symbols.length }))].map((g) => {
-                  const on = g.id === ALL ? listId === ALL : current?.id === g.id && listId !== ALL;
+                {[{ id: HELD, name: "My stocks", n: held.length }, { id: ALL, name: "All lists", n: new Set(lists.flatMap((g) => g.symbols)).size },
+                  ...lists.map((g) => ({ id: g.id, name: g.name, n: g.symbols.length }))].map((g) => {
+                  const on = g.id === HELD ? mode === "held" : g.id === ALL ? mode === "all" : current?.id === g.id;
                   return (
                     <button key={g.id} role="option" aria-selected={on} onClick={() => { pickList(g.id); setListsOpen(false); }} className={ROW}>
                       <span className="flex min-w-0 items-center gap-2"><Check size={13} className={on ? "text-accent" : "invisible"} /><span className="truncate">{g.name}</span></span>
@@ -145,7 +157,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
                     </button>
                   );
                 })}
-                {!lists.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{groupsQ.isLoading ? "Loading lists…" : "No watchlists yet. Add some under Portfolio → Watchlist."}</p>}
+                {groupsQ.isLoading && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">Loading lists…</p>}
               </div>
             )}
           </div>
@@ -183,7 +195,7 @@ export function WatchlistDock({ ticker, metric, expiries, onTicker, onMetric }: 
                     {s}{s === ticker.toUpperCase() && <Check size={13} className="text-accent" />}
                   </button>
                 ))}
-                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">This list is empty.</p>}
+                {!symbols.length && <p className="px-2.5 py-2 text-[12.5px] text-foreground/55">{mode === "held" ? (pfQ.isLoading ? "Loading your stocks…" : "No stocks synced from Robinhood yet.") : "This list is empty."}</p>}
               </div>
             )}
           </div>
