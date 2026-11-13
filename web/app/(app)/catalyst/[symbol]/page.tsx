@@ -9,6 +9,7 @@ import { fetchCatalysts, Catalysts } from "@/lib/api";
 import TickerSearchInput from "@/components/TickerSearchInput";
 import { Panel, Pill, Change, SectionHeader } from "@/components/ui";
 import { rememberSymbol } from "@/lib/recent";
+import { TickerLink } from "@/components/TickerLink";
 
 // ── formatting ───────────────────────────────────────────────────────────────
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
@@ -104,7 +105,7 @@ export default function CatalystPage() {
             <div className="min-w-0">
               <p className="eyebrow mb-2 flex items-center gap-2"><span className="h-px w-4 bg-foreground/30" />Catalyst</p>
               <h1 className="flex flex-wrap items-baseline gap-x-3 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-[40px]">
-                <span className="font-mono">{c.symbol}</span>
+                <TickerLink symbol={c.symbol} title={`Open the ${c.symbol} stock page and chart`} className="font-mono" />
                 <span className="text-lg font-normal tracking-normal text-foreground/55">{c.name}</span>
               </h1>
             </div>

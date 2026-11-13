@@ -6,6 +6,7 @@
  * optionflow/modules/hedge/voltarget.py). Exposure is in delta dollars, so options count with shares.
  * The page shows the scale for the whole book, the forecast against the target over the last year, and what
  * each holding would be at that scale. Target and cap are remembered per browser.
+ * The theory is behind the Theory button (VolTargetTheory), not on the page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -13,11 +14,12 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { fetchVolTarget, VolTarget as VT, VolTargetHolding } from "@/lib/api";
 import { DeskFigure, DeskFigures, DeskSection } from "@/components/desk";
+import { Computing, Formula, H, P, Terms, Theory } from "./Theory";
 
 const TARGETS = [0.10, 0.15, 0.20, 0.25] as const;
 const CAPS = [1, 1.5, 2] as const;
 const KEY = "hedge_vol_target";
-const REFRESH_MS = 30_000;
+const REFRESH_MS = 60_000;              // the server caches the priced book for 60 s
 
 const vol = (v?: number | null, d = 1) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
 const pct = (v?: number | null, d = 0) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
@@ -182,7 +184,7 @@ export function VolTargetTab() {
   useEffect(() => { if (loaded.current) try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage off */ } }, [prefs]);
   const { data: d, isLoading, error } = useQuery({
     queryKey: ["vol-target", prefs.target, prefs.cap], queryFn: () => fetchVolTarget(prefs.target, prefs.cap),
-    refetchInterval: REFRESH_MS, placeholderData: (prev) => prev,
+    refetchInterval: REFRESH_MS, staleTime: REFRESH_MS, placeholderData: (prev) => prev,
   });
   const pts = useMemo(() => d?.chart ?? [], [d?.chart]);
   const hover = useHover(pts.length);
@@ -211,13 +213,18 @@ export function VolTargetTab() {
       </div>
 
       {error && !d && <p className="py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't compute the volatility target."}</p>}
-      {isLoading && <div className="mt-4 h-40 animate-pulse bg-foreground/[0.03]" />}
+      {isLoading && <Computing what="your forecast" />}
       {d?.error && <p className="py-10 text-[15px] text-foreground/60">{d.error}</p>}
 
       {d && !d.error && (
         <>
           <div className="py-5">
             {verdict && <p className={clsx("mb-4 border-l-[3px] pl-3 text-[15px] font-medium", add! < -0.05 ? "border-loss text-foreground" : add! > 0.05 ? "border-gain text-foreground" : "border-accent text-foreground")}>{verdict}</p>}
+            {d.scale != null && d.scale < 0.25 && (
+              <p className="-mt-2 mb-4 pl-[15px] text-[12.5px] text-foreground/55">
+                A scale this small isn&apos;t an error: options carry far more delta than the cash they cost, so a leveraged, options-heavy book can run several times the target&apos;s risk. Theory explains it.
+              </p>
+            )}
             <DeskFigures>
               <DeskFigure size="lg" label="Forecast vol" value={vol(d.forecast)}
                 tone={d.forecast != null && d.forecast > prefs.target ? "text-loss" : "text-gain"}
@@ -265,15 +272,44 @@ export function VolTargetTab() {
             )}
           </DeskSection>
 
-          <DeskSection label="How it works">
-            <div className="max-w-2xl space-y-2 text-[13px] leading-relaxed text-foreground/65">
-              <p><b className="font-medium text-foreground">exposure = target vol ÷ forecast vol.</b> When the market gets wild the forecast rises and you hold less; when it&apos;s calm you can hold more, up to the max exposure.</p>
-              <p>The forecast is a GARCH(1,1): tomorrow&apos;s variance = ω + 0.10 × today&apos;s move² + 0.85 × today&apos;s variance, with ω set so it drifts back to the 3-year average. It runs on your whole book (each holding&apos;s delta dollars ÷ capital, replayed over the past returns), so holdings that move together count as more risk than ones that offset.</p>
-              <p>Change in shares is in delta: for options, trim or add contracts (or hedge with shares) until the delta moves by that much. A forecast, not advice.</p>
-            </div>
-          </DeskSection>
         </>
       )}
     </>
+  );
+}
+
+/** The Theory pop-up for this tab. */
+export function VolTargetTheory() {
+  return (
+    <Theory title="Volatility targeting">
+      <P>Hold less when markets get wild, more when they&apos;re calm, so the risk you carry stays about the same.</P>
+      <Formula>exposure = σ_target ÷ σ̂_forecast</Formula>
+      <Terms rows={[
+        ["exposure", "how much of your capital is in the market"],
+        ["σ_target", "the risk you want, as annual volatility (the Target vol chips)"],
+        ["σ̂_forecast", "the forecast of market risk; the hat means it's an estimate"],
+      ]} />
+      <P>With a 15% target: a 10% forecast gives 150% (leverage, or 100% at the cap), 15% gives 100%, 30% gives 50%.</P>
+
+      <H>The forecast: GARCH(1,1)</H>
+      <Formula>var[t+1] = ω + α·move[t]² + β·var[t]</Formula>
+      <Terms rows={[
+        ["α = 0.10", "a big move today raises tomorrow's risk"],
+        ["β = 0.85", "risk fades slowly: volatility comes in clusters"],
+        ["ω", "set to (1 − α − β) × the 3-year average variance, so the forecast drifts back to normal"],
+      ]} />
+      <P>α + β = 0.95: a shock loses half its effect in about 13 trading days. Daily variance × 252 sessions, square-rooted, gives the annual vol shown.</P>
+
+      <H>How this tab uses it</H>
+      <P>Exposure is in delta dollars (net delta × 100 × price), so options count with shares. Your book as it is today is replayed over three years of daily returns and the forecast runs on that, so holdings that move together count as more risk than ones that offset.</P>
+      <P><b className="font-medium text-foreground">Scale</b> = target ÷ forecast, cut so gross exposure stays within max exposure × capital. Every position gets the same scale; <b className="font-medium text-foreground">Change</b> is what to add or cut to get there, in dollars and in shares of delta (for options: trim or add contracts, or hedge with shares, until delta moves that much).</P>
+
+      <H>Why the scale can be tiny</H>
+      <P>Risk is measured on delta dollars against your capital. An option costs far less than the shares it moves like: a call worth $500 can carry $10,000 of delta. So a book of options can hold several times its capital in exposure, and its forecast can read 100–200% a year even though each stock is &quot;only&quot; 40–60% volatile. Then target ÷ forecast is small: 15% ÷ 200% = 0.075×, meaning that book carries about 13× the risk you asked for. It&apos;s consistent, not a bug: either raise the target or cut delta (fewer contracts, further out of the money, or short shares against them).</P>
+
+      <H>Why it works, and what it costs</H>
+      <P>Big losses tend to come when volatility spikes, and that&apos;s when the rule has you holding less. It usually improves return per unit of risk. The cost: after a crash, volatility stays high while prices rebound, so you can be underweight for the recovery. It also trades more often.</P>
+      <p className="text-foreground/50">A forecast, not advice.</p>
+    </Theory>
   );
 }

@@ -5,7 +5,7 @@ import random
 import pandas as pd
 import pytest
 
-from optionflow.modules.hedge import voltarget as vt
+from optionflow.modules.risk import voltarget as vt
 from tests.hedge.test_api import BODY, TOKEN, _login, client  # noqa: F401  (fixture)
 
 
@@ -70,8 +70,8 @@ def test_api_scales_the_synced_book(client):  # noqa: F811
     fake.last_price = lambda s: closes[-1]
     c.post("/api/v1/hedge/ingest", json={"username": "owner", "positions": [
         {"symbol": "ABC", "kind": "stock", "quantity": 200, "avg_price": 40}]}, headers={"X-Hedge-Ingest-Token": TOKEN})
-    assert c.get("/api/v1/hedge/vol-target").status_code == 401
-    r = c.get("/api/v1/hedge/vol-target?target=0.1&capital=100000", headers=_login(c, "owner"))
+    assert c.get("/api/v1/risk/vol-target").status_code == 401
+    r = c.get("/api/v1/risk/vol-target?target=0.1&capital=100000", headers=_login(c, "owner"))
     assert r.status_code == 200
     d = r.json()
     h = d["holdings"][0]
@@ -82,5 +82,5 @@ def test_api_scales_the_synced_book(client):  # noqa: F811
     assert h["risk_share"] == pytest.approx(1.0) and len(d["chart"]) > 100
     last = d["chart"][-1]
     assert last["scale"] == pytest.approx(min(0.1 / last["forecast"], d["max_scale"]))
-    assert c.get("/api/v1/hedge/vol-target?target=0", headers=_login(c, "owner")).status_code == 422
+    assert c.get("/api/v1/risk/vol-target?target=0", headers=_login(c, "owner")).status_code == 422
     insight.clear_cache()

@@ -12,9 +12,8 @@ from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.auth import service as auth_service
 from optionflow.modules.hedge import portfolio as pf
 from optionflow.modules.hedge import service
-from optionflow.modules.hedge import voltarget
 from optionflow.modules.hedge.schemas import (BrokerActivityOut, BooksOut, BrokerPositionOut, BrokerHistoryPoint, BrokerIncomeOut,
-                                              IngestOut, IngestRequest, BrokerPortfolioOut, VolTargetOut)
+                                              IngestOut, IngestRequest, BrokerPortfolioOut)
 
 router = APIRouter(prefix="/hedge", tags=["hedge"])
 stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
@@ -54,15 +53,6 @@ def positions(user=Depends(get_current_user)) -> List[BrokerPositionOut]:
 def books(user=Depends(get_current_user)) -> BooksOut:
     """Net delta / gamma, IV vs HV and the delta-neutral suggestion for every holding."""
     return BooksOut(**service.books_for(int(user["sub"])))
-
-
-@router.get("/vol-target", response_model=VolTargetOut)
-def vol_target(target: float = Query(voltarget.DEFAULT_TARGET, gt=0.0, le=2.0, description="Target annual vol, decimal (0.15 = 15%)"),
-               cap: float = Query(voltarget.DEFAULT_CAP, gt=0.0, le=5.0, description="Max gross delta dollars ÷ capital"),
-               capital: Optional[float] = Query(None, gt=0.0, description="Override the synced account value"),
-               user=Depends(get_current_user)) -> VolTargetOut:
-    """Volatility targeting: exposure = target ÷ GARCH forecast, for the whole book and each holding."""
-    return VolTargetOut(**voltarget.vol_target(int(user["sub"]), target, cap, capital))
 
 
 @stream_router.get("/stream", response_class=StreamingResponse)

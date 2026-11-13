@@ -21,6 +21,7 @@ import { bookBeta, dayPnl, liveAccount, okBooks, SESSION_LABEL, Tick, useLiveBoo
 import { SourceBadge } from "@/components/options-flow/SourceBadge";
 import { extMove, Quote, useQuotes } from "@/components/dashboard/quotes";
 import { Sectors } from "@/components/dashboard/Sectors";
+import { TickerLink } from "@/components/TickerLink";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const signed = (v?: number | null, d = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${usd(v, d)}`);
@@ -205,10 +206,11 @@ export default function DashboardPage() {
             ) : (
               <div className="border-t border-[var(--border)]">
                 {buybacks.map(({ b, c }) => (
-                  <Link key={`bb-${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} href="/hedge" className="block">
+                  <div key={`bb-${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} className="relative">
+                    <Link href="/hedge" className="absolute inset-0 z-[1]" aria-label={`${b.symbol}: open the hedge desk`} />
                     <DeskRow edge="loss">
                       <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
-                        <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                        <TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" />
                         <span><Tag tone="solid">Buy back</Tag></span>
                         <span className="min-w-0 truncate text-[13px] text-foreground" title={c.headline}>
                           {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · {Math.round(c.profit_pct * 100)}% in
@@ -216,7 +218,7 @@ export default function DashboardPage() {
                         <span className="text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{usd(c.cost, 0)}</span>
                       </div>
                     </DeskRow>
-                  </Link>
+                  </div>
                 ))}
                 {actions.map((b) => {
                   const s = b.suggestion!;
@@ -225,16 +227,17 @@ export default function DashboardPage() {
                     : s.action === "SELL_CALL" || s.action === "SELL_PUT" || s.action === "BUY_CALL" ? `${s.contracts}× ${s.strike}${s.long_strike != null ? `/${s.long_strike}` : ""}${s.otype === "call" ? "C" : "P"} ${s.action === "BUY_CALL" ? s.expiry : s.expiry?.slice(5)}`
                     : s.headline.split(/[;:]/)[0];
                   return (
-                    <Link key={b.symbol} href="/hedge" className="block">
+                    <div key={b.symbol} className="relative">
+                      <Link href="/hedge" className="absolute inset-0 z-[1]" aria-label={`${b.symbol}: open the hedge desk`} />
                       <DeskRow edge={a.edge}>
                         <div className="grid grid-cols-[52px_84px_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5 pl-4 pr-2">
-                          <span className="font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                          <TickerLink symbol={b.symbol} className="relative z-[2] font-mono text-[13.5px] font-semibold text-foreground" />
                           <span><Tag tone={a.tone}>{a.label}</Tag></span>
                           <span className={clsx("min-w-0 truncate text-[13px]", a.edge ? "text-foreground" : "text-foreground/50")} title={s.headline}>{what}</span>
                           <span className="text-right font-mono text-[12.5px] tabular-nums text-foreground/80">{a.edge && s.credit ? usd(Math.abs(s.credit), 0) : ""}</span>
                         </div>
                       </DeskRow>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -248,7 +251,7 @@ export default function DashboardPage() {
                 {spikes.map((b) => (
                   <DeskRow key={`s-${b.symbol}`} edge="loss">
                     <div className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)]">
-                      <span className="font-mono text-[14px] font-semibold text-foreground">{b.symbol}</span>
+                      <TickerLink symbol={b.symbol} className="font-mono text-[14px] font-semibold text-foreground" />
                       <span><Tag tone="loss">IV spike</Tag></span>
                       <span className="col-span-2 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">ATM IV {pct(b.iv?.iv_roc_day, 0)} today. Premium is rich: a call near your average.</span>
                     </div>
@@ -257,7 +260,7 @@ export default function DashboardPage() {
                 {expiring.map((o, i) => (
                   <DeskRow key={`e-${i}`} edge={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : null}>
                     <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 pl-4 pr-2 sm:grid-cols-[56px_auto_minmax(0,1fr)_auto]">
-                      <span className="font-mono text-[14px] font-semibold text-foreground">{o.symbol}</span>
+                      <TickerLink symbol={o.symbol} className="font-mono text-[14px] font-semibold text-foreground" />
                       <span><Tag tone={o.moneyness === "ITM" && o.contracts < 0 ? "warn" : "neutral"}>{o.dte}d · {o.moneyness ?? "—"}</Tag></span>
                       <span className={clsx("text-right font-mono text-[13px] tabular-nums sm:order-last", tone(o.premium))}>{signed(o.premium, 0)}</span>
                       <span className="col-span-3 min-w-0 text-[13px] leading-snug text-foreground/75 sm:col-span-1 sm:truncate">
@@ -333,7 +336,7 @@ export default function DashboardPage() {
                     const qt = quotes.data?.[it.symbol];
                     return (
                       <div key={it.symbol} className="grid grid-cols-[minmax(0,1fr)_auto_68px] items-baseline gap-3 border-b border-[var(--border)] py-2 font-mono text-[13px] tabular-nums last:border-0">
-                        <span className="truncate font-sans text-[13px] text-foreground/75">{it.label}</span>
+                        <TickerLink symbol={it.symbol} title={`Open ${it.label} (${it.symbol})`} className="truncate font-sans text-[13px] text-foreground/75">{it.label}</TickerLink>
                         <span className="text-right text-foreground"><Tick value={qt?.price}>{qt?.price != null ? fmtPx(it.symbol, qt.price) : "—"}</Tick></span>
                         <span className={clsx("text-right", tone(chg(qt)))}>{pct(chg(qt))}
                           {extMove(qt?.session, qt?.ext_change_pct) && <span className="block text-[10.5px] leading-tight"><ExtPct m={extMove(qt?.session, qt?.ext_change_pct)} /></span>}

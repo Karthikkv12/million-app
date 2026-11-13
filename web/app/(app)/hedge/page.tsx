@@ -14,7 +14,9 @@ import { bookBeta, dayPnl, Tick, useLive, useLiveBooks } from "@/lib/live";
 import { DeskFigure, DeskFigures, DeskPage, DeskRow, DeskSection, Ladder, Meter, Scale, Tag } from "@/components/desk";
 import { StrategyPicker } from "@/components/strategy/StrategyPicker";
 import { useStrategy } from "@/components/strategy/useStrategy";
-import { VolTargetTab } from "@/components/hedge/VolTarget";
+import { VolTargetTab, VolTargetTheory } from "@/components/hedge/VolTarget";
+import { FactorsTab, FactorsTheory } from "@/components/hedge/Factors";
+import { TickerLink } from "@/components/TickerLink";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -342,7 +344,7 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3 pl-4 pr-3 md:grid-cols-[150px_minmax(0,1fr)_auto] xl:grid-cols-[140px_150px_minmax(200px,1fr)_48px_96px_minmax(220px,1fr)_20px]">
         {/* symbol + price (phones put the price on the right) */}
         <div className="min-w-0">
-          <p className="font-mono text-[15px] font-semibold tracking-tight text-foreground">{b.symbol}
+          <p className="font-mono text-[15px] font-semibold tracking-tight text-foreground"><TickerLink symbol={b.symbol} />
             <span className={clsx("ml-2 font-mono text-[11px] font-normal xl:hidden", betaTone(b.beta))}>{b.beta != null ? `β ${b.beta.toFixed(2)}` : ""}</span>
           </p>
           <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
@@ -390,16 +392,25 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-type HedgeTab = "desk" | "vol";
+type HedgeTab = "desk" | "vol" | "factors";
 const TABS: { id: HedgeTab; label: string; hash: string }[] = [
-  { id: "desk", label: "Delta desk", hash: "" }, { id: "vol", label: "Vol target", hash: "#vol-target" },
+  { id: "desk", label: "Delta desk", hash: "" },
+  { id: "vol", label: "Vol target", hash: "#vol-target" },
+  { id: "factors", label: "Factors", hash: "#factors" },
 ];
+/** The tool tabs: title, one line on what it does, the theory pop-up and the body. */
+const TOOLS: Record<Exclude<HedgeTab, "desk">, { title: string; line: string; theory: React.ReactNode; body: React.ReactNode }> = {
+  vol: { title: "Vol target", line: "Less exposure when markets get wild: target vol ÷ forecast vol, on your whole book.",
+    theory: <VolTargetTheory />, body: <VolTargetTab /> },
+  factors: { title: "Factor exposure", line: "Which broad risks your book is really betting on, and how to neutralise them.",
+    theory: <FactorsTheory />, body: <FactorsTab /> },
+};
 
 /** The tab from the URL hash (#vol-target), so a tab can be linked and survives a reload. */
 function useHedgeTab(): [HedgeTab, (t: HedgeTab) => void] {
   const [tab, setTab] = useState<HedgeTab>("desk");
   useEffect(() => {
-    const read = () => setTab(window.location.hash === "#vol-target" ? "vol" : "desk");
+    const read = () => setTab(TABS.find((t) => t.hash && t.hash === window.location.hash)?.id ?? "desk");
     read();
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
@@ -427,17 +438,22 @@ function TabBar({ tab, onChange }: { tab: HedgeTab; onChange: (t: HedgeTab) => v
 
 export default function HedgePage() {
   const [tab, setTab] = useHedgeTab();
-  return tab === "vol" ? (
+  if (tab === "desk") return <DeltaDesk tabs={<TabBar tab={tab} onChange={setTab} />} />;
+  const t = TOOLS[tab];
+  return (
     <DeskPage>
-      <div className="pb-5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
-        <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">Vol target</h1>
-        <p className="mt-1 text-[13px] text-foreground/55">Less exposure when markets get wild: exposure = target vol ÷ forecast vol, on your whole book.</p>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 pb-5">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground/50">Hedge</p>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.03em] text-foreground sm:text-[34px]">{t.title}</h1>
+          <p className="mt-1 text-[13px] text-foreground/55">{t.line}</p>
+        </div>
+        {t.theory}
       </div>
       <TabBar tab={tab} onChange={setTab} />
-      <VolTargetTab />
+      {t.body}
     </DeskPage>
-  ) : <DeltaDesk tabs={<TabBar tab={tab} onChange={setTab} />} />;
+  );
 }
 
 function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
@@ -500,14 +516,15 @@ function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
               <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground">Buy back now · {buybacks.length}</p>
               <div className="mt-2 grid grid-cols-1 gap-1.5">
                 {buybacks.map(({ b, c }) => (
-                  <button key={`${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} onClick={() => setOpen(b.symbol)}
-                    className="flex min-w-0 items-center gap-3 border-l-[3px] border-loss bg-loss/[0.05] px-3 py-2 text-left hover:bg-loss/[0.09]">
-                    <span className="w-12 shrink-0 font-mono text-[13.5px] font-semibold text-foreground">{b.symbol}</span>
+                  <div key={`${b.symbol}-${c.strike}-${c.otype}-${c.expiry}`} role="button" tabIndex={0} onClick={() => setOpen(b.symbol)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(b.symbol); } }}
+                    className="flex min-w-0 cursor-pointer items-center gap-3 border-l-[3px] border-loss bg-loss/[0.05] px-3 py-2 text-left hover:bg-loss/[0.09]">
+                    <TickerLink symbol={b.symbol} className="w-12 shrink-0 font-mono text-[13.5px] font-semibold text-foreground" />
                     <span className="min-w-0 flex-1 truncate text-[13px] text-foreground/85" title={c.headline}>
                       {c.contracts}× {c.strike}{c.otype === "call" ? "C" : "P"} {c.expiry.slice(5)} · ${c.mark.toFixed(2)} <span className="text-foreground/45">(sold ${c.sold_at.toFixed(2)})</span>
                     </span>
                     <span className="shrink-0 font-mono text-[12px] tabular-nums text-gain">{Math.round(c.profit_pct * 100)}% in</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>

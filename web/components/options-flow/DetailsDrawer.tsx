@@ -14,6 +14,7 @@ import { Tag } from "@/components/desk";
 import { GexProfileChart } from "./GexProfileChart";
 import { FlowMomentumChart } from "./FlowMomentumChart";
 import { LeapsScore } from "@/components/insight/LeapsScore";
+import { TickerLink } from "@/components/TickerLink";
 
 type Tab = "levels" | "flow";
 
@@ -236,7 +237,7 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
           <div className="pb-3">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Details</p>
             <h2 className="font-mono text-[22px] font-semibold tracking-tight text-foreground">
-              {ticker} <span className="text-[15px] font-normal tabular-nums text-foreground/55">{data.spot.toFixed(2)}</span>
+              <TickerLink symbol={ticker} title={`Open the ${ticker} stock page and chart`} /> <span className="text-[15px] font-normal tabular-nums text-foreground/55">{data.spot.toFixed(2)}</span>
             </h2>
           </div>
           <div role="tablist" aria-label="Details section" className="ml-auto flex gap-5">
