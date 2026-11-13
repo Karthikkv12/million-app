@@ -9,7 +9,7 @@ from database.models import FlowStrikeSide, NetFlowSnapshot
 from optionflow.core.db import get_session
 
 _FIELDS = ("symbol", "ts", "price", "call_prem", "put_prem", "net_flow", "total_prem", "volume")
-_OPTIONAL = ("call_traded", "put_traded", "call_bought", "call_sold", "put_bought", "put_sold")
+_OPTIONAL = ("call_traded", "put_traded", "call_bought", "call_sold", "put_bought", "put_sold", "atm_iv_near", "atm_iv_30d")
 
 
 def add_snapshot(**row) -> None:
@@ -50,7 +50,7 @@ def existing_timestamps(symbol: str, since_iso: str) -> Set[str]:
 
 def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
     """(ts, price, call_prem, put_prem, net_flow, total_prem, volume, call_traded, put_traded, call_bought, call_sold,
-    put_bought, put_sold) rows, oldest first.
+    put_bought, put_sold, atm_iv_near, atm_iv_30d) rows, oldest first.
 
     Matches both timestamp spellings ever written ("…Z" and "…+00:00").
     """
@@ -64,6 +64,7 @@ def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
                 NetFlowSnapshot.call_traded, NetFlowSnapshot.put_traded,
                 NetFlowSnapshot.call_bought, NetFlowSnapshot.call_sold,
                 NetFlowSnapshot.put_bought, NetFlowSnapshot.put_sold,
+                NetFlowSnapshot.atm_iv_near, NetFlowSnapshot.atm_iv_30d,
             )
             .filter(NetFlowSnapshot.symbol == symbol)
             .filter(or_(NetFlowSnapshot.ts >= since_z, NetFlowSnapshot.ts >= since_offset))

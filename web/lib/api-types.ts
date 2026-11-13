@@ -622,6 +622,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/flow/{symbol}/open-interest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Interest
+         * @description Open interest by strike (calls and puts) and the max-pain strike for one expiry (default the nearest), plus
+         *     max pain for every listed expiry. From the cached chain; open interest updates once a day at the source.
+         */
+        get: operations["open_interest_api_v1_flow__symbol__open_interest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/flow/{symbol}/replay": {
         parameters: {
             query?: never;
@@ -3842,6 +3863,18 @@ export interface components {
             /** As Of */
             as_of?: string | null;
             /**
+             * Atm Iv 30D
+             * @description ATM implied vol (decimal) at a constant 30 days
+             */
+            atm_iv_30d?: number | null;
+            /**
+             * Atm Iv Near
+             * @description ATM implied vol (decimal) of the nearest expiry ≥ 1 day out
+             */
+            atm_iv_near?: number | null;
+            /** Atm Iv Near Expiry */
+            atm_iv_near_expiry?: string | null;
+            /**
              * Call Gex By Strike
              * @default []
              */
@@ -3899,6 +3932,13 @@ export interface components {
             max_call_wall?: number | null;
             /** Max Gex Strike */
             max_gex_strike?: number | null;
+            /**
+             * Max Pain
+             * @description Max-pain strike of the nearest expiry (max_pain_expiry)
+             */
+            max_pain?: number | null;
+            /** Max Pain Expiry */
+            max_pain_expiry?: string | null;
             /** Max Put Wall */
             max_put_wall?: number | null;
             /**
@@ -4478,8 +4518,25 @@ export interface components {
              */
             total: number;
         };
+        /** MaxPainPoint */
+        MaxPainPoint: {
+            /** Expiry */
+            expiry: string;
+            /** Max Pain */
+            max_pain?: number | null;
+        };
         /** NetFlowPoint */
         NetFlowPoint: {
+            /**
+             * Atm Iv 30D
+             * @description ATM implied vol (decimal) at a constant 30 days
+             */
+            atm_iv_30d?: number | null;
+            /**
+             * Atm Iv Near
+             * @description ATM implied vol (decimal), nearest expiry ≥ 1 day out; None on rows before 2026-11-14
+             */
+            atm_iv_near?: number | null;
             /**
              * Call Bought
              * @description Part of call_traded filled at or near the ask (buyer started it). Mid fills and volume from before the first refresh have no side, so bought + sold ≤ traded. None on rows before 2026-11-13 11:00 ET
@@ -4577,6 +4634,18 @@ export interface components {
              */
             iv_spike: boolean;
             /**
+             * Level Symbols
+             * @description Extra tickers watched for level alerts (e.g. SPY, QQQ), on top of the holdings
+             * @default []
+             */
+            level_symbols: string[];
+            /**
+             * Levels
+             * @description A dealer level moved (call wall, put wall, king, flip) or spot crossed the flip
+             * @default true
+             */
+            levels: boolean;
+            /**
              * Sell Call
              * @default true
              */
@@ -4592,6 +4661,65 @@ export interface components {
              * @default []
              */
             symbols: string[];
+        };
+        /** OpenInterestOut */
+        OpenInterestOut: {
+            /**
+             * Call Oi
+             * @default 0
+             */
+            call_oi: number;
+            /**
+             * Expiries
+             * @default []
+             */
+            expiries: string[];
+            /**
+             * Expiry
+             * @description The expiry the rows are for (the nearest unless one was asked)
+             */
+            expiry?: string | null;
+            /**
+             * Max Pain
+             * @description Strike where the open contracts of `expiry` are worth least at settlement
+             */
+            max_pain?: number | null;
+            /**
+             * Max Pain By Expiry
+             * @default []
+             */
+            max_pain_by_expiry: components["schemas"]["MaxPainPoint"][];
+            /** Put Call Ratio */
+            put_call_ratio?: number | null;
+            /**
+             * Put Oi
+             * @default 0
+             */
+            put_oi: number;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["OpenInterestRow"][];
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** OpenInterestRow */
+        OpenInterestRow: {
+            /**
+             * Call Oi
+             * @default 0
+             */
+            call_oi: number;
+            /**
+             * Put Oi
+             * @default 0
+             */
+            put_oi: number;
+            /** Strike */
+            strike: number;
         };
         /** OptionMetricsOut */
         OptionMetricsOut: {
@@ -8535,6 +8663,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TidePoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_interest_api_v1_flow__symbol__open_interest_get: {
+        parameters: {
+            query?: {
+                expiry?: string | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenInterestOut"];
                 };
             };
             /** @description Validation Error */

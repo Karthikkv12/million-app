@@ -15,6 +15,8 @@ import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
 import { PoliticalCard } from "@/components/insight/PoliticalCard";
 import { VolumeCard } from "@/components/insight/VolumeCard";
+import { OpenInterestCard } from "@/components/insight/OpenInterestCard";
+import { IvDriftCard } from "@/components/insight/IvDriftCard";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 import { TickerLogo } from "@/components/TickerLogo";
 import { SwipeDeck } from "@/components/SwipeDeck";
@@ -78,6 +80,14 @@ export default function StockPage() {
 
         <Panel title="Volume" sub={<span className="normal-case tracking-normal">Is today unusual for {sym}?</span>}>
           <VolumeCard symbol={sym} optionsVolume={gex && !gex.error ? gex.total_volume : null} />
+        </Panel>
+
+        <Panel title="Volatility drift" sub={<span className="normal-case tracking-normal">ATM implied vol through the day vs price</span>}>
+          <IvDriftCard symbol={sym} />
+        </Panel>
+
+        <Panel title="Open interest and max pain" sub={<span className="normal-case tracking-normal">Contracts open by strike for one expiry</span>}>
+          <OpenInterestCard symbol={sym} />
         </Panel>
 
         <GexReplay symbol={sym} />
