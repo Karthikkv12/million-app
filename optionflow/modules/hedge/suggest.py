@@ -219,7 +219,9 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
 
     warnings = _gamma_warnings(legs)
     key = getattr(strategy, "key", None) or "spike_wheel"
-    if key == "spike_wheel":
+    if is_long_calls_only(legs):                      # LEAPS held as stock: no strategy, just the exposure
+        s, closes, key = _as_long_stock(legs, net, spot, warnings), [], LONG_STOCK
+    elif key == "spike_wheel":
         s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
         closes = buybacks(legs)
     else:
@@ -232,6 +234,27 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
         closes = buybacks(legs, strategy.take_profit, strategy.early_profit)
     return Book(ctx.symbol, shares, ctx.avg_cost, lots, _r(net), _r(ngam, 5), _r(dollar_gamma, 2),
                 _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), closes, key)
+
+
+LONG_STOCK = "long_stock"   # Book.strategy for a holding of long calls only (owner, 2026-11-13)
+
+
+def is_long_calls_only(legs: List[Leg]) -> bool:
+    """No shares and nothing sold: every leg is a long call (LEAPS). The owner holds these as stock, not as
+    a strategy, so the desk suggests nothing for them."""
+    opts = [l for l in legs if l.kind == "option"]
+    return bool(opts) and len(opts) == len(legs) and all(l.otype == "call" and l.quantity > 0 for l in opts)
+
+
+def _as_long_stock(legs: List[Leg], net: float, spot: float, warnings: List[str]) -> Suggestion:
+    n = sum(l.quantity for l in legs)
+    eq = net * 100.0
+    near = min(legs, key=lambda l: l.dte if l.dte is not None else 1e9)
+    reasons = [f"{n:g} long call{'s' * (n != 1)}, nothing sold against {'them' if n != 1 else 'it'}: tracked as long stock, no strategy.",
+               f"Moves like ~{eq:,.0f} shares (Δ {net:+.2f}), ${eq * spot:,.0f} of stock exposure."]
+    if near.dte is not None:
+        reasons.append(f"Nearest expiry {near.strike:g}C {near.expiry}, {near.dte:.0f} days left.")
+    return Suggestion("TRACK", f"Long stock via calls: ~{eq:,.0f} sh", reasons, warnings=warnings)
 
 
 def buybacks(legs: List[Leg], take_profit: float = TAKE_PROFIT, early_profit: float = EARLY_PROFIT) -> List[Close]:
