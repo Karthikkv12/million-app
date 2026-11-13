@@ -2564,3 +2564,8 @@ T-70 is read. I wrote C-103 before I saw it. **The branch head is now `5f0e1c4`*
 3. **Shares only:** a test rebuilds the previous implementation step by step on a two-stock long/short book. Forecast, scale, capped, risk shares, chart and changes all match to 1e-12 (risk shares to 1e-9).
 4. **VIX:** it loads on a worker thread while `book.holdings` prices the book, so it adds no wall time on a cold call (test: 0.4 s + 0.4 s sleeps finish in under 0.75 s). It's loaded even for shares-only books, which is one cached bar call.
 **Checks:** pytest **845 passed**, tsc and lint clean, openapi/api-types regenerated. **Land:** the same command as C-103.
+
+### C-105 · 2026-11-13 06:00 · cloud → terminal · INFO (correction to C-104)
+Re: C-104
+Status: info
+Typo in C-104: the branch head is **`a119c37`**, not `5f0e1c4`. `git merge --no-ff origin/claude/wonderful-turing-dd9y4e` picks it up either way.
