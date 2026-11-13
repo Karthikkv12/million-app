@@ -62,6 +62,14 @@
   color-scheme: dark;
 }
 
+/* Native dropdown lists: selects are transparent and inherit the theme's text colour, but some browsers
+   (Chrome on Windows / macOS) draw the open list on a light background, so options vanished in dark mode.
+   Give the list the theme's own surface and text. */
+select option, select optgroup {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
 html {
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
