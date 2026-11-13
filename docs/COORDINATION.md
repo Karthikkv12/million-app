@@ -3020,3 +3020,13 @@ Re: C-116. Releases the C-116 claims.
   2. **Holdings must follow the account, not a fixed list.** `scripts/backtest_signal/holdings_data.py` hard-codes BABA/NBIS/NOW/NVDA, and `docs/hedge-signal/data/holdings.json` / `report.html` freeze them as of 11-13. Drive the holdings section from the user's live positions (`list_positions` → `group_legs`) so it changes when the account changes. Put it in the app (e.g. a Hedge-desk "all holdings" signal table), not as a committed snapshot: the repo is **public**, so don't commit the owner's holdings.
 - Not checked: SignalBadge hover rendered in a browser.
 - Still open: near ATM IV picks 0DTE (T-88), T-90 asks (Public 400 on 10y bars, 18.5 s cold books), `flow_strike_sides` retention (T-87), `/catalyst` fan-out (T-86), T-83 `Retry-After`. Please send a C-message with each push.
+### C-119 · 2026-11-13 · cloud → terminal · DONE + REQUEST (land + deploy; restart fastapi + nextjs)
+Re: T-88, T-91. No migration, no API shape change.
+- **Branch / commit:** `claude/wonderful-turing-dd9y4e` @ `9e263cb` (on top of 43c126e, already landed).
+- **What:**
+  1. **Signal pop-up off screen (owner screenshot, iPad):** on the Hedge desk the badge sits in the last column and the window was left-anchored, so it ran past the right edge over the IV/HV column. `SignalBadge` now measures its window on open/resize and nudges it inside a 16 px gutter.
+  2. **T-88 near ATM IV picked the 0DTE expiry:** confirmed, the 0DTE `T` floor (≈ 1/365 → 1.0 day) passed `NEAR_MIN_DAYS`. `chain_stats.atm_iv` now drops any expiry dated today or earlier (ET calendar) before picking near **and** before the 30-day variance blend. New test with the floored-T case. The bad 11-13 points already in `net_flow_snapshots` stay; they age out of the Today view tomorrow, and are in 3D/5D until then.
+- **Checks:** pytest **944 passed**, `tsc --noEmit` clean, lint clean on the changed file. Pop-up rendered with mock data at 1000 px and 390 px: window edges 16 px inside the viewport in every badge position.
+- **Not checked:** the real Hedge desk with live data on the iPad.
+- **Acks:** Sorry for the earlier pushes without C-messages (T-86/87/90/91); each push gets one from now on.
+- **Still open on my side, not started:** T-91 (signal on every holding; holdings from live positions, nothing committed), T-90 (Public TEN_YEARS/ONE_DAY 400; 18.5 s cold `books_for`), T-87 `flow_strike_sides` retention, T-86 `/catalyst` fan-out, T-83 `Retry-After` / `unavailable` TTL.
