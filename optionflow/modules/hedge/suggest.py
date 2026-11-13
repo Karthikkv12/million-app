@@ -219,7 +219,7 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
 
     warnings = _gamma_warnings(legs)
     key = getattr(strategy, "key", None) or "spike_wheel"
-    if is_long_calls_only(legs):                      # LEAPS held as stock: no strategy, just the exposure
+    if is_long_options_only(legs):                    # long calls / puts held as stock: no strategy, just the exposure
         s, closes, key = _as_long_stock(legs, net, spot, warnings), [], LONG_STOCK
     elif key == "spike_wheel":
         s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
@@ -236,25 +236,33 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
                 _r(target), regime, _r(gap), _r(iv_hv), legs, s, units(legs), closes, key)
 
 
-LONG_STOCK = "long_stock"   # Book.strategy for a holding of long calls only (owner, 2026-11-13)
+LONG_STOCK = "long_stock"   # Book.strategy for a holding of long options only (owner, 2026-11-13)
 
 
-def is_long_calls_only(legs: List[Leg]) -> bool:
-    """No shares and nothing sold: every leg is a long call (LEAPS). The owner holds these as stock, not as
-    a strategy, so the desk suggests nothing for them."""
+def is_long_options_only(legs: List[Leg]) -> bool:
+    """No shares and nothing sold: every leg is a long call (LEAPS) or a long put. The owner holds these as
+    stock exposure (calls long, puts short), not as a strategy, so the desk suggests nothing for them."""
     opts = [l for l in legs if l.kind == "option"]
-    return bool(opts) and len(opts) == len(legs) and all(l.otype == "call" and l.quantity > 0 for l in opts)
+    return bool(opts) and len(opts) == len(legs) and all(l.otype in ("call", "put") and l.quantity > 0 for l in opts)
+
+
+def _plural(n: float, word: str) -> str:
+    return f"{n:g} long {word}{'s' * (n != 1)}"
 
 
 def _as_long_stock(legs: List[Leg], net: float, spot: float, warnings: List[str]) -> Suggestion:
-    n = sum(l.quantity for l in legs)
+    calls = sum(l.quantity for l in legs if l.otype == "call")
+    puts = sum(l.quantity for l in legs if l.otype == "put")
     eq = net * 100.0
+    held = " + ".join(_plural(n, w) for n, w in ((calls, "call"), (puts, "put")) if n)
+    side = "long" if eq >= 0 else "short"
+    via = "calls and puts" if calls and puts else "calls" if calls else "puts"
+    reasons = [f"{held}, nothing sold: tracked as {side} stock, no strategy.",
+               f"Moves like ~{eq:+,.0f} shares (Δ {net:+.2f}), ${abs(eq) * spot:,.0f} of {side} exposure."]
     near = min(legs, key=lambda l: l.dte if l.dte is not None else 1e9)
-    reasons = [f"{n:g} long call{'s' * (n != 1)}, nothing sold against {'them' if n != 1 else 'it'}: tracked as long stock, no strategy.",
-               f"Moves like ~{eq:,.0f} shares (Δ {net:+.2f}), ${eq * spot:,.0f} of stock exposure."]
     if near.dte is not None:
-        reasons.append(f"Nearest expiry {near.strike:g}C {near.expiry}, {near.dte:.0f} days left.")
-    return Suggestion("TRACK", f"Long stock via calls: ~{eq:,.0f} sh", reasons, warnings=warnings)
+        reasons.append(f"Nearest expiry {near.strike:g}{'C' if near.otype == 'call' else 'P'} {near.expiry}, {near.dte:.0f} days left.")
+    return Suggestion("TRACK", f"{side.capitalize()} stock via {via}: ~{eq:+,.0f} sh", reasons, warnings=warnings)
 
 
 def buybacks(legs: List[Leg], take_profit: float = TAKE_PROFIT, early_profit: float = EARLY_PROFIT) -> List[Close]:

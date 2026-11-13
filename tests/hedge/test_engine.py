@@ -164,6 +164,19 @@ def test_leaps_only_holding_is_long_stock_under_any_strategy():
     assert book.strategy == "diagonal"
 
 
+def test_long_put_only_holding_is_short_stock():
+    from optionflow.modules.strategy.catalog import get
+    ctx = Context("NBIS", 115.0, None, atm_iv=0.7, hv20=0.6)
+    puts = [Leg("option", 2, 9.0, "put", 110.0, "2027-06-17", 216, 0.7)]
+    book = evaluate(ctx, puts, [], get("wheel").rules, chain())
+    assert book.suggestion.action == "TRACK" and book.strategy == "long_stock" and book.net_delta < 0
+    assert book.suggestion.headline.startswith("Short stock via puts: ~-")
+    mixed = [Leg(**vars(puts[0])), Leg("option", 1, 40.0, "call", 90.0, "2028-01-21", 434, 0.7)]
+    assert evaluate(ctx, mixed, [], None, chain()).strategy == "long_stock"
+    short_put = [Leg("option", -1, 3.0, "put", 100.0, EXP, 5, 0.7)]
+    assert evaluate(ctx, short_put, [], None, chain()).strategy != "long_stock"
+
+
 def test_pick_weekly_skips_0_1_dte():
     assert pick_weekly([("a", 0), ("b", 1), ("c", 4), ("d", 11)]) == "c"
     assert pick_weekly([("a", 1), ("d", 11)]) == "d"

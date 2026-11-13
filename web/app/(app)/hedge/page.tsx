@@ -230,7 +230,7 @@ function Legend() {
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
-          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Long</b>: long calls (LEAPS) with nothing sold, treated as stock.</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Long / Short</b>: long calls (LEAPS) or long puts with nothing sold, treated as stock (puts = short).</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
@@ -339,8 +339,8 @@ function Scales({ books }: { books: HedgeBook[] }) {
 // ── One holding ──────────────────────────────────────────────────────────────
 function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle: () => void }) {
   const s = b.suggestion;
-  const asStock = b.strategy === "long_stock";               // LEAPS only: tracked as long stock, no strategy
-  const a = asStock ? { ...ACTION.TRACK, label: "Long" } : actionOf(s);
+  const asStock = b.strategy === "long_stock";               // long calls / puts only: tracked as stock, no strategy
+  const a = asStock ? { ...ACTION.TRACK, label: (b.net_delta ?? 0) < 0 ? "Short" : "Long" } : actionOf(s);
   const per = perLot(b);
   const lots = Math.max(Math.floor(b.lots ?? 0), 1);
   const after = s?.net_delta_after != null && TRADE.has(s.action) ? s.net_delta_after / lots : null;
@@ -352,7 +352,7 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
           <p className="flex items-center gap-2 font-mono text-[15px] font-semibold tracking-tight text-foreground"><TickerLogo symbol={b.symbol} size={22} /><TickerLink symbol={b.symbol} />
             <span className={clsx("ml-2 font-mono text-[11px] font-normal xl:hidden", betaTone(b.beta))}>{b.beta != null ? `β ${b.beta.toFixed(2)}` : ""}</span>
           </p>
-          <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : asStock ? `calls ≈ ${Math.round((b.net_delta ?? 0) * 100)} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
+          <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : asStock ? `≈ ${Math.round((b.net_delta ?? 0) * 100)} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
           {b.units.some((u) => u.kind === "covered") && b.units.some((u) => u.kind === "uncovered") && (
             <p className="truncate font-mono text-[10.5px] text-foreground/50">
               {b.units.filter((u) => u.kind === "covered" || u.kind === "uncovered").map((u) => (
