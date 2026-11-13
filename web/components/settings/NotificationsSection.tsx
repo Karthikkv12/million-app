@@ -10,14 +10,48 @@ import { clsx } from "clsx";
 import { fetchNotifyPrefs, fetchPushConfig, fetchPushDevices, removePushSubscription, saveNotifyPrefs, savePushSubscription, sendTestPush, NotifyPrefs } from "@/lib/api";
 import { okBooks, useLiveBooks } from "@/lib/live";
 
-const KINDS: { key: keyof Omit<NotifyPrefs, "symbols">; label: string; desc: string }[] = [
+const KINDS: { key: keyof Omit<NotifyPrefs, "symbols" | "level_symbols">; label: string; desc: string }[] = [
   { key: "buyback", label: "Buy back", desc: "A short option has given up most of its premium (80%, or 50% with 3+ days left)." },
   { key: "sell_call", label: "Sell call", desc: "The desk suggests a call under your strategy (Hedge → Strategy)." },
   { key: "sell_put", label: "Sell put", desc: "The desk suggests a put or a put spread under your strategy." },
   { key: "buy_stock", label: "Buy stock", desc: "An odd lot at or below your average: round it up to 100 shares. Also the long call under LEAPS or Diagonals." },
   { key: "iv_spike", label: "IV spike", desc: "Implied volatility jumps on a stock you hold." },
   { key: "expiring_itm", label: "Expiring in the money", desc: "An option you sold is in the money with a day or less left." },
+  { key: "levels", label: "Dealer levels shift", desc: "The call wall, put wall, king or flip moves to a new strike, or the price crosses the flip. For your stocks and the tickers you add below." },
 ];
+
+/** Extra tickers for level alerts (SPY, QQQ…), on top of the holdings. */
+function LevelTickers({ p, held, save }: { p: NotifyPrefs; held: string[]; save: (n: NotifyPrefs) => void }) {
+  const [v, setV] = useState("");
+  const list = p.level_symbols ?? [];
+  const add = () => {
+    const s = v.trim().toUpperCase();
+    setV("");
+    if (!s || list.includes(s) || !/^[A-Z.^]{1,10}$/.test(s) || list.length >= 20) return;
+    save({ ...p, level_symbols: [...list, s].sort() });
+  };
+  return (
+    <div className="border-t border-[var(--border)] px-5 py-4">
+      <p className="text-[14.5px] font-medium text-foreground">Level alerts also for</p>
+      <p className="text-[12.5px] text-foreground/55">
+        Your stocks{held.length ? ` (${held.length})` : ""} are always watched. Add index or other tickers here, up to 20 in all.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {list.map((s) => (
+          <button key={s} onClick={() => save({ ...p, level_symbols: list.filter((x) => x !== s) })} aria-label={`Remove ${s}`}
+            className="h-8 rounded-full border border-accent bg-accent/10 px-3 font-mono text-[12px] text-accent">
+            {s} <span aria-hidden className="ml-1 text-accent/60">×</span>
+          </button>
+        ))}
+        <form onSubmit={(e) => { e.preventDefault(); add(); }} className="flex items-center gap-1.5">
+          <input value={v} onChange={(e) => setV(e.target.value)} placeholder="SPY" aria-label="Add a ticker for level alerts"
+            className="h-8 w-24 rounded-full border border-[var(--border)] bg-transparent px-3 font-mono text-[12px] uppercase text-foreground placeholder:text-foreground/35 focus:border-foreground/40 focus:outline-none" />
+          <button type="submit" className="h-8 rounded-full border border-[var(--border)] px-3 text-[12px] text-foreground/70 hover:text-foreground">Add</button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -85,6 +119,7 @@ function Controls() {
           <p className="mt-2 text-[12px] text-foreground/45">Also kept: {p.symbols.filter((s) => !held.includes(s)).join(", ")} (not held right now).</p>
         )}
       </div>
+      {p.levels && <LevelTickers p={p} held={held} save={save} />}
       {err && <p className="border-t border-[var(--border)] px-5 py-3 text-[13px] text-loss">{err}</p>}
     </div>
   );

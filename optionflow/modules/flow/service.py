@@ -124,6 +124,11 @@ def gex_payload(result: GEXResult) -> Dict[str, Any]:
         "max_gex_strike": result.max_gex_strike,
         "net_gex": result.net_gex,
         "net_vex": result.net_vex,
+        "max_pain": result.max_pain,
+        "max_pain_expiry": result.max_pain_expiry,
+        "atm_iv_near": result.atm_iv_near,
+        "atm_iv_near_expiry": result.atm_iv_near_expiry,
+        "atm_iv_30d": result.atm_iv_30d,
         "call_premium": result.call_premium,
         "put_premium": result.put_premium,
         "net_flow": result.net_flow,
@@ -177,6 +182,8 @@ def record_snapshot(result: GEXResult) -> None:
             volume=int(result.total_volume),
             call_traded=round(traded[0], 0) if traded else None,
             put_traded=round(traded[1], 0) if traded else None,
+            atm_iv_near=result.atm_iv_near,
+            atm_iv_30d=result.atm_iv_30d,
             **({k: round(v, 0) for k, v in zip(_SIDE_COLS, split)} if split else {}),
         )
     except Exception as exc:
@@ -283,6 +290,23 @@ def strike_flow(symbol: str, expiry: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
+def open_interest(symbol: str, expiry: Optional[str] = None) -> Dict[str, Any]:
+    """Open interest by strike and max pain for one expiry (default the nearest), from the cached chain; fetches the
+    chain first (through get_gex) when none is cached."""
+    from optionflow.modules.flow import chain_stats
+    sym = symbol.upper()
+    hit = gamma.chain_rows(sym)
+    if hit is None:
+        get_gex(sym)
+        hit = gamma.chain_rows(sym)
+    g = cached_gex(sym)
+    spot, rows = hit if hit else (0.0, None)
+    if g is not None and not g.error and g.spot:
+        spot = g.spot                                   # the live (respotted) price, not the fetch price
+    out = chain_stats.summary(rows, spot, expiry) if rows is not None else chain_stats.summary(None, spot)
+    return {"symbol": sym, **out}
+
+
 def _parse_ts(ts: str) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
@@ -345,13 +369,18 @@ def net_flow_history(symbol: str, days: int = 1, bucket_minutes: int = 0) -> Lis
                 "net_flow": last[4], "total_prem": last[5],
                 "volume": sum(r[6] or 0 for r in group),
                 **_traded_fields(*last[7:13]),
+                **_iv_fields(*last[13:15]),
             })
         return out
     return [
         {"ts": ts, "price": price, "call_prem": cp, "put_prem": pp,
-         "net_flow": nf, "total_prem": tp, "volume": vol, **_traded_fields(*rest)}
+         "net_flow": nf, "total_prem": tp, "volume": vol, **_traded_fields(*rest[:6]), **_iv_fields(*rest[6:8])}
         for ts, price, cp, pp, nf, tp, vol, *rest in rows
     ]
+
+
+def _iv_fields(near=None, d30=None) -> Dict[str, Any]:
+    return {"atm_iv_near": near, "atm_iv_30d": d30}
 
 
 def _traded_fields(ct=None, pt=None, cb=None, cs=None, pb=None, ps=None) -> Dict[str, Any]:

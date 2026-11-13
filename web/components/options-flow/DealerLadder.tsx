@@ -1,7 +1,7 @@
 "use client";
 /**
  * DealerLadder — the price scale from the dashboard's "SPY dealers", for any ticker on the Flow board:
- * call wall, king, flip and put wall around spot, plus four ideas placed at their strikes
+ * call wall, king, flip, put wall and the nearest expiry's max pain around spot, plus four ideas placed at their strikes
  * (buy call, sell call, buy put, sell put) with their expiry.
  * TradeIdeas — the same four in full: mid, delta, break-even, how each fits the gamma regime, and why that strike.
  */
@@ -82,6 +82,7 @@ export function DealerLadder({ data, height = 250, className }: { data: GexResul
         { label: "flip", price: data.zero_gamma, tone: "text-accent" },
         { label: `⚓ anchor ${anchor ? shortExpiry(anchor.expiry) : ""}`, price: anchor?.price, tone: ANCHOR_TONE },
         { label: "put wall", price: data.max_put_wall, tone: "text-loss" },
+        { label: `◎ max pain ${data.max_pain_expiry ? shortExpiry(data.max_pain_expiry) : ""}`, price: data.max_pain, tone: "text-[#7c3aed] dark:text-[#c4b5fd]" },
         { label: "⚔ battle", price: o?.battleground, tone: "text-warn", strong: true },
         { label: `+1σ ${o?.expected_dte ?? ""}d`, price: o?.expected_high, tone: "text-foreground/45" },
         { label: `−1σ ${o?.expected_dte ?? ""}d`, price: o?.expected_low, tone: "text-foreground/45" },

@@ -438,6 +438,10 @@ class NetFlowSnapshot(Base):
     call_sold   = Column(Float, nullable=True)
     put_bought  = Column(Float, nullable=True)
     put_sold    = Column(Float, nullable=True)
+    # ATM implied vol (decimal) at this snapshot (flow.chain_stats.atm_iv): nearest expiry ≥ 1 day out, and constant
+    # 30-day. None on rows before 2026-11-14 and when the chain had no usable quote at the money
+    atm_iv_near = Column(Float, nullable=True)
+    atm_iv_30d  = Column(Float, nullable=True)
 
 class FlowStrikeSide(Base):
     """Today's sided traded premium per contract (flow.traded.strikes), saved about once a minute per symbol so a
