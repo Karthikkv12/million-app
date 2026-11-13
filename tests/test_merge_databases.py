@@ -11,6 +11,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_databases.py"
 
 
+def _script_head() -> str:
+    """The newest migration in alembic/versions, so a new migration doesn't break this test."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    return ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_current_head()
+
+
 def _legacy(dir: Path) -> None:
     """Five legacy files: a user, a week with 2 positions (one pointing at a deleted holding),
     an empty duplicate table in users.db, and a legacy-only table in trades.db."""
@@ -80,7 +87,7 @@ def test_merges_with_dropped_orphans(legacy):
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
     head = con.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     con.close()
-    assert head == "0010_flow_traded_premium"
+    assert head == _script_head()
     dropped = json.loads(Path(str(target) + ".dropped.json").read_text())
     assert [(d["table"], d["row"]["id"]) for d in dropped] == [("option_positions", 2)]
 
