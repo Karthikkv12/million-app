@@ -46,6 +46,18 @@ def gamma(S: float, K: float, T: float, sigma: float, r: float = R_DEFAULT) -> f
     return _pdf(d1) / (S * sigma * math.sqrt(T))
 
 
+def price(S: float, K: float, T: float, sigma: float, otype: str, r: float = R_DEFAULT) -> float:
+    """Black-Scholes value of one option per share (no dividends); intrinsic at/after expiry or without a usable IV."""
+    call = otype.lower().startswith("c")
+    d1 = _d1(S, K, T, r, sigma)
+    if d1 is None:
+        return max(S - K, 0.0) if call else max(K - S, 0.0)
+    d2 = d1 - sigma * math.sqrt(T)
+    if call:
+        return S * _cdf(d1) - K * math.exp(-r * T) * _cdf(d2)
+    return K * math.exp(-r * T) * _cdf(-d2) - S * _cdf(-d1)
+
+
 def year_fraction(days: float) -> float:
     return max(days, 0.0) / 365.0
 

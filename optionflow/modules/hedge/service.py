@@ -23,13 +23,16 @@ from optionflow.core.db import get_session
 from optionflow.core.settings import get_settings
 from optionflow.modules.hedge import bs
 from optionflow.modules.hedge.ivtrack import TRACKER
-from optionflow.modules.hedge.suggest import Context, Leg, Quote, evaluate, pick_weekly
+from optionflow.modules.hedge import signal as stock_signal
+from optionflow.modules.hedge.suggest import Context, Leg, Quote, evaluate, is_long_options_only, pick_weekly
 from optionflow.providers.market_data import get_market_data
 
 logger = logging.getLogger("optionflow.hedge")
 
 SPOT_TTL, QUOTE_TTL, CHAIN_TTL, HV_TTL, BETA_TTL = 1.0, 300.0, 60.0, 3600.0, 6 * 3600.0
 BETA_BENCH = "SPY"
+VIX = "^VIX"              # market fear for hedge.signal (its 1-year percentile)
+IRX = "^IRX"              # 13-week T-bill yield, for option pricing
 
 
 def now_iso() -> str:
@@ -237,8 +240,64 @@ def _gex(sym: str) -> Dict[str, Optional[float]]:
         from optionflow.modules.flow import service as flow
         r = flow.get_gex(sym)
         return {"king": r.max_gex_strike, "put_wall": r.max_put_wall, "call_wall": r.max_call_wall,
-                "net_gex": r.net_gex, "zero_gamma": r.zero_gamma} if not r.error else {}
+                "net_gex": r.net_gex, "zero_gamma": r.zero_gamma, "max_pain": r.max_pain} if not r.error else {}
     return CACHE.get("gex", sym, CHAIN_TTL, load) or {}
+
+
+def _daily_bars(sym: str) -> List[Dict[str, Any]]:
+    """10 years of daily bars [{date, open, high, low, close, volume}], hourly (the IV model needs 5 years of history
+    plus a year of warm-up)."""
+    def load():
+        from optionflow.providers.market_data import bars_from_history
+        df = get_market_data().price_history(sym, "10y", "1d")
+        return bars_from_history(df, intraday=False) if df is not None and not df.empty else []
+    return CACHE.get("bars", sym, HV_TTL, load) or []
+
+
+def _rate() -> float:
+    """13-week T-bill yield (decimal) for option pricing, hourly; R_DEFAULT if unavailable."""
+    def load():
+        bars = _daily_bars(IRX)
+        return bars[-1]["close"] / 100.0 if bars else None
+    try:
+        r = CACHE.get("rate", IRX, HV_TTL, load)
+    except Exception:
+        r = None
+    return r if r is not None and 0 <= r < 0.25 else bs.R_DEFAULT
+
+
+def _session_frac(now: Optional[datetime] = None) -> Tuple[date, float]:
+    """(today in US-Eastern, share of the regular session gone: 0 before 9:30, 1 after 16:00 and on weekends)."""
+    from optionflow.workers.backfill import ET
+    t = (now or datetime.now(timezone.utc)).astimezone(ET)
+    if t.weekday() >= 5:
+        return t.date(), 1.0
+    m = t.hour * 60 + t.minute - (9 * 60 + 30)
+    return t.date(), min(max(m / 390.0, 0.0), 1.0)
+
+
+def _tape(sym: str, ivs: Any, hv: Dict[str, Any], gx: Dict[str, Any]) -> Optional[stock_signal.Tape]:
+    """History, volume and today's option flow for hedge.signal (long-options holdings). None if it fails."""
+    try:
+        bars = _daily_bars(sym)
+        vix_bars = _daily_bars(VIX)
+        today, frac = _session_frac()
+        flow = None
+        try:
+            from optionflow.modules.flow import traded
+            flow = traded.sides(sym)
+        except Exception:
+            logger.debug("no traded flow for %s", sym, exc_info=True)
+        return stock_signal.Tape(
+            0.0, [b["close"] for b in bars], [b.get("volume") for b in bars],
+            [b.get("high") for b in bars], [b.get("low") for b in bars],
+            today_bar=bool(bars) and bars[-1]["date"] == today.isoformat(), session_frac=frac,
+            hv20=hv.get("hv20"), zero_gamma=gx.get("zero_gamma"), max_pain=gx.get("max_pain"), flow=flow,
+            vix=[b["close"] for b in vix_bars], dates=[b["date"] for b in bars], vix_dates=[b["date"] for b in vix_bars],
+            rate=_rate())
+    except Exception:
+        logger.exception("signal tape for %s failed", sym)
+        return None
 
 
 def _chain(sym: str) -> Optional[Dict[str, Any]]:
@@ -373,7 +432,8 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     gx = _gex(sym)
     ctx = Context(sym, spot, avg_cost, day_change, _track_high(sym, spot), ivs.atm_iv or atm_iv, hv.get("hv20"),
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
-    book = evaluate(ctx, legs, quotes, rules, chain_quotes).to_dict()
+    tape = _tape(sym, ivs, hv, gx) if is_long_options_only(legs) else None
+    book = evaluate(ctx, legs, quotes, rules, chain_quotes, tape).to_dict()
     book.update({
         "spot": round(spot, 4), **day, "day_high": ctx.day_high,
         "accounts": accounts, "weekly_expiry": weekly, "beta": _beta(sym), "chain_source": chain.get("source"),

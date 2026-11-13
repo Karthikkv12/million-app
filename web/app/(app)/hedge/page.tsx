@@ -68,6 +68,117 @@ const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? 
 const actionOf = (s?: HedgeSuggestion | null) => !s ? null
   : s.long_strike != null ? { ...ACTION.SELL_PUT, label: "Put spread" } : ACTION[s.action];
 
+// ── Long options tracked as stock: levels + reads (hedge.signal) ─────────────
+type Signal = NonNullable<HedgeBook["signal"]>;
+const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neutral"; label: string; edge: "gain" | "loss" | "warn" | null }> = {
+  ADD: { tag: "gain", label: "Add", edge: "gain" },
+  HOLD: { tag: "neutral", label: "Hold", edge: null },
+  CAUTION: { tag: "warn", label: "Don't add", edge: "warn" },
+  TRIM: { tag: "loss", label: "Take profit", edge: "loss" },
+  ROLL: { tag: "warn", label: "Roll", edge: "warn" },
+};
+const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
+  fear: "Market fear", momentum: "RSI", dip: "Dip", flow: "Options flow", trend: "Trend", dealers: "Dealers",
+  volume: "Volume", volatility: "Volatility",
+};
+
+function ScoreBar({ v }: { v: number }) {
+  const w = Math.min(Math.abs(v), 1) * 50;
+  return (
+    <span className="relative inline-block h-1.5 w-16 shrink-0 rounded-full bg-foreground/10">
+      <span className="absolute inset-y-[-2px] left-1/2 w-px bg-foreground/30" />
+      <span className={clsx("absolute inset-y-0 rounded-full", v >= 0 ? "bg-gain" : "bg-loss")}
+        style={v >= 0 ? { left: "50%", width: `${w}%` } : { right: "50%", width: `${w}%` }} />
+    </span>
+  );
+}
+
+function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
+  const rows = g.levels.filter((l) => !l.key.startsWith("em_day"));
+  const above = rows.filter((l) => spot == null || l.price > spot);
+  const below = rows.filter((l) => spot != null && l.price <= spot);
+  const mark = (k: string) => k === g.support?.key || k === g.resistance?.key;
+  return (
+    <div className="mt-4 space-y-5">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
+        {[["Rebound score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score}</span>],
+          ["VIX percentile", g.vix_pct != null ? `${Math.round(g.vix_pct * 100)}%` : "—"],
+          ["Stock IV vs normal", g.iv_ratio != null ? <span key="iv" className={g.iv_ratio >= 1.2 ? "text-gain" : undefined}>{g.iv_ratio.toFixed(2)}× <span className="text-foreground/40">({vol(g.iv_model)} / {vol(g.iv_normal)})</span></span> : "—"],
+          ["Support", usd(g.support?.price)],
+          ["Risk line", g.stop != null ? <span key="st" className="text-loss">{usd(g.stop)}</span> : (g.vix_pct ?? 0) >= 0.8 ? "none in fear" : "—"],
+          ...(g.expected_move ? [["Move ±1σ", `${usd(g.expected_move.day)} d · ${usd(g.expected_move.week)} wk`]] : []),
+        ].map(([k, v]) => (
+          <div key={k as string}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className="mt-0.5 tabular-nums text-foreground">{v}</dd></div>
+        ))}
+      </dl>
+
+      {g.legs.length > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Your options · time decay</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full font-mono text-[12.5px] tabular-nums">
+              <thead><tr className="text-left text-[10px] uppercase tracking-[0.12em] text-foreground/45">
+                {["Contract", "Days", "IV", "Δ", "Time value", "Lost / 20d", "$ / day"].map((h) => <th key={h} className="py-1 pr-3 font-normal">{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {g.legs.map((l) => (
+                  <tr key={l.label} className="border-t border-[var(--border)]">
+                    <td className="py-1 pr-3 text-foreground">{l.label}</td>
+                    <td className="py-1 pr-3">{l.dte}</td>
+                    <td className="py-1 pr-3" title={l.iv_source === "model" ? "No quote: the backtest's IV model" : undefined}>{vol(l.iv)}{l.iv_source === "model" ? "*" : ""}</td>
+                    <td className="py-1 pr-3">{l.delta.toFixed(2)}</td>
+                    <td className="py-1 pr-3">{Math.round(l.extrinsic_pct * 100)}%</td>
+                    <td className={clsx("py-1 pr-3", l.roll ? "text-loss" : l.warn ? "text-warn" : "text-foreground/70")}>{(l.decay_20d * 100).toFixed(1)}%{l.roll ? " · roll" : l.warn ? " · soon" : ""}</td>
+                    <td className="sensitive py-1 pr-3">{usd(l.theta_day, 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-foreground/45">Roll once a leg loses 4%+ per 20 trading days (≈180 days left at 0.80Δ). Add with 365+ days.{g.legs.some((l) => l.iv_source === "model") ? " * IV from the model: no live quote." : ""}</p>
+        </div>
+      )}
+      {g.evidence && <p className="border-l-2 border-[var(--border-strong)] pl-3 text-[12.5px] leading-snug text-foreground/65">{g.evidence}</p>}
+      {g.reads.length > 0 && [true, false].map((tested) => g.reads.some((r) => !!r.tested === tested) && (
+        <div key={String(tested)}>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">{tested ? "Verdict inputs (backtested)" : "Context (not in the verdict)"}</p>
+          <ul className={clsx("mt-2 space-y-2.5", !tested && "opacity-70")}>
+            {g.reads.filter((r) => !!r.tested === tested).map((r) => (
+              <li key={r.key} className="text-[13px] leading-snug">
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="w-24 shrink-0 text-foreground/80">{READ_LABEL[r.key]}</span>
+                  <ScoreBar v={r.score} />
+                  <span className={clsx("w-11 shrink-0 text-right tabular-nums", tone(r.score))}>{sd(r.score)}</span>
+                  <span className="min-w-0 truncate text-[11.5px] text-foreground/45">{r.value}</span>
+                </div>
+                <p className="mt-0.5 text-foreground/60">{r.note}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      {rows.length > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Levels</p>
+          <ul className="mt-2 font-mono text-[12.5px] tabular-nums">
+            {[...above, null, ...below].map((l) => l == null ? (
+              <li key="spot" className="my-1 flex justify-between border-y border-[var(--border-strong)] py-1 text-foreground">
+                <span>Price</span><span>{usd(spot)}</span>
+              </li>
+            ) : (
+              <li key={l.key} className={clsx("flex items-baseline justify-between gap-3 py-0.5", mark(l.key) ? "text-foreground" : "text-foreground/55")}>
+                <span className="min-w-0 truncate">{mark(l.key) && <span className={l.price > (spot ?? 0) ? "text-loss" : "text-gain"}>● </span>}{l.label}{l.strength >= 3 && <span className="text-foreground/35"> ★</span>}</span>
+                <span className="shrink-0">{usd(l.price)} <span className="text-foreground/40">{pct(l.distance)}</span></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Expanded detail: ticket · legs · ladder ──────────────────────────────────
 function Detail({ b }: { b: HedgeBook }) {
   const s = b.suggestion;
@@ -117,9 +228,11 @@ function Detail({ b }: { b: HedgeBook }) {
                 ))}
               </dl>
             )}
+            {b.signal && <SignalPanel g={b.signal} spot={b.spot} />}
             {!!s.reasons?.length && (
               <ol className="mt-4 space-y-1.5 border-l border-[var(--border-strong)] pl-3 text-[13px] leading-snug text-foreground/70">
-                {s.reasons.map((r) => <li key={r}>{r}</li>)}
+                {(b.signal ? s.reasons.filter((r) => !b.signal!.reads.some((x) => r.startsWith(x.note)) && r !== b.signal!.evidence && !/^(Levels|Risk line|No stop|Expected move)/.test(r)) : s.reasons)
+                  .map((r) => <li key={r}>{r}</li>)}
               </ol>
             )}
             {!!s.warnings?.length && (
@@ -230,7 +343,7 @@ function Legend() {
           <Item title="Sell put" sym={<Edge cls="bg-gain" />}>Pullback: a red day or ≥1% off the high, IV not spiking. Sell the put at the highest strike below your average, if it pays at least 0.2% of the strike.</Item>
           <Item title="Buy back" sym={<Sym><Tag tone="solid">BB</Tag></Sym>}>A short option has given up most of its premium: 80% captured, or 50% with 3+ days left. Closing it frees the shares or cash for the next trade.</Item>
           <Item title="Buy stock" sym={<Edge cls="bg-warn" />}>An odd lot under 100 shares, priced at or below your average: round it up so it can be worked.</Item>
-          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only.</Item>
+          <Item title="Tags" sym={<Sym><Tag>wait</Tag></Sym>}><b className="font-medium text-foreground/75">Wait</b>: conditions not met yet (see the reasons). <b className="font-medium text-foreground/75">Worked</b>: every lot has a call and a put on. <b className="font-medium text-foreground/75">Track</b>: options only. <b className="font-medium text-foreground/75">Add / Hold / Don&apos;t add / Roll</b>: long calls (LEAPS) or long puts with nothing sold are treated as stock. The verdict uses only what held up in a 30-year backtest, priced on the options themselves (theta, IV, time left): market fear (VIX), oversold RSI, the dip under the 50-day, and the stock&apos;s own IV vs its 5-year normal. Roll fires when a leg loses 4%+ of its value per 20 trading days. Flow, dealers, trend and volume are shown as context.</Item>
         </div>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-3">
@@ -339,7 +452,8 @@ function Scales({ books }: { books: HedgeBook[] }) {
 // ── One holding ──────────────────────────────────────────────────────────────
 function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle: () => void }) {
   const s = b.suggestion;
-  const a = actionOf(s);
+  const asStock = b.strategy === "long_stock";               // long calls / puts only: tracked as stock, no strategy
+  const a = asStock ? (b.signal ? VERDICT[b.signal.verdict] : { ...ACTION.TRACK, label: (b.net_delta ?? 0) < 0 ? "Short" : "Long" }) : actionOf(s);
   const per = perLot(b);
   const lots = Math.max(Math.floor(b.lots ?? 0), 1);
   const after = s?.net_delta_after != null && TRADE.has(s.action) ? s.net_delta_after / lots : null;
@@ -351,7 +465,7 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
           <p className="flex items-center gap-2 font-mono text-[15px] font-semibold tracking-tight text-foreground"><TickerLogo symbol={b.symbol} size={22} /><TickerLink symbol={b.symbol} />
             <span className={clsx("ml-2 font-mono text-[11px] font-normal xl:hidden", betaTone(b.beta))}>{b.beta != null ? `β ${b.beta.toFixed(2)}` : ""}</span>
           </p>
-          <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
+          <p className="truncate font-mono text-[10.5px] text-foreground/40"><span className="sensitive">{b.shares ? `${b.shares} sh` : asStock ? `≈ ${Math.round((b.net_delta ?? 0) * 100)} sh` : "options"}</span>{b.avg_cost ? <> · avg {usd(b.avg_cost)}</> : null}</p>
           {b.units.some((u) => u.kind === "covered") && b.units.some((u) => u.kind === "uncovered") && (
             <p className="truncate font-mono text-[10.5px] text-foreground/50">
               {b.units.filter((u) => u.kind === "covered" || u.kind === "uncovered").map((u) => (
