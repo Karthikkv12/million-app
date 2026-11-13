@@ -7,6 +7,8 @@ off, and alerts can be limited to some symbols (prefs, below; the same prefs on 
   the long call of the LEAPS / diagonal strategies)
 - iv_spike: ATM IV spikes on a holding (off by default)
 - expiring_itm: a short option is in the money with ≤ 1 day left, so assignment is likely (off by default)
+- levels: a dealer level of a holding or of an extra `level_symbols` ticker moved (call wall, put wall, king, flip),
+  or spot crossed the flip (LevelWatch, below)
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
 restart can repeat that day's alerts at most once.
 
@@ -22,6 +24,7 @@ import json
 import logging
 import os
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
@@ -32,9 +35,16 @@ from optionflow.modules.notify import webpush
 logger = logging.getLogger("optionflow.notify")
 ET = ZoneInfo("America/New_York")
 MAX_PER_CYCLE = 6                     # more than this in one minute → one summary instead
-KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm")
+KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm", "levels")
 DEFAULT_PREFS: Dict[str, Any] = {"buyback": True, "sell_call": True, "sell_put": True, "buy_stock": True,
-                                 "iv_spike": False, "expiring_itm": False, "symbols": []}   # [] = every holding
+                                 "iv_spike": False, "expiring_itm": False, "levels": True,
+                                 "symbols": [],          # [] = every holding
+                                 "level_symbols": []}    # watched for level alerts on top of the holdings
+MAX_LEVEL_SYMBOLS = 20
+
+
+def _syms(xs, n: int) -> List[str]:
+    return sorted({str(x).strip().upper() for x in (xs or []) if str(x).strip()})[:n]
 
 
 def clean_prefs(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -42,8 +52,8 @@ def clean_prefs(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     for k in KINDS:
         if isinstance((p or {}).get(k), bool):
             out[k] = p[k]
-    syms = (p or {}).get("symbols") or []
-    out["symbols"] = sorted({str(x).strip().upper() for x in syms if str(x).strip()})[:100]
+    out["symbols"] = _syms((p or {}).get("symbols"), 100)
+    out["level_symbols"] = _syms((p or {}).get("level_symbols"), MAX_LEVEL_SYMBOLS)
     return out
 
 
@@ -57,7 +67,11 @@ def _load(raw: Optional[str]) -> Dict[str, Any]:
 def allows(prefs: Dict[str, Any], alert: Dict[str, Any]) -> bool:
     if alert.get("kind") == "summary":
         return True
-    return bool(prefs.get(alert["kind"])) and (not prefs.get("symbols") or alert["symbol"] in prefs["symbols"])
+    if not prefs.get(alert["kind"]):
+        return False
+    if alert["kind"] == "levels" and alert["symbol"] in (prefs.get("level_symbols") or []):
+        return True                                   # asked for by name: not limited by `symbols`
+    return not prefs.get("symbols") or alert["symbol"] in prefs["symbols"]
 
 
 def now_iso() -> str:
@@ -255,6 +269,147 @@ def alerts_for(books: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+# ── Level-shift alerts (#57) ──────────────────────────────────────────────────
+LEVELS = (("max_call_wall", "call wall", "it tends to cap rallies"),
+          ("max_put_wall", "put wall", "it tends to hold dips"),
+          ("max_gex_strike", "king strike", "price tends to pin there"))
+FLIP_MOVE_PCT = 0.005      # the flip has to move this share of spot to count as a move
+CROSS_BAND_PCT = 0.001     # spot must clear the flip by this share of spot to count as on that side
+CROSS_COOLDOWN = 30 * 60   # seconds: at most one crossing alert per symbol in this window
+
+
+def _px(v: float) -> str:
+    return f"{v:,.2f}".rstrip("0").rstrip(".") if v % 1 else f"{v:,.0f}"
+
+
+class LevelWatch:
+    """Dealer levels per symbol, compared between refreshes. A change has to show on two refreshes in a row (two
+    different `as_of`) before it is reported, so a wall that flickers between two strikes for one refresh stays
+    quiet. The first refresh of a symbol only sets the baseline. Market data, so one instance serves every user."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._base: Dict[str, Dict[str, Any]] = {}      # symbol → reported levels + side of the flip
+        self._pending: Dict[str, Dict[str, Any]] = {}   # symbol → {field: candidate value} seen once
+        self._as_of: Dict[str, str] = {}
+        self._cross_at: Dict[str, float] = {}
+
+    def check(self, r: Any, now: Optional[float] = None) -> List[Dict[str, Any]]:
+        """Alerts for this refresh of one symbol (a GEXResult); [] for an error, a stale result or a repeat."""
+        if r is None or getattr(r, "error", None) or getattr(r, "stale", False) or not r.spot:
+            return []
+        sym, spot = r.symbol.upper(), float(r.spot)
+        now = time.time() if now is None else now
+        flip = r.zero_gamma
+        side = None
+        if flip is not None:
+            band = spot * CROSS_BAND_PCT
+            side = "above" if spot > flip + band else "below" if spot < flip - band else None
+        cur = {f: getattr(r, f) for f, _, _ in LEVELS}
+        cur["zero_gamma"] = flip
+        with self._lock:
+            if r.as_of and self._as_of.get(sym) == r.as_of:
+                return []
+            self._as_of[sym] = r.as_of or ""
+            base = self._base.get(sym)
+            if base is None:
+                self._base[sym] = {**cur, "side": side}
+                return []
+            pend = self._pending.setdefault(sym, {})
+            out: List[Dict[str, Any]] = []
+            day = datetime.now(ET).date().isoformat()
+
+            def confirmed(field: str, val: Any) -> bool:
+                if pend.get(field, object()) == val:
+                    pend.pop(field, None)
+                    return True
+                pend[field] = val
+                return False
+
+            for f, name, why in LEVELS:
+                old, new = base.get(f), cur[f]
+                if new is None or old == new:
+                    pend.pop(f, None)
+                    continue
+                if old is None:                         # level appeared: adopt it quietly
+                    base[f] = new
+                    continue
+                if confirmed(f, new):
+                    base[f] = new
+                    up = "up" if new > old else "down"
+                    out.append({"key": f"lv:{sym}:{f}:{new:g}:{day}", "kind": "levels", "symbol": sym,
+                                "title": f"{sym} {name} moved {up}: {_px(old)} → {_px(new)}",
+                                "body": f"Spot ${spot:,.2f}. The {name} is where dealer gamma is heaviest on that "
+                                        f"side; {why}.", "url": f"/stocks/{sym}"})
+            old_flip = base.get("zero_gamma")
+            if flip is None:
+                pend.pop("zero_gamma", None)
+            elif old_flip is None:
+                base["zero_gamma"] = flip
+            elif abs(flip - old_flip) >= spot * FLIP_MOVE_PCT:
+                if confirmed("zero_gamma", round(flip / (spot * FLIP_MOVE_PCT))):   # same neighbourhood twice
+                    base["zero_gamma"] = flip
+                    up = "up" if flip > old_flip else "down"
+                    regime = ("above it: dealers long gamma, moves fade" if spot >= flip
+                              else "below it: dealers short gamma, moves run")
+                    out.append({"key": f"lv:{sym}:flip:{round(flip, 1):g}:{day}", "kind": "levels", "symbol": sym,
+                                "title": f"{sym} flip moved {up}: {_px(round(old_flip, 2))} → {_px(round(flip, 2))}",
+                                "body": f"Spot ${spot:,.2f} is {regime}.", "url": f"/stocks/{sym}"})
+            else:
+                pend.pop("zero_gamma", None)
+            old_side = base.get("side")
+            if side is None or side == old_side:
+                pend.pop("side", None)
+            elif old_side is None:
+                base["side"] = side
+            elif confirmed("side", side):
+                base["side"] = side
+                if now - self._cross_at.get(sym, -1e18) >= CROSS_COOLDOWN:
+                    self._cross_at[sym] = now
+                    what = ("Dealers are now long gamma: they sell rallies and buy dips, so moves tend to fade."
+                            if side == "above" else
+                            "Dealers are now short gamma: they sell drops and buy rallies, so moves tend to run.")
+                    out.append({"key": f"lv:{sym}:cross:{side}:{int(now // CROSS_COOLDOWN)}", "kind": "levels",
+                                "symbol": sym, "title": f"{sym} crossed {side} the flip ({_px(round(flip, 2))})",
+                                "body": f"Spot ${spot:,.2f}. {what}", "url": f"/stocks/{sym}"})
+            return out
+
+    def clear(self) -> None:
+        with self._lock:
+            self._base.clear()
+            self._pending.clear()
+            self._as_of.clear()
+            self._cross_at.clear()
+
+
+LEVEL_WATCH = LevelWatch()
+
+
+def level_symbols(books: Dict[str, Any], prefs_list: List[Dict[str, Any]]) -> List[str]:
+    """Symbols a user's level alerts cover: the holdings in `books` plus every device's `level_symbols`, capped."""
+    if not any(p.get("levels") for p in prefs_list):
+        return []
+    held = [b["symbol"] for b in books.get("books", []) if b.get("symbol") and not b.get("error")]
+    extra = [x for p in prefs_list for x in p.get("level_symbols") or []]
+    return _syms(extra + held, MAX_LEVEL_SYMBOLS)
+
+
+def level_alerts(symbols: List[str], gex_fn=None, watch: Optional[LevelWatch] = None) -> Dict[str, List[Dict[str, Any]]]:
+    """{symbol: alerts} for this cycle: each symbol's levels (cached GEX, refetched when older than the cache TTL)
+    checked once against the last cycle. Symbols whose data fails are skipped."""
+    if gex_fn is None:
+        from optionflow.modules.flow import service as flow
+        gex_fn = flow.get_gex
+    watch = watch or LEVEL_WATCH
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for sym in symbols:
+        try:
+            out[sym] = watch.check(gex_fn(sym))
+        except Exception as e:
+            logger.info("level check for %s failed: %s", sym, e)
+    return out
+
+
 class _Sent:
     """Keys already pushed today (ET), per user."""
     def __init__(self) -> None:
@@ -276,15 +431,22 @@ class _Sent:
 SENT = _Sent()
 
 
-def run_for_user(user_id: int, books_fn=None, sender=None) -> int:
-    """Compute alerts for one user, push the new ones each device asked for. Returns notifications delivered."""
+def run_for_user(user_id: int, books_fn=None, sender=None,
+                 levels: Optional[Dict[str, List[Dict[str, Any]]]] = None) -> int:
+    """Compute alerts for one user, push the new ones each device asked for. Returns notifications delivered.
+    `levels` is this cycle's level_alerts() by symbol; only the user's level_symbols() are taken from it."""
     if books_fn is None:
         from optionflow.modules.hedge import service as hedge
         books_fn = hedge.books_for
     subs = subscriptions(user_id)
     if not subs:
         return 0
-    wanted = [a for a in alerts_for(books_fn(user_id)) if any(allows(sub["prefs"], a) for sub in subs)]
+    books = books_fn(user_id)
+    found = alerts_for(books)
+    if levels:
+        for sym in level_symbols(books, [sub["prefs"] for sub in subs]):
+            found.extend(levels.get(sym) or [])
+    wanted = [a for a in found if any(allows(sub["prefs"], a) for sub in subs)]
     fresh = set(SENT.new(user_id, [a["key"] for a in wanted]))
     todo = [a for a in wanted if a["key"] in fresh]
     if not todo:

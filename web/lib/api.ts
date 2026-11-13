@@ -356,6 +356,9 @@ export interface FlowSnapshot {
   /** Net call premium (calls bought − sold) and net put premium (puts bought − sold). */
   ncp?: number | null;
   npp?: number | null;
+  /** ATM implied vol (decimal): nearest expiry ≥ 1 day out, and constant 30-day. Null on rows before 2026-11-14. */
+  atm_iv_near?: number | null;
+  atm_iv_30d?: number | null;
 }
 
 export const fetchNetFlowHistory = (symbol: string, days = 1) =>
@@ -1017,6 +1020,11 @@ export const fetchFlowLeaders = (limit = 5) => api.get<FlowLeaders>(`/flow/leade
 export type StrikeFlow = Schemas["StrikeFlowOut"];
 export const fetchStrikeFlow = (symbol: string, expiry?: string | null) =>
   api.get<StrikeFlow>(`/flow/${encodeURIComponent(symbol.toUpperCase())}/strikes${expiry ? `?expiry=${expiry}` : ""}`);
+
+// ── Open interest by strike and max pain per expiry (flow.chain_stats) ───────
+export type OpenInterest = Schemas["OpenInterestOut"];
+export const fetchOpenInterest = (symbol: string, expiry?: string | null) =>
+  api.get<OpenInterest>(`/flow/${encodeURIComponent(symbol.toUpperCase())}/open-interest${expiry ? `?expiry=${expiry}` : ""}`);
 
 // ── Scenario / payoff matrix (risk.scenario) ─────────────────────────────────
 export type ScenarioIn = Schemas["ScenarioIn"];

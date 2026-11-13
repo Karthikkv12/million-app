@@ -13,7 +13,7 @@ from optionflow.core import errors
 from optionflow.core.deps import get_current_user, get_current_user_for_stream
 from optionflow.modules.flow import history, service, tide
 from optionflow.modules.flow.schemas import (
-    FlowLeadersOut, GexDayOut, GexOut, NetFlowPoint, StrikeFlowOut, TidePoint, WatchRequest,
+    FlowLeadersOut, GexDayOut, GexOut, NetFlowPoint, OpenInterestOut, StrikeFlowOut, TidePoint, WatchRequest,
 )
 from optionflow.workers import backfill
 
@@ -62,6 +62,14 @@ def strike_flow(symbol: str, expiry: Optional[str] = Query(None, pattern=r"^\d{4
     """Today's option volume by strike, split into bought (at the ask) and sold (at the bid), in premium and in
     delta dollars. Quote rule on the last print per refresh: a burst of trades between refreshes takes one side."""
     return StrikeFlowOut(**service.strike_flow(symbol, expiry))
+
+
+@stream_router.get("/{symbol}/open-interest", response_model=OpenInterestOut)
+def open_interest(symbol: str, expiry: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+                  _user=Depends(get_current_user)) -> OpenInterestOut:
+    """Open interest by strike (calls and puts) and the max-pain strike for one expiry (default the nearest), plus
+    max pain for every listed expiry. From the cached chain; open interest updates once a day at the source."""
+    return OpenInterestOut(**service.open_interest(symbol, expiry))
 
 
 @stream_router.get("/{symbol}/stream", response_class=StreamingResponse)

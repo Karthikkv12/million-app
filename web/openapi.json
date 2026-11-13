@@ -4966,6 +4966,41 @@
       ],
       "title": "As Of"
      },
+     "atm_iv_30d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM implied vol (decimal) at a constant 30 days",
+      "title": "Atm Iv 30D"
+     },
+     "atm_iv_near": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM implied vol (decimal) of the nearest expiry \u2265 1 day out",
+      "title": "Atm Iv Near"
+     },
+     "atm_iv_near_expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Atm Iv Near Expiry"
+     },
      "call_gex_by_strike": {
       "default": [],
       "items": {
@@ -5085,6 +5120,29 @@
        }
       ],
       "title": "Max Gex Strike"
+     },
+     "max_pain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Max-pain strike of the nearest expiry (max_pain_expiry)",
+      "title": "Max Pain"
+     },
+     "max_pain_expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Pain Expiry"
      },
      "max_put_wall": {
       "anyOf": [
@@ -6881,8 +6939,56 @@
     "title": "LobbyingSection",
     "type": "object"
    },
+   "MaxPainPoint": {
+    "properties": {
+     "expiry": {
+      "title": "Expiry",
+      "type": "string"
+     },
+     "max_pain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Pain"
+     }
+    },
+    "required": [
+     "expiry"
+    ],
+    "title": "MaxPainPoint",
+    "type": "object"
+   },
    "NetFlowPoint": {
     "properties": {
+     "atm_iv_30d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM implied vol (decimal) at a constant 30 days",
+      "title": "Atm Iv 30D"
+     },
+     "atm_iv_near": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "ATM implied vol (decimal), nearest expiry \u2265 1 day out; None on rows before 2026-11-14",
+      "title": "Atm Iv Near"
+     },
      "call_bought": {
       "anyOf": [
        {
@@ -7142,6 +7248,22 @@
       "title": "Iv Spike",
       "type": "boolean"
      },
+     "level_symbols": {
+      "default": [],
+      "description": "Extra tickers watched for level alerts (e.g. SPY, QQQ), on top of the holdings",
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Level Symbols",
+      "type": "array"
+     },
+     "levels": {
+      "default": true,
+      "description": "A dealer level moved (call wall, put wall, king, flip) or spot crossed the flip",
+      "title": "Levels",
+      "type": "boolean"
+     },
      "sell_call": {
       "default": true,
       "title": "Sell Call",
@@ -7164,6 +7286,122 @@
      }
     },
     "title": "NotifyPrefs",
+    "type": "object"
+   },
+   "OpenInterestOut": {
+    "properties": {
+     "call_oi": {
+      "default": 0,
+      "title": "Call Oi",
+      "type": "integer"
+     },
+     "expiries": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Expiries",
+      "type": "array"
+     },
+     "expiry": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The expiry the rows are for (the nearest unless one was asked)",
+      "title": "Expiry"
+     },
+     "max_pain": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Strike where the open contracts of `expiry` are worth least at settlement",
+      "title": "Max Pain"
+     },
+     "max_pain_by_expiry": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/MaxPainPoint"
+      },
+      "title": "Max Pain By Expiry",
+      "type": "array"
+     },
+     "put_call_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Put Call Ratio"
+     },
+     "put_oi": {
+      "default": 0,
+      "title": "Put Oi",
+      "type": "integer"
+     },
+     "rows": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/OpenInterestRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "OpenInterestOut",
+    "type": "object"
+   },
+   "OpenInterestRow": {
+    "properties": {
+     "call_oi": {
+      "default": 0,
+      "title": "Call Oi",
+      "type": "integer"
+     },
+     "put_oi": {
+      "default": 0,
+      "title": "Put Oi",
+      "type": "integer"
+     },
+     "strike": {
+      "title": "Strike",
+      "type": "number"
+     }
+    },
+    "required": [
+     "strike"
+    ],
+    "title": "OpenInterestRow",
     "type": "object"
    },
    "OptionMetricsOut": {
@@ -17736,6 +17974,71 @@
      }
     ],
     "summary": "Flow Tide",
+    "tags": [
+     "flow"
+    ]
+   }
+  },
+  "/api/v1/flow/{symbol}/open-interest": {
+   "get": {
+    "description": "Open interest by strike (calls and puts) and the max-pain strike for one expiry (default the nearest), plus\nmax pain for every listed expiry. From the cached chain; open interest updates once a day at the source.",
+    "operationId": "open_interest_api_v1_flow__symbol__open_interest_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "expiry",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Expiry"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OpenInterestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Open Interest",
     "tags": [
      "flow"
     ]

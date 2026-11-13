@@ -68,6 +68,11 @@ class GexOut(BaseModel):
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
     net_vex: float = 0.0
+    max_pain: Optional[float] = Field(None, description="Max-pain strike of the nearest expiry (max_pain_expiry)")
+    max_pain_expiry: Optional[str] = None
+    atm_iv_near: Optional[float] = Field(None, description="ATM implied vol (decimal) of the nearest expiry ≥ 1 day out")
+    atm_iv_near_expiry: Optional[str] = None
+    atm_iv_30d: Optional[float] = Field(None, description="ATM implied vol (decimal) at a constant 30 days")
     call_premium: float = 0.0
     put_premium: float = 0.0
     net_flow: float = 0.0
@@ -103,6 +108,9 @@ class NetFlowPoint(BaseModel):
     put_sold: Optional[float] = Field(None, description="Part of put_traded filled at or near the bid")
     ncp: Optional[float] = Field(None, description="Net call premium: call_bought − call_sold")
     npp: Optional[float] = Field(None, description="Net put premium: put_bought − put_sold")
+    atm_iv_near: Optional[float] = Field(None, description="ATM implied vol (decimal), nearest expiry ≥ 1 day out; "
+                                         "None on rows before 2026-11-14")
+    atm_iv_30d: Optional[float] = Field(None, description="ATM implied vol (decimal) at a constant 30 days")
 
 
 class StrikeFlowRow(BaseModel):
@@ -184,3 +192,28 @@ class TidePoint(BaseModel):
     put_prem: float
     spy: Optional[float] = None
     symbols: int = Field(..., description="Symbols contributing at this point")
+
+
+class OpenInterestRow(BaseModel):
+    strike: float
+    call_oi: int = 0
+    put_oi: int = 0
+
+
+class MaxPainPoint(BaseModel):
+    expiry: str
+    max_pain: Optional[float] = None
+
+
+class OpenInterestOut(BaseModel):
+    symbol: str
+    spot: Optional[float] = None
+    expiries: List[str] = []
+    expiry: Optional[str] = Field(None, description="The expiry the rows are for (the nearest unless one was asked)")
+    max_pain: Optional[float] = Field(None, description="Strike where the open contracts of `expiry` are worth least "
+                                      "at settlement")
+    rows: List[OpenInterestRow] = []
+    call_oi: int = 0
+    put_oi: int = 0
+    put_call_ratio: Optional[float] = None
+    max_pain_by_expiry: List[MaxPainPoint] = []

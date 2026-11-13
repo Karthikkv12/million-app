@@ -126,6 +126,12 @@ class GEXResult:
     max_gex_strike: Optional[float] = None
     net_gex: float = 0.0
     net_vex: float = 0.0
+    # max pain of the nearest expiry (flow.chain_stats) and ATM IV: nearest expiry ≥ 1 day out, and constant 30-day
+    max_pain: Optional[float] = None
+    max_pain_expiry: Optional[str] = None
+    atm_iv_near: Optional[float] = None
+    atm_iv_near_expiry: Optional[str] = None
+    atm_iv_30d: Optional[float] = None
     lot_size: int = 100   # contract multiplier (US options: always 100)
     # ── Net flow fields ──────────────────────────────────────────────────────
     call_premium: float = 0.0       # total call premium (OI × mid × lot_size)
@@ -300,6 +306,12 @@ def chain_symbol(symbol: str) -> Optional[str]:
     return None if c is None else c.sym
 
 
+def chain_rows(symbol: str) -> Optional[tuple]:
+    """(spot, rows) of `symbol`'s last fetched chain, or None."""
+    c = _chains.get(symbol.upper())
+    return None if c is None else (c.spot, c.rows)
+
+
 def clear_chains() -> None:
     with _chains_lock:
         _chains.clear()
@@ -381,6 +393,16 @@ def _build(display_sym: str, sym: str, spot: float, df: pd.DataFrame, source: st
         # Net GEX
         result.net_gex = float(by_strike["gex"].sum())
         result.net_vex = float(df["vex"].sum())
+
+        # Max pain (nearest expiry) and ATM IV; never fatal
+        try:
+            from optionflow.modules.flow import chain_stats
+            result.max_pain_expiry = expiries[0]
+            result.max_pain = chain_stats.max_pain(df, expiries[0])
+            iv = chain_stats.atm_iv(df, spot)
+            result.atm_iv_near, result.atm_iv_near_expiry, result.atm_iv_30d = iv["near"], iv["near_expiry"], iv["d30"]
+        except Exception:
+            pass
 
         # Key levels
         result.zero_gamma = _find_zero_gamma(by_strike, spot)
