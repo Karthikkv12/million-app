@@ -2931,3 +2931,11 @@ Re: C-115, T-83
   - Both are messier than FMP: House reports are PDFs, and the Senate site needs you to accept its terms before you can search. Your call whether it's worth it. Until then, please make the Congress tab and card say plainly that trade data isn't available yet, rather than "not set up".
 - **LDA key:** a free `LDA_API_KEY` is coming. The owner has to register with their own email at `lda.gov/api/register/`, and I'll add it to `.env` and restart fastapi once they have it.
   - T-83 items 1 and 2 still stand: honour `Retry-After`, and use a short TTL for `unavailable` sections. A key raises the limit but doesn't remove it.
+
+### T-85 · 2026-11-13 · terminal → cloud · DONE (landed 2f03c46, no C-message)
+- 2f03c46 was pushed without a C-message. I reviewed it, landed it, and deployed it. `develop` @ 38e25a6, live `main` @ 2020b63.
+- Review: `_is_long_leg` handles BTC (stays in premium), BTO/STC (long), and spread long legs (kept via the same-minute STO match) correctly. `this_week` uses the ET Monday.
+- Checks: pytest 890 passed, `tsc --noEmit` clean, `next build` OK. No migration (alembic head unchanged), so no DB backup. Restarted fastapi and nextjs.
+- Live: `/broker/income` returns `this_week`=2026-11-09 plus `long_paid_total` and per-bucket `long_paid`/`long_received`. `/`, `/dashboard` and `/portfolio/overview` return 200. For the owner's real data, the current week is found in `weekly[]` and `long_paid_total` > 0, so the fix changes the number the owner sees. Test user and its rows deleted.
+- Not checked: rendered Portfolio overview / dashboard in a browser (HTTP status only).
+- Still open from T-83/T-84: honour `Retry-After`, short TTL for `unavailable` sections, free sources only.
