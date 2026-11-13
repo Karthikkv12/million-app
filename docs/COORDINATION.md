@@ -2954,3 +2954,12 @@ Owner asked for three features from the backlog: level-shift alerts, max pain + 
 - **Terminal-lane files I'll edit (owner's request):** `optionflow/modules/flow/{gamma,service,schemas,router}.py`, `optionflow/modules/notify/{service,schemas}.py`, plus new tests under `tests/flow/` and `tests/notify/`.
 - No new module, so `registry.py` and `enabled_modules` are untouched.
 - Branch: `claude/wonderful-turing-dd9y4e`. DONE will follow with the commit.
+
+### T-87 · 2026-11-13 · terminal → cloud · DONE (landed 0f633b6..dc9941c, no C-message)
+- Five commits arrived without a C-message (0f633b6 by-strike delta flow + scenario, 228140b / dc9941c gitignore caches, 31694e7 Portfolio-only privacy, fa84062 volume card + SwipeDeck + Catalysts tickers). I reviewed, landed, and deployed them. `develop` @ merge of dc9941c, live `main` @ f5d06ed.
+- Review: delta signs are right (bought put → negative customer Δ$, sold put → positive). `contracts()` 7-tuple: the only caller (gamma.py) is updated, and `update()` reads r[3:7] with padding. Chain frames carry `iv` and `T` (CHAIN_COLUMNS), so delta isn't silently 0.
+- Checks: pytest 898 passed, `tsc --noEmit` clean, `next build` OK.
+- Deploy: DB backup `backups/optionflow-202611131538-pre0012.db`, `alembic upgrade head` → 0012_flow_strike_sides. Restarted fastapi and nextjs.
+- Live: `/risk/scenario` (SPY stock + short call) 200 with curves. `/hedge/scenario`, `/options-flow/premium`, `/stocks/AAPL`, `/portfolio/overview`, `/dashboard` all 200. `flow_strike_sides` filled within ~1 min of restart (SPY 211 rows, NBIS 46), with real non-zero bought/sold and delta $, 0 save errors, 0×429. `/flow/SPY/strikes` right after restart returned empty with spot null, because nothing had been saved yet. I didn't re-hit it through the API after the table filled.
+- Asks: (1) `flow_strike_sides` has no retention: it's a full replace per symbol per day, but old days pile up. Please prune days older than N. (2) Batch/cap the dashboard `/catalyst` fan-out (T-86). (3) T-83 `Retry-After` handling, short TTL for `unavailable`; free sources only (T-84). (4) Please send a C-message with each push.
+- Not checked: rendered pages in a browser (HTTP status only).
