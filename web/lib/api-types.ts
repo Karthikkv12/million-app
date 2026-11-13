@@ -804,6 +804,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/insight/leaps-scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leaps Scores
+         * @description The LEAPS score of many symbols in one request (e.g. every holding): scores and entry, no factors.
+         */
+        get: operations["leaps_scores_api_v1_insight_leaps_scores_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/insight/{symbol}/leaps-score": {
         parameters: {
             query?: never;
@@ -3619,6 +3639,48 @@ export interface components {
              */
             spike: boolean;
         };
+        /**
+         * LeapsScoreBrief
+         * @description One symbol's LEAPS score in a batch: the numbers only, no factors (open the stock page for those).
+         */
+        LeapsScoreBrief: {
+            /** Band */
+            band?: string | null;
+            /** @description Entry for the stronger side */
+            entry?: components["schemas"]["ScoreEntry"] | null;
+            /** Error */
+            error?: string | null;
+            /** Options Label */
+            options_label?: string | null;
+            /**
+             * Options Score
+             * @description Option quality, same for call and put
+             */
+            options_score?: number | null;
+            /** Price */
+            price?: number | null;
+            /** Put Band */
+            put_band?: string | null;
+            /** Put Score */
+            put_score?: number | null;
+            /**
+             * Realtime
+             * @default false
+             */
+            realtime: boolean;
+            /**
+             * Score
+             * @description Long call score, 0–100; None without enough history
+             */
+            score?: number | null;
+            /**
+             * Side
+             * @description The stronger side (call on a tie)
+             */
+            side?: ("call" | "put") | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** LeapsScoreOut */
         LeapsScoreOut: {
             /** As Of */
@@ -3663,6 +3725,16 @@ export interface components {
             /** Symbol */
             symbol: string;
             traits?: components["schemas"]["ScoreTraits"] | null;
+        };
+        /** LeapsScoresOut */
+        LeapsScoresOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Scores
+             * @default []
+             */
+            scores: components["schemas"]["LeapsScoreBrief"][];
         };
         /** LedgerEntryOut */
         LedgerEntryOut: {
@@ -7463,6 +7535,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leaps_scores_api_v1_insight_leaps_scores_get: {
+        parameters: {
+            query: {
+                /** @description Comma-separated, e.g. AAPL,MSFT (up to 60) */
+                symbols: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeapsScoresOut"];
                 };
             };
             /** @description Validation Error */

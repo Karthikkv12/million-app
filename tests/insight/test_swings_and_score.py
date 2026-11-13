@@ -181,6 +181,22 @@ def test_api_needs_login_and_validates_the_period(md):
     c = TestClient(create_app(Settings(_env_file=None)))
     assert c.get("/api/v1/insight/ABC/swings").status_code == 401
     assert c.get("/api/v1/insight/ABC/leaps-score").status_code == 401
+    assert c.get("/api/v1/insight/leaps-scores?symbols=ABC").status_code == 401
+
+
+def test_batch_scores_every_symbol_in_order_and_survives_a_bad_one(md):
+    out = service.leaps_scores(["abc", " XYZ", "ABC", "NOPE", ""])
+    rows = out["scores"]
+    assert [r["symbol"] for r in rows] == ["ABC", "XYZ", "NOPE"] and out["as_of"]
+    one = service.leaps_score("ABC")
+    abc = rows[0]
+    assert abc["score"] == one["score"] and abc["put_score"] == one["put"]["score"]
+    assert abc["options_score"] == (one["options"] or {}).get("score")
+    better = "put" if one["put"]["score"] > one["score"] else "call"
+    assert abc["side"] == better and abc["entry"] == (one["put"]["entry"] if better == "put" else one["entry"])
+    assert rows[2]["score"] is None and rows[2]["side"] is None and rows[2]["error"] == "No price history for NOPE."
+    assert service.leaps_scores([])["scores"] == []
+    assert len(service.leaps_scores([f"S{i}" for i in range(100)])["scores"]) == service.MAX_BATCH
 
 
 # ── entry price ───────────────────────────────────────────────────────────────
