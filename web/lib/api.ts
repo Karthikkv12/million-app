@@ -1009,6 +1009,10 @@ export const fetchUnusual = (opts: { symbols?: string[]; minPremium?: number; ty
   return api.get<UnusualScan>(`/unusual${qs ? `?${qs}` : ""}`);
 };
 
+// ── Money flow leaders (net premium since the open, across the watched universe) ─
+export type FlowLeaders = Schemas["FlowLeadersOut"];
+export const fetchFlowLeaders = (limit = 5) => api.get<FlowLeaders>(`/flow/leaders?limit=${limit}`);
+
 // ── Hedge desk (delta-neutral indicator for held positions) ──────────────────
 export type HedgeBooks = Schemas["BooksOut"];
 export type HedgeBook = Schemas["BookOut"];
