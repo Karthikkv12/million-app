@@ -2892,3 +2892,31 @@ Status: open (close with your DONE)
   - Live from the sandbox, lobbying and contracts worked for NVDA, LMT and AAPL: LMT lobbying is ~$4M a quarter and federal contracts $55.5B over 12 months; NVDA lobbying is $1.3–2.2M a quarter.
   - I rendered the card, the badge and the Congress page in dark, light and phone widths, using real LMT lobbying and contract data with sample trades. No sideways scroll at 390 px.
 - **Not checked:** the sector line by eye, real FMP responses, and the warm-up load on the Mac.
+
+### T-83 · 2026-11-13 · terminal → cloud · DONE
+Re: C-115
+Status: done. There are 3 follow-ups for you below.
+- **Merged** `a3fddb9` into `develop` as **`737dd79`**, then released. Live `main` is at **`097f5d1`**, and both are pushed.
+  - No migration. The Mac's `.env` doesn't set `ENABLED_MODULES`, so `politics` is on by default.
+  - I restarted `com.optflw.fastapi`, which started the `politics-warm` thread. I also rebuilt and restarted `com.optflw.nextjs`.
+- **Review:** the terminal-lane edits are fine (`settings.py`, `main.py`, `registry.py` and the contract test).
+  - Nit: the new `fmp_api_key` / `lda_api_key` block sits under the "AI assistant" header comment, above the Gemini keys.
+- **Checks on the merged tree:** **889 tests passed**. A fresh OpenAPI export has no diff, tsc is clean, and `next build` succeeded (it includes `/catalyst/congress`).
+- **Live, about 13:20–13:25 ET:** `/`, `/dashboard`, `/catalyst/congress` and `/stocks/LMT` return 200.
+  - **`/politics/LMT`:** lobbying `ok`, $16.32M over 4 quarters (2026 Q3 $4.09M), and contracts `ok`, $55.45B over 12 months. Both match your numbers. Congress is `not_configured`, as expected. The cold request took ~8.6 s.
+  - **NVDA:** "NVIDIA Corporation", lobbying $6.15M over 4 quarters, contracts `none`.
+  - **AAPL:** lobbying $11.15M over 4 quarters, contracts $9.2K.
+  - **`/politics/summary`:** the first call served LMT and queued NVDA, AAPL and XOM. The warm worker cleared that queue within ~15 s. `/politics/feed` returned 200 in 0.18 s.
+  - fastapi was at ~5% CPU and 237 MB RSS a minute after the restart.
+- **Follow-ups (yours):**
+  1. **lda.gov throttles us without a key.** XOM ("ExxonMobil Holdings Corporation") got lobbying `unavailable`, and the log shows `429 Too Many Requests` on `client_name=EXXON+MOBIL`. A direct curl got `429` with `Retry-After: 12`. That happened after only 4 profiles, so the ~90-stock sector warm-up will hit it a lot.
+     - Please honour `Retry-After`, either by sleeping and retrying once or by re-queueing the symbol. The 4 s `WARM_GAP` isn't enough for an anonymous client making several LDA calls per symbol.
+     - Getting a free `LDA_API_KEY` may be the real fix. That's the owner's call.
+  2. **Failures are cached for 12 h.** A profile with an `unavailable` section is saved and served for the full `CACHE_TTL`. Line 297 only keeps an older good section if one exists. So XOM will show no lobbying until about 01:25 tomorrow.
+     - Please give a profile that has any `unavailable` section a short TTL (for example 10–15 min), so `summary()` re-queues it.
+  3. **The FMP key will end up in our logs.** `httpx` logs every request URL at INFO level, and `_fmp()` puts `apikey=` in the query string. Once `FMP_API_KEY` is set, the key will be written to `logs/com.optflw.fastapi.log` on every call.
+     - Please send it as a header if FMP accepts one (the `apikey` header), or redact it before it's logged.
+- **Not checked:**
+  - The card, the Congress page and the sector line by eye.
+  - Real FMP responses (there's still no key).
+  - The full sector warm-up load, or how many 429s it gets.
