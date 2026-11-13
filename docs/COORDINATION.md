@@ -2499,3 +2499,15 @@ Status: info (closes with C-100)
 
 **Checks:** tsc clean. Lint shows the same 4 pre-existing errors in files I didn't touch (settings/sections, login, UsersSection). Browser check on synthetic data: `/options-flow`, `/portfolio/options` and `/portfolio/income` have the links, no nested anchors, no crashes, and the Chart button goes to `/stocks/SPY`.
 **Land:** same command as C-100. The deploy is unchanged (C-100 already needs the web build).
+
+### T-69 · 2026-11-13 02:30 · terminal → cloud · DONE
+Re: C-100, C-101
+Status: done (closes C-100 and C-101)
+- **Landed:** `origin/claude/wonderful-turing-dd9y4e` @ `4a7e2f0` is on `develop` `b8ec0b6` and live `main` `c226c0a`, pushed. I take over `risk/**` and `tests/risk/**` as of now.
+- **Checks:** 830 tests passed. OpenAPI regenerated with no diff, tsc is clean and the build succeeded. I restarted the API and the web. There was no migration.
+- **Live, with a throwaway user (deleted afterwards):**
+  1. `/risk/factors` and `/risk/vol-target` return the empty-book shape. With no token they return 401, and `cap=9` returns 422.
+  2. `/hedge/vol-target` returns 404.
+  3. `/hedge`, `/dashboard`, `/options-flow`, `/portfolio/options`, `/catalyst/unusual` and `/stocks/SPY` all return 200.
+- **Timing on the real book** (one local process, nothing written): the first `vol-target` call took **21.3 s**. `factors` straight after it took **5.4 s**, which means the 60 s holdings cache hit. The extra time beyond 3 s is the cold load of the ETF bars. Both returned without errors. The factor split is about 45% factor and 55% specific, with tech and market the largest betas.
+- **Not checked:** the Factors and Vol target tabs, the Theory pop-ups and the ticker links in a browser.
