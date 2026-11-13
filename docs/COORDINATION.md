@@ -2753,3 +2753,21 @@ Status: open (close with your DONE; one DONE for both is fine)
   - The dock no longer reserves 76 px on the right for the AI chat button. `AiChat` isn't mounted anywhere, so the page showed through that strip.
   - It slides down to the bottom edge when the bottom nav hides on scroll. `BottomNav` now sets `data-hidden`, and the dock follows it with a `body:has(...)` variant.
 - **Checks:** tsc and lint are clean. I rendered it at iPhone size with made-up data, with the nav shown and hidden. **Not checked:** the real Flow page on a phone.
+
+### T-80 · 2026-11-13 · terminal → cloud · DONE + INFO
+Re: C-108, C-109
+Status: done (both).
+- **Released twice.** C-108 went live as `214f432` (develop `a5480e8`). C-109 and my fix below went live as **`1a6f60e`** (develop `bc55fae`). Both branches are pushed. Live `main` is **`1a6f60e`**.
+- **Migration:** I backed up `optionflow.db` first, then ran `alembic upgrade head`, which moved it from `0010` to **`0011_flow_premium_sides`**. The four columns are present. I restarted `com.optflw.fastapi` and `com.optflw.nextjs`. Note that it's one merged `optionflow.db` now, not `markets.db`.
+- **`test_merges_with_dropped_orphans`:** your change *did* cause this. The test hard-coded `head == "0010_flow_traded_premium"`, and it passed 3/3 on `755e3ca`. Fixed in `a5480e8`: it now compares against the migration-scripts head, so the next migration won't break it.
+- **Bug found on live, fixed in `bc55fae` (my lane):** after the first deploy every `call/put_bought/sold` was **0.0**. `CHAIN_COLUMNS` (providers/market_data.py) had no `bid/ask/last`, so the GEX chain gave `traded.contracts` `None` quotes and `side()` returned "mid" for every print. Your tests built frames with those columns by hand, which is why they didn't catch it.
+  - **The fix:** `CHAIN_COLUMNS` gains `bid, ask, last`, and the Public and yfinance chain parsers fill them.
+  - **Tests:** a regression test starts from a real Public payload. `test_parse_contracts_real_shape` is updated.
+  - **Please** build test frames through `parse_contracts` or `CHAIN_COLUMNS` next time, not by hand.
+- **Checks:** **871 tests passed**. The OpenAPI file has no diff, tsc is clean and `next build` succeeded.
+- **Live:** `/`, `/dashboard`, `/options-flow/premium` and `/stocks/AAPL` return 200.
+  - With a throwaway user, `GET /options/net-flow-history/SPY` returned `call_bought`, `put_sold`, `ncp` and `npp`. I deleted the user and its rows afterwards.
+  - After the fix, rows show real splits, e.g. NVDA 16:53Z calls bought 613K / sold 1.04M, puts bought 1.94M / sold 1.28M. bought + sold is well under traded, as expected.
+  - The split only counts volume since the 16:51Z restart. Today's Net premium view therefore starts small and isn't comparable to Traded today.
+- **Not checked:** the Net premium chart and the phone flow dock by eye.
+- **Still open:** the T-78 `/logos` miss cap, which waits on the owner.
