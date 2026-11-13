@@ -10,7 +10,7 @@ import { useTheme } from "@/lib/theme";
 import { SlidersHorizontal } from "lucide-react";
 import { TickerPanelWithQuery, makeSlot, STRIKE_OPTIONS, strikeLabel, PALETTES, DEFAULT_HEAT_OPTS } from "@/components/options-flow";
 import type { Slot, HeatOpts } from "@/components/options-flow";
-import { WatchlistDock } from "@/components/options-flow/WatchlistDock";
+import { WatchlistDock, shareFlowTicker } from "@/components/options-flow/WatchlistDock";
 
 // One accent (matches --accent): light #2f5bea, dark #90bff9
 const ACCENT = { light: "#2f5bea", dark: "#90bff9" } as const;
@@ -86,7 +86,7 @@ export default function OptionsFlowPage() {
   // A new ticker gets its own expiries; the GEX / VEX choice carries over while browsing.
   const goTo = useCallback((sym: string) => {
     const t = sym.trim().toUpperCase();
-    if (t) update({ ticker: t, input: t, expiryFilter: null });
+    if (t) { update({ ticker: t, input: t, expiryFilter: null }); shareFlowTicker(t, "board"); }
   }, [update]);
 
   return (

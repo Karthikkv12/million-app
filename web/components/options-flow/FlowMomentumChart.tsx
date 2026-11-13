@@ -36,9 +36,10 @@ type Day = (typeof DAYS)[number];
 type Mode = "side" | "since" | "total";
 type Key = "call" | "put" | "net" | "price";
 
-const m = (v: number | null | undefined, d = 1) => {
+const m = (v: number | null | undefined, digits?: number) => {
   if (v == null) return "—";
   const a = Math.abs(v), s = v < 0 ? "−" : v > 0 ? "+" : "";
+  const d = digits ?? (a < 1 ? 2 : 1);                        // under $1M: $0.04M, not $0.0M
   return a >= 1000 ? `${s}$${(a / 1000).toFixed(2)}B` : `${s}$${a.toFixed(d)}M`;
 };
 const utc = (ts: string) => new Date(/Z|[+-]\d\d:\d\d$/.test(ts) ? ts : ts + "Z");
@@ -56,6 +57,17 @@ export function openIndex(snaps: { ts: string }[]): number {
   const i = snaps.findIndex((s) => { const t = et(s.ts); return t.day === day && t.min >= OPEN; });
   return Math.max(i, 0);
 }
+const etClock = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+/** ET wall-clock time of an epoch-ms moment, e.g. "9:30 AM". */
+const clock = (ms: number) => etClock.format(new Date(ms));
+/** 9:30, then every hour from 11:00 to 16:00 ET (10:00 is too close to 9:30 to label both). */
+const sessionTicks = (open: number) => [open, ...Array.from({ length: 6 }, (_, k) => open + (90 + 60 * k) * 60_000)];
+/** Y-axis labels in $M with as many decimals as the range needs ($0.2M, not "$0M" twice). */
+const moneyTick = (rows: { yc: number | null; yp: number | null; yn: number | null }[]) => {
+  const span = Math.max(...rows.flatMap((r) => [r.yc, r.yp, r.yn].map((v) => Math.abs(v ?? 0))), 0);
+  const d = span >= 20 ? 0 : span >= 2 ? 1 : 2;
+  return (v: number) => m(v, d);
+};
 const when = (ts: string, days: number) => {
   const d = utc(ts);
   return days === 1 ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
@@ -90,46 +102,72 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
   const measured = all.some((s) => s.call_traded != null || s.put_traded != null);
   const sided = all.some((s) => s.ncp != null && s.npp != null);
   const eff: Mode = mode === "side" ? (sided ? "side" : measured ? "since" : "total") : measured ? mode : "total";
-  const fromOpen = eff !== "total" && days === 1;
+  // 1-day view: always from the 9:30 ET bell, on a fixed 9:30–16:00 axis.
+  const fromOpen = days === 1;
   const snaps = useMemo(() => {
     if (!fromOpen) return all;
     const cut = all.slice(openIndex(all));
     return cut.length >= 2 ? cut : all;
   }, [all, fromOpen]);
   const widened = !picked && days > 1 && snaps.length >= 2;
+  /** The latest snapshot's ET session, 9:30–16:00, in epoch ms. */
+  const session = useMemo(() => {
+    if (!snaps.length) return null;
+    const ts = snaps[snaps.length - 1].ts, ms = utc(ts).getTime();
+    const open = Math.floor(ms / 60_000) * 60_000 - (et(ts).min - OPEN) * 60_000;
+    return { open, close: open + 390 * 60_000 };
+  }, [snaps]);
 
   const rows = useMemo(() => {
     if (!snaps.length) return [];
     // "Traded": the server's figures are already cumulative since that ET day's open, so they're plotted as is.
     // Across days, earlier days' closing totals are carried in; a null (outside the session) holds the last value.
-    let day = "", doneC = 0, doneP = 0, tc = 0, tp = 0;
+    // `has`: this row carries the mode's figures. Rows before they were first measured are left out of the lines
+    // (null) instead of drawn flat at zero (the bought / sold split began on 2026-11-13 at ~11:41 ET).
+    let day = "", doneC = 0, doneP = 0, tc = 0, tp = 0, gotT = false, gotS = false;
     const done = [0, 0, 0, 0], now = [0, 0, 0, 0];          // call bought, call sold, put bought, put sold
-    return snaps.map((s, i) => {
+    const out = snaps.map((s) => {
       const call = s.call_prem / 1e6, put = s.put_prem / 1e6, net = s.net_flow / 1e6;
       const d = et(s.ts).day;
       if (d !== day) { doneC += tc; doneP += tp; tc = 0; tp = 0; for (let k = 0; k < 4; k++) { done[k] += now[k]; now[k] = 0; } day = d; }
-      if (s.call_traded != null) tc = s.call_traded / 1e6;
+      if (s.call_traded != null) { tc = s.call_traded / 1e6; gotT = true; }
       if (s.put_traded != null) tp = s.put_traded / 1e6;
       const four = [s.call_bought, s.call_sold, s.put_bought, s.put_sold];
-      if (four.every((x) => x != null)) four.forEach((x, k) => { now[k] = (x as number) / 1e6; });
+      if (four.every((x) => x != null)) { four.forEach((x, k) => { now[k] = (x as number) / 1e6; }); gotS = true; }
       const dc = doneC + tc, dp = doneP + tp;
       const [cb, cs, pb, ps] = now.map((x, k) => done[k] + x);
+      const base = { t: utc(s.ts).getTime(), ts: s.ts, price: s.price as number | null, sides: { cb, cs, pb, ps }, raw: { call, put, net, volume: s.volume } };
       if (eff === "side") {
         const ncp = cb - cs, npp = pb - ps;
-        return { i, ts: s.ts, price: s.price, call: ncp, putVal: npp, put: npp, net: ncp - npp,
-          sides: { cb, cs, pb, ps }, raw: { call, put, net, volume: s.volume } };
+        return { ...base, has: gotS, call: ncp, putVal: npp, put: npp, net: ncp - npp };
       }
       return {
-        i, ts: s.ts, price: s.price,
+        ...base, has: eff === "total" || gotT,
         call: eff === "since" ? dc : call,
         putVal: eff === "since" ? dp : put,          // real value (readout)
         put: eff === "since" ? dp : -put,           // plotted: totals mirror puts below zero
         net: eff === "since" ? dc - dp : net,
-        sides: { cb, cs, pb, ps },
-        raw: { call, put, net, volume: s.volume },
       };
     });
-  }, [snaps, eff]);
+    // 1-day view: a point at the 9:30 bell. Cumulative lines start there at zero when the day was measured from the
+    // open; the price line starts at its first snapshot.
+    if (fromOpen && out.length && session) {
+      const first = out[0];
+      const zero = eff !== "total" && first.has && first.t - session.open < 30 * 60_000;
+      out.unshift({ ...first, t: session.open, ts: new Date(session.open).toISOString(), price: null, has: zero,
+        call: 0, putVal: 0, put: 0, net: 0, sides: { cb: 0, cs: 0, pb: 0, ps: 0 }, raw: { call: 0, put: 0, net: 0, volume: 0 } });
+    }
+    return out.map((r, i) => ({ ...r, i, yc: r.has ? r.call : null, yp: r.has ? r.put : null, yn: r.has ? r.net : null }));
+  }, [snaps, eff, fromOpen, session]);
+  /** When the shown mode's figures start later than the bell on the latest day (the first day they exist). */
+  const lateStart = useMemo(() => {
+    if (!fromOpen || eff === "total" || !session) return null;
+    const firstHas = rows.find((r) => r.has && r.t > session.open);
+    const zeroAtOpen = rows[0]?.has;
+    return !zeroAtOpen && firstHas && firstHas.t - session.open > 30 * 60_000 ? firstHas.ts : null;
+  }, [rows, fromOpen, eff, session]);
+  const [zoom, setZoom] = useState<[number, number] | null>(null);
+  useEffect(() => { setZoom(null); }, [days, mode, symbol]);
 
   const last = rows.length - 1;
   const cur = rows[hover ?? last];
@@ -161,6 +199,11 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
       {!measured && mode === "since" && !isLoading && all.length > 0 && (
         <p className="mb-2 font-mono text-[11px] text-foreground/55">Premium traded is not measured yet in this window (it starts 2026-11-13); showing totals.</p>
       )}
+      {lateStart && (
+        <p className="mb-2 font-mono text-[11px] text-foreground/55">
+          {eff === "side" ? "Bought / sold" : "Premium traded"} has been measured since {when(lateStart, 1)} today. From the next session it starts at the 9:30 bell.
+        </p>
+      )}
       {widened && (
         <p className="mb-2 font-mono text-[11px] text-warn">No flow yet today (market closed); showing the last {days} days.</p>
       )}
@@ -189,19 +232,20 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
           {/* Readout: follows the cursor; relative to the pin when one is set */}
           <div className={clsx("mb-2 grid grid-cols-2 gap-x-4 gap-y-1 border-y border-[var(--border)] py-2 font-mono text-[12px] tabular-nums sm:grid-cols-[auto_repeat(4,minmax(0,1fr))]", eff === "side" && "sm:!grid-cols-[auto_repeat(3,minmax(0,1fr))]")}>
             <div className="col-span-2 flex items-center gap-2 text-foreground/60 sm:col-span-1">
-              {base ? <><Pin size={12} className="text-accent" />{when(base.ts, days)} → {when(cur.ts, days)}</> : <>{when(cur.ts, days)}{hover == null && <span className="text-foreground/35">latest</span>}</>}
+              {base ? <><Pin size={12} className="text-accent" />{when(base.ts, days)} → {when(cur.ts, days)}</> : hover != null ? when(cur.ts, days) : null}
             </div>
             {(() => {
               const d = (a: number, b?: number) => (base ? a - (b ?? 0) : a);
-              const px = base ? (cur.price / base.price - 1) * 100 : null;
+              const px = base && cur.price != null && base.price ? (cur.price / base.price - 1) * 100 : null;
+              const dash = !cur.has || (base != null && !base.has);
               const side = eff === "side";
               const tone = (v: number, good: boolean) => (v === 0 ? "text-foreground" : (v > 0) === good ? "text-gain" : "text-loss");
               return [
                 [side ? "NCP" : "Calls", m(d(cur.call, base?.call)), side ? tone(d(cur.call, base?.call), true) : "text-gain"],
                 [side ? "NPP" : "Puts", m(d(cur.putVal, base?.putVal)), side ? tone(d(cur.putVal, base?.putVal), false) : "text-loss"],
                 ...(side ? [] : [["Net", m(d(cur.net, base?.net)), d(cur.net, base?.net) >= 0 ? "text-gain" : "text-loss"]]),
-                ["Price", base ? `${cur.price.toFixed(2)} (${px! >= 0 ? "+" : ""}${px!.toFixed(2)}%)` : cur.price.toFixed(2), "text-foreground"],
-              ].map(([l, v, t]) => (
+                ["Price", cur.price == null ? "—" : px != null ? `${cur.price.toFixed(2)} (${px >= 0 ? "+" : ""}${px.toFixed(2)}%)` : cur.price.toFixed(2), "text-foreground"],
+              ].map(([l, v, t]) => (l === "Price" || !dash ? [l, v, t] : [l, "—", "text-foreground/40"])).map(([l, v, t]) => (
                 <div key={l} className="min-w-0"><span className="mr-1.5 text-[10px] uppercase tracking-[0.12em] text-foreground/40">{l}</span><span className={t}>{v}</span></div>
               ));
             })()}
@@ -234,28 +278,35 @@ export function FlowMomentumChart({ symbol, variant = "drawer", levels = [] }: P
                   </linearGradient>
                 </defs>
                 <CartesianGrid {...grid} />
-                <XAxis dataKey="ts" {...xAxis} minTickGap={48} tickFormatter={(v: string) => when(v, days)} />
-                <YAxis yAxisId="m" {...yAxis} width={56} tickFormatter={(v: number) => m(v, 0)} />
+                {fromOpen && session
+                  ? <XAxis dataKey="t" type="number" scale="time" {...xAxis} domain={zoom ?? [session.open, session.close]} allowDataOverflow
+                      ticks={zoom ? undefined : sessionTicks(session.open)} minTickGap={24} tickFormatter={(v: number) => clock(v)} />
+                  : <XAxis dataKey="ts" {...xAxis} minTickGap={48} tickFormatter={(v: string) => when(v, days)} />}
+                <YAxis yAxisId="m" {...yAxis} width={56} tickFormatter={moneyTick(rows)} />
                 <YAxis yAxisId="px" orientation="right" {...yAxis} width={48} domain={["auto", "auto"]} hide={!on.price} tickFormatter={(v: number) => v.toFixed(0)} />
                 <Tooltip cursor={{ stroke: c.muted, strokeDasharray: "3 3" }} content={() => null} />
                 <ReferenceLine yAxisId="m" y={0} stroke={c.border} />
-                {pin != null && <ReferenceLine yAxisId="m" x={rows[pin].ts} stroke={c.accent} strokeDasharray="4 3" label={{ value: "pin", position: "insideTopLeft", fill: c.accent, fontSize: 10 }} />}
-                {eff === "side" && on.call && <Area yAxisId="m" type="monotone" dataKey="call" stroke={c.gain} strokeWidth={1.75} fill="url(#ncpFill)" baseValue={0} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
-                {eff === "side" && on.put && <Area yAxisId="m" type="monotone" dataKey="put" stroke={c.loss} strokeWidth={1.75} fill="url(#nppFill)" baseValue={0} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
+                {pin != null && <ReferenceLine yAxisId="m" x={fromOpen && session ? rows[pin].t : rows[pin].ts} stroke={c.accent} strokeDasharray="4 3" label={{ value: "pin", position: "insideTopLeft", fill: c.accent, fontSize: 10 }} />}
+                {eff === "side" && on.call && <Area yAxisId="m" type="monotone" dataKey="yc" stroke={c.gain} strokeWidth={1.75} fill="url(#ncpFill)" baseValue={0} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
+                {eff === "side" && on.put && <Area yAxisId="m" type="monotone" dataKey="yp" stroke={c.loss} strokeWidth={1.75} fill="url(#nppFill)" baseValue={0} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
                 {eff !== "side" && on.call && (page
-                  ? <Line yAxisId="m" type="monotone" dataKey="call" stroke={c.gain} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
-                  : <Bar yAxisId="m" dataKey="call" fill={c.gainSoft} maxBarSize={5} isAnimationActive={false} />)}
+                  ? <Line yAxisId="m" type="monotone" dataKey="yc" stroke={c.gain} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+                  : <Bar yAxisId="m" dataKey="yc" fill={c.gainSoft} maxBarSize={5} isAnimationActive={false} />)}
                 {eff !== "side" && on.put && (page
-                  ? <Line yAxisId="m" type="monotone" dataKey="put" stroke={c.loss} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
-                  : <Bar yAxisId="m" dataKey="put" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />)}
-                {on.net && eff !== "side" && <Area yAxisId="m" type="monotone" dataKey="net" stroke={c.accent} strokeWidth={2.25} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
+                  ? <Line yAxisId="m" type="monotone" dataKey="yp" stroke={c.loss} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+                  : <Bar yAxisId="m" dataKey="yp" fill={c.lossSoft} maxBarSize={5} isAnimationActive={false} />)}
+                {on.net && eff !== "side" && <Area yAxisId="m" type="monotone" dataKey="yn" stroke={c.accent} strokeWidth={2.25} fill="url(#netFill)" dot={false} activeDot={{ r: 3.5 }} isAnimationActive={false} />}
                 {on.price && levels.filter((l) => l.price != null).map((l) => (
                   <ReferenceLine key={l.label} yAxisId="px" y={l.price!} stroke={l.color} strokeDasharray="5 4" strokeWidth={1.25} ifOverflow="extendDomain"
                     label={{ value: `${l.label} ${l.price!.toFixed(2)}`, position: "insideBottomRight", fill: l.color, fontSize: 10.5 }} />
                 ))}
                 {on.price && <Line yAxisId="px" type="monotone" dataKey="price" stroke={c.ink} strokeOpacity={0.55} strokeWidth={1.25} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
                 {rows.length > 20 && (
-                  <Brush dataKey="ts" height={20} travellerWidth={8} stroke={c.border} fill="transparent" tickFormatter={(v: string) => when(v, days)} />
+                  <Brush dataKey="ts" height={20} travellerWidth={8} stroke={c.border} fill="transparent" tickFormatter={(v: string) => when(v, days)}
+                    onChange={(r: { startIndex?: number; endIndex?: number }) => {
+                      if (!fromOpen || r.startIndex == null || r.endIndex == null) return;
+                      setZoom(r.startIndex <= 0 && r.endIndex >= rows.length - 1 ? null : [rows[r.startIndex].t, rows[r.endIndex].t]);
+                    }} />
                 )}
               </ComposedChart>
             </ResponsiveContainer>

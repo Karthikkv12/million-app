@@ -71,3 +71,29 @@ def test_endpoint_is_public(store, monkeypatch, settings_override):
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and "max-age" in r.headers["cache-control"]
     assert c.get("/api/v1/logos/NOPE").status_code == 404
     assert c.get("/api/v1/logos/bad%20sym").status_code == 404
+
+
+def test_new_fetches_are_capped_but_cached_tiles_always_serve(store, monkeypatch, settings_override):
+    logos.reset_limits()
+    monkeypatch.setattr(logos, "FETCH_PER_IP", 2)
+    calls = []
+    monkeypatch.setattr(logos, "_fetch", lambda s: calls.append(s) or (logos.tile(_png((0, 0, 255, 255))) if s == "AAPL" else None))
+    c = TestClient(create_app(Settings(_env_file=None)))
+    me = {"x-forwarded-for": "1.2.3.4"}
+    assert c.get("/api/v1/logos/AAPL", headers=me).status_code == 200      # fetch 1
+    assert c.get("/api/v1/logos/ZZZA", headers=me).status_code == 404      # fetch 2 (a miss, remembered)
+    r = c.get("/api/v1/logos/ZZZB", headers=me)
+    assert r.status_code == 429 and r.headers["retry-after"] == "60"       # third new symbol: over the cap
+    assert c.get("/api/v1/logos/AAPL", headers=me).status_code == 200      # cached: still served
+    assert c.get("/api/v1/logos/ZZZA", headers=me).status_code == 404      # remembered miss: no fetch
+    assert c.get("/api/v1/logos/ZZZB", headers={"x-forwarded-for": "5.6.7.8"}).status_code == 404   # another client
+    assert calls == ["AAPL", "ZZZA", "ZZZB"]
+    logos.reset_limits()
+
+
+def test_global_cap(monkeypatch):
+    logos.reset_limits()
+    monkeypatch.setattr(logos, "FETCH_GLOBAL", 3)
+    assert [logos.allow_fetch(f"ip{i}", now=100.0) for i in range(4)] == [True, True, True, False]
+    assert logos.allow_fetch("ip9", now=161.0)                             # the window has moved on
+    logos.reset_limits()
