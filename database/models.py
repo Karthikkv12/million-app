@@ -432,6 +432,12 @@ class NetFlowSnapshot(Base):
     # premium traded today so far (Δvolume × mid per contract, flow.traded); None outside the session / old rows
     call_traded = Column(Float, nullable=True)
     put_traded  = Column(Float, nullable=True)
+    # the part of it filed by side (flow.traded.side): at the ask = bought, at the bid = sold; mid and unwatched
+    # volume are in neither, so bought + sold ≤ traded. None outside the session / rows before 2026-11-13 11:00 ET
+    call_bought = Column(Float, nullable=True)
+    call_sold   = Column(Float, nullable=True)
+    put_bought  = Column(Float, nullable=True)
+    put_sold    = Column(Float, nullable=True)
 
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"

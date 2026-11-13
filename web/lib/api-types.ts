@@ -4142,13 +4142,28 @@ export interface components {
         };
         /** NetFlowPoint */
         NetFlowPoint: {
+            /**
+             * Call Bought
+             * @description Part of call_traded filled at or near the ask (buyer started it). Mid fills and volume from before the first refresh have no side, so bought + sold ≤ traded. None on rows before 2026-11-13 11:00 ET
+             */
+            call_bought?: number | null;
             /** Call Prem */
             call_prem?: number | null;
+            /**
+             * Call Sold
+             * @description Part of call_traded filled at or near the bid
+             */
+            call_sold?: number | null;
             /**
              * Call Traded
              * @description Call premium traded today so far (Δvolume × mid per contract, nearest 12 expiries); None outside the session and on rows before 2026-11-13
              */
             call_traded?: number | null;
+            /**
+             * Ncp
+             * @description Net call premium: call_bought − call_sold
+             */
+            ncp?: number | null;
             /** Net Flow */
             net_flow?: number | null;
             /**
@@ -4156,10 +4171,25 @@ export interface components {
              * @description call_traded − put_traded
              */
             net_traded?: number | null;
+            /**
+             * Npp
+             * @description Net put premium: put_bought − put_sold
+             */
+            npp?: number | null;
             /** Price */
             price?: number | null;
+            /**
+             * Put Bought
+             * @description Part of put_traded filled at or near the ask
+             */
+            put_bought?: number | null;
             /** Put Prem */
             put_prem?: number | null;
+            /**
+             * Put Sold
+             * @description Part of put_traded filled at or near the bid
+             */
+            put_sold?: number | null;
             /**
              * Put Traded
              * @description Put premium traded today so far (as call_traded)

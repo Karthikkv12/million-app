@@ -67,7 +67,7 @@ function PremiumPage() {
         <TickerSearchInput value={input} onChange={setInput} onSelect={open} placeholder="Any ticker or company" actionLabel="Open" className="w-full sm:w-80" />
       </div>
 
-      <DeskSection label="Through the day" meta={<>Premium traded in calls and puts,<br />and the stock price.</>}>
+      <DeskSection label="Through the day" meta={<>Net premium: calls and puts bought<br />minus sold, and the stock price.</>}>
         {symbol && <FlowMomentumChart key={symbol} symbol={symbol} variant="page" levels={[
           { label: "⚓ Anchor", price: anchor?.price, color: dark ? "#67e8f9" : "#0e7490" },
           { label: "Flip", price: d?.zero_gamma, color: dark ? "#90bff9" : "#2f5bea" },

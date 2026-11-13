@@ -347,6 +347,15 @@ export interface FlowSnapshot {
   call_traded?: number | null;
   put_traded?: number | null;
   net_traded?: number | null;
+  /** The part of the traded premium filed by side: filled at or near the ask (bought) or the bid (sold). Mid fills
+   *  and volume from before the first refresh have no side. Null on rows before 2026-11-13 ~noon ET. */
+  call_bought?: number | null;
+  call_sold?: number | null;
+  put_bought?: number | null;
+  put_sold?: number | null;
+  /** Net call premium (calls bought − sold) and net put premium (puts bought − sold). */
+  ncp?: number | null;
+  npp?: number | null;
 }
 
 export const fetchNetFlowHistory = (symbol: string, days = 1) =>

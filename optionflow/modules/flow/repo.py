@@ -9,7 +9,7 @@ from database.models import NetFlowSnapshot
 from optionflow.core.db import get_session
 
 _FIELDS = ("symbol", "ts", "price", "call_prem", "put_prem", "net_flow", "total_prem", "volume")
-_OPTIONAL = ("call_traded", "put_traded")
+_OPTIONAL = ("call_traded", "put_traded", "call_bought", "call_sold", "put_bought", "put_sold")
 
 
 def add_snapshot(**row) -> None:
@@ -49,7 +49,8 @@ def existing_timestamps(symbol: str, since_iso: str) -> Set[str]:
 
 
 def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
-    """(ts, price, call_prem, put_prem, net_flow, total_prem, volume, call_traded, put_traded) rows, oldest first.
+    """(ts, price, call_prem, put_prem, net_flow, total_prem, volume, call_traded, put_traded, call_bought, call_sold,
+    put_bought, put_sold) rows, oldest first.
 
     Matches both timestamp spellings ever written ("…Z" and "…+00:00").
     """
@@ -61,6 +62,8 @@ def list_since(symbol: str, since_z: str, since_offset: str) -> List[tuple]:
                 NetFlowSnapshot.put_prem, NetFlowSnapshot.net_flow,
                 NetFlowSnapshot.total_prem, NetFlowSnapshot.volume,
                 NetFlowSnapshot.call_traded, NetFlowSnapshot.put_traded,
+                NetFlowSnapshot.call_bought, NetFlowSnapshot.call_sold,
+                NetFlowSnapshot.put_bought, NetFlowSnapshot.put_sold,
             )
             .filter(NetFlowSnapshot.symbol == symbol)
             .filter(or_(NetFlowSnapshot.ts >= since_z, NetFlowSnapshot.ts >= since_offset))
@@ -92,17 +95,22 @@ def list_all_since(since_z: str, since_offset: str) -> List[tuple]:
 
 
 def last_traded(symbol: str, since_z: str, since_offset: str):
-    """(call_traded, put_traded) of the newest snapshot at or after `since` that has them, or None."""
+    """(call_traded, put_traded, call_bought, call_sold, put_bought, put_sold) of the newest snapshot at or after
+    `since` that has traded totals, or None. The side figures are None on rows written before they existed."""
     session = get_session()
     try:
         r = (
-            session.query(NetFlowSnapshot.call_traded, NetFlowSnapshot.put_traded)
+            session.query(NetFlowSnapshot.call_traded, NetFlowSnapshot.put_traded,
+                          NetFlowSnapshot.call_bought, NetFlowSnapshot.call_sold,
+                          NetFlowSnapshot.put_bought, NetFlowSnapshot.put_sold)
             .filter(NetFlowSnapshot.symbol == symbol, NetFlowSnapshot.call_traded.isnot(None),
                     NetFlowSnapshot.put_traded.isnot(None))
             .filter(or_(NetFlowSnapshot.ts >= since_z, NetFlowSnapshot.ts >= since_offset))
             .order_by(NetFlowSnapshot.ts.desc())
             .first()
         )
-        return (float(r[0]), float(r[1])) if r else None
+        if not r:
+            return None
+        return (float(r[0]), float(r[1])) + tuple(None if x is None else float(x) for x in r[2:6])
     finally:
         session.close()
