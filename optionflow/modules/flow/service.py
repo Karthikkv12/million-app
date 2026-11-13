@@ -123,6 +123,7 @@ def record_snapshot(result: GEXResult) -> None:
             return
         _last_snapshot[sym] = ts
     traded = _traded(result)
+    split = _sides(result.symbol) if traded else None
     try:
         repo.add_snapshot(
             symbol=result.symbol,
@@ -135,6 +136,7 @@ def record_snapshot(result: GEXResult) -> None:
             volume=int(result.total_volume),
             call_traded=round(traded[0], 0) if traded else None,
             put_traded=round(traded[1], 0) if traded else None,
+            **({k: round(v, 0) for k, v in zip(_SIDE_COLS, split)} if split else {}),
         )
     except Exception as exc:
         logger.error("record_snapshot failed for %s: %s", result.symbol, exc)
@@ -150,6 +152,18 @@ def _traded(result: GEXResult) -> Optional[Tuple[float, float]]:
         return traded.update(result.symbol, result.contracts, restore=_restore_traded)
     except Exception as exc:
         logger.error("traded premium failed for %s: %s", result.symbol, exc)
+        return None
+
+
+_SIDE_COLS = ("call_bought", "call_sold", "put_bought", "put_sold")
+
+
+def _sides(symbol: str) -> Optional[Tuple[float, float, float, float]]:
+    try:
+        from optionflow.modules.flow import traded
+        return traded.sides(symbol)
+    except Exception as exc:
+        logger.error("premium sides failed for %s: %s", symbol, exc)
         return None
 
 
@@ -220,19 +234,24 @@ def net_flow_history(symbol: str, days: int = 1, bucket_minutes: int = 0) -> Lis
                 "price": last[1], "call_prem": last[2], "put_prem": last[3],
                 "net_flow": last[4], "total_prem": last[5],
                 "volume": sum(r[6] or 0 for r in group),
-                **_traded_fields(last[7], last[8]),
+                **_traded_fields(*last[7:13]),
             })
         return out
     return [
         {"ts": ts, "price": price, "call_prem": cp, "put_prem": pp,
-         "net_flow": nf, "total_prem": tp, "volume": vol, **_traded_fields(ct, pt)}
-        for ts, price, cp, pp, nf, tp, vol, ct, pt in rows
+         "net_flow": nf, "total_prem": tp, "volume": vol, **_traded_fields(*rest)}
+        for ts, price, cp, pp, nf, tp, vol, *rest in rows
     ]
 
 
-def _traded_fields(ct, pt) -> Dict[str, Any]:
+def _traded_fields(ct=None, pt=None, cb=None, cs=None, pb=None, ps=None) -> Dict[str, Any]:
+    """Traded totals plus their bought / sold split. NCP = calls bought − sold, NPP = puts bought − sold; the
+    sentiment split counts calls bought and puts sold as bullish, calls sold and puts bought as bearish."""
     net = ct - pt if ct is not None and pt is not None else None
-    return {"call_traded": ct, "put_traded": pt, "net_traded": net}
+    have = None not in (cb, cs, pb, ps)
+    return {"call_traded": ct, "put_traded": pt, "net_traded": net,
+            "call_bought": cb, "call_sold": cs, "put_bought": pb, "put_sold": ps,
+            "ncp": cb - cs if have else None, "npp": pb - ps if have else None}
 
 
 # ── Watched symbols (heartbeat from open flow boards) ─────────────────────────
