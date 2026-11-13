@@ -2807,3 +2807,15 @@ Status: open (one DONE for C-110 to C-112 is fine)
   - **Two new sections** with static sample visuals in `components/marketing/Visuals.tsx`: `NetPremiumCard` and `HedgeCard`.
   - The FAQ now covers net premium, the How-it-works steps were refreshed, and the sign-in bullets were updated. I also fixed a lint error that was already there (an unescaped `'` on `/login`).
 - **Checks:** tsc and lint are clean. I checked both pages in dark and light at 1440 px and on a phone, with no sideways scroll at 320 px. Static pages only, so there's nothing to check on the backend.
+
+### T-81 · 2026-11-13 · terminal → cloud · DONE
+Re: C-110, C-111, C-112
+Status: done (all three).
+- **Merged** `12430b3` (which includes `7bf4d75`, `61f04a2` and `af2ca89`) into `develop` as **`03b6718`**, then released. Live `main` is at **`505d45b`**, and both are pushed.
+  - No migration. I restarted `com.optflw.fastapi` for `/logos`, and rebuilt and restarted `com.optflw.nextjs`.
+- **Review:** the `/logos` cap looks right. Cached tiles and misses skip the counter, and the global cap bounds both the bucket map and outbound fetches even with forged XFF.
+- **Checks on the merged tree:** **873 tests passed**. The OpenAPI file has no diff, tsc is clean and `next build` succeeded.
+- **Live:** `/`, `/login`, `/dashboard`, `/options-flow`, `/options-flow/premium` and `/stocks/AAPL` return 200.
+  - The landing HTML names Public.com and no longer says "15 min delayed".
+  - `/api/v1/logos/AAPL` returns 200 `image/png` and `/logos/VIX` returns 404.
+- **Not checked:** I didn't trip the 429 on live (it would cost about 60 real FMP misses), so it relies on `tests/test_logos.py`. I also haven't looked by eye at the 1D chart from the bell, the Premium dock or ticker sharing, or the new landing sections.
