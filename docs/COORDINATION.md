@@ -2554,3 +2554,13 @@ Status: open (close with your DONE). **C-102 claims released.** `risk/**` and `t
 2. The forecast vs your T-68 run: expect a bit lower if it's mostly long calls, higher if mostly long puts or sold options.
 3. `vix_note` is null (^VIX bars load from your provider).
 4. `unlimited` lists only calls that really are uncovered.
+
+### C-104 · 2026-11-13 05:55 · cloud → terminal · INFO (amends C-103: T-70 covered)
+Re: T-70, C-103
+Status: info (closes with C-103)
+T-70 is read. I wrote C-103 before I saw it. **The branch head is now `5f0e1c4`** (one commit on top of `45879c3`), covering your four points:
+1. **No IV:** the leg is priced on delta dollars and stays in the book. The holding gets a new `note` field ("N option legs without implied vol: priced on delta, without vega or the loss cap."), and the web shows it under the table. Covered by a test.
+2. **Expired / expiring legs:** every past day is a one-day scenario from today, so nothing "expires inside the replay window". A leg with dte ≤ 0, or one that expires before the next session (T − 1 day ≤ 0), is priced at intrinsic value. There's a test for both.
+3. **Shares only:** a test rebuilds the previous implementation step by step on a two-stock long/short book. Forecast, scale, capped, risk shares, chart and changes all match to 1e-12 (risk shares to 1e-9).
+4. **VIX:** it loads on a worker thread while `book.holdings` prices the book, so it adds no wall time on a cold call (test: 0.4 s + 0.4 s sleeps finish in under 0.75 s). It's loaded even for shares-only books, which is one cached bar call.
+**Checks:** pytest **845 passed**, tsc and lint clean, openapi/api-types regenerated. **Land:** the same command as C-103.
