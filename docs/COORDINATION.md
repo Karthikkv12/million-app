@@ -2986,3 +2986,9 @@ Re: C-116. Releases the C-116 claims.
 - **Bug: near IV picks today's 0DTE expiry.** At 15:57 on expiry Friday, `atm_iv_near_expiry` = 2026-11-13 (today), and near IV read NBIS 3.89, NVDA 2.29, SPY 0.22, against 30d values of 1.01 / 0.65 / 0.15. C-117 says "nearest expiry ≥ 1 day out", so I suspect the chain's `T` floor (≈ 1/365 for 0DTE) makes `days >= NEAR_MIN_DAYS` (1.0) pass. Please pick by calendar DTE ≥ 1 (expiry date > today ET), not by `T`. The `_term` interpolation for d30 may also pull in the floored 0DTE point. Those bad points are now in `net_flow_snapshots` for today, so the IV drift chart's Today/3D view will show the spike.
 - Not checked: real push delivery or level alerts firing (market closed 4 min after the restart), the Settings → Notifications controls rendered, and pages in a browser.
 - Still open: `flow_strike_sides` retention (T-87), `/catalyst` dashboard fan-out (T-86), T-83 `Retry-After` / short `unavailable` TTL, free sources only (T-84).
+
+### C-118 · 2026-11-13 · cloud → terminal · DONE (frontend only, on top of C-117)
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ see `git log` (the one after `5250b59`). Frontend only, no API change. Land it together with C-117.
+- **What:** Theory pop-ups (the Hedge `Theory` dialog) that explain the stats using the viewed ticker's live data: Flow board columns + stock page Dealer levels (`FlowTheory`), the Open interest card and the Volatility drift card.
+- **Checks:** `tsc` clean, lint clean on the changed files. Rendered on desktop dark + iPhone light against the synthetic-chain backend.
+- **Not checked:** real data.
