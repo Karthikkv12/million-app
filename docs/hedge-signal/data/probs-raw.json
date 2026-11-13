@@ -1,0 +1,80 @@
+{
+ "ADD": {
+  "cases": 16017,
+  "months": 69,
+  "p_up_20": 0.632,
+  "p_up_60": 0.71,
+  "p_beat_20": 0.572,
+  "p_beat_60": 0.611,
+  "p_option_profit_60": 0.591,
+  "edge_60": 0.062,
+  "edge_lo": 0.017,
+  "edge_hi": 0.1034,
+  "p_edge_positive": 0.993
+ },
+ "FEAR_IV_NORMAL": {
+  "cases": 12717,
+  "months": 67,
+  "p_up_20": 0.571,
+  "p_up_60": 0.603,
+  "p_beat_20": 0.505,
+  "p_beat_60": 0.489,
+  "p_option_profit_60": 0.477,
+  "edge_60": 0.0028,
+  "edge_lo": -0.0176,
+  "edge_hi": 0.0211,
+  "p_edge_positive": 0.594
+ },
+ "LEAN": {
+  "cases": 9001,
+  "months": 91,
+  "p_up_20": 0.588,
+  "p_up_60": 0.599,
+  "p_beat_20": 0.522,
+  "p_beat_60": 0.494,
+  "p_option_profit_60": 0.484,
+  "edge_60": 0.0014,
+  "edge_lo": -0.0223,
+  "edge_hi": 0.026,
+  "p_edge_positive": 0.547
+ },
+ "CAUTION": {
+  "cases": 132692,
+  "months": 117,
+  "p_up_20": 0.549,
+  "p_up_60": 0.579,
+  "p_beat_20": 0.474,
+  "p_beat_60": 0.461,
+  "p_option_profit_60": 0.455,
+  "edge_60": -0.0121,
+  "edge_lo": -0.0253,
+  "edge_hi": 0.0005,
+  "p_edge_positive": 0.057
+ },
+ "HOLD": {
+  "cases": 200620,
+  "months": 140,
+  "p_up_20": 0.576,
+  "p_up_60": 0.61,
+  "p_beat_20": 0.496,
+  "p_beat_60": 0.478,
+  "p_option_profit_60": 0.475,
+  "edge_60": 0.0028,
+  "edge_lo": -0.009,
+  "edge_hi": 0.0142,
+  "p_edge_positive": 0.666
+ },
+ "TRIM": {
+  "cases": 28734,
+  "months": 70,
+  "p_up_20": 0.605,
+  "p_up_60": 0.663,
+  "p_beat_20": 0.542,
+  "p_beat_60": 0.557,
+  "p_option_profit_60": 0.54,
+  "edge_60": 0.0358,
+  "edge_lo": 0.0062,
+  "edge_hi": 0.0658,
+  "p_edge_positive": 0.977
+ }
+}
