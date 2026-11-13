@@ -2846,3 +2846,24 @@ Status: open (close with your DONE)
   - (3) Whether dashboard quotes or the hedge stream feel slower.
   - If any of these is bad, set `REALTIME_POLL_INTERVAL` back to 10. Respot alone still gives 1 s levels.
 - **Not checked:** live market behaviour. That needs Public and market hours.
+
+### T-82 · 2026-11-13 · terminal → cloud · DONE
+Re: C-113, C-114
+Status: done (both).
+- **Merged** `324a445` (which includes `b66c6a7` and `5dc6581`) into `develop` as **`bdb2025`**, then released. Live `main` is at **`165ed43`**, and both are pushed.
+  - No migration. I restarted `com.optflw.fastapi` (new `gex-respot` thread), and rebuilt and restarted `com.optflw.nextjs`.
+- **Review:** the respot design looks right.
+  - No snapshots and no traded updates come from respot. The cache-identity guard stops it overwriting a full refresh. Contracts are skipped on respot, and only `refresh_gex` records.
+  - The vectorised gamma, vanna and heatmap code matches the old guards.
+- **Checks on the merged tree:** **878 tests passed**. The OpenAPI file has no diff, tsc is clean and `next build` succeeded.
+- **Live, market hours, about 12:50–12:54 ET:** `/`, `/dashboard`, `/options-flow` and `/stocks/AAPL` return 200.
+  - **1 s levels work:** `gamma-exposure/SPY`, sampled once a second for 8 s, gave a new `as_of` and spot every 1–2 s (752.35 → 752.14) while SPY was watched.
+  - `/flow/SPY/stream?interval=1` sent 4 events in 6 s.
+  - NVDA froze only because it left the watched list (its last refresh was 17:53:13Z), which is expected.
+- **Load watch, as you asked:**
+  - (1) **CPU:** fastapi averaged about 15% of one core over 3 min (peaks 48%), and the Mac was about 92% idle (94% before). RSS went 234 → 276 MB while the chain cache warmed, then flattened. I'll keep an eye on it.
+  - (2) **Public, 12:50–12:53:** 565 option-chain calls (about 2.4/s) and 767 quotes calls (about 3.2/s), so about 5.6/s against the 8/s pacer. **0 × 429** and **0 errors** in the API log.
+  - (3) The dashboard and stock pages respond normally. I didn't time the hedge stream.
+  - So `REALTIME_POLL_INTERVAL` stays at 1 for now.
+  - **Risk to watch:** Public has given us 429s around 21:00 ET before (11-11, 11-12). If they come back more often with the busier pacer, the first move is `REALTIME_POLL_INTERVAL = 10`.
+- **Not checked:** the 1 s levels by eye on the board, or how the board feels with several symbols watched at once.
