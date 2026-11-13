@@ -122,6 +122,7 @@ def record_snapshot(result: GEXResult) -> None:
         if _last_snapshot.get(sym) == ts:
             return
         _last_snapshot[sym] = ts
+    traded = _traded(result)
     try:
         repo.add_snapshot(
             symbol=result.symbol,
@@ -132,9 +133,30 @@ def record_snapshot(result: GEXResult) -> None:
             net_flow=round(result.net_flow, 0),
             total_prem=round(result.call_premium + result.put_premium, 0),
             volume=int(result.total_volume),
+            call_traded=round(traded[0], 0) if traded else None,
+            put_traded=round(traded[1], 0) if traded else None,
         )
     except Exception as exc:
         logger.error("record_snapshot failed for %s: %s", result.symbol, exc)
+
+
+def _traded(result: GEXResult) -> Optional[Tuple[float, float]]:
+    """Today's traded (call, put) premium after folding in this refresh (flow.traded); None outside the session,
+    for a result with no chain, or on any error."""
+    if result.error or not result.contracts:
+        return None
+    try:
+        from optionflow.modules.flow import traded
+        return traded.update(result.symbol, result.contracts, restore=_restore_traded)
+    except Exception as exc:
+        logger.error("traded premium failed for %s: %s", result.symbol, exc)
+        return None
+
+
+def _restore_traded(symbol: str, day) -> Optional[Tuple[float, float]]:
+    from optionflow.workers.backfill import ET
+    start = datetime(day.year, day.month, day.day, tzinfo=ET).astimezone(timezone.utc)
+    return repo.last_traded(symbol, start.strftime("%Y-%m-%dT%H:%M:%SZ"), start.strftime("%Y-%m-%dT%H:%M:%S+00:00"))
 
 
 def _parse_ts(ts: str) -> Optional[datetime]:
@@ -198,13 +220,19 @@ def net_flow_history(symbol: str, days: int = 1, bucket_minutes: int = 0) -> Lis
                 "price": last[1], "call_prem": last[2], "put_prem": last[3],
                 "net_flow": last[4], "total_prem": last[5],
                 "volume": sum(r[6] or 0 for r in group),
+                **_traded_fields(last[7], last[8]),
             })
         return out
     return [
         {"ts": ts, "price": price, "call_prem": cp, "put_prem": pp,
-         "net_flow": nf, "total_prem": tp, "volume": vol}
-        for ts, price, cp, pp, nf, tp, vol in rows
+         "net_flow": nf, "total_prem": tp, "volume": vol, **_traded_fields(ct, pt)}
+        for ts, price, cp, pp, nf, tp, vol, ct, pt in rows
     ]
+
+
+def _traded_fields(ct, pt) -> Dict[str, Any]:
+    net = ct - pt if ct is not None and pt is not None else None
+    return {"call_traded": ct, "put_traded": pt, "net_traded": net}
 
 
 # ── Watched symbols (heartbeat from open flow boards) ─────────────────────────
