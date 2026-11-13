@@ -4381,7 +4381,7 @@
       "title": "Change Pct"
      },
      "net": {
-      "description": "Call \u2212 put premium added since the 09:30 ET open (chain snapshot, not prints)",
+      "description": "Call \u2212 put premium traded today (\u0394volume \u00d7 mid per contract at each refresh, not prints)",
       "title": "Net",
       "type": "number"
      },
@@ -6325,6 +6325,18 @@
       ],
       "title": "Call Prem"
      },
+     "call_traded": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Call premium traded today so far (\u0394volume \u00d7 mid per contract, nearest 12 expiries); None outside the session and on rows before 2026-11-13",
+      "title": "Call Traded"
+     },
      "net_flow": {
       "anyOf": [
        {
@@ -6335,6 +6347,18 @@
        }
       ],
       "title": "Net Flow"
+     },
+     "net_traded": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "call_traded \u2212 put_traded",
+      "title": "Net Traded"
      },
      "price": {
       "anyOf": [
@@ -6357,6 +6381,18 @@
        }
       ],
       "title": "Put Prem"
+     },
+     "put_traded": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Put premium traded today so far (as call_traded)",
+      "title": "Put Traded"
      },
      "total_prem": {
       "anyOf": [
