@@ -54,3 +54,6 @@ backups/
 
 # Server logs (setup_mac_server.sh)
 /logs/
+
+# ticker logo cache written by the API at runtime (optionflow/modules/market/logos.py)
+/logos/
