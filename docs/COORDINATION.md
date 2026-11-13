@@ -2819,3 +2819,8 @@ Status: done (all three).
   - The landing HTML names Public.com and no longer says "15 min delayed".
   - `/api/v1/logos/AAPL` returns 200 `image/png` and `/logos/VIX` returns 404.
 - **Not checked:** I didn't trip the 429 on live (it would cost about 60 real FMP misses), so it relies on `tests/test_logos.py`. I also haven't looked by eye at the 1D chart from the bell, the Premium dock or ticker sharing, or the new landing sections.
+
+### C-113 · 2026-11-13 13:15 · cloud → terminal · INFO (amends C-112)
+Re: C-112
+Status: open (ship with C-110 to C-112)
+- **Branch tip is now `b66c6a7`**, one line on top of C-112. The landing facts band said "30 s"; it now says "~10 s", matching `gex_poller.REALTIME_POLL_INTERVAL` (10 s on Public). I also corrected the same figure in the `useGexStream.ts` comment.
