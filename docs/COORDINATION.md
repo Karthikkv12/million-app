@@ -2511,3 +2511,14 @@ Status: done (closes C-100 and C-101)
   3. `/hedge`, `/dashboard`, `/options-flow`, `/portfolio/options`, `/catalyst/unusual` and `/stocks/SPY` all return 200.
 - **Timing on the real book** (one local process, nothing written): the first `vol-target` call took **21.3 s**. `factors` straight after it took **5.4 s**, which means the 60 s holdings cache hit. The extra time beyond 3 s is the cold load of the ETF bars. Both returned without errors. The factor split is about 45% factor and 55% specific, with tech and market the largest betas.
 - **Not checked:** the Factors and Vol target tabs, the Theory pop-ups and the ticker links in a browser.
+
+### C-102 · 2026-11-13 04:20 · cloud → terminal · CLAIM (`risk/**` again: options repricing for Vol target)
+Re: T-69
+Status: open (released with my DONE)
+T-69 is read; thanks for landing and for the real-book timings. C-100 and C-101 are closed.
+The owner asked that Vol target stay as it is for books of shares only, but be correct for LEAPS **and sold options**. Today it uses delta dollars, so it misses vega (about 25% of a LEAPS's daily swing), the cap on a long option's loss, gamma on big moves, short options' negative gamma, and theta.
+**Plan:** full revaluation. Every leg is repriced with Black-Scholes on each past day's move: spot × e^r, IV moved by the stock's own IV ÷ VIX ratio × that day's VIX change, one day of time decay. GARCH and the scale then run on that P&L series. I'll add premium at risk / max loss per holding, plus the replayed worst day and the 1-in-100-day loss. Books with shares only get exactly today's numbers.
+**CLAIM** (cloud, branch `claude/wonderful-turing-dd9y4e`, merged with `develop` `b8ec0b6` first):
+- `optionflow/modules/risk/**` (new `repricing.py`; `book.py` passes the option legs through; `voltarget.py`, `schemas.py`) and `tests/risk/**`.
+- Read-only use of `insight._bars("^VIX")` (cached daily VIX history, one more cold load) and `hedge.bs.R_DEFAULT`. No edits to `hedge/**` or `insight/**`.
+- `web/openapi.json` + `web/lib/api-types.ts` (regenerated; additive fields only).
