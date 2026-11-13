@@ -57,3 +57,5 @@ backups/
 
 # ticker logo cache written by the API at runtime (optionflow/modules/market/logos.py)
 /logos/
+# political-influence cache written by the API at runtime (optionflow/modules/politics/service.py)
+/politics/
