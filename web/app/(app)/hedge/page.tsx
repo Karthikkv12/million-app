@@ -20,6 +20,7 @@ import { FactorsTab, FactorsTheory } from "@/components/hedge/Factors";
 import { TickerLink } from "@/components/TickerLink";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Theory } from "@/components/hedge/Theory";
+import { SignalBadge } from "@/components/signal/SignalBadge";
 
 const usd = (v?: number | null, d = 2) => (v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
 const big = (v?: number | null) => {
@@ -516,7 +517,8 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         {/* signal */}
         <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
           {(b.closes?.length ?? 0) > 0 && <Tag tone="solid">Buy back</Tag>}
-          {a && <Tag tone={a.tag}>{a.label}</Tag>}
+          {asStock && b.signal ? <SignalBadge signal={b.signal} label={a?.label} reasons={s?.reasons ?? []} />
+            : a && <Tag tone={a.tag}>{a.label}</Tag>}
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
             {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
           </span>

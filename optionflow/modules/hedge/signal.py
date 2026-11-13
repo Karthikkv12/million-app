@@ -77,8 +77,8 @@ EVIDENCE = {
     "CAUTION": "Backtest: −0.3% to −0.6% vs holding over 20 days, about −1.2% over 60; a weak edge (t ≈ −2): "
                "don't add, but it is not a sell.",
     "HOLD": "Backtest: no edge either way on these days (most days).",
-    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: −0.0% vs holding over 20 days, −0.9% over "
-            "60; 13,059 cases). The edge appears only once the VIX joins in.",
+    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: +0.1% vs holding over 60 days, 90% range "
+            "−2.2% to +2.6%; 9,001 cases). The edge appears only once the VIX joins in.",
     "TRIM": "Backtest (long side): the stock beat holding by +1.2% / 20 days after this setup: puts tend to give back.",
 }
 # Probabilities per signal, 2015–2026 (unseen when the rules were set); scripts/backtest_signal/probs.py.

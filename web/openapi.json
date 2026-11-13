@@ -12758,6 +12758,95 @@
     "title": "StockInfoOut",
     "type": "object"
    },
+   "StockSignalOut": {
+    "description": "The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol}).",
+    "properties": {
+     "day_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "held": {
+      "description": "long_options: the Hedge desk's own book signal",
+      "enum": [
+       "none",
+       "stock",
+       "long_options"
+      ],
+      "title": "Held",
+      "type": "string"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held",
+      "title": "Label"
+     },
+     "reasons": {
+      "default": [],
+      "description": "Why: backtest odds, evidence, levels, IV, legs and the reads",
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "signal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "spot": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spot"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "held"
+    ],
+    "title": "StockSignalOut",
+    "type": "object"
+   },
    "StrategyInfo": {
     "properties": {
      "buys_options": {
@@ -18953,6 +19042,54 @@
      }
     ],
     "summary": "Positions",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/signal/{symbol}": {
+   "get": {
+    "description": "The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /\nDon't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal.",
+    "operationId": "signal_api_v1_hedge_signal__symbol__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StockSignalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Signal",
     "tags": [
      "hedge"
     ]

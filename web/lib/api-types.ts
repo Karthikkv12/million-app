@@ -809,6 +809,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/signal/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Signal
+         * @description The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /
+         *     Don't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal.
+         */
+        get: operations["signal_api_v1_hedge_signal__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hedge/stream": {
         parameters: {
             query?: never;
@@ -6266,6 +6287,38 @@ export interface components {
             /** Week 52 Low */
             week_52_low?: number | null;
         };
+        /**
+         * StockSignalOut
+         * @description The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol}).
+         */
+        StockSignalOut: {
+            /** Day Change */
+            day_change?: number | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Held
+             * @description long_options: the Hedge desk's own book signal
+             * @enum {string}
+             */
+            held: "none" | "stock" | "long_options";
+            /**
+             * Label
+             * @description Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held
+             */
+            label?: string | null;
+            /**
+             * Reasons
+             * @description Why: backtest odds, evidence, levels, IV, legs and the reads
+             * @default []
+             */
+            reasons: string[];
+            signal?: components["schemas"]["SignalOut"] | null;
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** StrategyInfo */
         StrategyInfo: {
             /** Buys Options */
@@ -9174,6 +9227,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokerPositionOut"][];
+                };
+            };
+        };
+    };
+    signal_api_v1_hedge_signal__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSignalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

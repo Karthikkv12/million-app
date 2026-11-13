@@ -230,6 +230,18 @@ class SignalOut(BaseModel):
     probability: Optional[SignalProbOut] = None
 
 
+class StockSignalOut(BaseModel):
+    """The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol})."""
+    symbol: str
+    held: Literal["none", "stock", "long_options"] = Field(..., description="long_options: the Hedge desk's own book signal")
+    label: Optional[str] = Field(None, description="Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held")
+    spot: Optional[float] = None
+    day_change: Optional[float] = None
+    signal: Optional[SignalOut] = None
+    reasons: List[str] = Field([], description="Why: backtest odds, evidence, levels, IV, legs and the reads")
+    error: Optional[str] = None
+
+
 class BookOut(BaseModel):
     symbol: str
     error: Optional[str] = None
