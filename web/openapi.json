@@ -263,6 +263,24 @@
     "title": "AdminUserOut",
     "type": "object"
    },
+   "Amount": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "number"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "amount"
+    ],
+    "title": "Amount",
+    "type": "object"
+   },
    "AnalystAction": {
     "properties": {
      "action": {
@@ -3528,6 +3546,281 @@
     "title": "CloseOut",
     "type": "object"
    },
+   "CongressSection": {
+    "properties": {
+     "buys_90d": {
+      "default": 0,
+      "title": "Buys 90D",
+      "type": "integer"
+     },
+     "members_90d": {
+      "default": 0,
+      "title": "Members 90D",
+      "type": "integer"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "sells_90d": {
+      "default": 0,
+      "title": "Sells 90D",
+      "type": "integer"
+     },
+     "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "none",
+       "unknown_company",
+       "not_configured",
+       "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "trades": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/CongressTrade"
+      },
+      "title": "Trades",
+      "type": "array"
+     },
+     "trades_12m": {
+      "default": 0,
+      "title": "Trades 12M",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "CongressSection",
+    "type": "object"
+   },
+   "CongressTrade": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Disclosed range, e.g. '$1,001 - $15,000'",
+      "title": "Amount"
+     },
+     "asset": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset"
+     },
+     "chamber": {
+      "title": "Chamber",
+      "type": "string"
+     },
+     "days_late": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Days between the trade and its disclosure",
+      "title": "Days Late"
+     },
+     "disclosure_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Disclosure Date"
+     },
+     "district": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "District"
+     },
+     "link": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Link"
+     },
+     "member": {
+      "title": "Member",
+      "type": "string"
+     },
+     "owner": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Self, Spouse, Joint, Child \u2026 as disclosed",
+      "title": "Owner"
+     },
+     "side": {
+      "enum": [
+       "buy",
+       "sell",
+       "exchange",
+       "other"
+      ],
+      "title": "Side",
+      "type": "string"
+     },
+     "symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Symbol"
+     },
+     "transaction_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Transaction Date"
+     },
+     "type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "As disclosed, e.g. 'Purchase', 'Sale (Partial)'",
+      "title": "Type"
+     }
+    },
+    "required": [
+     "chamber",
+     "member",
+     "side"
+    ],
+    "title": "CongressTrade",
+    "type": "object"
+   },
+   "ContractsSection": {
+    "properties": {
+     "agencies": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/Amount"
+      },
+      "title": "Agencies",
+      "type": "array"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "recipients": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/Amount"
+      },
+      "title": "Recipients",
+      "type": "array"
+     },
+     "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "none",
+       "unknown_company",
+       "not_configured",
+       "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "total_12m": {
+      "default": 0,
+      "title": "Total 12M",
+      "type": "number"
+     },
+     "window": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Window"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "ContractsSection",
+    "type": "object"
+   },
    "CreatedOut": {
     "properties": {
      "id": {
@@ -4361,6 +4654,98 @@
      "factors"
     ],
     "title": "FactorsOut",
+    "type": "object"
+   },
+   "FeedCongress": {
+    "properties": {
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "none",
+       "unknown_company",
+       "not_configured",
+       "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "trades": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/CongressTrade"
+      },
+      "title": "Trades",
+      "type": "array"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "FeedCongress",
+    "type": "object"
+   },
+   "FeedLobbying": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "number"
+     },
+     "company": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Company"
+     },
+     "issues": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Issues",
+      "type": "array"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "total_4q": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total 4Q"
+     }
+    },
+    "required": [
+     "symbol",
+     "period",
+     "amount"
+    ],
+    "title": "FeedLobbying",
     "type": "object"
    },
    "FlowByExpiry": {
@@ -6341,6 +6726,135 @@
     "title": "LiveQuoteOut",
     "type": "object"
    },
+   "LobbyIssue": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "count"
+    ],
+    "title": "LobbyIssue",
+    "type": "object"
+   },
+   "LobbyQuarter": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "number"
+     },
+     "filings": {
+      "title": "Filings",
+      "type": "integer"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period",
+     "amount",
+     "filings"
+    ],
+    "title": "LobbyQuarter",
+    "type": "object"
+   },
+   "LobbyingSection": {
+    "properties": {
+     "agencies": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Agencies",
+      "type": "array"
+     },
+     "firms": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Firms",
+      "type": "array"
+     },
+     "in_house": {
+      "default": false,
+      "title": "In House",
+      "type": "boolean"
+     },
+     "issues": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LobbyIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+     },
+     "latest": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LobbyQuarter"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "quarters": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LobbyQuarter"
+      },
+      "title": "Quarters",
+      "type": "array"
+     },
+     "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "none",
+       "unknown_company",
+       "not_configured",
+       "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "total": {
+      "default": 0,
+      "title": "Total",
+      "type": "number"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "LobbyingSection",
+    "type": "object"
+   },
    "NetFlowPoint": {
     "properties": {
      "call_bought": {
@@ -7218,6 +7732,193 @@
      }
     },
     "title": "PaperTradePatch",
+    "type": "object"
+   },
+   "PoliticalCompact": {
+    "properties": {
+     "congress_buys_90d": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Congress Buys 90D"
+     },
+     "congress_sells_90d": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Congress Sells 90D"
+     },
+     "contracts_12m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Contracts 12M"
+     },
+     "lobbying_4q": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lobbying 4Q"
+     },
+     "lobbying_last_q": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lobbying Last Q"
+     },
+     "lobbying_period": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lobbying Period"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol"
+    ],
+    "title": "PoliticalCompact",
+    "type": "object"
+   },
+   "PoliticalFeed": {
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "congress": {
+      "$ref": "#/components/schemas/FeedCongress"
+     },
+     "lobbying": {
+      "items": {
+       "$ref": "#/components/schemas/FeedLobbying"
+      },
+      "title": "Lobbying",
+      "type": "array"
+     },
+     "pending": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Pending",
+      "type": "array"
+     }
+    },
+    "required": [
+     "congress",
+     "lobbying",
+     "as_of"
+    ],
+    "title": "PoliticalFeed",
+    "type": "object"
+   },
+   "PoliticalProfile": {
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "company": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Company"
+     },
+     "congress": {
+      "$ref": "#/components/schemas/CongressSection"
+     },
+     "contracts": {
+      "$ref": "#/components/schemas/ContractsSection"
+     },
+     "lobbying": {
+      "$ref": "#/components/schemas/LobbyingSection"
+     },
+     "matched_names": {
+      "default": [],
+      "description": "Normalised names matched in lobbying and contract records",
+      "items": {
+       "type": "string"
+      },
+      "title": "Matched Names",
+      "type": "array"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "congress",
+     "lobbying",
+     "contracts",
+     "as_of"
+    ],
+    "title": "PoliticalProfile",
+    "type": "object"
+   },
+   "PoliticalSummary": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/PoliticalCompact"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "pending": {
+      "default": [],
+      "description": "Symbols queued for a first fetch; ask again in a minute",
+      "items": {
+       "type": "string"
+      },
+      "title": "Pending",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items"
+    ],
+    "title": "PoliticalSummary",
     "type": "object"
    },
    "PortfolioSnapshotCreateRequest": {
@@ -17840,6 +18541,183 @@
     "summary": "Update Trade",
     "tags": [
      "pulse"
+    ]
+   }
+  },
+  "/api/v1/politics/feed": {
+   "get": {
+    "description": "The newest congressional trade disclosures and, for `symbols`, their latest lobbying quarter.",
+    "operationId": "feed_api_v1_politics_feed_get",
+    "parameters": [
+     {
+      "description": "Only these tickers (comma-separated, max 200)",
+      "in": "query",
+      "name": "symbols",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only these tickers (comma-separated, max 200)",
+       "title": "Symbols"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 30,
+       "maximum": 365,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PoliticalFeed"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Feed",
+    "tags": [
+     "politics"
+    ]
+   }
+  },
+  "/api/v1/politics/summary": {
+   "get": {
+    "description": "Compact political figures for many tickers (sector rows). Never waits on the sources: tickers without\na cached profile come back in `pending` and are fetched in the background.",
+    "operationId": "summary_api_v1_politics_summary_get",
+    "parameters": [
+     {
+      "description": "Comma-separated tickers (max 200)",
+      "in": "query",
+      "name": "symbols",
+      "required": true,
+      "schema": {
+       "description": "Comma-separated tickers (max 200)",
+       "title": "Symbols",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PoliticalSummary"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Summary",
+    "tags": [
+     "politics"
+    ]
+   }
+  },
+  "/api/v1/politics/{symbol}": {
+   "get": {
+    "description": "Congressional trades, lobbying and federal contracts for one ticker (cached 12 h).",
+    "operationId": "political_profile_api_v1_politics__symbol__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "refresh",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Refresh",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PoliticalProfile"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Political Profile",
+    "tags": [
+     "politics"
     ]
    }
   },

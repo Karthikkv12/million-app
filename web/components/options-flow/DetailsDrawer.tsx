@@ -14,6 +14,7 @@ import { Tag } from "@/components/desk";
 import { GexProfileChart } from "./GexProfileChart";
 import { FlowMomentumChart } from "./FlowMomentumChart";
 import { LeapsScore } from "@/components/insight/LeapsScore";
+import { PoliticalBadge } from "@/components/insight/PoliticalCard";
 import { TickerLink } from "@/components/TickerLink";
 
 type Tab = "levels" | "flow";
@@ -234,11 +235,12 @@ export function DetailsDrawer({ open, onClose, data, ticker, accentColor }: Prop
       <button className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} aria-label="Close details" />
       <aside className="relative flex h-[100dvh] w-full max-w-[680px] flex-col border-l border-[var(--border-strong)] bg-[var(--background)]">
         <header className="flex items-end gap-4 border-b border-[var(--border-strong)] px-5 pt-4">
-          <div className="pb-3">
+          <div className="min-w-0 pb-3">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Details</p>
             <h2 className="font-mono text-[22px] font-semibold tracking-tight text-foreground">
               <TickerLink symbol={ticker} title={`Open the ${ticker} stock page and chart`} /> <span className="text-[15px] font-normal tabular-nums text-foreground/55">{data.spot.toFixed(2)}</span>
             </h2>
+            <PoliticalBadge symbol={ticker} className="mt-0.5" />
           </div>
           <div role="tablist" aria-label="Details section" className="ml-auto flex gap-5">
             {([["levels", "Levels"], ["flow", "Premium & flow"]] as const).map(([t, l]) => (

@@ -13,6 +13,7 @@ import { GexReplay } from "@/components/options-flow/GexReplay";
 import { DealerLadder, TradeIdeas } from "@/components/options-flow/DealerLadder";
 import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
+import { PoliticalCard } from "@/components/insight/PoliticalCard";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 import { TickerLogo } from "@/components/TickerLogo";
 import { SwipeDeck } from "@/components/SwipeDeck";
@@ -75,6 +76,12 @@ export default function StockPage() {
         </Panel>
 
         <GexReplay symbol={sym} />
+
+        <section id="political" className="scroll-mt-24">
+          <Panel title="Political influence" sub={<span className="normal-case tracking-normal">Congress trades · lobbying · federal contracts</span>}>
+            <PoliticalCard symbol={sym} />
+          </Panel>
+        </section>
         </div>
         <aside className="min-w-0 xl:sticky xl:top-20">
           <SwipeDeck label={`${sym} LEAPS score and dealer levels`}

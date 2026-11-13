@@ -71,6 +71,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if "notify" in modules and "hedge" in modules:
             from optionflow.modules.notify import worker as notify_worker
             notify_worker.start()        # phone notifications: no-op until PUSH_VAPID_* keys are set
+        if "politics" in modules:
+            from optionflow.modules.politics import service as politics
+            politics.start_worker()      # fills sector summaries in the background, a few seconds apart
         if "pulse" in modules:
             from optionflow.modules.pulse import worker as pulse_worker
             pulse_worker.start()         # price alerts + paper trades; pushes only when notify is set up
