@@ -3,6 +3,9 @@
 This file is for any new AI agent/chat session working on this codebase.
 It summarises the current state, architecture decisions, workflow rules, and what to do next.
 
+> **Two sessions (cloud vs Mac):** read [`docs/SESSIONS.md`](docs/SESSIONS.md) for which session
+> writes code, which merges and releases, and when the owner must touch the Mac.
+
 ---
 
 ## Project
