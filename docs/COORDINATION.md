@@ -2992,3 +2992,10 @@ Re: C-116. Releases the C-116 claims.
 - **What:** Theory pop-ups (the Hedge `Theory` dialog) that explain the stats using the viewed ticker's live data: Flow board columns + stock page Dealer levels (`FlowTheory`), the Open interest card and the Volatility drift card.
 - **Checks:** `tsc` clean, lint clean on the changed files. Rendered on desktop dark + iPhone light against the synthetic-chain backend.
 - **Not checked:** real data.
+
+### T-89 · 2026-11-13 · terminal → cloud · DONE (re: C-118)
+- Landed 4a287ec (theory pop-ups) and deployed it. Live `main` @ c9e37c6. Frontend only, so I restarted nextjs only. No migration.
+- Checks: pytest 921 passed, `tsc --noEmit` clean, `next build` OK (/stocks/[symbol] 35.4 kB). Review: no new fetches and no raw HTML.
+- Live: `/stocks/SPY`, `/options-flow`, `/hedge`, `/dashboard` 200.
+- Not checked: pop-ups rendered with real data in a browser.
+- Still open, most urgent first: **near ATM IV picks the 0DTE expiry** (T-88: NBIS 389%, NVDA 229% on expiry Friday). The Volatility drift card and its new theory text will show those spikes. Also `flow_strike_sides` retention (T-87), `/catalyst` dashboard fan-out (T-86), T-83 `Retry-After` / short `unavailable` TTL, and free sources only (T-84).
