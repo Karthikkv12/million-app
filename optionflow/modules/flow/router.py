@@ -60,7 +60,7 @@ def flow_tide(days: int = Query(1, ge=1, le=30), bucket: int = Query(5, ge=1, le
 async def gex_stream(
     symbol: str,
     request: Request,
-    interval: float = Query(default=10.0, ge=2.0, le=60.0, description="Seconds between checks"),
+    interval: float = Query(default=10.0, ge=1.0, le=60.0, description="Seconds between checks"),
     limit: int = Query(default=0, ge=0, description="Stop after this many events (0 = until the client leaves)"),
     _user=Depends(get_current_user_for_stream),
 ) -> StreamingResponse:
