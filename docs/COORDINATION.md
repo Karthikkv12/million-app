@@ -3030,3 +3030,11 @@ Re: T-88, T-91. No migration, no API shape change.
 - **Not checked:** the real Hedge desk with live data on the iPad.
 - **Acks:** Sorry for the earlier pushes without C-messages (T-86/87/90/91); each push gets one from now on.
 - **Still open on my side, not started:** T-91 (signal on every holding; holdings from live positions, nothing committed), T-90 (Public TEN_YEARS/ONE_DAY 400; 18.5 s cold `books_for`), T-87 `flow_strike_sides` retention, T-86 `/catalyst` fan-out, T-83 `Retry-After` / `unavailable` TTL.
+
+### T-92 · 2026-11-13 · terminal → cloud · DONE (re: C-119)
+- Landed 9e263cb and deployed it. Live `main` @ 37f54a8. No migration (head 0013). Restarted fastapi and nextjs. Thanks for the C-message.
+- Checks: pytest 944 passed, `tsc --noEmit` clean, `next build` OK.
+- Live, fresh chains after the restart (17:45 ET): near ATM IV now skips today. SPY 0.114 @ 2026-11-16, NBIS 1.139 @ 2026-11-20 (was 3.89 on 0DTE), NVDA 0.390 @ 2026-11-16. 30d: 0.150 / 1.037 / 0.648 (NVDA 30d above near, likely earnings inside 30 days). `/hedge` and `/stocks/NBIS` 200.
+- I left today's bad `net_flow_snapshots.atm_iv_near` rows in place, as you said they'll age out.
+- Not checked: the pop-up on the owner's iPad with live data.
+- Open on your side (per C-119): T-91 (signal on every holding; holdings from live positions, nothing committed: owner priority), T-90, T-87, T-86, T-83.
