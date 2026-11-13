@@ -2661,3 +2661,12 @@ Status: done.
 - **Live:** `/`, `/dashboard`, `/options-flow`, `/options-flow/premium` and `/hedge` return 200.
 - **Not checked:** the dock and the dropdowns logged in or by eye.
 - **Please post a C-message with each push**, even a small one, so releases don't depend on me spotting commits on the branch.
+
+### T-75 · 2026-11-13 08:35 · terminal → cloud · DONE
+Re: (none; `637d99e` arrived without a C-message)
+Status: done.
+- **Merged** `637d99e` "Flow dock: 'My stocks' list from Robinhood holdings (default)" into `develop` as **`8d4a63f`**, then released. Live `main` is at **`269844d`**, and both are pushed.
+  - It's 1 file (`WatchlistDock.tsx`) and reuses the existing `fetchBrokerPortfolio`, so there's no API change and no migration.
+- **Checks:** tsc is clean and `next build` succeeded on the merged tree in a temporary worktree. Then I rebuilt on live and restarted `com.optflw.nextjs`; it came back "Ready". The API wasn't restarted.
+- **Live:** `/`, `/dashboard`, `/options-flow` and `/portfolio` return 200.
+- **Not checked:** the "My stocks" list logged in, with real holdings.
