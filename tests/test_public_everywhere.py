@@ -97,8 +97,9 @@ class FakeYahoo:
         self.history_calls = 0
         self.contract_calls = 0
 
-    def price_history(self, symbol, period, interval):
+    def price_history(self, symbol, period, interval, prepost=False):
         self.history_calls += 1
+        self.last_prepost = prepost
         df = pd.DataFrame({"open": [1.0], "high": [1.0], "low": [1.0], "close": [1.0], "volume": [1]},
                           index=pd.DatetimeIndex([pd.Timestamp("2026-11-06", tz="UTC")]))
         df.attrs["source"] = "yfinance"
@@ -139,10 +140,21 @@ def test_history_request_maps_yahoo_periods_and_intervals():
     assert history_request("5d", "30m") == ("WEEK", "THIRTY_MINUTES", ("sessions", 5))
     assert history_request("2y", "1wk") == ("FIVE_YEARS", "ONE_WEEK", ("days", 731))
     assert history_request("2d", "5m") == ("WEEK", "FIVE_MINUTES", ("sessions", 2))
-    assert history_request("14d", "30m") == ("MONTH", "THIRTY_MINUTES", ("days", 14))
+    assert history_request("14d", "1h") == ("MONTH", "ONE_HOUR", ("days", 14))
     assert history_request("max", "1mo") == ("ALL", "ONE_MONTH", None)
     assert history_request("1d", "2m") is None          # Public has no 2-minute bars → Yahoo
     assert history_request("1mo", "90m") is None
+
+
+def test_history_request_skips_bar_sizes_public_rejects_for_the_period():
+    # Public answers 400 "Period X is not compatible with aggregation Y" for these → straight to Yahoo.
+    for period, interval in [("5d", "1m"), ("1mo", "5m"), ("1mo", "30m"), ("14d", "30m"),
+                             ("3mo", "1h"), ("6mo", "1h"), ("1y", "1h"), ("ytd", "1h")]:
+        assert history_request(period, interval) is None, (period, interval)
+    assert history_request("1d", "1h") == ("DAY", "ONE_HOUR", None)
+    assert history_request("5d", "5m") == ("WEEK", "FIVE_MINUTES", ("sessions", 5))
+    assert history_request("1mo", "1h") == ("MONTH", "ONE_HOUR", None)
+    assert history_request("3mo", "1d") == ("QUARTER", "ONE_DAY", None)
 
 
 def test_parse_bars_regular_session_in_utc():
@@ -230,6 +242,54 @@ def test_market_history_endpoint_reports_source(md):
     from optionflow.modules.market import service
     out = service.price_history("AAPL", "6mo", "1d")
     assert out["source"] == "public" and out["current_price"] == 342.37 and out["error"] is None
+
+
+# ── extended hours (prepost) ─────────────────────────────────────────────────
+
+def test_parse_bars_extended_adds_pre_and_after_market():
+    payload = _history([_bar("2026-11-06T09:30:00-05:00", 340.0)],
+                       pre=[_bar("2026-11-06T04:00:00-05:00", 339.0)], after=[_bar("2026-11-06T16:05:00-05:00", 341.0)])
+    assert len(parse_bars(payload)) == 1
+    df = parse_bars(payload, extended=True)
+    assert list(df["close"]) == [339.0, 340.0, 341.0] and df.index.is_monotonic_increasing
+
+
+def test_prepost_one_day_from_public_without_session_toggle(md):
+    fake, yahoo, provider = md
+    fake.bars["DAY/FIVE_MINUTES"] = _history([_bar("2026-11-06T09:30:00-05:00", 340.0)],
+                                             pre=[_bar("2026-11-06T04:00:00-05:00", 339.0)],
+                                             after=[_bar("2026-11-06T16:05:00-05:00", 341.0)])
+    assert len(provider.price_history("AAPL", "1d", "5m")) == 1          # regular only, cached separately
+    df = provider.price_history("AAPL", "1d", "5m", prepost=True)
+    assert df.attrs["source"] == "public" and len(df) == 3 and yahoo.history_calls == 0
+    params = [r[2] for r in fake.requests if "/historicdata/" in r[1]]
+    assert params == [{"tradingSessionToggle": "REGULAR_HOURS"}, {}]
+
+
+def test_prepost_beyond_one_day_goes_straight_to_yahoo(md):
+    # Public's WEEK and longer periods carry no pre/after-market bars (probed 2026-11-11).
+    fake, yahoo, provider = md
+    df = provider.price_history("AAPL", "5d", "15m", prepost=True)
+    assert df.attrs["source"] == "yfinance" and yahoo.last_prepost is True
+    assert fake.count("/historicdata/") == 0
+
+
+def test_prepost_ignored_for_daily_bars(md):
+    fake, yahoo, _ = md
+    fake.bars["HALF_YEAR/ONE_DAY"] = _history([_bar("2026-11-06T00:00:00-05:00", 342.37)])
+    from optionflow.modules.market import service
+    out = service.price_history("AAPL", "6mo", "1d", prepost=True)
+    assert out["source"] == "public" and out["prepost"] is False and yahoo.history_calls == 0
+
+
+def test_market_history_endpoint_prepost_flag(md):
+    fake, _, _ = md
+    fake.bars["DAY/ONE_MINUTE"] = _history([_bar("2026-11-06T09:30:00-05:00", 340.0)],
+                                           after=[_bar("2026-11-06T16:01:00-05:00", 341.0)])
+    from optionflow.modules.market import service
+    out = service.price_history("AAPL", "1d", "1m", prepost=True)
+    assert out["prepost"] is True and len(out["bars"]) == 2 and out["current_price"] == 341.0
+    assert service.price_history("AAPL", "1d", "1m")["prepost"] is False
 
 
 # ── option contracts: scanner and catalysts ──────────────────────────────────

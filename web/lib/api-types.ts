@@ -96,6 +96,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Alerts */
+        get: operations["list_alerts_api_v1_alerts_price_get"];
+        put?: never;
+        /**
+         * Create Alert
+         * @description Push once when the price is at or beyond the level (checked every few seconds, extended hours included).
+         */
+        post: operations["create_alert_api_v1_alerts_price_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/price/{alert_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Alert */
+        delete: operations["delete_alert_api_v1_alerts_price__alert_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Alert */
+        patch: operations["update_alert_api_v1_alerts_price__alert_id__patch"];
+        trace?: never;
+    };
     "/api/v1/auth/change-password": {
         parameters: {
             query?: never;
@@ -541,6 +580,46 @@ export interface paths {
         head?: never;
         /** Update Cc Week */
         patch: operations["update_cc_week_api_v1_credit_card_weeks__row_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/flow/leaders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Flow Leaders
+         * @description Top bullish / bearish symbols by net premium (calls − puts) added since today's open.
+         */
+        get: operations["flow_leaders_api_v1_flow_leaders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/flow/tide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Flow Tide
+         * @description Market tide: premium added since each session's open, summed across the watched universe, with SPY.
+         */
+        get: operations["flow_tide_api_v1_flow_tide_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/flow/{symbol}/replay": {
@@ -1046,6 +1125,45 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/paper-trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Trades */
+        get: operations["list_trades_api_v1_paper_trades_get"];
+        put?: never;
+        /**
+         * Create Trade
+         * @description Paper only. planned → open when the price reaches entry; open → stopped / target at those levels.
+         */
+        post: operations["create_trade_api_v1_paper_trades_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/paper-trades/{trade_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Trade */
+        delete: operations["delete_trade_api_v1_paper_trades__trade_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Trade */
+        patch: operations["update_trade_api_v1_paper_trades__trade_id__patch"];
         trace?: never;
     };
     "/api/v1/portfolio/account-balances": {
@@ -3104,6 +3222,51 @@ export interface components {
             /** Put Prem */
             put_prem: number;
         };
+        /** FlowLeader */
+        FlowLeader: {
+            /** Call Prem */
+            call_prem: number;
+            /**
+             * Change Pct
+             * @description Day change %, from real-time quotes when available
+             */
+            change_pct?: number | null;
+            /**
+             * Net
+             * @description Call − put premium added since the 09:30 ET open (chain snapshot, not prints)
+             */
+            net: number;
+            /** Put Prem */
+            put_prem: number;
+            /** Spot */
+            spot?: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** FlowLeadersOut */
+        FlowLeadersOut: {
+            /**
+             * As Of
+             * @description Latest snapshot used (UTC)
+             */
+            as_of?: string | null;
+            /** Bearish */
+            bearish: components["schemas"]["FlowLeader"][];
+            /** Bullish */
+            bullish: components["schemas"]["FlowLeader"][];
+            /**
+             * Session
+             * @description US-Eastern session date (YYYY-MM-DD) the totals are for
+             */
+            session?: string | null;
+            /**
+             * Symbols
+             * @description Symbols with snapshots in the session
+             */
+            symbols: number;
+            /** Universe */
+            universe: string;
+        };
         /** GexDayOut */
         GexDayOut: {
             /** Date */
@@ -3872,6 +4035,94 @@ export interface components {
              */
             up: number;
         };
+        /** PaperTradeIn */
+        PaperTradeIn: {
+            /** Entry */
+            entry: number;
+            /** Note */
+            note?: string | null;
+            /** Qty */
+            qty: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Status
+             * @description 'open' starts it at once, filled at entry
+             * @default planned
+             * @enum {string}
+             */
+            status: "planned" | "open";
+            /** Stop */
+            stop?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Target */
+            target?: number | null;
+        };
+        /** PaperTradeOut */
+        PaperTradeOut: {
+            /** Closed At */
+            closed_at?: string | null;
+            /** Created At */
+            created_at: string;
+            /**
+             * Created Price
+             * @description Price when planned: entry triggers when crossed from this side
+             */
+            created_price?: number | null;
+            /** Entry */
+            entry: number;
+            /** Exit Price */
+            exit_price?: number | null;
+            /** Id */
+            id: number;
+            /** Note */
+            note?: string | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Qty */
+            qty: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "open" | "stopped" | "target" | "closed";
+            /** Stop */
+            stop?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Target */
+            target?: number | null;
+        };
+        /**
+         * PaperTradePatch
+         * @description Levels / qty while planned or open (an open trade's entry is fixed); status 'closed' closes it at
+         *     exit_price, or the current price when omitted.
+         */
+        PaperTradePatch: {
+            /** Entry */
+            entry?: number | null;
+            /** Exit Price */
+            exit_price?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Qty */
+            qty?: number | null;
+            /** Status */
+            status?: "closed" | null;
+            /** Stop */
+            stop?: number | null;
+            /** Target */
+            target?: number | null;
+        };
         /** PortfolioSnapshotCreateRequest */
         PortfolioSnapshotCreateRequest: {
             /** Cash */
@@ -4221,6 +4472,57 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PriceAlertIn */
+        PriceAlertIn: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Note */
+            note?: string | null;
+            /** Price */
+            price: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** PriceAlertOut */
+        PriceAlertOut: {
+            /** Created At */
+            created_at: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Id */
+            id: number;
+            /** Note */
+            note?: string | null;
+            /** Price */
+            price: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Triggered At
+             * @description Set once, when the price first reached the level (UTC)
+             */
+            triggered_at?: string | null;
+            /** Triggered Price */
+            triggered_price?: number | null;
+        };
+        /**
+         * PriceAlertPatch
+         * @description Changing price or direction re-arms a triggered alert.
+         */
+        PriceAlertPatch: {
+            /** Direction */
+            direction?: ("above" | "below") | null;
+            /** Note */
+            note?: string | null;
+            /** Price */
+            price?: number | null;
+        };
         /** PriceBar */
         PriceBar: {
             /** Close */
@@ -4247,6 +4549,11 @@ export interface components {
             current_price?: number | null;
             /** Error */
             error?: string | null;
+            /**
+             * Prepost
+             * @default false
+             */
+            prepost: boolean;
             /** Source */
             source?: string | null;
             /** Symbol */
@@ -5044,6 +5351,27 @@ export interface components {
              * @default
              */
             type: string;
+        };
+        /** TidePoint */
+        TidePoint: {
+            /** Call Prem */
+            call_prem: number;
+            /** Net */
+            net: number;
+            /** Put Prem */
+            put_prem: number;
+            /** Spy */
+            spy?: number | null;
+            /**
+             * Symbols
+             * @description Symbols contributing at this point
+             */
+            symbols: number;
+            /**
+             * Ts
+             * @description Bucket start (UTC)
+             */
+            ts: string;
         };
         /** TopFlowStrike */
         TopFlowStrike: {
@@ -5967,6 +6295,134 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_alerts_api_v1_alerts_price_get: {
+        parameters: {
+            query?: {
+                symbol?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceAlertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_alert_api_v1_alerts_price_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAlertIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceAlertOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_alert_api_v1_alerts_price__alert_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_alert_api_v1_alerts_price__alert_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceAlertPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceAlertOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -6929,6 +7385,71 @@ export interface operations {
             };
         };
     };
+    flow_leaders_api_v1_flow_leaders_get: {
+        parameters: {
+            query?: {
+                /** @description Only 'default': symbols the poller has watched today */
+                universe?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowLeadersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flow_tide_api_v1_flow_tide_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                bucket?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TidePoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     gex_replay_api_v1_flow__symbol__replay_get: {
         parameters: {
             query?: {
@@ -7702,6 +8223,135 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trades_api_v1_paper_trades_get: {
+        parameters: {
+            query?: {
+                symbol?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperTradeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trade_api_v1_paper_trades_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaperTradeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperTradeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trade_api_v1_paper_trades__trade_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trade_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trade_api_v1_paper_trades__trade_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trade_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaperTradePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperTradeOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -9014,6 +9664,7 @@ export interface operations {
             query?: {
                 period?: string;
                 interval?: string;
+                prepost?: boolean;
             };
             header?: never;
             path: {

@@ -256,8 +256,8 @@ class YahooMarketData:
         return price if price > 0 else None
 
     @_guarded
-    def price_history(self, symbol: str, period: str, interval: str) -> pd.DataFrame:
-        hist = yf.Ticker(symbol).history(period=period, interval=interval)
+    def price_history(self, symbol: str, period: str, interval: str, prepost: bool = False) -> pd.DataFrame:
+        hist = yf.Ticker(symbol).history(period=period, interval=interval, prepost=prepost)
         if hist is None or hist.empty:
             return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
         idx = pd.DatetimeIndex(hist.index)
