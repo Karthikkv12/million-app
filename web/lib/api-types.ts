@@ -1961,6 +1961,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlists/extended-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Extended Hours
+         * @description Cboe's extended-hours options list (stocks and ETFs), read from Cboe's reference file and refreshed every 12 h.
+         */
+        get: operations["extended_hours_api_v1_watchlists_extended_hours_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlists/option-metrics": {
         parameters: {
             query?: never;
@@ -3296,6 +3316,24 @@ export interface components {
             pct: number;
             /** Strike */
             strike: number;
+        };
+        /** ExtendedHoursOut */
+        ExtendedHoursOut: {
+            /**
+             * As Of
+             * @description When the list was read from Cboe (or the launch date for the built-in list)
+             */
+            as_of: string;
+            /**
+             * Live
+             * @description True = read from Cboe's reference file; False = the built-in launch list
+             */
+            live: boolean;
+            /**
+             * Symbols
+             * @description Stocks and ETFs whose options trade 7:30–9:25 a.m. and 4:00–4:15 p.m. ET on Cboe
+             */
+            symbols: string[];
         };
         /** FactorHolding */
         FactorHolding: {
@@ -10334,6 +10372,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extended_hours_api_v1_watchlists_extended_hours_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtendedHoursOut"];
                 };
             };
         };

@@ -65,7 +65,7 @@ export function OverviewTab() {
         ) : <p className="py-10 text-center text-[13px] text-foreground/55">The chart fills in as daily syncs come in.</p>}
       </Panel>
 
-      <SectorDonut holdings={p.holdings} />
+      <SectorDonut holdings={p.holdings} options={p.options} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Accounts" padded={false}>
