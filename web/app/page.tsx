@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Moon, Plus, Sun } from "lucide-react";
 import { Logo } from "@/components/Navbar";
 import { SampleBoard } from "@/components/marketing/SampleBoard";
-import { RegimeCard, SectorTiles, WindowFrame } from "@/components/marketing/Visuals";
+import { HedgeCard, NetPremiumCard, RegimeCard, SectorTiles, WindowFrame } from "@/components/marketing/Visuals";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 
@@ -13,30 +13,34 @@ import { useTheme } from "@/lib/theme";
 // ── Content ──────────────────────────────────────────────────────────────────
 
 const FACTS = [
-  { value: "10–All", label: "strikes per board, your choice" },
-  { value: "5", label: "colour palettes, two colour-blind safe" },
-  { value: "60 s", label: "refresh while the page is open" },
-  { value: "~15 min", label: "data delay, shown on every board" },
+  { value: "Live", label: "real-time option chains from Public.com" },
+  { value: "30 s", label: "levels refresh, pushed to the page as they change" },
+  { value: "GEX + VEX", label: "gamma and vanna by strike × expiry" },
+  { value: "9:30", label: "net premium counted from the bell" },
 ];
 
 const STEPS = [
-  { title: "Pick a ticker", body: "Type any optionable symbol (SPY, QQQ, a single stock) and the board loads every strike and expiry around spot." },
-  { title: "Read the levels", body: "The king node, flip and walls are marked for you, with the gamma regime written in plain words above the board." },
-  { title: "Plan the session", body: "Use the walls as likely ceiling and floor, the flip as the line where behaviour changes, and size accordingly." },
+  { title: "Pick a ticker", body: "Type any optionable symbol, or step through your watchlist or your Robinhood names with ‹ › from the dock at the bottom." },
+  { title: "Read the levels", body: "The king node, flip and walls are marked for you, with the gamma regime and the likely direction written in plain words." },
+  { title: "Follow the money", body: "Net premium shows whether calls and puts are being bought or sold since the bell, so you can see who is leaning which way." },
 ];
 
 const FAQ = [
   {
     q: "Where does the data come from?",
-    a: "Option chains and prices come from Yahoo Finance and are about 15 minutes delayed. Every board says so. A real-time feed is planned as an option.",
+    a: "Option chains and quotes come in real time from Public.com. If Public can't be reached, a board falls back to Yahoo Finance, which is about 15 minutes delayed, and a badge on the board says which source you're looking at.",
   },
   {
     q: "How is gamma exposure calculated?",
     a: "For each contract: gamma × open interest × 100 × spot² × 1%. Calls count as positive, puts as negative, so each cell is the dollar hedging dealers need for a 1% move.",
   },
   {
+    q: "What is net premium?",
+    a: "Each refresh, new volume on a contract counts as bought when it traded at or near the ask and sold when it traded at or near the bid. Net call premium is calls bought minus calls sold; net put premium is the same for puts. Both run from the 9:30 bell. It reads the last print between refreshes, not every single trade, so treat it as a strong estimate.",
+  },
+  {
     q: "Which tickers work?",
-    a: "Any US symbol with listed options on Yahoo Finance: index ETFs like SPY and QQQ, indexes like SPX, and single stocks.",
+    a: "Any US symbol with listed options: index ETFs like SPY and QQQ, indexes like SPX, and single stocks.",
   },
   {
     q: "Can I use it on my phone?",
@@ -111,21 +115,21 @@ function Hero() {
       <Container className="relative pb-6 pt-16 text-center sm:pt-24">
         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[13px] text-foreground/70">
           <span className="h-1.5 w-1.5 rounded-full bg-gain" />
-          New flow board: every strike × expiry on one screen
+          New: net premium, who&apos;s buying and who&apos;s selling since the bell
         </span>
         <h1 className="mx-auto mt-7 max-w-4xl text-balance text-[44px] font-semibold leading-[1.02] tracking-[-0.045em] text-foreground sm:text-7xl">
           See where dealers <span className="gradient-text">have to hedge.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-pretty text-[17px] leading-relaxed text-foreground/65 sm:text-lg">
-          OptionFlow maps gamma exposure across every strike and expiry and marks the levels that move price
-          (the king node, the gamma flip and the call and put walls) before you size in.
+          OptionFlow maps gamma exposure across every strike and expiry, marks the levels that move price
+          (the king node, the gamma flip and the call and put walls) and shows which way the option money is leaning.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <PrimaryCTA />
           <a href="#how" className="btn-ghost h-12 px-6 text-[15px]">See how it works</a>
         </div>
         <ul className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-x-6 gap-y-2 text-[13px] text-foreground/60">
-          {["Any optionable ticker", "Yahoo Finance data, ~15 min delayed", "Light and dark, desktop and phone"].map((t) => (
+          {["Real-time chains from Public.com", "Any optionable ticker", "Light and dark, desktop and phone"].map((t) => (
             <li key={t} className="flex items-center gap-1.5"><Check size={14} className="text-gain" />{t}</li>
           ))}
         </ul>
@@ -204,7 +208,7 @@ function Product() {
           eyebrow="Flow board"
           title="Find the king node in a second."
           body="Every strike and expiry on one board, coloured by how much gamma sits there. The biggest cell is starred, spot is marked, and the board centres itself on price."
-          points={["Choose 10, 20, 30, 40 or all strikes around spot", "Five palettes, including Cividis and Viridis", "“% of king” and “dim small” to cut the noise"]}
+          points={["Gamma (GEX) or vanna (VEX), 10 to all strikes around spot", "Step through your watchlist or Robinhood names from the dock", "Replay the day's levels snapshot by snapshot"]}
           visual={<SampleBoard />}
         />
         <Feature
@@ -216,10 +220,25 @@ function Product() {
           visual={<RegimeCard />}
         />
         <Feature
+          eyebrow="Net premium"
+          title="See who's buying and who's selling."
+          body="Every trade is sorted by where it printed: at the ask is a buyer paying up, at the bid is a seller giving in. Net call and net put premium run from the bell against the price, so a quiet tape and real conviction look different."
+          points={["Calls and puts, bought and sold, from 9:30 ET", "A bullish / bearish split of the day's money", "A one-line read of where it's leaning"]}
+          visual={<NetPremiumCard />}
+        />
+        <Feature
+          flip
+          eyebrow="Hedge and portfolio"
+          title="Your book, kept near your delta target."
+          body="Portfolio pulls your Robinhood shares and options. Hedge adds up their delta, gamma and vega and suggests the trades that bring the book back inside your band, favouring premium you collect."
+          points={["Net delta, gamma and vega across the whole book", "Suggestions to sell calls or puts, or trim stock", "Volatility targeting and factor exposure, explained"]}
+          visual={<HedgeCard />}
+        />
+        <Feature
           eyebrow="Dashboard"
           title="Then zoom out to the whole tape."
           body="Sectors ranked by today's move open into heatmaps sized by market cap, next to VIX, rates, the dollar and your own book."
-          points={["Sector ETFs ranked, each with its stocks", "Indexes, futures, VIX, 10Y and dollar on one screen", "US economic calendar and unusual options activity under Research"]}
+          points={["Sector ETFs ranked, each with its stocks", "Stock pages with a LEAPS score and the dealer levels", "US economic calendar and unusual options activity under Research"]}
           visual={<SectorTiles />}
         />
       </Container>
@@ -303,7 +322,7 @@ function Footer() {
         <div>
           <Logo href="/" />
           <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-foreground/55">
-            Gamma exposure and dealer positioning for options traders.
+            Dealer positioning, option flow and hedging for options traders.
           </p>
         </div>
         <div>
@@ -311,7 +330,8 @@ function Footer() {
           <ul className="grid gap-2.5 text-[14px] text-foreground/65">
             <li><a href="#product" className="hover:text-foreground">Flow board</a></li>
             <li><a href="#product" className="hover:text-foreground">Levels</a></li>
-            <li><a href="#product" className="hover:text-foreground">Markets</a></li>
+            <li><a href="#product" className="hover:text-foreground">Net premium</a></li>
+            <li><a href="#product" className="hover:text-foreground">Hedge</a></li>
           </ul>
         </div>
         <div>
@@ -325,7 +345,7 @@ function Footer() {
       <div className="border-t border-[var(--border)]">
         <Container className="flex flex-col gap-2 py-6 text-[13px] text-foreground/50 sm:flex-row sm:justify-between">
           <span>© 2026 OptionFlow</span>
-          <span>For information only, not investment advice. Market data is delayed about 15 minutes.</span>
+          <span>For information only, not investment advice. Real-time data from Public.com; delayed data is labelled.</span>
         </Container>
       </div>
     </footer>
