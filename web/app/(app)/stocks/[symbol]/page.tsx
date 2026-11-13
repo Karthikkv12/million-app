@@ -15,6 +15,7 @@ import { SwingCharts } from "@/components/insight/SwingCharts";
 import { LeapsScore } from "@/components/insight/LeapsScore";
 import { SourceBadge, sourceName } from "@/components/options-flow/SourceBadge";
 import { TickerLogo } from "@/components/TickerLogo";
+import { SwipeDeck } from "@/components/SwipeDeck";
 
 const usd = (v?: number | null) => (v == null ? "—" : `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const bigUsd = (v?: number | null) => {
@@ -65,8 +66,8 @@ export default function StockPage() {
           onSymbol={(s) => router.push(`/stocks/${encodeURIComponent(s)}`)} />
       </section>
 
-      {/* Left: drawdown and GEX replay stacked. Right (wide screens): LEAPS score and dealer levels in a
-          column that stays in view and scrolls on its own, so its long cards don't stretch the page. */}
+      {/* Left: drawdown and GEX replay stacked. Right (wide screens): LEAPS score and dealer levels share one
+          slot you swipe between; it stays in view, and each card scrolls on its own if it is taller than the screen. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid min-w-0 gap-4">
         <Panel title="Drawdown and upside spikes">
@@ -75,29 +76,36 @@ export default function StockPage() {
 
         <GexReplay symbol={sym} />
         </div>
-        <aside aria-label={`${sym} LEAPS score and dealer levels`}
-          className="grid min-w-0 gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:rounded-[var(--radius,12px)] xl:pr-1 [scrollbar-width:thin]">
-        <Panel title="LEAPS score">
-          <LeapsScore symbol={sym} compact label={false} />
-        </Panel>
-        <Panel title="Dealer levels" actions={gex && !gex.error ? <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Pill> : null}>
-          {gexLoading ? <div className="grid gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10" />)}</div>
-            : !gex || gex.error ? <p className="text-[13px] text-foreground/60">No options data for {sym}.</p> : (
-              <>
-                <DealerLadder data={gex} className="!px-0 !pt-0" />
-                <TradeIdeas data={gex} collapsible className="!px-0 border-t border-[var(--border)]" />
-                <div className="mt-3 flex items-baseline justify-between border-t border-[var(--border)] pt-3">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Net GEX</span>
-                  <span className={`font-mono text-[15px] tabular-nums ${longGamma ? "text-gain" : "text-loss"}`}>{bigUsd(gex.net_gex)}</span>
-                </div>
-                <p className="mt-3 text-[12px] leading-relaxed text-foreground/55">
-                  {gex.zero_gamma != null && (gex.spot >= gex.zero_gamma
-                    ? "Above the flip: dealers tend to sell rallies and buy dips, which dampens moves."
-                    : "Below the flip: dealers tend to sell into drops and buy into rallies, which stretches moves.")}
-                </p>
-              </>
-            )}
-        </Panel>
+        <aside className="min-w-0 xl:sticky xl:top-20">
+          <SwipeDeck label={`${sym} LEAPS score and dealer levels`}
+            slideClassName="xl:max-h-[calc(100dvh-8.5rem)] xl:overflow-y-auto xl:overscroll-contain xl:rounded-2xl [scrollbar-width:thin]"
+            slides={[
+              { key: "leaps", label: "LEAPS", node: (
+                <Panel title="LEAPS score">
+                  <LeapsScore symbol={sym} compact label={false} />
+                </Panel>
+              ) },
+              { key: "dealer", label: "Dealers", node: (
+                <Panel title="Dealer levels" actions={gex && !gex.error ? <Pill tone={longGamma ? "good" : "warn"} className="normal-case tracking-normal">{longGamma ? "+GEX · pinned" : "−GEX · volatile"}</Pill> : null}>
+                  {gexLoading ? <div className="grid gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10" />)}</div>
+                    : !gex || gex.error ? <p className="text-[13px] text-foreground/60">No options data for {sym}.</p> : (
+                      <>
+                        <DealerLadder data={gex} className="!px-0 !pt-0" />
+                        <TradeIdeas data={gex} collapsible className="!px-0 border-t border-[var(--border)]" />
+                        <div className="mt-3 flex items-baseline justify-between border-t border-[var(--border)] pt-3">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/50">Net GEX</span>
+                          <span className={`font-mono text-[15px] tabular-nums ${longGamma ? "text-gain" : "text-loss"}`}>{bigUsd(gex.net_gex)}</span>
+                        </div>
+                        <p className="mt-3 text-[12px] leading-relaxed text-foreground/55">
+                          {gex.zero_gamma != null && (gex.spot >= gex.zero_gamma
+                            ? "Above the flip: dealers tend to sell rallies and buy dips, which dampens moves."
+                            : "Below the flip: dealers tend to sell into drops and buy into rallies, which stretches moves.")}
+                        </p>
+                      </>
+                    )}
+                </Panel>
+              ) },
+            ]} />
         </aside>
       </div>
     </div>
