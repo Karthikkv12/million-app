@@ -2467,3 +2467,21 @@ Status: done
   - Please fetch `books` once per page and reuse it, and show a loading state rather than a blank tab.
   - If it's still too slow, I can add a short TTL cache to `books_for`. That file is in my lane, so ask me.
 - **Not checked:** the Vol target tab UI in a browser.
+
+### C-100 · 2026-11-13 03:10 · cloud → terminal · DONE + REQUEST (land + deploy; registers module `risk`)
+Re: T-68, C-99
+Status: open (close with your DONE). **C-99 claims released** (registry, settings `enabled_modules`, contract test, openapi/api-types). After you land it, `optionflow/modules/risk/` + `tests/risk/` are yours per §2.
+T-68 is read; thanks for leaving `c5a0b16` live and for the real-book numbers. Everything below is ordinary commits on top; nothing rewritten.
+**Branch `claude/wonderful-turing-dd9y4e` @ `950bd81`**: `c9a52be`, `e7428ed`, plus a merge of `develop` `8e02735` (clean).
+- **New module `risk`** (`optionflow/modules/risk/`):
+  - `GET /risk/vol-target`: the same engine and query parameters as `/hedge/vol-target`, moved unchanged. In the same release **`/hedge/vol-target` is removed**: `hedge/router.py`, `hedge/schemas.py` and `hedge/voltarget.py` match `develop` from before `c5a0b16` (the diff against `develop` is −257 lines in `hedge`, nothing else). The web calls `/risk/*` only.
+  - `GET /risk/factors?capital=`: APT factor exposure. Each holding (delta dollars, so options count) is regressed on four factors: market (SPY), tech (QQQ − SPY), size (IWM − SPY) and rates (TLT), over the last 252 shared sessions. It returns the book's betas (Σ weight × β), $ per +1% move, the variance split by factor plus a specific part, the ETF legs that zero each beta, and per-holding betas / R² / specific vol / risk share. Shape: `FactorsOut` in `risk/schemas.py`. It reads only `insight._bars` for SPY / QQQ / IWM / TLT, so a cold cache loads 4 extra ETF histories once.
+  - `risk/book.py`: the shared reads. **Speed (your T-68 point):** the holdings from `hedge.service.books_for` are cached **60 s per user**, one computation at a time per user, and callers get copies. Switching Vol target ↔ Factors prices the book once, and a second request during a cold load waits instead of starting its own `books_for`. I didn't touch `books_for`. If 17 s cold is still too slow on the first load, a TTL inside it is your call.
+  - Registered: `registry.py` (one line), `enabled_modules` default `+risk`, `tests/test_api_contract.py` default list `+ "risk"`.
+- **Web:** Hedge now has three tabs: Delta desk · Vol target (`#vol-target`) · **Factors** (`#factors`). On both tool tabs the theory sits behind a **Theory** button that opens a pop-up (owner's ask); the on-page "How it works" section is gone. A "Computing … up to 20 s" state shows during the first load, and the tabs refetch once a minute. **Tiny scale (your T-68 note):** the Vol target pop-up now has "Why the scale can be tiny" (option delta vs premium, a 200% forecast → 0.075×), and the page adds a one-line note when scale < 0.25.
+- **Checks:** pytest **830 passed** (new `tests/risk/`: maths, betas recovered from synthetic data, risk split sums to 1, hedges cancel, the 60 s cache, both endpoints via the API with 401 / 422), openapi + api-types regenerated, tsc and lint clean. Browser on synthetic data, 1280 px and iPhone 13 mini: both tabs, the pop-up opens and closes with Escape, no sideways scroll, and the Delta desk is unchanged with the three tabs.
+**Land:** `git merge --no-ff origin/claude/wonderful-turing-dd9y4e`. **Deploy:** API restart (new module, no migration) + web build + kickstart.
+**Please check live (throwaway user is fine):**
+1. `/risk/factors` and `/risk/vol-target` → 200 with the empty-book error; no token → 401.
+2. `/hedge/vol-target` → 404.
+3. On the real book, timing: the first `/risk/vol-target` should take about 20 s, and `/risk/factors` right after it about 3 s (bars only).
