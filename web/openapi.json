@@ -11978,7 +11978,7 @@
     "type": "object"
    },
    "SignalScanOut": {
-    "description": "The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan).",
+    "description": "The tested signal across a universe of US stocks and ETFs, by fear score (GET /hedge/scan).",
     "properties": {
      "as_of": {
       "anyOf": [
@@ -12019,8 +12019,18 @@
       "type": "number"
      },
      "universe": {
+      "description": "Tickers in the universe",
       "title": "Universe",
       "type": "integer"
+     },
+     "universe_key": {
+      "default": "popular",
+      "enum": [
+       "popular",
+       "sp500"
+      ],
+      "title": "Universe Key",
+      "type": "string"
      },
      "vix": {
       "anyOf": [
@@ -19566,8 +19576,26 @@
   },
   "/api/v1/hedge/scan": {
    "get": {
-    "description": "The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,\nwith the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your\nholdings are marked.",
+    "description": "The backtested signal across a universe, ranked by fear score (Buy / Wait / Don't buy yet, with the close or VIX\nlevel that would make it Buy). Shared per universe, refreshed every 15 minutes in the background; your holdings are\nmarked.",
     "operationId": "scan_api_v1_hedge_scan_get",
+    "parameters": [
+     {
+      "description": "popular: 100 popular stocks and ETFs; sp500: the S&P 500",
+      "in": "query",
+      "name": "universe",
+      "required": false,
+      "schema": {
+       "default": "popular",
+       "description": "popular: 100 popular stocks and ETFs; sp500: the S&P 500",
+       "enum": [
+        "popular",
+        "sp500"
+       ],
+       "title": "Universe",
+       "type": "string"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "content": {
@@ -19578,6 +19606,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "security": [

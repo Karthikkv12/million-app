@@ -818,9 +818,9 @@ export interface paths {
         };
         /**
          * Scan
-         * @description The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,
-         *     with the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your
-         *     holdings are marked.
+         * @description The backtested signal across a universe, ranked by fear score (Buy / Wait / Don't buy yet, with the close or VIX
+         *     level that would make it Buy). Shared per universe, refreshed every 15 minutes in the background; your holdings are
+         *     marked.
          */
         get: operations["scan_api_v1_hedge_scan_get"];
         put?: never;
@@ -6217,7 +6217,7 @@ export interface components {
         };
         /**
          * SignalScanOut
-         * @description The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan).
+         * @description The tested signal across a universe of US stocks and ETFs, by fear score (GET /hedge/scan).
          */
         SignalScanOut: {
             /** As Of */
@@ -6241,8 +6241,17 @@ export interface components {
             rows: components["schemas"]["SignalScanRowOut"][];
             /** Score Cut */
             score_cut: number;
-            /** Universe */
+            /**
+             * Universe
+             * @description Tickers in the universe
+             */
             universe: number;
+            /**
+             * Universe Key
+             * @default popular
+             * @enum {string}
+             */
+            universe_key: "popular" | "sp500";
             /** Vix */
             vix?: number | null;
             /** Vix Pct */
@@ -9454,7 +9463,10 @@ export interface operations {
     };
     scan_api_v1_hedge_scan_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description popular: 100 popular stocks and ETFs; sp500: the S&P 500 */
+                universe?: "popular" | "sp500";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -9468,6 +9480,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignalScanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
