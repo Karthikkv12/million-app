@@ -92,7 +92,9 @@ def build(symbols: Optional[List[str]] = None, universe: str = "popular") -> Dic
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for sym, r in ex.map(one, symbols):
             (rows.append(r) if r else failed.append(sym))
-    rows.sort(key=lambda r: (-(r["fear_score"] or 0.0), r["symbol"]))
+    # fear score first; ties (the oversold term caps at RSI 20) break by lower RSI, then deeper under the 50-day
+    rows.sort(key=lambda r: (-round(r["fear_score"] or 0.0, 3), r["rsi"] if r["rsi"] is not None else 100.0,
+                             r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"]))
     vp = sg.vix_percentile(vix) if vix else None
     out = {"at": time.time(), "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
            "rows": rows, "building": False, "failed": failed, "vix": vix[-1] if vix else None, "vix_pct": vp}

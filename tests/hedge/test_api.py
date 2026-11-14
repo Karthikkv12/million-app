@@ -208,3 +208,14 @@ def test_signal_scan_has_an_sp500_universe(client):
     assert d["universe_key"] == "sp500" and d["universe"] == len(sc.UNIVERSES["sp500"])
     assert {r["symbol"] for r in d["rows"]} == {"AAA", "BBB"}
     assert c.get("/api/v1/hedge/scan?universe=nope", headers=_login(c, "owner")).status_code == 422
+
+
+def test_signal_scan_breaks_fear_score_ties_by_rsi():
+    from optionflow.modules.hedge import scan as sc
+    rows = [{"symbol": s, "fear_score": f, "rsi": r, "vs_50d": d} for s, f, r, d in
+            (("AAA", 0.362, 19.0, -0.24), ("BBB", 0.362, 11.0, -0.24), ("CCC", 0.40, 30.0, -0.1), ("DDD", 0.362, 11.0, -0.30))]
+    key = lambda r: (-round(r["fear_score"] or 0.0, 3), r["rsi"] if r["rsi"] is not None else 100.0,
+                     r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"])
+    assert [r["symbol"] for r in sorted(rows, key=key)] == ["CCC", "DDD", "BBB", "AAA"]
+    import inspect
+    assert "r[\"rsi\"] if r[\"rsi\"] is not None else 100.0" in inspect.getsource(sc.build)

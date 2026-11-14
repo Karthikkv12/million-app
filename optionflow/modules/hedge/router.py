@@ -66,7 +66,7 @@ def scan(universe: Literal["popular", "sp500"] = Query("popular", description="p
         held = {p["symbol"].upper() for p in service.list_positions(int(user["sub"]))}
     except Exception:
         held = set()
-    return SignalScanOut(**sc.get(held, wait=20.0, universe=universe))
+    return SignalScanOut(**sc.get(held, wait=0.0, universe=universe))   # never block: the page polls while it builds
 
 
 @router.get("/signal/{symbol}", response_model=StockSignalOut)
