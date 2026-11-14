@@ -49,3 +49,18 @@ def test_matches_the_backtest_setup_on_random_days():
         fs = sg.fear_score(sg.vix_percentile(vx), sg.rsi(px))
         want = (fs is not None and fs >= sg.SCORE_CUT) or (px[-1] / px[-6] - 1 <= -0.05 and px[-1] > sum(px[-200:]) / 200)
         assert (r["verdict"] == "BUY") == want
+
+
+def test_swing_for_uses_the_live_price_during_the_session(monkeypatch):
+    from datetime import date
+    from optionflow.modules.hedge import service
+    px = ramp(100, 0.2, 260)
+    bars = [{"date": f"2025-{1 + i // 28:02d}-{1 + i % 28:02d}", "close": c} for i, c in enumerate(px)]
+    monkeypatch.setattr(service, "_daily_bars", lambda s: [{"date": b["date"], "close": c} for b, c in zip(bars, vix(15.0, n=260))]
+                        if s == service.VIX else bars)
+    monkeypatch.setattr(service, "_session_frac", lambda: (date(2026, 11, 16), 0.5))       # mid-session, no bar yet
+    live_drop = px[-5] * 0.93                                                              # −7% vs 5 sessions ago
+    r = service.swing_for("XYZ", live_drop)
+    assert r["verdict"] == "BUY" and r["drop"] and r["stats"]["oos"]["trades"] == sw.STATS["oos"]["trades"]
+    monkeypatch.setattr(service, "_session_frac", lambda: (date(2026, 11, 15), 1.0))       # weekend: last close stands
+    assert service.swing_for("XYZ", live_drop)["verdict"] == "WAIT"
