@@ -5,6 +5,8 @@
  * the same verdict, words and odds.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { clsx } from "clsx";
 import { Tag } from "@/components/desk";
 import type { HedgeBook } from "@/lib/api";
@@ -42,57 +44,64 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
   signal: SignalData; label?: string | null; reasons?: string[]; align?: "left" | "right"; className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);          // phones: a full-screen sheet instead of a floating window
+  const [pos, setPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const box = useRef<HTMLSpanElement>(null);
-  const pop = useRef<HTMLSpanElement>(null);
-  const [shift, setShift] = useState(0);
+  const pop = useRef<HTMLDivElement>(null);
+  const leave = useRef<ReturnType<typeof setTimeout> | null>(null);
   const id = useId();
   const c = confidenceOf(g);
   const p = g.probability;
+  const show = () => { if (leave.current) clearTimeout(leave.current); setOpen(true); };
+  const hide = () => { if (leave.current) clearTimeout(leave.current); leave.current = setTimeout(() => setOpen(false), 150); };
+  useEffect(() => () => { if (leave.current) clearTimeout(leave.current); }, []);
   useEffect(() => {
     if (!open) return;
-    const off = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const inside = (n: Node) => !!(box.current?.contains(n) || pop.current?.contains(n));
+    const off = (e: PointerEvent) => { if (!inside(e.target as Node)) setOpen(false); };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("pointerdown", off);
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("pointerdown", off); document.removeEventListener("keydown", esc); };
   }, [open]);
-  // keep the window on screen: anchored to the badge, then nudged left/right so it never runs past a 16px gutter
-  // (on the Hedge desk the badge sits in the last column, so a left-anchored window ran off the right edge)
+  // Where it goes: phones (< 640 px) get a full-screen sheet; wider screens a window kept wholly inside the viewport,
+  // under the badge if it fits, else over it, else centred at full height with its own scroll. Never the page's scroll.
   useLayoutEffect(() => {
-    if (!open) { setShift(0); return; }
-    const fit = () => {
-      const el = pop.current;
-      if (!el) return;
-      const prev = Number(el.dataset.shift ?? 0);
-      const r = el.getBoundingClientRect();
-      const left = r.left - prev, right = r.right - prev, vw = document.documentElement.clientWidth, gap = 16;
-      const dx = right > vw - gap ? vw - gap - right : left < gap ? gap - left : 0;
-      el.dataset.shift = String(dx);
-      setShift(dx);
+    if (!open) { setPos(null); return; }
+    const phone = window.matchMedia("(max-width: 639px)").matches;
+    setSheet(phone);
+    if (phone) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }
+    const place = () => {
+      const el = pop.current, b = box.current;
+      if (!el || !b) return;
+      const r = b.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight, gap = 16, off = 8;
+      const w = el.offsetWidth, h = el.scrollHeight;
+      const below = vh - r.bottom - off - gap, above = r.top - off - gap;
+      const maxHeight = vh - 2 * gap;
+      let top: number;
+      if (h <= below) top = r.bottom + off;
+      else if (h <= above) top = r.top - off - h;
+      else { top = gap + Math.max(0, (maxHeight - h) / 2); }
+      const want = align === "right" ? r.right - w : r.left;
+      const left = Math.min(Math.max(gap, want), vw - gap - w);
+      setPos({ top, left, maxHeight });
     };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [open]);
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, align]);
   const tested = g.reads.filter((r) => r.tested);
   // why: the read notes, the IV line, then roll lines; the odds and evidence have their own blocks
   const why = [...tested.map((r) => r.note), ...(g.fear_score != null ? [`Fear score ${g.fear_score.toFixed(2)} (Add at ≥ 0.28): VIX percentile × how oversold.`] : []),
     ...reasons.filter((r) => /^Stock IV|→ roll|→ expiry/.test(r))].slice(0, 7);
   const plan = g.plan?.lines ?? [];
-  return (
-    <span ref={box} className={clsx("relative inline-flex", className)}
-      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button type="button" data-testid="signal-badge" aria-describedby={open ? id : undefined} aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
-        className="inline-flex items-center rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-        <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
-        <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] text-foreground/45" title={SIGNAL_HORIZON_LINE}>{SIGNAL_HORIZON}</span>
-      </button>
-      {open && (
-        <span id={id} ref={pop} role="tooltip" onClick={(e) => e.stopPropagation()}
-          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
-          className={clsx("absolute top-full z-50 mt-2 block w-[min(380px,calc(100vw-32px))] cursor-default rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-left shadow-xl",
-            align === "right" ? "right-0" : "left-0")}>
+  const body = (
+        <>
           <span className="flex items-center justify-between gap-3">
             <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
             <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/45">Confidence · <span className={clsx(
@@ -151,8 +160,38 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
           )}
           {g.evidence && <span className="mt-3 block border-l-2 border-[var(--border-strong)] pl-2 text-[11.5px] leading-snug text-foreground/55">{g.evidence}</span>}
           <span className="mt-2 block text-[10.5px] text-foreground/40">Averages for this setup, not a forecast for one trade. Not financial advice.</span>
-        </span>
-      )}
+        </>
+  );
+  return (
+    <span ref={box} className={clsx("relative inline-flex", className)}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") show(); }} onPointerLeave={(e) => { if (e.pointerType === "mouse") hide(); }}>
+      <button type="button" data-testid="signal-badge" aria-haspopup="dialog" aria-controls={open ? id : undefined} aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        className="inline-flex items-center rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
+        <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] text-foreground/45" title={SIGNAL_HORIZON_LINE}>{SIGNAL_HORIZON}</span>
+      </button>
+      {open && typeof document !== "undefined" && createPortal(
+        sheet ? (
+          <div id={id} ref={pop} role="dialog" aria-modal="true" aria-label={`Signal: ${label ?? DEFAULT_LABEL[g.verdict]}`} data-testid="signal-pop"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[100] flex flex-col bg-[var(--surface)] text-left">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/55">Signal</span>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border)] text-foreground/70 hover:text-foreground"><X size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-4">{body}</div>
+          </div>
+        ) : (
+          <div id={id} ref={pop} role="dialog" aria-label={`Signal: ${label ?? DEFAULT_LABEL[g.verdict]}`} data-testid="signal-pop"
+            onClick={(e) => e.stopPropagation()}
+            onPointerEnter={(e) => { if (e.pointerType === "mouse") show(); }} onPointerLeave={(e) => { if (e.pointerType === "mouse") hide(); }}
+            style={pos ? { top: pos.top, left: pos.left, maxHeight: pos.maxHeight } : { top: 0, left: 0, visibility: "hidden" }}
+            className="fixed z-[100] block w-[min(400px,calc(100vw-32px))] cursor-default overflow-y-auto overscroll-contain rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-left shadow-xl">
+            {body}
+          </div>
+        ), document.body)}
     </span>
   );
 }
