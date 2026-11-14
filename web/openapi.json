@@ -7330,6 +7330,12 @@
       "title": "Levels",
       "type": "boolean"
      },
+     "scanner": {
+      "default": true,
+      "description": "The Signal scanner (live every second in market hours) turns a name into a Buy, Swing buy or Strong swing buy; once per symbol and kind per day",
+      "title": "Scanner",
+      "type": "boolean"
+     },
      "sell_call": {
       "default": true,
       "title": "Sell Call",
@@ -11797,7 +11803,7 @@
         "type": "null"
        }
       ],
-      "description": "Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (\u22121.5% to \u22121.65% vs holding over 60 days); not in fear",
+      "description": "Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (about \u22121% to \u22121.65% vs holding over 60 days; a weak edge); not in fear",
       "title": "Exit Below"
      },
      "lines": {
@@ -12122,6 +12128,12 @@
       "title": "Failed",
       "type": "array"
      },
+     "live": {
+      "default": false,
+      "description": "Re-priced every second right now (regular market hours)",
+      "title": "Live",
+      "type": "boolean"
+     },
      "rows": {
       "default": [],
       "items": {
@@ -12143,6 +12155,24 @@
         "type": "null"
        }
       ]
+     },
+     "tick_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Last live re-price (UTC)",
+      "title": "Tick At"
+     },
+     "tick_seconds": {
+      "default": 1.0,
+      "description": "Seconds between live re-prices",
+      "title": "Tick Seconds",
+      "type": "number"
      },
      "universe": {
       "description": "Tickers in the universe",
@@ -12385,6 +12415,12 @@
        }
       ],
       "title": "Swing Reason"
+     },
+     "swing_strong": {
+      "default": false,
+      "description": "Strong swing buy: \u2265 7% down in 5 days above the 200-day",
+      "title": "Swing Strong",
+      "type": "boolean"
      },
      "symbol": {
       "title": "Symbol",
@@ -14292,6 +14328,12 @@
        }
       ]
      },
+     "strong": {
+      "default": false,
+      "description": "Strong swing buy: \u2265 7% down in 5 days above the 200-day (about 2\u00d7 the average trade)",
+      "title": "Strong",
+      "type": "boolean"
+     },
      "verdict": {
       "enum": [
        "BUY",
@@ -14449,8 +14491,47 @@
      "is": {
       "$ref": "#/components/schemas/SwingStatsOut"
      },
+     "new52": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStatsOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "2015\u20132026 on the 52 names added in round 3 (never used to choose)"
+     },
      "oos": {
       "$ref": "#/components/schemas/SwingStatsOut"
+     },
+     "strong_is": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStatsOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "STRONG buys (\u2265 7% 5-day drop above the 200-day), 1995\u20132014"
+     },
+     "strong_oos": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStatsOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "STRONG buys, 2015\u20132026"
+     },
+     "symbols": {
+      "default": 148,
+      "description": "Stocks and ETFs in the backtest",
+      "title": "Symbols",
+      "type": "integer"
      }
     },
     "required": [

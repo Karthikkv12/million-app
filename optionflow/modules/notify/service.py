@@ -9,6 +9,9 @@ off, and alerts can be limited to some symbols (prefs, below; the same prefs on 
 - expiring_itm: a short option is in the money with ≤ 1 day left, so assignment is likely (off by default)
 - signals: a holding's backtested signal (hedge.signal) turns actionable: Add, Exit, Take profit or Roll. Once per
   symbol and verdict per 7 days (the Notification Center's window), so a fear dip that lasts a week alerts once
+- scanner: the Signal scanner (hedge.scan_live, every second in market hours) turns a name into a Buy (1–3 month),
+  a Swing buy or a Strong swing buy, held for 3 straight seconds. Once per symbol and kind per day; any name in the
+  scanner's universe, not only holdings
 - levels: a dealer level of a holding or of an extra `level_symbols` ticker moved (call wall, put wall, king, flip),
   or spot crossed the flip (LevelWatch, below)
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
@@ -41,9 +44,10 @@ from optionflow.modules.notify import webpush
 logger = logging.getLogger("optionflow.notify")
 ET = ZoneInfo("America/New_York")
 MAX_PER_CYCLE = 6                     # more than this in one minute → one summary instead
-KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm", "levels", "signals")
+KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm", "levels", "signals", "scanner")
 DEFAULT_PREFS: Dict[str, Any] = {"buyback": True, "sell_call": True, "sell_put": True, "buy_stock": True,
                                  "iv_spike": False, "expiring_itm": False, "levels": True, "signals": True,
+                                 "scanner": True,        # the Signal scanner, live every second in market hours
                                  "symbols": [],          # [] = every holding
                                  "level_symbols": []}    # watched for level alerts on top of the holdings
 MAX_LEVEL_SYMBOLS = 20
@@ -77,6 +81,8 @@ def allows(prefs: Dict[str, Any], alert: Dict[str, Any]) -> bool:
         return False
     if alert["kind"] == "levels" and alert["symbol"] in (prefs.get("level_symbols") or []):
         return True                                   # asked for by name: not limited by `symbols`
+    if alert["kind"] == "scanner":
+        return True                                   # the scanner is about names you don't hold: not limited by `symbols`
     return not prefs.get("symbols") or alert["symbol"] in prefs["symbols"]
 
 

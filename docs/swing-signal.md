@@ -49,3 +49,57 @@ In 2015–2026 the 148 names gave about 14 swing buys a day on average (median 4
 `optionflow/modules/hedge/swing.py` (`read()`), on every Signal-scanner row (`GET /hedge/scan`: `swing`,
 `swing_reason`, `swing_buy_below`, `swing_exit_above`, `ret5`, `vs_200d`, `swing_stats`). Research → Signal scanner →
 **Swing · 1–4 wk**. `tests/hedge/test_swing.py` checks the live rule against the backtest definition on random series.
+
+## Round 3 — 200 symbols, sharper signals (2026-11-14)
+
+52 names added (`fetch.py`, last two lines): MRVL ADI NXPI ON MCHP INTU ADSK WDAY ANET SPOT PINS COF USB PNC SPGI ICE CME
+BX TMO ABT DHR ISRG VRTX REGN MDT SYK BKNG CMG LULU ROST TJX MO UNP NOC GD ETN DAL CCL EOG PSX VLO FCX NEM LIN NEE DUK AMT
+XLU XBI EEM EFA GDX. Now 200 symbols, 1,175,374 symbol-days. None of the new names was used to choose a rule, so they are a
+second hold-out. Scripts: `swing3.py`, `swing3b.py`.
+
+**The rule holds on names it never saw.** The current rule (fear dip or 5% drop above the 200-day; sell above the 10-day
+average or after 20 days), per trade after costs:
+
+| | Trades | Avg | Median | Win | Worst 1 in 20 | t |
+|---|---|---|---|---|---|---|
+| 1995–2014 (200 names) | 19,578 | +0.81% | +1.25% | 67.1% | −8.5% | 9.89 |
+| 2015–2026 (200 names) | 16,307 | +0.56% | +1.08% | 65.8% | −8.7% | 5.51 |
+| 2015–2026, the 52 new names only | 4,384 | +0.56% | +1.08% | 66.4% | −7.8% | 5.09 |
+
+**Sharper triggers did not beat it** (1995–2014 avg / t → 2015–2026 avg / t). A change had to beat the current rule on
+1995–2014 on both the average and the t, by more than noise:
+
+| Drop leg (fear-dip leg unchanged) | 1995–2014 | 2015–2026 |
+|---|---|---|
+| **Current: drop ≥ 5%, above 200-day** | +0.81% / 9.89 | +0.56% / 5.51 |
+| Volatility-scaled drop, z ≤ −1.25 / −1.5 / −2 | +0.73–0.76% / 5.7–10.1 | +0.52–0.63% / 4.9–5.5 |
+| Drop ≥ 5% and z ≤ −1.25 | +0.81% / 9.99 | +0.61% / 5.91 |
+| Stock-only drop (vs SPY) ≥ 5% | +0.75% / 8.32 | +0.53% / 4.96 |
+| Drop ≥ 5%, SPY above its 200-day | +0.82% / 9.91 | +0.57% / 4.10 |
+| Drop ≥ 5%, ≤ 25% off the 52-week high | +0.79% / 10.38 | +0.55% / 5.39 |
+
+Two variants edged the current rule on 1995–2014 by 0.01% and 0.1 of t. That is noise, so the trigger is unchanged.
+
+**Strong swing buy (new).** The buys were graded instead (8 grades, chosen on 1995–2014 as the highest average with t ≥ 5):
+**a 5-day drop of 7% or more with the close above the 200-day.**
+
+| Strong buys | Trades | Avg | Median | Win | Days | Worst 1 in 20 | t |
+|---|---|---|---|---|---|---|---|
+| 1995–2014 | 2,414 | +1.53% | +2.55% | 69.7% | 7.0 | −10.8% | 6.70 |
+| 2015–2026 | 2,125 | +0.95% | +2.35% | 66.0% | 7.5 | −13.1% | 5.36 |
+| 2015–2026, 52 new names | 467 | +1.10% | +2.42% | 67.9% | 7.6 | −11.5% | 2.84 |
+
+About twice the average trade, with a deeper worst case. The other grades: both legs at once (1995–2014 +1.64%, but
+t 4.4 and 2015–2026 +0.35%); fear dip only (2015–2026 t 1.8: mostly the market bouncing); RSI(2) < 5 (no bigger trade).
+
+**In the app.** `swing.read()` returns `strong`; the scanner rows carry `swing_strong`; the tag reads "Strong swing".
+
+## Live scanner (2026-11-14)
+
+`optionflow/modules/hedge/scan_live.py` re-prices the Signal scanner **every second, 09:30–16:00 ET on weekdays**. Each
+tick sends one batched Public quote request for the 100 popular names, sets today's bar to the live price and reads the
+rows again. The S&P 500 updates 50 names a tick (all 503 in about 10 s), and only while someone has it open, because
+Public allows about 8 requests a second for the whole app. When a name turns into a Buy, Swing buy or Strong swing buy
+and stays one for 3 straight seconds, it alerts once per symbol and kind per day: in the Notification Center, plus a
+phone push where push is set up (Settings → Notifications → Signal scanner). The rules are read on closes, so an
+intraday Buy means "if it closes here", and the backtests buy at the next open.

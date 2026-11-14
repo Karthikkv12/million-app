@@ -39,9 +39,14 @@ export function OptionsTab() {
                 <td className={`${TD} text-right text-foreground/70`}>{usd(o.avg_price)}</td>
                 <td className={`sensitive ${TD} text-right ${(o.premium ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{signedUsd(o.premium, 0)}</td>
                 <td className={`${TD} text-right text-foreground`}>{usd(o.spot)}</td>
-                <td className={`${TD} text-right`}>
-                  {o.moneyness && <Pill tone={o.moneyness === "ITM" ? (o.contracts < 0 ? "warn" : "good") : "neutral"} className="mr-1.5">{o.moneyness}</Pill>}
-                  <span className="text-foreground/55">{pct(o.distance_pct, 1)}</span>
+                <td className={`${TD} text-right whitespace-nowrap`}>
+                  {/* fixed slots so the pill and the % line up row to row, whatever the sign or width */}
+                  <span className="inline-flex items-center justify-end gap-2">
+                    <span className="inline-flex w-[46px] justify-center">
+                      {o.moneyness && <Pill tone={o.moneyness === "ITM" ? (o.contracts < 0 ? "warn" : "good") : "neutral"}>{o.moneyness}</Pill>}
+                    </span>
+                    <span className="w-[58px] text-right tabular-nums text-foreground/55">{pct(o.distance_pct, 1)}</span>
+                  </span>
                 </td>
                 <td className={`${TD} font-sans text-[12px] text-foreground/55`}>{o.account}</td>
               </tr>

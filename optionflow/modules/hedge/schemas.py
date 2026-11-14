@@ -230,7 +230,7 @@ class SignalPlanOut(BaseModel):
     vix_pct_needed: Optional[float] = None
     clears_text: Optional[str] = Field(None, description="What clears a Don't add / Don't buy yet")
     upside: Optional[float] = Field(None, description="Nearest resistance (held): no tested sell price")
-    exit_below: Optional[float] = Field(None, description="Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (−1.5% to −1.65% vs holding over 60 days); not in fear")
+    exit_below: Optional[float] = Field(None, description="Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (about −1% to −1.65% vs holding over 60 days; a weak edge); not in fear")
     covered_call: Optional[Literal["0.15", "0.30"]] = Field(None, description="Covered-call delta to sell now (held shares)")
 
 
@@ -272,6 +272,7 @@ class SwingReadOut(BaseModel):
     vs_200d: float
     fear: bool = Field(..., description="Fear dip (the 1–3 month Add)")
     drop: bool = Field(..., description="≥ 5% down in 5 days above the 200-day")
+    strong: bool = Field(False, description="Strong swing buy: ≥ 7% down in 5 days above the 200-day (about 2× the average trade)")
     stats: Optional["SwingStatsSetOut"] = None
 
 
@@ -463,6 +464,7 @@ class SignalScanRowOut(BaseModel):
     held: bool = Field(False, description="You hold it (any form)")
     swing: Optional[Literal["BUY", "WAIT"]] = Field(None, description="Swing read (1 week – 1 month); None without 200 days of history")
     swing_reason: Optional[str] = None
+    swing_strong: bool = Field(False, description="Strong swing buy: ≥ 7% down in 5 days above the 200-day")
     swing_buy_below: Optional[float] = Field(None, description="A close at or under this would make it a swing buy")
     swing_exit_above: Optional[float] = Field(None, description="Swing exit: the first close above the 10-day average (this is today's)")
     ret5: Optional[float] = Field(None, description="5-day change")
@@ -488,7 +490,11 @@ class SwingStatsSetOut(BaseModel):
     """Backtest of the swing rule (hedge.swing.STATS): IS 1995–2014 (chosen), OOS 2015–2026 (unseen)."""
     is_: SwingStatsOut = Field(..., alias="is")
     oos: SwingStatsOut
+    new52: Optional[SwingStatsOut] = Field(None, description="2015–2026 on the 52 names added in round 3 (never used to choose)")
+    strong_is: Optional[SwingStatsOut] = Field(None, description="STRONG buys (≥ 7% 5-day drop above the 200-day), 1995–2014")
+    strong_oos: Optional[SwingStatsOut] = Field(None, description="STRONG buys, 2015–2026")
     baseline_oos_5d: SwingBaselineOut
+    symbols: int = Field(148, description="Stocks and ETFs in the backtest")
 
     model_config = {"populate_by_name": True}
 
@@ -505,6 +511,9 @@ class SignalScanOut(BaseModel):
     rows: List[SignalScanRowOut] = []
     failed: List[str] = Field([], description="Symbols with no history this scan")
     swing_stats: Optional[SwingStatsSetOut] = None
+    live: bool = Field(False, description="Re-priced every second right now (regular market hours)")
+    tick_at: Optional[str] = Field(None, description="Last live re-price (UTC)")
+    tick_seconds: float = Field(1.0, description="Seconds between live re-prices")
 
 
 SwingReadOut.model_rebuild()

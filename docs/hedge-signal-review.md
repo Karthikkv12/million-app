@@ -201,3 +201,22 @@ cut, not a crash call.
 14. The committed holdings snapshot (`holdings_data.py`, `data/holdings.json`, the report's holdings tables) is removed.
 
 Not financial advice. Averages for setups, not forecasts for one stock.
+
+## Round 3 — re-read on 200 symbols (2026-11-14)
+
+`scripts/backtest_signal/signal3.py`: 52 names added (see docs/swing-signal.md), 1,175,374 symbol-days. Excess = vs
+holding the same stock; t clustered by month.
+
+| Rule | 1995–2014, 60d | 2015–2026, 20d | 2015–2026, 60d | 52 new names, 2015–2026, 60d |
+|---|---|---|---|---|
+| ADD (fear score ≥ 0.283) | +3.22% (t 4.55) | +1.31% (t 3.17) | +3.55% (t 2.46) | +3.82% (t 1.98) |
+| CAUTION | −1.08% (t −1.52) | −0.37% (t −2.46) | −1.04% (t −2.63) | −0.40% (t −1.94) |
+| EXIT (calm, fresh close under the 200-day) | −1.45% (t 0.12) | −0.40% (t −1.78) | −0.99% (t −2.53) | +0.75% (t −0.87) |
+
+- **ADD holds**, including on the names it never saw. No filter beat it on 1995–2014: score ≥ 0.25 / 0.35, 60-day
+  return vs SPY ≥ −10% / −20%, within 20% of the 200-day, ≤ 30% off the 52-week high. The relative-strength filter
+  raised the t (4.92) but cut the average from +3.2% to +2.1%, so it was not taken.
+- **CAUTION holds.**
+- **EXIT is the weakest rule.** It shows no edge on 1995–2014 (t 0.1), is −1.0% (not −1.65%) on 200 names in
+  2015–2026, and is positive on the new names. It stays a "reason to cut, not a crash call", and the app's numbers
+  now say −1.0%. If next week's names also fail it, drop it.

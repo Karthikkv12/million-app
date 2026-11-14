@@ -27,14 +27,16 @@ export function SwingBadge({ swing: s, symbol, className }: { swing: SwingData; 
     return () => { document.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
   }, [open]);
   const buy = s.verdict === "BUY";
-  const o = s.stats?.oos;
-  const name = buy ? "Swing buy" : "Wait";
+  const strong = buy && !!s.strong;
+  const o = strong ? s.stats?.strong_oos ?? s.stats?.oos : s.stats?.oos;
+  const n = s.stats?.symbols ?? 148;
+  const name = strong ? "Strong swing buy" : buy ? "Swing buy" : "Wait";
   return (
     <span className={clsx("inline-flex", className)}>
       <button type="button" data-testid="swing-badge" aria-haspopup="dialog" aria-controls={open ? id : undefined} aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
         className="inline-flex items-center rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-        <Tag tone={buy ? "gain" : "neutral"}>{name}</Tag>
+        <Tag tone={buy ? "gain" : "neutral"}>{strong ? "Strong swing" : name}</Tag>
         <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] text-foreground/45">{SWING_HORIZON}</span>
       </button>
       {open && typeof document !== "undefined" && createPortal(
@@ -60,7 +62,7 @@ export function SwingBadge({ swing: s, symbol, className }: { swing: SwingData; 
                   ["Or sell after", `${s.max_days} trading days`],
                   ["5-day change", pct(s.ret5)],
                   ["vs 200-day avg", pct(s.vs_200d)],
-                  ["Setup", s.fear && s.drop ? "fear dip + 5% drop" : s.fear ? "fear dip" : s.drop ? "5% drop, uptrend" : "none"],
+                  ["Setup", strong ? (s.fear ? "fear dip + 7% drop" : "7%+ drop, uptrend") : s.fear && s.drop ? "fear dip + 5% drop" : s.fear ? "fear dip" : s.drop ? "5% drop, uptrend" : "none"],
                 ] as const).map(([k, v]) => (
                   <div key={k} className="rounded-md bg-[var(--surface-2)] px-2.5 py-2">
                     <dt className="text-[9.5px] uppercase tracking-[0.1em] text-foreground/45">{k}</dt>
@@ -72,11 +74,12 @@ export function SwingBadge({ swing: s, symbol, className }: { swing: SwingData; 
               <p className="mt-1 leading-snug text-foreground/75">
                 Buy at the next open after a fear dip (the 1–3 month Add) or a drop of 5% or more in 5 trading days while above
                 the 200-day average. Sell at the first close above the 10-day average, or after 20 trading days. No stop-loss:
-                every stop tested lowered the average trade.
+                every stop tested lowered the average trade. Strong: the drop is 7% or more (about twice the average trade, with
+                a deeper worst case).
               </p>
               {o && (
                 <>
-                  <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45">Backtest · 2015–2026, unseen</p>
+                  <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45">Backtest{strong ? " · strong buys" : ""} · 2015–2026, unseen</p>
                   <span className="mt-1 grid grid-cols-3 gap-2 font-mono">
                     {([["Winners", pct(o.win, 0).replace("+", "")], ["Avg trade", pct(o.avg, 2)], ["Days held", o.days.toFixed(1)]] as const).map(([k, v]) => (
                       <span key={k} className="block rounded-md bg-[var(--surface-2)] px-2 py-1.5">
@@ -86,7 +89,7 @@ export function SwingBadge({ swing: s, symbol, className }: { swing: SwingData; 
                     ))}
                   </span>
                   <p className="mt-2 font-mono text-[11px] text-foreground/50">
-                    {o.trades.toLocaleString("en-US")} trades on 148 stocks and ETFs, after 0.2% costs; median {pct(o.median, 2)}; the worst 1 in 20
+                    {o.trades.toLocaleString("en-US")} trades on {n} stocks and ETFs, after 0.2% costs; median {pct(o.median, 2)}; the worst 1 in 20
                     lost {pct(-o.worst5, 0).replace("+", "")} or more. Any day held 5 days: {s.stats ? pct(s.stats.baseline_oos_5d.avg, 2) : "—"}.
                   </p>
                 </>

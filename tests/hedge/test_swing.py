@@ -64,3 +64,14 @@ def test_swing_for_uses_the_live_price_during_the_session(monkeypatch):
     assert r["verdict"] == "BUY" and r["drop"] and r["stats"]["oos"]["trades"] == sw.STATS["oos"]["trades"]
     monkeypatch.setattr(service, "_session_frac", lambda: (date(2026, 11, 15), 1.0))       # weekend: last close stands
     assert service.swing_for("XYZ", live_drop)["verdict"] == "WAIT"
+
+
+def test_seven_percent_drop_above_the_200_day_is_a_strong_buy():
+    px = ramp(100, 0.2, 255) + [150.0, 148.0, 145.0, 142.0, 139.0]          # −7.9% vs 5 sessions ago
+    r = sw.read(px, vix(15.0))
+    assert r["verdict"] == "BUY" and r["strong"] and r["reason"].startswith("Strong swing buy")
+    px5 = ramp(100, 0.2, 255) + [150.0, 149.0, 147.0, 145.0, 142.0]          # −5.4%: a buy, not strong
+    r5 = sw.read(px5, vix(15.0))
+    assert r5["verdict"] == "BUY" and not r5["strong"] and r5["reason"].startswith("Swing buy")
+    assert not sw.read(ramp(100, 0.2, 260), vix(15.0))["strong"]
+    assert sw.STATS["symbols"] == 200 and sw.STATS["strong_oos"]["avg"] > sw.STATS["oos"]["avg"]

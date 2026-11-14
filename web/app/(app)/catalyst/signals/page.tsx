@@ -49,8 +49,9 @@ export default function SignalScannerPage() {
   const { data, isLoading, isFetching, refetch, error } = useQuery<SignalScan>({
     queryKey: ["signal-scan", universe],
     queryFn: () => fetchSignalScan(universe),
-    staleTime: 60_000,
-    refetchInterval: (q) => (q.state.data?.building && !q.state.data.rows.length ? 5_000 : 5 * 60_000),
+    staleTime: 1_000,
+    // live in market hours: the server re-prices the scan every second (hedge.scan_live), so poll every second
+    refetchInterval: (q) => (q.state.data?.live ? 1_000 : q.state.data?.building && !q.state.data.rows.length ? 5_000 : 60_000),
   });
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<SortKey>("fear_score");
@@ -87,7 +88,16 @@ export default function SignalScannerPage() {
         sub={mode === "swing"
           ? "Swing trades, 1 week to 1 month, backtested on their own: buy a fear dip or a 5% five-day drop above the 200-day at the next open; sell at the first close above the 10-day average, or after 20 trading days."
           : "The desk's backtested buy read on 100 popular names or the whole S&P 500: who is a Buy now, and the close or VIX level that would make the rest one. A timing call for the next 1–3 months, not a long-term pick."}
-        action={<RefreshButton onRefresh={() => refetch()} isRefreshing={isFetching} />} />
+        action={
+          <span className="inline-flex items-center gap-3">
+            {data?.live && (
+              <span data-testid="scan-live" title={`Re-priced every ${data.tick_seconds ?? 1}s in market hours; Buy alerts go to your Notification Center`}
+                className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-gain">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Live · {data.tick_seconds ?? 1}s
+              </span>
+            )}
+            <RefreshButton onRefresh={() => refetch()} isRefreshing={isFetching && !data?.live} />
+          </span>} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {(mode === "swing" ? [
@@ -148,7 +158,7 @@ export default function SignalScannerPage() {
                       <td className="py-2 pl-4 pr-3"><Link href={stockHref(r.symbol)} className="font-semibold text-foreground hover:text-accent">{r.symbol}</Link>
                         {r.held && <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.1em] text-accent">held</span>}</td>
                       <td className="py-2 pr-3 text-right">{usd(r.price)} <span className={clsx("text-[11px]", (r.day_change ?? 0) >= 0 ? "text-gain" : "text-loss")}>{pct(r.day_change)}</span></td>
-                      <td className="py-2 pr-3">{r.swing ? <Tag tone={r.swing === "BUY" ? "gain" : "neutral"}>{r.swing === "BUY" ? "Swing buy" : "Wait"}</Tag> : "—"}</td>
+                      <td className="py-2 pr-3">{r.swing ? <Tag tone={r.swing === "BUY" ? "gain" : "neutral"}>{r.swing === "BUY" ? (r.swing_strong ? "Strong swing" : "Swing buy") : "Wait"}</Tag> : "—"}</td>
                       <td className={clsx("py-2 pr-3 text-right", (r.ret5 ?? 0) <= -0.05 ? "text-loss" : undefined)}>{pct(r.ret5)}</td>
                       <td className="py-2 pr-3 text-right">{pct(r.vs_200d)}</td>
                       <td className="py-2 pr-3 text-right">{r.rsi != null ? r.rsi.toFixed(0) : "—"}</td>
@@ -200,14 +210,17 @@ export default function SignalScannerPage() {
             </table>
           </div>
         )}
+        {data?.live && <p className="px-4 py-2 font-mono text-[11px] text-foreground/45">Live: read on the last trade every second. A Buy here means &ldquo;if it closes here&rdquo;; the backtests buy at the next open after the close. A Buy that holds 3 seconds alerts once a day.</p>}
         {!!data?.failed?.length && <p className="px-4 py-2 font-mono text-[11px] text-foreground/40">No history this scan: {data.failed.join(" · ")}</p>}
       </Panel>
       {mode === "swing" ? (
         <p className="mt-3 text-[12px] leading-relaxed text-foreground/45">
-          Backtest, 148 US stocks and ETFs, bought at the next open, 0.2% round-trip cost, rule chosen on 1995–2014.
+          Backtest, {ss?.symbols ?? 148} US stocks and ETFs, bought at the next open, 0.2% round-trip cost, rule chosen on 1995–2014.
           {ss && <> In 2015–2026 (unseen): {ss.oos.trades.toLocaleString("en-US")} trades, {Math.round(ss.oos.win * 100)}% winners,
           average {pct(ss.oos.avg, 2)} (median {pct(ss.oos.median, 2)}) in {ss.oos.days.toFixed(1)} days; the worst 1 in 20 lost {pct(-ss.oos.worst5, 0).replace("+", "")} or more.
-          Any day held 5 days: {pct(ss.baseline_oos_5d.avg, 2)}.</>} No stop-loss: every stop tested lowered the average. Most fear-dip
+          Any day held 5 days: {pct(ss.baseline_oos_5d.avg, 2)}.
+          {ss.strong_oos && <> Strong swing buys (a 7%+ drop): {ss.strong_oos.trades.toLocaleString("en-US")} trades, average {pct(ss.strong_oos.avg, 2)},
+          but the worst 1 in 20 lost {pct(-ss.strong_oos.worst5, 0).replace("+", "")} or more.</>}</>} No stop-loss: every stop tested lowered the average. Most fear-dip
           gains are the whole market bouncing, so many swing buys on one day are one bet, not many. Not financial advice.
         </p>
       ) : (

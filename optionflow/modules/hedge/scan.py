@@ -37,7 +37,8 @@ WORKERS = 4                   # parallel fetches (provider rate limits)
 
 _lock = threading.Lock()
 def _blank() -> Dict[str, Any]:
-    return {"at": 0.0, "as_of": None, "rows": [], "building": False, "failed": [], "vix": None, "vix_pct": None}
+    return {"at": 0.0, "as_of": None, "rows": [], "building": False, "failed": [], "vix": None, "vix_pct": None,
+            "viewed": 0.0}
 
 
 _states: Dict[str, Dict[str, Any]] = {u: _blank() for u in UNIVERSES}
@@ -54,9 +55,11 @@ def _bars(sym: str) -> List[Dict[str, Any]]:
     return service.CACHE.get("bars2y", sym, SCAN_BARS_TTL, load) or []
 
 
-def row(sym: str, vix: List[float], vix_dates: List[str], today: str) -> Optional[Dict[str, Any]]:
-    """One symbol's read (not held). None when there's no history."""
-    bars = _bars(sym)
+def row(sym: str, vix: List[float], vix_dates: List[str], today: str,
+        bars: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+    """One symbol's read (not held). None when there's no history. `bars`: daily bars to read instead of the cached ones
+    (scan_live passes them with today's bar set to the live price)."""
+    bars = _bars(sym) if bars is None else bars
     if len(bars) < 60:
         return None
     closes = [b["close"] for b in bars]
@@ -79,8 +82,15 @@ def row(sym: str, vix: List[float], vix_dates: List[str], today: str) -> Optiona
             "buy_below": plan.get("buy_below"), "vix_trigger": plan.get("vix_trigger"),
             "support": (g.support or {}).get("price"), "headline": g.headline,
             "p_edge_positive": p.get("p_edge_positive"), "edge_60": p.get("edge_60"),
-            "swing": s.get("verdict"), "swing_reason": s.get("reason"), "swing_buy_below": s.get("buy_below"),
+            "swing": s.get("verdict"), "swing_reason": s.get("reason"),
+            "swing_strong": bool(s.get("strong")), "swing_buy_below": s.get("buy_below"),
             "swing_exit_above": s.get("exit_above"), "ret5": s.get("ret5"), "vs_200d": s.get("vs_200d")}
+
+
+def sort_rows(rows: List[Dict[str, Any]]) -> None:
+    """Fear score first; ties (the oversold term caps at RSI 20) break by lower RSI, then deeper under the 50-day."""
+    rows.sort(key=lambda r: (-round(r["fear_score"] or 0.0, 3), r["rsi"] if r["rsi"] is not None else 100.0,
+                             r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"]))
 
 
 def build(symbols: Optional[List[str]] = None, universe: str = "popular") -> Dict[str, Any]:
@@ -100,9 +110,7 @@ def build(symbols: Optional[List[str]] = None, universe: str = "popular") -> Dic
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for sym, r in ex.map(one, symbols):
             (rows.append(r) if r else failed.append(sym))
-    # fear score first; ties (the oversold term caps at RSI 20) break by lower RSI, then deeper under the 50-day
-    rows.sort(key=lambda r: (-round(r["fear_score"] or 0.0, 3), r["rsi"] if r["rsi"] is not None else 100.0,
-                             r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"]))
+    sort_rows(rows)
     vp = sg.vix_percentile(vix) if vix else None
     out = {"at": time.time(), "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
            "rows": rows, "building": False, "failed": failed, "vix": vix[-1] if vix else None, "vix_pct": vp}
@@ -125,6 +133,7 @@ def get(held: Optional[set] = None, wait: float = 0.0, universe: str = "popular"
     """The latest scan of `universe`; starts a background rebuild when it's stale. `wait`: seconds to block for a first scan."""
     _state = _states[universe]
     with _lock:
+        _state["viewed"] = time.time()            # scan_live keeps a universe live while someone looks at it
         stale = time.time() - _state["at"] > SCAN_TTL
         if stale and not _state["building"]:
             _state["building"] = True
@@ -133,10 +142,12 @@ def get(held: Optional[set] = None, wait: float = 0.0, universe: str = "popular"
     while wait and not _state["rows"] and _state["building"] and time.time() < deadline:
         time.sleep(0.25)
     with _lock:
-        snap = {k: v for k, v in _state.items() if k != "at"}
+        snap = {k: v for k, v in _state.items() if k not in ("at", "viewed")}
         snap["rows"] = [dict(r, held=bool(held and r["symbol"] in held)) for r in _state["rows"]]
     snap["universe"] = len(UNIVERSES[universe])
     snap["universe_key"] = universe
     snap["score_cut"] = sg.SCORE_CUT
     snap["swing_stats"] = sw.STATS
+    from optionflow.modules.hedge import scan_live
+    snap.update(scan_live.status(universe))
     return snap

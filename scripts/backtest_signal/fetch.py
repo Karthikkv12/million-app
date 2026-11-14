@@ -7,7 +7,12 @@ XOM CVX OXY COP SLB HAL DVN FANG MPC
 JNJ PFE MRK ABBV LLY UNH CVS WBA MRNA BIIB GILD AMGN BMY
 WMT COST TGT HD LOW NKE SBUX MCD KO PEP PG CL KHC
 BA CAT DE GE HON LMT RTX UPS FDX F GM
-SPY QQQ IWM DIA XLK XLF XLE XLV XLY XLP XLI SMH ARKK GLD SLV TLT""".split()
+SPY QQQ IWM DIA XLK XLF XLE XLV XLY XLP XLI SMH ARKK GLD SLV TLT
+MRVL ADI NXPI ON MCHP INTU ADSK WDAY ANET SPOT PINS COF USB PNC SPGI ICE CME BX TMO ABT DHR ISRG VRTX REGN MDT SYK
+BKNG CMG LULU ROST TJX MO UNP NOC GD ETN DAL CCL EOG PSX VLO FCX NEM LIN NEE DUK AMT XLU XBI EEM EFA GDX""".split()
+# 2026-11-14 round 3: the last two lines (52 names) took the backtest from 148 to 200 symbols. Add more each week:
+# append a line here, re-run fetch.py + feats.py, then swing3.py / swing3b.py / signal3.py (new names are reported
+# apart as a hold-out). SQ, ROKU, WBD, WBA in the first block no longer download from Yahoo.
 out={}
 for i in range(0,len(U),25):
     b=U[i:i+25]

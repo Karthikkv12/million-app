@@ -218,4 +218,4 @@ def test_signal_scan_breaks_fear_score_ties_by_rsi():
                      r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"])
     assert [r["symbol"] for r in sorted(rows, key=key)] == ["CCC", "DDD", "BBB", "AAA"]
     import inspect
-    assert "r[\"rsi\"] if r[\"rsi\"] is not None else 100.0" in inspect.getsource(sc.build)
+    assert "r[\"rsi\"] if r[\"rsi\"] is not None else 100.0" in inspect.getsource(sc.sort_rows)

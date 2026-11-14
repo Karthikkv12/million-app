@@ -4758,6 +4758,12 @@ export interface components {
              */
             levels: boolean;
             /**
+             * Scanner
+             * @description The Signal scanner (live every second in market hours) turns a name into a Buy, Swing buy or Strong swing buy; once per symbol and kind per day
+             * @default true
+             */
+            scanner: boolean;
+            /**
              * Sell Call
              * @default true
              */
@@ -6176,7 +6182,7 @@ export interface components {
             covered_call?: ("0.15" | "0.30") | null;
             /**
              * Exit Below
-             * @description Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (−1.5% to −1.65% vs holding over 60 days); not in fear
+             * @description Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (about −1% to −1.65% vs holding over 60 days; a weak edge); not in fear
              */
             exit_below?: number | null;
             /**
@@ -6334,6 +6340,12 @@ export interface components {
              */
             failed: string[];
             /**
+             * Live
+             * @description Re-priced every second right now (regular market hours)
+             * @default false
+             */
+            live: boolean;
+            /**
              * Rows
              * @default []
              */
@@ -6341,6 +6353,17 @@ export interface components {
             /** Score Cut */
             score_cut: number;
             swing_stats?: components["schemas"]["SwingStatsSetOut"] | null;
+            /**
+             * Tick At
+             * @description Last live re-price (UTC)
+             */
+            tick_at?: string | null;
+            /**
+             * Tick Seconds
+             * @description Seconds between live re-prices
+             * @default 1
+             */
+            tick_seconds: number;
             /**
              * Universe
              * @description Tickers in the universe
@@ -6428,6 +6451,12 @@ export interface components {
             swing_exit_above?: number | null;
             /** Swing Reason */
             swing_reason?: string | null;
+            /**
+             * Swing Strong
+             * @description Strong swing buy: ≥ 7% down in 5 days above the 200-day
+             * @default false
+             */
+            swing_strong: boolean;
             /** Symbol */
             symbol: string;
             /**
@@ -7012,6 +7041,12 @@ export interface components {
             ret5: number;
             stats?: components["schemas"]["SwingStatsSetOut"] | null;
             /**
+             * Strong
+             * @description Strong swing buy: ≥ 7% down in 5 days above the 200-day (about 2× the average trade)
+             * @default false
+             */
+            strong: boolean;
+            /**
              * Verdict
              * @enum {string}
              */
@@ -7080,7 +7115,19 @@ export interface components {
         SwingStatsSetOut: {
             baseline_oos_5d: components["schemas"]["SwingBaselineOut"];
             is: components["schemas"]["SwingStatsOut"];
+            /** @description 2015–2026 on the 52 names added in round 3 (never used to choose) */
+            new52?: components["schemas"]["SwingStatsOut"] | null;
             oos: components["schemas"]["SwingStatsOut"];
+            /** @description STRONG buys (≥ 7% 5-day drop above the 200-day), 1995–2014 */
+            strong_is?: components["schemas"]["SwingStatsOut"] | null;
+            /** @description STRONG buys, 2015–2026 */
+            strong_oos?: components["schemas"]["SwingStatsOut"] | null;
+            /**
+             * Symbols
+             * @description Stocks and ETFs in the backtest
+             * @default 148
+             */
+            symbols: number;
         };
         /** SwingsOut */
         SwingsOut: {

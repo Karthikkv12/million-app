@@ -26,7 +26,7 @@ const GROUPS: { id: Group; label: string; icon: typeof Bell }[] = [
   { id: "other", label: "Other", icon: Bell },
 ];
 const groupOf = (kind: string): Group =>
-  kind === "signals" ? "signals" : ["buyback", "sell_call", "sell_put", "buy_stock", "expiring_itm"].includes(kind) ? "trades"
+  kind === "signals" || kind === "scanner" ? "signals" : ["buyback", "sell_call", "sell_put", "buy_stock", "expiring_itm"].includes(kind) ? "trades"
     : kind === "levels" || kind === "iv_spike" ? "levels"
     : kind === "price_alert" ? "alerts"
     : kind.startsWith("paper_") ? "paper"

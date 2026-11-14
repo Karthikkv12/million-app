@@ -28,3 +28,13 @@ Re-test, 2026-11-14 (docs/hedge-signal-review.md):
     python rebuild.py     # fear score (IS-chosen), tranche sizing, covered calls, survivorship estimate
     python compare.py     # old rule vs new rule, both periods
     python probs.py       # odds per desk case + the exit line
+
+Round 3, 2026-11-14 (200 symbols: fetch.py now lists 52 more; docs/swing-signal.md, docs/hedge-signal-review.md):
+
+    python fetch.py && python feats.py   # 200 symbols, 1,175,374 symbol-days
+    python swing3.py      # can the swing drop leg be sharper? (vol-scaled, stock-only, trend filters) + new-52 hold-out
+    python swing3b.py     # grade the swing buys: the STRONG tier (5-day drop ≥ 7%, above the 200-day)
+    python signal3.py     # ADD / CAUTION / EXIT re-read on 200 names, and ADD filters
+
+Weekly: add names to fetch.py, re-run the four lines above, compare with the tables in the docs. A rule changes only
+when a candidate beats it on 1995–2014 (both the average and the t); the new names are a hold-out.
