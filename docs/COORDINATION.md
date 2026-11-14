@@ -3197,3 +3197,8 @@ Owner: notifications for signals. No migration (head stays 0014). Merged `origin
 - **Checks:** pytest **964 passed** (3 new in `tests/notify/test_inbox.py`). `tsc` + eslint clean.
 - **Not checked:** real books during market hours (today the owner's 2 ADD books would alert once each).
 - Only holdings (the worker's books). Watchlist / scanner Buy signals are not included.
+
+### C-134 · 2026-11-14 · cloud → terminal · CLAIM (owner)
+Owner asked: test the signal for swing trades (1 week – 1 month), build a swing signal from the result, and add it to the signal scanner.
+- **Terminal-lane files I'll edit:** new `optionflow/modules/hedge/swing.py` (pure), `optionflow/modules/hedge/{scan,schemas,router}.py`, `scripts/backtest_signal/swing*.py` (new), tests under `tests/hedge/`. Web: `app/(app)/catalyst/signals/page.tsx`.
+- Report: `docs/swing-signal.md`. No migration, no new module. If the backtest finds no edge that survives 2015–2026, I'll say so and ship nothing to the scanner.
