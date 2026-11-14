@@ -15,13 +15,13 @@ export default function FlowLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   return (
     <>
-      <nav aria-label="Flow" className="border-b border-[var(--border)]">
-        <div className="flex w-full gap-1 overflow-x-auto px-4 sm:px-8">
+      <nav aria-label="Flow" className="shadow-[inset_0_-1px_0_var(--border)]">
+        <div className="flex w-full gap-1 overflow-x-auto overflow-y-hidden px-4 sm:px-8">
           {TABS.map((t) => {
             const on = t.match(pathname);
             return (
               <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined}
-                className={clsx("-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-[13.5px] transition",
+                className={clsx("flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-[13.5px] transition",
                   on ? "border-foreground font-medium text-foreground" : "border-transparent text-foreground/55 hover:text-foreground")}>
                 <t.icon size={15} />{t.label}
               </Link>

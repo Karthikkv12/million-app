@@ -189,7 +189,7 @@ export function WatchlistTab() {
   return (
     <div className="space-y-4">
       {/* Every list as a tab with + at the end; ⋮ (list actions) pinned on the right. */}
-      <div className="flex items-end gap-1 border-b border-[var(--border)]">
+      <div className="flex items-end gap-1 shadow-[inset_0_-1px_0_var(--border)]">
         <div className="min-w-0 flex-1">
         <ListTabs
           lists={lists} selected={selected} onSelect={(id) => { setSelected(id); setSector(""); setErr(null); }}
@@ -370,14 +370,14 @@ function ListTabs({ lists, selected, onSelect, allLabel, allCount, adding, onAdd
     const on = selected === id;
     return (
       <button key={id} role="tab" aria-selected={on} onClick={() => onSelect(id)}
-        className={clsx("-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] transition",
+        className={clsx("flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] transition",
           on ? "border-foreground font-medium text-foreground" : "border-transparent text-foreground/55 hover:text-foreground")}>
         {label}<span className={clsx("font-mono text-[11px]", on ? "text-foreground/55" : "text-foreground/35")}>{n}</span>
       </button>
     );
   };
   return (
-    <div ref={strip} role="tablist" aria-label="Watchlists" className="-ml-4 overflow-x-auto pl-4 sm:ml-0 sm:pl-0 lg:overflow-visible">
+    <div ref={strip} role="tablist" aria-label="Watchlists" className="-ml-4 overflow-x-auto overflow-y-hidden pl-4 sm:ml-0 sm:pl-0 lg:overflow-visible">
       {/* Phones: one row that swipes sideways. Wide screens: tabs wrap so every list is visible. */}
       <div className="flex min-w-max items-end gap-0.5 lg:min-w-0 lg:flex-wrap">
         {tab(ALL, allLabel, allCount)}
