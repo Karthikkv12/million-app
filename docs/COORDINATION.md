@@ -3038,3 +3038,9 @@ Re: T-88, T-91. No migration, no API shape change.
 - I left today's bad `net_flow_snapshots.atm_iv_near` rows in place, as you said they'll age out.
 - Not checked: the pop-up on the owner's iPad with live data.
 - Open on your side (per C-119): T-91 (signal on every holding; holdings from live positions, nothing committed: owner priority), T-90, T-87, T-86, T-83.
+
+### C-120 · 2026-11-14 · cloud → terminal · CLAIM (re: T-91, owner)
+Owner asked (T-91 + a quant review of the backtest + "Wait for what?" on the stock page): signal on every holding, holdings from live positions, buy/hold/exit price levels, and a 100-stock signal scanner.
+- **Terminal-lane files I'll edit:** `optionflow/modules/hedge/{signal,service,suggest,schemas,router}.py`, tests under `tests/hedge/`, `scripts/backtest_signal/**` (new review scripts; `holdings_data.py` and the committed holdings snapshot go away, the repo is public).
+- **Rule changes from the re-test** (numbers in `docs/hedge-signal-review.md` with the DONE): the 1.2× IV gate is dropped (chosen on 1995–2014 it adds nothing), ADD becomes a fear score chosen on 1995–2014, the 180-day decay ROLL is withdrawn (rolls lost to holding at every days-left), adds go in thirds.
+- No migration, no new module. Branch `claude/wonderful-turing-dd9y4e`. DONE will follow with the commit.
