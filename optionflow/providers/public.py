@@ -341,7 +341,9 @@ _PERIODS: Dict[str, Tuple[str, Optional[Tuple[str, int]]]] = {
 # with aggregation Y" (probed 2026-11-11: WEEK/ONE_MINUTE, MONTH/30m, QUARTER…YTD/ONE_HOUR all 400).
 _AGG_ORDER = ["ONE_MINUTE", "FIVE_MINUTES", "FIFTEEN_MINUTES", "THIRTY_MINUTES", "ONE_HOUR",
               "ONE_DAY", "ONE_WEEK", "ONE_MONTH", "THREE_MONTHS"]
-_FINEST = {"DAY": "ONE_MINUTE", "WEEK": "FIVE_MINUTES", "MONTH": "ONE_HOUR"}   # longer periods: ONE_DAY
+# TEN_YEARS rejects ONE_DAY ("Period TEN_YEARS is not compatible with aggregation ONE_DAY", seen live 2026-11-13),
+# so 10y daily bars go straight to Yahoo instead of spending a Public request on a 400 first.
+_FINEST = {"DAY": "ONE_MINUTE", "WEEK": "FIVE_MINUTES", "MONTH": "ONE_HOUR", "TEN_YEARS": "ONE_WEEK"}   # others: ONE_DAY
 
 
 def _compatible(pub_period: str, agg: str) -> bool:

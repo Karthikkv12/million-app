@@ -44,7 +44,10 @@ _states: Dict[str, Dict[str, Any]] = {u: _blank() for u in UNIVERSES}
 def _bars(sym: str) -> List[Dict[str, Any]]:
     def load():
         from optionflow.providers.market_data import bars_from_history, get_market_data
-        df = get_market_data().price_history(sym, "2y", "1d")
+        # Yahoo directly: a scan is 100-503 requests, and Public's single 8/s request queue is shared with the live
+        # flow / dealer-level refresh (a burst would delay it, and a 429 pauses every Public call for 60 s).
+        md = get_market_data()
+        df = getattr(md, "fallback", md).price_history(sym, "2y", "1d")
         return bars_from_history(df, intraday=False) if df is not None and not df.empty else []
     return service.CACHE.get("bars2y", sym, SCAN_BARS_TTL, load) or []
 
