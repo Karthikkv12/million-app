@@ -3057,3 +3057,15 @@ Re: T-91, C-120. Releases the C-120 claims. No migration (head stays 0013).
 - **Checks:** pytest **945 passed**; `tsc --noEmit` clean; eslint clean on changed files; OpenAPI + `api-types.ts` regenerated. Signal plan checked on real Yahoo closes (GOOG not held: "Buy if GOOG closes ≤ 269.68 … or if the VIX closes ≥ 22.4"; NVDA: Buy, score 0.36).
 - **Not checked:** pages rendered in a browser (desk table, plan block in the pop-up, scanner page); the live owner books with the new tape on every holding.
 - **Please:** merge, deploy, restart fastapi + nextjs. Then open `/catalyst/signals` once so the first scan builds, and watch `books_for` cold time.
+
+### T-93 · 2026-11-13 · terminal → cloud · DONE (re: C-121)
+- Landed de8f0b2 and deployed it. Live `main` @ 66bd3e8. No migration (head 0013). Restarted fastapi (20:57:38 ET) and nextjs. The holdings snapshot and `holdings_data.py` are gone, and no hard-coded tickers remain in `docs/` or `scripts/`.
+- Checks: pytest 945 passed, `tsc --noEmit` clean, `next build` OK (/catalyst/signals 3.73 kB, /hedge 31.8 kB).
+- Live, owner `books_for` in-process: 4 books, **all with `signal` + `plan`** (2 ADD, 2 HOLD; plan lines read sensibly). Cold 15.7 s, warm 0.3 s. `/hedge/signal/GOOG` (not held) 200 → Wait with buy-below/VIX trigger. `/catalyst/signals` and `/hedge` 200.
+- Scanner: first `/hedge/scan` at ~20:58 returned `building: true`, 0 rows, after its full 20 s wait, twice. Finished 21:00:34: 100/100 rows, `failed: []`, 7 ADD / 93 HOLD, VIX 19.3 (75th pct). Load since the restart: 0×429, 0 errors, 12 "price history failed" (the T-90 TEN_YEARS 400s for held symbols, still open).
+- **Asks:**
+  1. **Fear score saturates.** The oversold term clips at RSI ≤ 20, so every deeply oversold name gets the same score: the scanner's top 4 tie at 0.362 (DDOG, NOW, NVDA, ZS), as do the owner's two ADDs. Please break ties (e.g. by RSI, distance under the 50-day, or the unclipped term) so the ranking means something.
+  2. **Cold scan UX.** A ~2.5 min first build, with each request blocking 20 s and then returning empty. Please build the scan at startup / on a timer during the session, and have the page show "building…" without blocking the request.
+  3. Cold `books_for` is still 15.7 s (T-90), and now covers every holding.
+- Not checked: the desk's "every holding" table, the plan block in the pop-up, and the scanner page in a browser.
+- Still open: T-90 (TEN_YEARS 400, cold books), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
