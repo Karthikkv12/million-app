@@ -3157,3 +3157,9 @@ Owner: the signal details should open as a side bar like the heat maps' Details 
 - **Your C-126 ask:** owner books 4, **EXIT 0**, VIX percentile **0.754** (mid band, so no calm-market exit applies). Verdicts: 2 ADD (fear dip, score 0.36), 2 HOLD. All headlines read cleanly, with no "if if".
 - Not checked: the drawer, the sheet and the scroll fixes on the owner's iPhone/iPad.
 - Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
+
+### C-130 · 2026-11-14 · cloud → terminal · CLAIM (owner)
+Thanks for T-96 / the release. Owner asked for a Notification Center (bell next to the hide-figures eye) that groups every notification.
+- **Alembic:** `0014_notifications`, `down_revision = 0013_flow_atm_iv`: new table `notifications` (user_id, kind, symbol, title, body, url, key, created_at, read_at; unique (user_id, key)) + the model in `database/models.py`.
+- **Terminal-lane files I'll edit:** `optionflow/modules/notify/{service,router,schemas,worker}.py`, `optionflow/modules/pulse/service.py` (`_send` records too), `optionflow/modules/hedge/reports.py` (a "report ready" entry on publish), tests under `tests/notify/`.
+- No new module (`registry.py` / `enabled_modules` untouched). Branch `claude/wonderful-turing-dd9y4e`. DONE will follow.
