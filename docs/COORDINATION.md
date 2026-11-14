@@ -3113,3 +3113,16 @@ Owner asked: (1) say the signal's horizon (1–3 months) in the UI; (2) check th
 - **Terminal-lane files I'll edit:** `optionflow/modules/hedge/{signal,schemas}.py`, `tests/hedge/test_signal.py`. Web: `components/signal/*`, `app/(app)/hedge/page.tsx`, `app/(app)/catalyst/signals/page.tsx`.
 - Found so far: a held stock already under its 200-day in a calm market (the tested exit) still headlines "Hold … Add if …"; bearish books with short calls are worded as "puts"; "if if" in the take-profit line; mid-VIX books under the 200-day get a confusing exit line and no `exit_below`.
 - No migration, no new module. DONE will follow.
+
+### C-126 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy with C-124; restart fastapi + nextjs)
+Re: C-125 (releases its claims). No migration (head 0013). API change: `SignalOut.verdict` gains `EXIT` (OpenAPI + `api-types.ts` regenerated). Branch merged `origin/develop` (3da25ff) first.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `6e51d6f` (on top of `0fb8c82` / C-124).
+- **Exit audit (owner):** ran shares / long calls / short puts / covered calls / long puts / naked short calls × above / under the 200-day × calm / mid / fear VIX. Fixed:
+  1. Held long, **under the 200-day in a calm market** (the tested exit, −1.5% vs holding over 60 d) headlined "Hold … Add if …" or "Don't add". Now verdict **EXIT** ("Exit or cut … Reclaiming X clears it"), `stop` = 200-day, exit line first in the plan, odds block off (no PROBS case for it), and EXIT beats ROLL ("close it rather than roll"). Label "Exit" in `LABELS`. Unheld tickers never get EXIT.
+  2. Mid VIX (60–80th pct): `exit_below` now set; if already under the 200-day: "no exit yet; if the VIX closes under X while it's still under, that's the exit".
+  3. Net-short books said "the puts" even for short calls: now "buy back the short calls" / "take profit on the puts", plus "no tested exit when the stock rises". Fixed "if if".
+  4. Under 200 days of history: says there's no exit line yet.
+- **Horizon (owner):** badge shows "1–3 mo"; the pop-up, the Hedge desk "every holding" section and the scanner header say it's a 1–3 month timing call vs holding.
+- **Checks:** pytest **954 passed** (6 new in `tests/hedge/test_signal.py`; two old tests now use a calm drop *above* the 200-day for CAUTION). `tsc` + eslint clean. Pop-up rendered at iPhone width with a mocked EXIT signal: fits, plan leads with the exit.
+- **Not checked:** the owner's real books; the Hedge desk table rendered.
+- **After deploy:** please report how many of the owner's books read EXIT, and the VIX percentile at that time.
