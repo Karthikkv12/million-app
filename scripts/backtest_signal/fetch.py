@@ -9,10 +9,16 @@ WMT COST TGT HD LOW NKE SBUX MCD KO PEP PG CL KHC
 BA CAT DE GE HON LMT RTX UPS FDX F GM
 SPY QQQ IWM DIA XLK XLF XLE XLV XLY XLP XLI SMH ARKK GLD SLV TLT
 MRVL ADI NXPI ON MCHP INTU ADSK WDAY ANET SPOT PINS COF USB PNC SPGI ICE CME BX TMO ABT DHR ISRG VRTX REGN MDT SYK
-BKNG CMG LULU ROST TJX MO UNP NOC GD ETN DAL CCL EOG PSX VLO FCX NEM LIN NEE DUK AMT XLU XBI EEM EFA GDX""".split()
+BKNG CMG LULU ROST TJX MO UNP NOC GD ETN DAL CCL EOG PSX VLO FCX NEM LIN NEE DUK AMT XLU XBI EEM EFA GDX
+^GSPC ^RUT ^N225 ^FTSE ^GDAXI ^FCHI ^HSI ^AXJO ^GSPTSE ^BVSP ^KS11 ^TWII DD NUE IP APD SHW ECL VMC O SPG PLD PSA WELL AIG
+ALL TRV CB PGR GIS HSY KMB SYY ADM CPB KR MMM EMR ITW CSX NSC PH DOV WM SO D AEP ED EXC XEL BAX BDX CI HUM DBC USO UNG IEF
+LQD HYG EWJ EWZ FXI EWG VNQ""".split()
 # 2026-11-14 round 3: the last two lines (52 names) took the backtest from 148 to 200 symbols. Add more each week:
 # append a line here, re-run fetch.py + feats.py, then swing3.py / swing3b.py / signal3.py (new names are reported
 # apart as a hold-out). SQ, ROKU, WBD, WBA in the first block no longer download from Yahoo.
+# 2026-11-14 round 4: the last three lines (65 names: 12 indexes back to 1927, older stocks in materials, REITs,
+# insurance, staples, transports, utilities, health; bond / commodity / country ETFs) → 265 symbols. Then feats4.py
+# (back to 1963, modeled VIX before 1991) and round4.py. MMC and K no longer download.
 out={}
 for i in range(0,len(U),25):
     b=U[i:i+25]

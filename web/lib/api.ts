@@ -339,6 +339,8 @@ export type SignalScan = Schemas["SignalScanOut"];
 export type SignalScanRow = Schemas["SignalScanRowOut"];
 export type ScanUniverse = SignalScan["universe_key"];
 export const fetchSignalScan = (universe: ScanUniverse = "popular") => api.get<SignalScan>(`/hedge/scan?universe=${universe}`);
+export type SignalLog = Schemas["SignalLogOut"];
+export const fetchSignalLog = (days = 365) => api.get<SignalLog>(`/hedge/signal-log?days=${days}`);
 export const fetchStockSignal = (symbol: string) =>
   api.get<StockSignal>(`/hedge/signal/${encodeURIComponent(symbol.toUpperCase())}`);
 

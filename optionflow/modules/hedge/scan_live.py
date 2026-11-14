@@ -36,6 +36,7 @@ _started = False
 _live: Dict[str, Dict[str, Any]] = {}          # universe -> {"tick_at": epoch, "ticks": int, "priced": int}
 _streak: Dict[str, int] = {}                   # "universe|SYM|kind" -> straight ticks the Buy has held
 _cursor: Dict[str, int] = {}                   # S&P 500 rotation position
+_closed: Dict[str, str] = {}                   # universe -> ET day whose closing reads are logged
 
 
 def market_open(now: Optional[datetime] = None) -> bool:
@@ -200,6 +201,32 @@ def _symbols(universe: str) -> List[str]:
     return (syms[i:] + syms[:i])[:LIVE_BATCH]
 
 
+def _today() -> str:
+    from optionflow.modules.notify.service import ET
+    return datetime.now(ET).date().isoformat()
+
+
+def log_close(now: Optional[datetime] = None) -> int:
+    """After 16:00 ET on a weekday, once per universe and day: log the Buy reads on the session's last re-price
+    (hedge.signal_log, trigger "close"). Only universes re-priced live today, so the rows are today's closes."""
+    from optionflow.modules.hedge import scan as sc, signal_log
+    from optionflow.modules.notify.service import ET
+    t = (now or datetime.now(ET)).astimezone(ET)
+    if t.weekday() >= 5 or (t.hour, t.minute) < (16, 0):
+        return 0
+    day, n = t.date().isoformat(), 0
+    for u in sc.UNIVERSES:
+        with _lock:
+            at = (_live.get(u) or {}).get("tick_at")
+        if _closed.get(u) == day or not at or datetime.fromtimestamp(at, ET).date().isoformat() != day:
+            continue
+        _closed[u] = day
+        with sc._lock:
+            rows = list(sc._states[u]["rows"])
+        n += signal_log.log(rows, "close", day, universe=u)
+    return n
+
+
 def run_once() -> int:
     """One tick over the live universes; returns pushes sent."""
     from optionflow.modules.hedge import scan as sc
@@ -216,6 +243,10 @@ def run_once() -> int:
     for a in alerts:                         # a name in both universes alerts once
         if a["key"] not in seen:
             seen.add(a["key"]); uniq.append(a)
+    if uniq:
+        from optionflow.modules.hedge import signal_log
+        rows = {r["symbol"]: r for u in sc.UNIVERSES for r in sc._states[u]["rows"]}
+        signal_log.log([rows[a["symbol"]] for a in uniq if a["symbol"] in rows], "intraday", _today())
     return deliver(uniq)
 
 
@@ -223,6 +254,10 @@ def _loop() -> None:
     while True:
         t0 = time.monotonic()
         if not market_open():
+            try:
+                log_close()                  # once a day after the close: the track record's "close" entries
+            except Exception:
+                logger.exception("signal log at the close failed")
             time.sleep(IDLE_SLEEP)
             continue
         try:

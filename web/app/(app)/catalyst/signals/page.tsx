@@ -13,6 +13,7 @@ import { fetchSignalScan, ScanUniverse, SignalScan, SignalScanRow } from "@/lib/
 import { stockHref } from "@/components/TickerLink";
 import { PageHeader, Panel, RefreshButton, Segmented } from "@/components/ui";
 import { Tag } from "@/components/desk";
+import { TrackRecord } from "@/components/signal/TrackRecord";
 
 type Filter = "all" | "buy" | "near" | "held" | "avoid";
 type SortKey = "fear_score" | "rsi" | "vs_50d" | "off_high" | "to_trigger" | "symbol" | "ret5" | "vs_200d" | "to_swing";
@@ -174,12 +175,13 @@ export default function SignalScannerPage() {
         )}
         {!!all.length && mode === "trend" && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] font-mono text-[12.5px] tabular-nums" data-testid="signal-scan">
+            <table className="w-full min-w-[960px] font-mono text-[12.5px] tabular-nums" data-testid="signal-scan">
               <thead><tr className="border-b border-[var(--border-strong)] text-left text-[10px] text-foreground/45">
                 <th className="py-2 pl-4 pr-3 font-normal"><button type="button" onClick={() => onSort("symbol")} className="uppercase tracking-[0.12em] hover:text-foreground">Ticker{sort === "symbol" ? (dir === -1 ? " ↓" : " ↑") : ""}</button></th>
                 <th className="py-2 pr-3 text-right font-normal uppercase tracking-[0.12em]">Price</th>
                 <th className="py-2 pr-3 font-normal uppercase tracking-[0.12em]">Signal</th>
                 <Th k="fear_score">Fear score</Th>
+                <th className="py-2 pr-3 text-right font-normal uppercase tracking-[0.12em]" title="The fear-score band's 60-day return vs holding, on years no rule was set on (1963–1994 and 2015–2026)">60d edge</th>
                 <Th k="rsi" right>RSI</Th>
                 <Th k="vs_50d" right>vs 50d</Th>
                 <Th k="off_high" right>vs 52w high</Th>
@@ -197,6 +199,9 @@ export default function SignalScannerPage() {
                       <td className="py-2 pr-3 text-right">{usd(r.price)} <span className={clsx("text-[11px]", (r.day_change ?? 0) >= 0 ? "text-gain" : "text-loss")}>{pct(r.day_change)}</span></td>
                       <td className="py-2 pr-3"><Tag tone={TONE[r.verdict]}>{r.label}</Tag></td>
                       <td className="py-2 pr-3"><span className="flex items-center gap-2"><ScoreBar v={r.fear_score} cut={cut} /><span className={(r.fear_score ?? 0) >= cut ? "text-gain" : "text-foreground/70"}>{r.fear_score != null ? r.fear_score.toFixed(2) : "—"}</span></span></td>
+                      <td className="py-2 pr-3 text-right" title={r.score_band ? `${r.score_band}: ${pct(r.score_edge_60)} vs holding over 60 days, on average` : undefined}>
+                        <span className={(r.score_edge_60 ?? 0) >= 0.01 ? "text-gain" : "text-foreground/60"}>{pct(r.score_edge_60)}</span>
+                        {r.score_band && <span className="ml-1.5 font-sans text-[10.5px] text-foreground/45">{r.score_band}</span>}</td>
                       <td className={clsx("py-2 pr-3 text-right", (r.rsi ?? 50) < 30 ? "text-gain" : (r.rsi ?? 50) > 70 ? "text-warn" : undefined)}>{r.rsi != null ? r.rsi.toFixed(0) : "—"}</td>
                       <td className="py-2 pr-3 text-right">{pct(r.vs_50d)}</td>
                       <td className="py-2 pr-3 text-right">{pct(r.off_high)}</td>
@@ -225,11 +230,13 @@ export default function SignalScannerPage() {
         </p>
       ) : (
       <p className="mt-3 text-[12px] leading-relaxed text-foreground/45">
-        Read as if you don&apos;t hold the stock. Buy = fear score ≥ {cut.toFixed(2)}: in 2015–2026 (unseen when the rule was set) such days beat
-        holding by +3.5% over 60 trading days on average, up about 6 times in 10. Buy in thirds, ≥10 trading days apart. Averages for the setup,
+        Read as if you don&apos;t hold the stock. Buy = fear score ≥ {cut.toFixed(2)}. On every year no rule was set on (1963–1994 and 2015–2026, 265 stocks and ETFs)
+        such days beat holding by +2.4% over 60 trading days on average (95% range +0.3% to +4.5%). The edge grows with the score:
+        about +0.5% more for every 0.1 (the 60d edge column). Buy in thirds, ≥10 trading days apart. Averages for the setup,
         not a forecast for one stock. Not financial advice.
       </p>
       )}
+      <div className="mt-6"><TrackRecord /></div>
     </div>
   );
 }

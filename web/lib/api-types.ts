@@ -831,6 +831,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/signal-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Signal Log Report
+         * @description The live track record: every Signal-scanner Buy / Swing buy / Strong swing buy since it was logged, with what
+         *     the stock did after (entry at the next open, after 0.2% costs), and a summary per kind beside the backtest.
+         */
+        get: operations["signal_log_report_api_v1_hedge_signal_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hedge/signal/{symbol}": {
         parameters: {
             query?: never;
@@ -6065,6 +6086,97 @@ export interface components {
              */
             strength: number;
         };
+        /** SignalLogEntryOut */
+        SignalLogEntryOut: {
+            /** Day */
+            day: string;
+            /**
+             * Entry
+             * @description Next session's open (the backtests' entry); None until it trades
+             */
+            entry?: number | null;
+            /** Entry Day */
+            entry_day?: string | null;
+            /** Fear Score */
+            fear_score?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "BUY" | "SWING" | "SWING_STRONG";
+            /** Price */
+            price: number;
+            /** R20 */
+            r20?: number | null;
+            /**
+             * R5
+             * @description Entry → close 5 sessions after the signal, after 0.2% costs
+             */
+            r5?: number | null;
+            /** R60 */
+            r60?: number | null;
+            /** Ret5 */
+            ret5?: number | null;
+            /** Swing Days */
+            swing_days?: number | null;
+            /**
+             * Swing Ret
+             * @description Swing kinds: by the swing exit (first close above the 10-day, max 20)
+             */
+            swing_ret?: number | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "close" | "intraday";
+        };
+        /** SignalLogKindOut */
+        SignalLogKindOut: {
+            /** Avg */
+            avg?: number | null;
+            /** Avg R5 */
+            avg_r5?: number | null;
+            /**
+             * Closed
+             * @description With a finished result (swing exit, or 60 sessions for Buy)
+             */
+            closed: number;
+            /** Measure */
+            measure: string;
+            /** Signals */
+            signals: number;
+            /** Win */
+            win?: number | null;
+        };
+        /**
+         * SignalLogOut
+         * @description The live track record (hedge.signal_log).
+         */
+        SignalLogOut: {
+            /**
+             * Backtest
+             * @default {}
+             */
+            backtest: {
+                [key: string]: components["schemas"]["SwingStatsOut"] | null;
+            };
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["SignalLogEntryOut"][];
+            /** Since */
+            since: string;
+            /**
+             * Summary
+             * @default {}
+             */
+            summary: {
+                [key: string]: components["schemas"]["SignalLogKindOut"];
+            };
+        };
         /**
          * SignalOut
          * @description The tested read, levels and price plan for any holding or ticker (hedge.signal).
@@ -6432,6 +6544,16 @@ export interface components {
             ret5?: number | null;
             /** Rsi */
             rsi?: number | null;
+            /**
+             * Score Band
+             * @description Fear-score band: no fear dip / faint / mild / near a Buy / Buy / strong Buy
+             */
+            score_band?: string | null;
+            /**
+             * Score Edge 60
+             * @description That band's 60-day return vs holding on unseen years (1963–94 + 2015–26)
+             */
+            score_edge_60?: number | null;
             /** Support */
             support?: number | null;
             /**
@@ -6984,6 +7106,18 @@ export interface components {
             /** Win */
             win: number;
         };
+        /** SwingNetOut */
+        SwingNetOut: {
+            /**
+             * Avg
+             * @description Per trade, minus the S&P 500 over the same days
+             */
+            avg: number;
+            /** T */
+            t: number;
+            /** Trades */
+            trades: number;
+        };
         /** SwingPoint */
         SwingPoint: {
             /** Close */
@@ -7115,11 +7249,15 @@ export interface components {
         SwingStatsSetOut: {
             baseline_oos_5d: components["schemas"]["SwingBaselineOut"];
             is: components["schemas"]["SwingStatsOut"];
+            /** @description All swing buys, net of the S&P 500 over the same days (1963–94 + 2015–26) */
+            net_unseen?: components["schemas"]["SwingNetOut"] | null;
             /** @description 2015–2026 on the 52 names added in round 3 (never used to choose) */
             new52?: components["schemas"]["SwingStatsOut"] | null;
             oos: components["schemas"]["SwingStatsOut"];
             /** @description STRONG buys (≥ 7% 5-day drop above the 200-day), 1995–2014 */
             strong_is?: components["schemas"]["SwingStatsOut"] | null;
+            /** @description Strong swing buys, net of the S&P 500 (1963–94 + 2015–26) */
+            strong_net_unseen?: components["schemas"]["SwingNetOut"] | null;
             /** @description STRONG buys, 2015–2026 */
             strong_oos?: components["schemas"]["SwingStatsOut"] | null;
             /**
@@ -9738,6 +9876,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignalScanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signal_log_report_api_v1_hedge_signal_log_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                trigger?: ("close" | "intraday") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignalLogOut"];
                 };
             };
             /** @description Validation Error */

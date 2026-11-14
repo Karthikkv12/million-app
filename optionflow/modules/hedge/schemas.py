@@ -1,7 +1,7 @@
 """optionflow/modules/hedge/schemas.py — request/response models."""
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -462,6 +462,8 @@ class SignalScanRowOut(BaseModel):
     p_edge_positive: Optional[float] = None
     edge_60: Optional[float] = None
     held: bool = Field(False, description="You hold it (any form)")
+    score_band: Optional[str] = Field(None, description="Fear-score band: no fear dip / faint / mild / near a Buy / Buy / strong Buy")
+    score_edge_60: Optional[float] = Field(None, description="That band's 60-day return vs holding on unseen years (1963–94 + 2015–26)")
     swing: Optional[Literal["BUY", "WAIT"]] = Field(None, description="Swing read (1 week – 1 month); None without 200 days of history")
     swing_reason: Optional[str] = None
     swing_strong: bool = Field(False, description="Strong swing buy: ≥ 7% down in 5 days above the 200-day")
@@ -481,6 +483,12 @@ class SwingStatsOut(BaseModel):
     t: float
 
 
+class SwingNetOut(BaseModel):
+    trades: int
+    avg: float = Field(..., description="Per trade, minus the S&P 500 over the same days")
+    t: float
+
+
 class SwingBaselineOut(BaseModel):
     avg: float
     win: float
@@ -495,6 +503,8 @@ class SwingStatsSetOut(BaseModel):
     strong_oos: Optional[SwingStatsOut] = Field(None, description="STRONG buys, 2015–2026")
     baseline_oos_5d: SwingBaselineOut
     symbols: int = Field(148, description="Stocks and ETFs in the backtest")
+    net_unseen: Optional[SwingNetOut] = Field(None, description="All swing buys, net of the S&P 500 over the same days (1963–94 + 2015–26)")
+    strong_net_unseen: Optional[SwingNetOut] = Field(None, description="Strong swing buys, net of the S&P 500 (1963–94 + 2015–26)")
 
     model_config = {"populate_by_name": True}
 
@@ -514,6 +524,40 @@ class SignalScanOut(BaseModel):
     live: bool = Field(False, description="Re-priced every second right now (regular market hours)")
     tick_at: Optional[str] = Field(None, description="Last live re-price (UTC)")
     tick_seconds: float = Field(1.0, description="Seconds between live re-prices")
+
+
+class SignalLogEntryOut(BaseModel):
+    day: str
+    symbol: str
+    kind: Literal["BUY", "SWING", "SWING_STRONG"]
+    trigger: Literal["close", "intraday"]
+    price: float
+    fear_score: Optional[float] = None
+    ret5: Optional[float] = None
+    entry: Optional[float] = Field(None, description="Next session's open (the backtests' entry); None until it trades")
+    entry_day: Optional[str] = None
+    r5: Optional[float] = Field(None, description="Entry → close 5 sessions after the signal, after 0.2% costs")
+    r20: Optional[float] = None
+    r60: Optional[float] = None
+    swing_ret: Optional[float] = Field(None, description="Swing kinds: by the swing exit (first close above the 10-day, max 20)")
+    swing_days: Optional[int] = None
+
+
+class SignalLogKindOut(BaseModel):
+    signals: int
+    closed: int = Field(..., description="With a finished result (swing exit, or 60 sessions for Buy)")
+    avg: Optional[float] = None
+    win: Optional[float] = None
+    avg_r5: Optional[float] = None
+    measure: str
+
+
+class SignalLogOut(BaseModel):
+    """The live track record (hedge.signal_log)."""
+    since: str
+    entries: List[SignalLogEntryOut] = []
+    summary: Dict[str, SignalLogKindOut] = {}
+    backtest: Dict[str, Optional[SwingStatsOut]] = {}
 
 
 SwingReadOut.model_rebuild()

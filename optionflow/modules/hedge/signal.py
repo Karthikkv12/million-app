@@ -48,9 +48,8 @@ CALM_VIX, KNIFE_DD = 0.60, -0.10
 SCORE_CUT = 0.283            # ADD: fear score ≥ this (chosen on 1995–2014)
 TRANCHES, TRANCHE_GAP = 3, 10       # add in thirds, ≥ 10 trading days apart
 EXPIRY_ROLL, EXPIRY_WARN = 30, 60   # days left: roll or close / heads-up (expiry mechanics; time decay alone didn't pay)
-EXIT_DROP_60 = -0.0099              # calm close under the 200-day → 60-day excess (200 names, 2015–2026, t −2.5;
-                                    # 148 names: −1.65%, t −2.75). Weakest of the rules: no edge on 1995–2014
-                                    # and none on the 52 names added in round 3
+EXIT_DROP_60 = -0.0055              # calm fresh close under the 200-day → 60-day excess, every unseen year (1963–94 +
+                                    # 2015–26, 265 names; round 4). Unproven: the 95% range crosses zero (−1.4% to +0.3%)
 ADD_MIN_DTE, ADD_DELTA, ADD_HOLD_DAYS = 365, 0.80, 60
 DECAY_DAYS = 28              # 20 trading days ≈ 28 calendar days
 # 30-day IV model: log IV30 = c0 + c1·log HV20 + c2·log HV60 + c3·log HV252 + c4·log(VIX / its 1-year median)
@@ -59,19 +58,20 @@ IV_NORMAL_DAYS, IV_NORMAL_MIN = 1260, 252
 TERM_KAPPA = 2.25            # /yr: long-dated IV = normal + (IV30 − normal)·g(T)/g(1/12), g(T) = (1 − e^{−κT})/(κT)
 # Backtest evidence per case (2015–2026, unseen when the rules were set).
 EVIDENCE = {
-    "ADD": "Backtest (fear score, 2015–2026, unseen; 200 stocks and ETFs): +3.6% vs holding over 60 trading days "
-           "(t 2.5), +1.3% over 20 (t 3.2), and +3.8% on the 52 names added last; 365-day 0.80Δ calls +3.5% of premium vs an average day over 20 days after costs (t 3.2). Up only "
+    "ADD": "Backtest (fear score, 265 stocks and ETFs, every year no rule was set on: 1963–1994 and 2015–2026): +2.4% "
+           "vs holding over 60 trading days (95% range +0.3% to +4.5%); 2015–2026 alone +3.4%, 1963–1994 +1.2%. The higher "
+           "the score, the bigger the rebound; 365-day 0.80Δ calls +3.5% of premium vs an average day over 20 days after costs (t 3.2). Up only "
            "~6 times in 10: the edge is the big rebounds. Failed in long bear markets (2008, 2022): add in thirds.",
     "LEAN": "Backtest: oversold WITHOUT enough market fear had no edge (2015–2026: −0.2% vs holding over 60 days, 90% "
             "range −1.4% to +1.1%; 31,547 cases). The edge appears once the VIX joins in.",
-    "CAUTION": "Backtest: −0.4% vs holding over 20 days and −1.0% over 60 (t −2.6, 2015–2026, 200 names): don't add, but it is "
+    "CAUTION": "Backtest: −0.7% vs holding over 60 days on every unseen year (1963–1994 + 2015–2026; 95% range −1.6% to +0.1%): don't add, but it is "
                "not a sell.",
     "HOLD": "Backtest: no edge either way on these days (most days).",
     "TRIM": "Backtest: on fear-dip days held puts lost 7.9% (365-day) to 11.1% (180-day) of their value vs an average "
             "day over 60 trading days (2015–2026): stocks tend to rebound.",
     "EXIT": "Backtest: days a held stock sat under its 200-day while the market was calm ran −1.5% vs holding over the next 60 "
-            "trading days (t −2.5, 2015–2026); a fresh close under it −1.0% on 200 names (t −2.5). A weak edge that did not "
-            "show on 1995–2014 or on the 52 names added in round 3: a reason to cut, not a "
+            "trading days (t −2.5, 2015–2026); a fresh close under it −0.55% on every unseen year (1963–1994 + 2015–2026, "
+            "265 names; 95% range −1.4% to +0.3%), so the edge is unproven: a reason to cut, not a "
             "crash call. The same breaks during market fear came before +3.6%, so it only counts when the market is calm.",
     "ROLL": "Expiry, not decay: rolling early to escape time decay lost ~4% of the position to costs at every days-left "
             "tested (90–365). Inside 30 days, decide: roll to 365+ days or close.",
@@ -629,6 +629,30 @@ def fear_score(vp: Optional[float], r14: Optional[float]) -> Optional[float]:
     return _clip((vp - 0.5) / 0.5, 0.0, 1.0) ** 1.5 * _clip((50.0 - r14) / 30.0, 0.0, 1.0)
 
 
+# Round 4 (scripts/backtest_signal/round4.py): the fear score is graded, not just yes/no at SCORE_CUT. 60-day return vs
+# holding the same stock, per score band, on data no rule was set on (1963–1994 + 2015–2026, US stocks and ETFs; before
+# 1991 the fear gauge is a modeled VIX). (lo, hi, label, edge, 95% low, 95% high). The bands rise in order, in both the
+# rule-setting years and the unseen ones.
+SCORE_BANDS = (
+    (-1.0, 0.0, "no fear dip", -0.0039, -0.0109, 0.0031),
+    (0.0, 0.10, "faint", 0.0039, -0.0086, 0.0164),
+    (0.10, 0.20, "mild", 0.0108, -0.0035, 0.0251),
+    (0.20, SCORE_CUT, "near a Buy", 0.0151, -0.0001, 0.0304),
+    (SCORE_CUT, 0.45, "Buy", 0.0164, 0.0000, 0.0328),
+    (0.45, 9.0, "strong Buy", 0.0289, 0.0037, 0.0540),
+)
+
+
+def score_band(fs: Optional[float]) -> Optional[Dict[str, Any]]:
+    """The fear score's band and its unseen-data 60-day edge vs holding (SCORE_BANDS)."""
+    if fs is None:
+        return None
+    for lo, hi, label, edge, elo, ehi in SCORE_BANDS:
+        if lo < fs <= hi or (lo == -1.0 and fs <= 0.0):
+            return {"label": label, "edge_60": edge, "edge_lo": elo, "edge_hi": ehi}
+    return None
+
+
 def vix_at_pct(vix: Sequence[float], p: float) -> Optional[float]:
     """About the VIX close that would rank at percentile `p` of the last year."""
     v = sorted(float(x) for x in list(vix)[-252:] if _ok(x))
@@ -722,7 +746,7 @@ def plan(t: Tape, px: List[float], vp: Optional[float], r14: Optional[float], fs
         if m200 and calm and t.spot > m200:
             out["exit_below"] = round(m200, 2)
             L.append(f"Exit line: a close under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) while the market is calm came "
-                     f"before {EXIT_DROP_60:+.1%} vs holding over 60 days (t −2.5). Weak edge: a reason to cut, not a crash call.")
+                     f"before {EXIT_DROP_60:+.1%} vs holding over 60 days (unproven: the 95% range crosses zero). Weak edge: a reason to cut, not a crash call.")
         elif m200 and calm:
             out["exit_below"] = round(m200, 2)
             L.append(f"Exit: under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%} away) in a calm market. Such days ran −1.5% "

@@ -82,6 +82,8 @@ def row(sym: str, vix: List[float], vix_dates: List[str], today: str,
             "buy_below": plan.get("buy_below"), "vix_trigger": plan.get("vix_trigger"),
             "support": (g.support or {}).get("price"), "headline": g.headline,
             "p_edge_positive": p.get("p_edge_positive"), "edge_60": p.get("edge_60"),
+            "score_band": (sg.score_band(g.fear_score) or {}).get("label"),
+            "score_edge_60": (sg.score_band(g.fear_score) or {}).get("edge_60"),
             "swing": s.get("verdict"), "swing_reason": s.get("reason"),
             "swing_strong": bool(s.get("strong")), "swing_buy_below": s.get("buy_below"),
             "swing_exit_above": s.get("exit_above"), "ret5": s.get("ret5"), "vs_200d": s.get("vs_200d")}

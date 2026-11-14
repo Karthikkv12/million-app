@@ -12,6 +12,10 @@ on 1995–2014 by month-clustered t-stat, read once on 2015–2026:
   STRONG  a buy whose 5-day drop is ≥ 7% with the close above the 200-day (round 3, chosen on 1995–2014 among 8
         grades): about twice the average trade (2015–2026 +0.95% vs +0.56%), with a deeper worst case (−13% 1 in 20).
 
+Round 4 (265 names, back to 1963): measured net of the S&P 500 over the same days, plain swing buys are the market's
+bounce (+0.08% a trade, t 1.5) while Strong swing buys beat it by +0.71% (t 4.4) on every year no rule was set on
+(1963–1994 + 2015–2026). The Strong grade is the stock-specific part; it also held on 1963–1994 (+1.20% a trade, t 3.2).
+
 Round 3 (52 names added, never used to choose): the rule held on them (2015–2026 +0.56% a trade, t 5.1). Nine
 sharper drop legs (volatility-scaled, stock-only vs SPY, trend filters) did not beat it on 1995–2014 by more than
 noise, so the trigger is unchanged.
@@ -40,7 +44,11 @@ STATS: Dict[str, Dict[str, float]] = {
     "strong_is":  {"trades": 2414, "avg": 0.0153, "median": 0.0255, "win": 0.697, "days": 7.0, "worst5": -0.108, "t": 6.70},
     "strong_oos": {"trades": 2125, "avg": 0.0095, "median": 0.0235, "win": 0.660, "days": 7.5, "worst5": -0.131, "t": 5.36},
     "baseline_oos_5d": {"avg": 0.0016, "win": 0.512},   # any day, held 5 days (148-name run)
-    "symbols": 200,
+    # round 4 (round4.py, 265 names, every unseen year: 1963–1994 + 2015–2026), each trade minus the S&P 500 over the
+    # same days: plain swing buys are the market's bounce (+0.08%, t 1.5); Strong ones beat it (+0.71%, t 4.4)
+    "net_unseen":        {"trades": 36753, "avg": 0.0008, "t": 1.50},
+    "strong_net_unseen": {"trades": 3840, "avg": 0.0071, "t": 4.40},
+    "symbols": 200,      # the is / oos / strong rows above (round 3); the net rows are round 4's 265 names
 }
 
 

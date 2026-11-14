@@ -13,7 +13,7 @@ from optionflow.modules.auth import service as auth_service
 from optionflow.modules.hedge import portfolio as pf
 from optionflow.modules.hedge import service
 from optionflow.modules.hedge.schemas import (BrokerActivityOut, BooksOut, BrokerPositionOut, BrokerHistoryPoint, BrokerIncomeOut,
-                                              IngestOut, IngestRequest, BrokerPortfolioOut, SignalScanOut, StockSignalOut)
+                                              IngestOut, IngestRequest, BrokerPortfolioOut, SignalLogOut, SignalScanOut, StockSignalOut)
 
 router = APIRouter(prefix="/hedge", tags=["hedge"])
 stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
@@ -67,6 +67,17 @@ def scan(universe: Literal["popular", "sp500"] = Query("popular", description="p
     except Exception:
         held = set()
     return SignalScanOut(**sc.get(held, wait=0.0, universe=universe))   # never block: the page polls while it builds
+
+
+@router.get("/signal-log", response_model=SignalLogOut)
+def signal_log_report(days: int = Query(365, ge=1, le=3650), trigger: Optional[Literal["close", "intraday"]] = Query(None),
+                      _user=Depends(get_current_user)) -> SignalLogOut:
+    """The live track record: every Signal-scanner Buy / Swing buy / Strong swing buy since it was logged, with what
+    the stock did after (entry at the next open, after 0.2% costs), and a summary per kind beside the backtest."""
+    from optionflow.modules.hedge import signal_log, swing
+    out = signal_log.report(days=days, trigger=trigger)
+    out["backtest"] = {"SWING": swing.STATS["oos"], "SWING_STRONG": swing.STATS.get("strong_oos")}
+    return SignalLogOut(**out)
 
 
 @router.get("/signal/{symbol}", response_model=StockSignalOut)

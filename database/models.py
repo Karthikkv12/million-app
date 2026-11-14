@@ -677,3 +677,22 @@ class PaperTrade(Base):
     closed_at   = Column(String, nullable=True)
     exit_price  = Column(Float, nullable=True)
     created_price = Column(Float, nullable=True)               # price when planned: which side `entry` is on
+
+
+class SignalLog(Base):
+    """The live track record (hedge.signal_log): every Signal-scanner Buy / Swing buy / Strong swing buy, logged when
+    it fires, so the signals get a forward test on data no rule was fitted to. `trigger`: "close" = the read on the
+    session's last re-price (what the backtests trade: buy at the next open), "intraday" = a live alert that held 3
+    seconds. One row per (day, symbol, kind, trigger); outcomes are computed when read, from daily bars."""
+    __tablename__ = "signal_log"
+    __table_args__ = (UniqueConstraint("day", "symbol", "kind", "trigger", name="uq_signal_log"),)
+    id         = Column(Integer, primary_key=True)
+    day        = Column(String, nullable=False, index=True)      # ET date of the signal
+    symbol     = Column(String, nullable=False)
+    kind       = Column(String, nullable=False)                  # BUY · SWING · SWING_STRONG
+    trigger    = Column(String, nullable=False)                  # close · intraday
+    price      = Column(Float, nullable=False)
+    fear_score = Column(Float, nullable=True)
+    ret5       = Column(Float, nullable=True)
+    universe   = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)                  # ISO UTC

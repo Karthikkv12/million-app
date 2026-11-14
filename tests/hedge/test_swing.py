@@ -75,3 +75,13 @@ def test_seven_percent_drop_above_the_200_day_is_a_strong_buy():
     assert r5["verdict"] == "BUY" and not r5["strong"] and r5["reason"].startswith("Swing buy")
     assert not sw.read(ramp(100, 0.2, 260), vix(15.0))["strong"]
     assert sw.STATS["symbols"] == 200 and sw.STATS["strong_oos"]["avg"] > sw.STATS["oos"]["avg"]
+
+
+def test_score_bands_rise_and_cover_every_score():
+    from optionflow.modules.hedge import signal as sg
+    edges = [b[3] for b in sg.SCORE_BANDS]
+    assert edges == sorted(edges)                                    # the bigger the fear score, the bigger the edge
+    assert sg.score_band(0.0)["label"] == "no fear dip" and sg.score_band(None) is None
+    assert sg.score_band(sg.SCORE_CUT)["label"] == "near a Buy"       # the cut itself is ≤ its band's top
+    assert sg.score_band(sg.SCORE_CUT + 0.001)["label"] == "Buy" and sg.score_band(0.9)["label"] == "strong Buy"
+    assert sw.STATS["strong_net_unseen"]["avg"] > sw.STATS["net_unseen"]["avg"]

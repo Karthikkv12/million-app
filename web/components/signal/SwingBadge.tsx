@@ -95,7 +95,11 @@ export function SwingBadge({ swing: s, symbol, className }: { swing: SwingData; 
                 </>
               )}
               <p className="mt-3 border-l-2 border-[var(--border-strong)] pl-2 text-[11.5px] leading-snug text-foreground/55">
-                Fear-dip swing gains are mostly the whole market bouncing; the 5% drop in an uptrend is more about the stock itself.
+                {s.stats?.net_unseen && s.stats?.strong_net_unseen
+                  ? <>Net of the S&amp;P 500 over the same days, a plain swing buy made {pct(s.stats.net_unseen.avg, 2)} a trade: it is mostly the
+                    whole market bouncing. A Strong swing buy beat the market by {pct(s.stats.strong_net_unseen.avg, 2)} (1963–1994 and 2015–2026,
+                    years no rule was set on). </>
+                  : <>Fear-dip swing gains are mostly the whole market bouncing; the 5% drop in an uptrend is more about the stock itself. </>}
                 Separate from the 1–3 month signal: both can be true at once, or disagree.
               </p>
               <p className="mt-2 text-[10.5px] text-foreground/40">Averages for this setup, not a forecast for one trade. Not financial advice.</p>

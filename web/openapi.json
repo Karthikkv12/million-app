@@ -11502,6 +11502,252 @@
     "title": "SignalLevelOut",
     "type": "object"
    },
+   "SignalLogEntryOut": {
+    "properties": {
+     "day": {
+      "title": "Day",
+      "type": "string"
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Next session's open (the backtests' entry); None until it trades",
+      "title": "Entry"
+     },
+     "entry_day": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry Day"
+     },
+     "fear_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fear Score"
+     },
+     "kind": {
+      "enum": [
+       "BUY",
+       "SWING",
+       "SWING_STRONG"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "r20": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "R20"
+     },
+     "r5": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Entry \u2192 close 5 sessions after the signal, after 0.2% costs",
+      "title": "R5"
+     },
+     "r60": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "R60"
+     },
+     "ret5": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ret5"
+     },
+     "swing_days": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Swing Days"
+     },
+     "swing_ret": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Swing kinds: by the swing exit (first close above the 10-day, max 20)",
+      "title": "Swing Ret"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "trigger": {
+      "enum": [
+       "close",
+       "intraday"
+      ],
+      "title": "Trigger",
+      "type": "string"
+     }
+    },
+    "required": [
+     "day",
+     "symbol",
+     "kind",
+     "trigger",
+     "price"
+    ],
+    "title": "SignalLogEntryOut",
+    "type": "object"
+   },
+   "SignalLogKindOut": {
+    "properties": {
+     "avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg"
+     },
+     "avg_r5": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg R5"
+     },
+     "closed": {
+      "description": "With a finished result (swing exit, or 60 sessions for Buy)",
+      "title": "Closed",
+      "type": "integer"
+     },
+     "measure": {
+      "title": "Measure",
+      "type": "string"
+     },
+     "signals": {
+      "title": "Signals",
+      "type": "integer"
+     },
+     "win": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Win"
+     }
+    },
+    "required": [
+     "signals",
+     "closed",
+     "measure"
+    ],
+    "title": "SignalLogKindOut",
+    "type": "object"
+   },
+   "SignalLogOut": {
+    "description": "The live track record (hedge.signal_log).",
+    "properties": {
+     "backtest": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/SwingStatsOut"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "default": {},
+      "title": "Backtest",
+      "type": "object"
+     },
+     "entries": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SignalLogEntryOut"
+      },
+      "title": "Entries",
+      "type": "array"
+     },
+     "since": {
+      "title": "Since",
+      "type": "string"
+     },
+     "summary": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/SignalLogKindOut"
+      },
+      "default": {},
+      "title": "Summary",
+      "type": "object"
+     }
+    },
+    "required": [
+     "since"
+    ],
+    "title": "SignalLogOut",
+    "type": "object"
+   },
    "SignalOut": {
     "description": "The tested read, levels and price plan for any holding or ticker (hedge.signal).",
     "properties": {
@@ -12353,6 +12599,30 @@
        }
       ],
       "title": "Rsi"
+     },
+     "score_band": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Fear-score band: no fear dip / faint / mild / near a Buy / Buy / strong Buy",
+      "title": "Score Band"
+     },
+     "score_edge_60": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "That band's 60-day return vs holding on unseen years (1963\u201394 + 2015\u201326)",
+      "title": "Score Edge 60"
      },
      "support": {
       "anyOf": [
@@ -14243,6 +14513,30 @@
     "title": "SwingBaselineOut",
     "type": "object"
    },
+   "SwingNetOut": {
+    "properties": {
+     "avg": {
+      "description": "Per trade, minus the S&P 500 over the same days",
+      "title": "Avg",
+      "type": "number"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     },
+     "trades": {
+      "title": "Trades",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "trades",
+     "avg",
+     "t"
+    ],
+    "title": "SwingNetOut",
+    "type": "object"
+   },
    "SwingPoint": {
     "properties": {
      "close": {
@@ -14491,6 +14785,17 @@
      "is": {
       "$ref": "#/components/schemas/SwingStatsOut"
      },
+     "net_unseen": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingNetOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "All swing buys, net of the S&P 500 over the same days (1963\u201394 + 2015\u201326)"
+     },
      "new52": {
       "anyOf": [
        {
@@ -14515,6 +14820,17 @@
        }
       ],
       "description": "STRONG buys (\u2265 7% 5-day drop above the 200-day), 1995\u20132014"
+     },
+     "strong_net_unseen": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingNetOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Strong swing buys, net of the S&P 500 (1963\u201394 + 2015\u201326)"
      },
      "strong_oos": {
       "anyOf": [
@@ -20091,6 +20407,77 @@
      }
     ],
     "summary": "Scan",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
+  "/api/v1/hedge/signal-log": {
+   "get": {
+    "description": "The live track record: every Signal-scanner Buy / Swing buy / Strong swing buy since it was logged, with what\nthe stock did after (entry at the next open, after 0.2% costs), and a summary per kind beside the backtest.",
+    "operationId": "signal_log_report_api_v1_hedge_signal_log_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 365,
+       "maximum": 3650,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "trigger",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "close",
+          "intraday"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Trigger"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SignalLogOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Signal Log Report",
     "tags": [
      "hedge"
     ]

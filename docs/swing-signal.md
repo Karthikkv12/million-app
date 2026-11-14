@@ -103,3 +103,10 @@ Public allows about 8 requests a second for the whole app. When a name turns int
 and stays one for 3 straight seconds, it alerts once per symbol and kind per day: in the Notification Center, plus a
 phone push where push is set up (Settings → Notifications → Signal scanner). The rules are read on closes, so an
 intraday Buy means "if it closes here", and the backtests buy at the next open.
+
+## Round 4 (2026-11-14): the market-adjusted view
+
+On 265 names back to 1963 (docs/signal-accuracy.md → R4), each swing trade minus the S&P 500 over the same days, on
+every year no rule was set on (1963–1994 + 2015–2026): all swing buys +0.08% (t 1.5), so they are mostly the market's
+bounce; Strong swing buys +0.71% (t 4.4), a real stock-specific edge. Strong swing buys also held on 1963–1994 alone
+(+1.20% a trade, t 3.2). The trigger is unchanged; the swing drawer now shows both net numbers.

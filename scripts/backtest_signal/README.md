@@ -38,5 +38,12 @@ Round 3, 2026-11-14 (200 symbols: fetch.py now lists 52 more; docs/swing-signal.
     python accuracy.py    # the accuracy tracker: per round, each signal's edge, SE, 95% range, effective n, hold-out
                           # → accuracy.json; append the round to docs/signal-accuracy.md (+ docs/signal-accuracy.json)
 
+Round 4, 2026-11-14 (265 symbols, back to 1963; docs/signal-accuracy.md → R4):
+
+    python fetch.py       # 265 symbols (indexes from 1927)
+    python feats4.py      # back to 1963; fear gauge = VIX percentile, or a modeled VIX before 1991 (fit 1990–2014)
+    python round4.py      # precision per round, the 1963–94 era as a hold-out, foreign markets, score bands + slope,
+                          # swing trades net of the S&P 500 → round4.json (copied to docs/signal-accuracy-r4.json)
+
 Weekly: add names to fetch.py, re-run the four lines above, compare with the tables in the docs. A rule changes only
 when a candidate beats it on 1995–2014 (both the average and the t); the new names are a hold-out.
