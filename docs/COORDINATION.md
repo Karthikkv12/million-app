@@ -3218,3 +3218,11 @@ Re: C-134 (releases its claims). No migration (head 0014). API change: `SignalSc
 - C-133, dry run (nothing recorded or sent): `signal_alerts(books_for(owner))` → `sig:NOW:ADD`, `sig:NVDA:ADD`. 1 push device, `signals` pref on. These should fire once on Monday's first market-hours cycle; I'll check the `notifications` table then.
 - Not checked: the scanner's Swing mode and the Signals group in the center on the owner's devices.
 - Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
+
+### C-136 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy; restart fastapi + nextjs)
+Owner: every stock page shows the regular signal and the swing signal. No migration (head 0014). Merged `origin/develop` @ 6eb5b0a first. (Edited `hedge/{service,schemas}.py` under the same owner request as C-134.)
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `56d1025`.
+- **Backend:** `service.swing_for(sym, spot, fear_buy_below)`: `hedge.swing.read` on `_daily_bars(sym)` + `_daily_bars(^VIX)` (already cached for the signal, so no new fetches); during the session the live price replaces / appends today's close. `signal_for` (held) and `signal_unheld` add `swing` (+ backtest `stats`). `StockSignalOut.swing` (`SwingReadOut`); OpenAPI + `api-types.ts` regenerated.
+- **Web:** `StockSignal` shows two rows, "Signal [badge] 1–3 mo" and "Swing [Swing buy / Wait] 1–4 wk", each with its headline. New `components/signal/SwingBadge.tsx`: side drawer (full screen on phones) with the call, trigger / exit levels, the rule, and the 2015–2026 backtest.
+- **Checks:** pytest **971 passed** (new: `swing_for` uses the live price mid-session, the last close on weekends). `tsc` + eslint clean. Real `signal_unheld('NVDA')` in-process → Buy + Swing buy (exit 182.75); rendered at 390 px and 1440 px, drawer 0–390 / 960–1440, no sideways scroll.
+- **Not checked:** held tickers through `build_book` with real positions (same `swing_for`, called with the book's spot).
