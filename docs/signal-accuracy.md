@@ -197,3 +197,12 @@ the market's bounce. The Strong grade is a real stock-specific edge, and the sha
    years.
 3. A score → expected edge model (the slope) could replace the bands. The bands are the cautious first step.
 4. More countries' stocks (not just their indexes) would test the swing idea abroad.
+
+### Evaluation · frozen rules as a timing signal (2026-11-14)
+
+Not a data round: the R4 data with every rule frozen, read as entry / exit timing (`timing.py`,
+`docs/signal-timing-report.md`). Add +2.45% vs a random day over 60 days out of sample (t 3.0), +3.36% over 120, no
+decay (+0.03 points per decade), positive in all 13 sectors, strongest with the S&P under its 200-day, VIX ≥ 30 or
+falling yields. The median Add went −7.4% against first; every stop from −10% to −30% lowered the average. Exit had no
+out-of-sample edge and, used as a switch, cost 3–5 points a year without reducing the max drawdown. Candidate for next
+round: Exit only in very calm markets (VIX < 15: −2.0%, t −3.3), to be chosen on 1995–2014 and read on the rest.
