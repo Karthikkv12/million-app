@@ -3202,3 +3202,11 @@ Owner: notifications for signals. No migration (head stays 0014). Merged `origin
 Owner asked: test the signal for swing trades (1 week – 1 month), build a swing signal from the result, and add it to the signal scanner.
 - **Terminal-lane files I'll edit:** new `optionflow/modules/hedge/swing.py` (pure), `optionflow/modules/hedge/{scan,schemas,router}.py`, `scripts/backtest_signal/swing*.py` (new), tests under `tests/hedge/`. Web: `app/(app)/catalyst/signals/page.tsx`.
 - Report: `docs/swing-signal.md`. No migration, no new module. If the backtest finds no edge that survives 2015–2026, I'll say so and ship nothing to the scanner.
+
+### C-135 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy; restart fastapi + nextjs)
+Re: C-134 (releases its claims). No migration (head 0014). API change: `SignalScanRowOut` gains swing fields, `SignalScanOut.swing_stats` (OpenAPI + `api-types.ts` regenerated).
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `e3150e0` (includes C-133 @ fd70aed if not landed yet).
+- **Backtest** (`scripts/backtest_signal/swing.py`, `swing2.py`; report `docs/swing-signal.md`): next-open entry, 0.2% round trip, one trade at a time per symbol, chosen on 1995–2014. Rule: **buy** a fear dip (score ≥ 0.283) or a ≥ 5% 5-day drop above the 200-day; **sell** at the first close above the 10-day average, max 20 trading days; no stop (stops lowered every average). 2015–2026: 11,923 trades, +0.56% avg, 65.5% win, 5.5 days, worst 1 in 20 −9.1% (any day held 5 days: +0.16%).
+- **Code:** new `optionflow/modules/hedge/swing.py` (pure `read()`); `scan.row` adds `swing`, `swing_reason`, `swing_buy_below`, `swing_exit_above`, `ret5`, `vs_200d`; `scan.get` adds `swing_stats`. No extra fetches (same 2y bars + VIX). Web: Research → Signal scanner gets a "1–3 months / Swing · 1–4 wk" switch (cards, filters, table, backtest footer).
+- **Checks:** pytest **970 passed** (new `tests/hedge/test_swing.py`, incl. parity with the backtest definition on 300 random series). `tsc` + eslint clean. Real Yahoo bars in-process (8 tickers, VIX 19.3 / 75th pct): NVDA, NOW, DDOG, ZS swing buys (fear dip); AAPL/SPY/TSLA/UNH Wait with triggers. Page rendered at 390 px and 1440 px with those rows, no sideways page scroll.
+- **Not checked:** the full S&P 500 scan in the server (same bars as today, so no new load expected).
