@@ -230,7 +230,7 @@ class SignalPlanOut(BaseModel):
     vix_pct_needed: Optional[float] = None
     clears_text: Optional[str] = Field(None, description="What clears a Don't add / Don't buy yet")
     upside: Optional[float] = Field(None, description="Nearest resistance (held): no tested sell price")
-    exit_below: Optional[float] = Field(None, description="Held, calm market: the 200-day average (close under it → −1.65% vs holding over 60 days)")
+    exit_below: Optional[float] = Field(None, description="Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (−1.5% to −1.65% vs holding over 60 days); not in fear")
     covered_call: Optional[Literal["0.15", "0.30"]] = Field(None, description="Covered-call delta to sell now (held shares)")
 
 
@@ -238,12 +238,12 @@ class SignalOut(BaseModel):
     """The tested read, levels and price plan for any holding or ticker (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
     bias: Literal["bullish", "bearish", "neutral"]
-    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry")
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL", "EXIT"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add) / EXIT (held, under the 200-day in a calm market). Net short (puts, short calls): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry. Horizon: the next 20–60 trading days (1–3 months)")
     side: Literal["long", "short"]
     headline: str
     support: Optional[SignalLevelOut] = None
     resistance: Optional[SignalLevelOut] = None
-    stop: Optional[float] = Field(None, description="Risk line, calm markets only: the 200-day average")
+    stop: Optional[float] = Field(None, description="Held, calm market: the 200-day average (under it = EXIT)")
     add_at: Optional[float] = None
     target: Optional[float] = None
     reads: List[SignalReadOut] = []

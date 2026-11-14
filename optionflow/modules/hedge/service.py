@@ -448,9 +448,9 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
 # ── The signal for any ticker (stock page) ───────────────────────────────────
 # Labels by what you hold: a buy decision when you hold nothing, an add / hold decision when you do.
 LABELS = {
-    "none": {"ADD": "Buy", "HOLD": "Wait", "CAUTION": "Don't buy yet", "TRIM": "Take profit", "ROLL": "Roll"},
-    "long": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll"},
-    "short": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll"},
+    "none": {"ADD": "Buy", "HOLD": "Wait", "CAUTION": "Don't buy yet", "TRIM": "Take profit", "ROLL": "Roll", "EXIT": "Exit"},
+    "long": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll", "EXIT": "Exit"},
+    "short": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll", "EXIT": "Exit"},
 }
 
 

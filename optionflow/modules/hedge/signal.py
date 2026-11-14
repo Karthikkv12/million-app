@@ -66,6 +66,9 @@ EVIDENCE = {
     "HOLD": "Backtest: no edge either way on these days (most days).",
     "TRIM": "Backtest: on fear-dip days held puts lost 7.9% (365-day) to 11.1% (180-day) of their value vs an average "
             "day over 60 trading days (2015–2026): stocks tend to rebound.",
+    "EXIT": "Backtest: days a held stock sat under its 200-day while the market was calm ran −1.5% vs holding over the next 60 "
+            "trading days (t −2.5, 2015–2026); a fresh close under it −1.65% (t −2.75). A weak edge: a reason to cut, not a "
+            "crash call. The same breaks during market fear came before +3.6%, so it only counts when the market is calm.",
     "ROLL": "Expiry, not decay: rolling early to escape time decay lost ~4% of the position to costs at every days-left "
             "tested (90–365). Inside 30 days, decide: roll to 365+ days or close.",
 }
@@ -151,7 +154,7 @@ class Read:
 class Signal:
     score: int                               # −100 … +100, bullish positive
     bias: str                                # bullish | bearish | neutral
-    verdict: str                             # ADD | HOLD | CAUTION (long) · TRIM | HOLD (long puts)
+    verdict: str                             # ADD | HOLD | CAUTION | EXIT (long) · TRIM | HOLD (net short) · ROLL
     side: str                                # long | short
     headline: str
     support: Optional[Dict[str, Any]] = None
@@ -545,12 +548,15 @@ def evaluate(t: Tape, exposure: float) -> Signal:
     lean = long and verdict == "HOLD" and r14 is not None and r14 < ADD_RSI and vp is not None
     case = ("TRIM" if verdict == "TRIM" else "ADD" if verdict == "ADD" else "CAUTION" if verdict == "CAUTION"
             else "LEAN" if lean else "HOLD")
-    if expiring and verdict != "TRIM":
+    exit_now = long and t.held and calm and m200 is not None and t.spot < m200 and verdict in ("HOLD", "CAUTION")
+    if exit_now:
+        verdict = "EXIT"                                   # the tested exit beats Hold / Don't add (and rolling)
+    elif expiring and verdict != "TRIM":
         verdict = "ROLL"
 
     lv, em = levels(t, px)
     sup, res = _nearest(lv, t.spot, True), _nearest(lv, t.spot, False)
-    stop = round(m200, 2) if (calm and m200 and long and t.held and t.spot > m200) else None
+    stop = round(m200, 2) if (calm and m200 and long and t.held) else None
     add_at, target = ((sup["price"] if sup else None), (res["price"] if res else None)) if long else \
                      ((res["price"] if res else None), (sup["price"] if sup else None))
     pl = plan(t, px, vp, r14, fs, case, long, sup, res, m200, calm, hi52, knife, stretched, legs)
@@ -559,7 +565,13 @@ def evaluate(t: Tape, exposure: float) -> Signal:
 
     buy, held = (not t.held), t.held
     trig = pl.get("trigger_text")
-    if verdict == "ROLL":
+    if verdict == "EXIT":
+        head = (f"Exit or cut: under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%} away) in a calm market; such days ran "
+                f"−1.5% vs holding over 60 days. Reclaiming {_px(m200)} clears it")
+        if expiring:
+            worst = min(expiring, key=lambda d: d["dte"])
+            head += f". The {worst['label']} has {worst['dte']} days left: close it rather than roll"
+    elif verdict == "ROLL":
         worst = min(expiring, key=lambda d: d["dte"])
         head = f"Roll or close the {worst['label']}: {worst['dte']} days left (expiry, not decay); roll to {ADD_MIN_DTE}+ days"
         if fear_dip:
@@ -571,12 +583,12 @@ def evaluate(t: Tape, exposure: float) -> Signal:
         why = "stock-specific weakness in a calm market" if knife else "stretched in a calm market"
         head = f"{'Don’t buy yet' if buy else 'Don’t add'}: {why}" + (f"; clears {pl['clears_text']}" if pl.get("clears_text") else "")
     elif verdict == "TRIM":
-        head = "Take profit on the puts: fear dip, rebounds are likely"
+        head = f"{bear_action(t.legs).capitalize()}: fear dip, rebounds are likely"
     elif lean:
         head = (f"{'Wait' if buy else 'Hold'}: oversold (RSI {r14:.0f}) but the market isn't scared enough "
                 f"(VIX {vp:.0%} pct)") + (f". {'Buy' if buy else 'Add'} {trig}" if trig else "")
     elif not long:
-        head = "Hold the puts: no fear dip" + (f" · take profit {trig}" if trig else "")
+        head = f"Hold {bear_label(t.legs)}: no fear dip" + (f" · {bear_action(t.legs)} {trig}" if trig else "")
     else:
         head = (f"{'Wait' if buy else 'Hold'}: no edge right now") + (f". {'Buy' if buy else 'Add'} {trig}" if trig else "")
     if vp is None or r14 is None:
@@ -585,10 +597,25 @@ def evaluate(t: Tape, exposure: float) -> Signal:
     return Signal(score, bias, verdict, "long" if long else "short", head, sup, res, stop, add_at, target,
                   [{"key": r.key, "score": round(r.score, 2), "weight": WEIGHTS[r.key], "value": r.value, "note": r.note,
                     "tested": r.key in TESTED} for r in reads], lv, em, _r(vp),
-                  EVIDENCE[case if verdict != "ROLL" else "ROLL"],
+                  EVIDENCE[verdict if verdict in ("ROLL", "EXIT") else case],
                   _r(iv_now), _r(iv_norm), _r(iv_ratio), legs,
-                  dict(PROBS[case], case=case) if (vp is not None and r14 is not None) else None,
+                  dict(PROBS[case], case=case) if (vp is not None and r14 is not None and verdict != "EXIT") else None,
                   position_pnl(t, pairs), _r(fs), pl)
+
+
+def bear_label(legs: Sequence[Dict[str, Any]]) -> str:
+    """What a net-short book holds, in words: the puts, the short calls, or both."""
+    puts = any((l.get("quantity") or 0) > 0 and l.get("otype") == "put" for l in legs)
+    calls = any((l.get("quantity") or 0) < 0 and l.get("otype") == "call" for l in legs)
+    return "the puts and short calls" if puts and calls else "the short calls" if calls else "the puts" if puts \
+        else "the bearish position"
+
+
+def bear_action(legs: Sequence[Dict[str, Any]]) -> str:
+    """The take-profit move for a net-short book: sell the puts, buy back the short calls."""
+    w = bear_label(legs)
+    return {"the short calls": "buy back the short calls", "the puts": "take profit on the puts"}.get(
+        w, f"take profit on {w}")
 
 
 def fear_score(vp: Optional[float], r14: Optional[float]) -> Optional[float]:
@@ -656,9 +683,12 @@ def plan(t: Tape, px: List[float], vp: Optional[float], r14: Optional[float], fs
             out["trigger_text"] = " or ".join(parts)
         elif fr == 0:
             out["trigger_text"] = f"once RSI is under 50 (now {r14:.0f}) and the VIX is above its median"
-    if not long:                                                 # long puts / net short
-        L.append("Take profit on the puts if " + (out.get("trigger_text") or "a fear dip comes") + ": on fear dips held puts lost "
-                 "7.9–11.1% of value vs an average day over 60 days (2015–2026).")
+    if not long:                                                 # long puts / short calls / net short
+        what = bear_label(t.legs)
+        L.append(f"{bear_action(t.legs).capitalize()} " + (out.get("trigger_text") or "if a fear dip comes") + ": on fear dips "
+                 "stocks tended to rebound (held puts lost 7.9–11.1% of value vs an average day over 60 days, 2015–2026).")
+        L.append(f"No tested exit for {what} when the stock rises: strength didn't predict anything either way in the "
+                 "backtest, so a stop there is a risk choice.")
         return out
     if case == "ADD":
         L.append(f"{verb} in thirds: one third now, the next ≥ {TRANCHE_GAP} trading days later only if the signal is still on, at most "
@@ -684,19 +714,29 @@ def plan(t: Tape, px: List[float], vp: Optional[float], r14: Optional[float], fs
             out["upside"] = res["price"]
             L.append(f"Upside: resistance {_px(res['price'])} ({res['label']}, {res['distance']:+.1%}). Hold through it: strength "
                      "didn't predict falls in the backtest, so there is no tested sell price; trimming there is a risk choice.")
+        calm_vix = vix_at_pct(t.vix, CALM_VIX)
         if m200 and calm and t.spot > m200:
             out["exit_below"] = round(m200, 2)
             L.append(f"Exit line: a close under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) while the market is calm came "
                      f"before {EXIT_DROP_60:+.1%} vs holding over 60 days (t −2.8). Weak edge: a reason to cut, not a crash call.")
         elif m200 and calm:
             out["exit_below"] = round(m200, 2)
-            L.append(f"Under the 200-day ({_px(m200)}) in a calm market: such days ran −1.5% vs holding over 60 days (t −2.5). "
-                     f"Reclaiming {_px(m200)} clears it.")
+            L.append(f"Exit: under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%} away) in a calm market. Such days ran −1.5% "
+                     f"vs holding over 60 days (t −2.5). Reclaiming {_px(m200)} clears it.")
         elif m200 and vp >= ADD_VIX:
             L.append(f"No exit on breaks while the market is scared: closes under the 200-day ({_px(m200)}) during fear came "
                      "before +3.6% vs holding over 60 days.")
+        elif m200 and t.spot < m200:
+            out["exit_below"] = round(m200, 2)
+            L.append(f"Under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%} away), but the market isn't calm (VIX {vp:.0%} pct): "
+                     "no exit yet. If the VIX closes " + (f"under {calm_vix:.1f} " if calm_vix else "under its 60th percentile ")
+                     + f"while it's still under {_px(m200)}, that's the exit.")
         elif m200:
-            L.append(f"Exit line: the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) once the market calms (VIX under its 60th pct).")
+            out["exit_below"] = round(m200, 2)
+            L.append(f"Exit line: a close under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) once the market is calm (VIX "
+                     + (f"under {calm_vix:.1f}" if calm_vix else "under its 60th pct") + ").")
+        else:
+            L.append("Fewer than 200 days of prices: no tested exit line yet.")
         shorts = [l for l in t.legs if (l.get("quantity") or 0) < 0 and l.get("otype") == "call"]
         if t.shares > 0 or shorts:
             if case == "ADD" or (vp >= ADD_VIX and r14 < ADD_RSI):
@@ -713,6 +753,11 @@ def plan(t: Tape, px: List[float], vp: Optional[float], r14: Optional[float], fs
         if legs:
             L.append("Long calls: time decay alone is not a reason to roll (same-delta rolls lost ~4% of the position to costs "
                      f"at every days-left 90–365); decide inside {EXPIRY_ROLL} days of expiry.")
+        if m200 and calm and t.spot < m200 and case in ("HOLD", "LEAN", "CAUTION"):      # EXIT: the exit leads the plan
+            ex = next(i for i, l in enumerate(L) if l.startswith("Exit:"))
+            L.insert(0, L.pop(ex))
+            L[:] = [("Only a fear spike would turn it into Add: " + out["trigger_text"] + ".") if l == f"{verb} signal {out.get('trigger_text')}."
+                    else l for l in L]
     return out
 
 

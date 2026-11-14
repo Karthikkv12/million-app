@@ -18,13 +18,13 @@ export default function CatalystLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   return (
     <>
-      <nav aria-label="Research" className="border-b border-[var(--border)]">
-        <div className="mx-auto flex w-full max-w-screen-2xl gap-1 overflow-x-auto px-4 sm:px-6">
+      <nav aria-label="Research" className="shadow-[inset_0_-1px_0_var(--border)]">
+        <div className="mx-auto flex w-full max-w-screen-2xl gap-1 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
           {TABS.map((t) => {
             const on = t.match(pathname);
             return (
               <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined}
-                className={clsx("-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-[13.5px] transition",
+                className={clsx("flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-[13.5px] transition",
                   on ? "border-foreground font-medium text-foreground" : "border-transparent text-foreground/55 hover:text-foreground")}>
                 <t.icon size={15} />{t.label}
               </Link>

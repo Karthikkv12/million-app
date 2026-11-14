@@ -175,7 +175,7 @@ def test_signal_for_a_leaps_holding_is_the_hedge_desk_signal(client):
     assert sig["held"] == "long_options" and book["strategy"] == "long_stock"
     for k in ("verdict", "headline", "score", "probability", "legs"):           # the stock page reads the desk's own signal
         assert sig["signal"][k] == book["signal"][k]
-    assert sig["label"] in {"Add", "Hold", "Don't add", "Roll"}
+    assert sig["label"] in {"Add", "Hold", "Don't add", "Roll", "Exit"}
     assert book["suggestion"]["reasons"][:len(sig["reasons"])] == sig["reasons"]
     other = c.get("/api/v1/hedge/signal/XYZ", headers=_login(c, "other")).json()  # another user doesn't hold it
     assert other["held"] == "none" and other["label"] in {"Buy", "Wait", "Don't buy yet"}

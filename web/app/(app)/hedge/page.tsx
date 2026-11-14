@@ -77,6 +77,7 @@ const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neut
   CAUTION: { tag: "warn", label: "Don't add", edge: "warn" },
   TRIM: { tag: "loss", label: "Take profit", edge: "loss" },
   ROLL: { tag: "warn", label: "Roll", edge: "warn" },
+  EXIT: { tag: "loss", label: "Exit", edge: "loss" },
 };
 const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
   fear: "Market fear", momentum: "RSI", dip: "Dip", flow: "Options flow", trend: "Trend", dealers: "Dealers",
@@ -541,9 +542,9 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         {/* signal */}
         <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
           {(b.closes?.length ?? 0) > 0 && <Tag tone="solid">Buy back</Tag>}
-          {asStock && b.signal ? <SignalBadge signal={b.signal} label={a?.label} reasons={s?.reasons ?? []} align="right" />
+          {asStock && b.signal ? <SignalBadge signal={b.signal} label={a?.label} reasons={s?.reasons ?? []} symbol={b.symbol} />
             : a && <Tag tone={a.tag}>{a.label}</Tag>}
-          {!asStock && b.signal && <SignalBadge signal={b.signal} label={VERDICT[b.signal.verdict].label} align="right" />}
+          {!asStock && b.signal && <SignalBadge signal={b.signal} label={VERDICT[b.signal.verdict].label} symbol={b.symbol} />}
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
             {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
           </span>
@@ -559,10 +560,10 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
 function HoldingSignals({ books, onOpen }: { books: HedgeBook[]; onOpen: (sym: string) => void }) {
   const rows = books.filter((b) => b.signal).sort((a, b) => (b.signal!.fear_score ?? -1) - (a.signal!.fear_score ?? -1));
   if (!rows.length) return null;
-  const order: Signal["verdict"][] = ["ADD", "TRIM", "ROLL", "CAUTION", "HOLD"];
+  const order: Signal["verdict"][] = ["EXIT", "ADD", "TRIM", "ROLL", "CAUTION", "HOLD"];
   const count = (v: Signal["verdict"]) => rows.filter((b) => b.signal!.verdict === v).length;
   return (
-    <DeskSection label="Signal · every holding" meta={<>The backtested read for each holding, whatever it is.<br />Follows your synced positions.</>}>
+    <DeskSection label="Signal · every holding" meta={<>The backtested read for each holding, whatever it is: a timing call for the next 1–3 months.<br />Follows your synced positions.</>}>
       <p className="mb-2 font-mono text-[11px] text-foreground/50">
         {order.filter((v) => count(v)).map((v) => `${VERDICT[v].label} ${count(v)}`).join(" · ")}
       </p>
@@ -578,7 +579,7 @@ function HoldingSignals({ books, onOpen }: { books: HedgeBook[]; onOpen: (sym: s
                 <tr key={b.symbol} className="cursor-pointer border-b border-[var(--border)] hover:bg-foreground/[0.03]" onClick={() => onOpen(b.symbol)}>
                   <td className="py-2 pl-4 pr-3"><span className="flex items-center gap-2"><TickerLogo symbol={b.symbol} size={16} /><span className="font-semibold text-foreground">{b.symbol}</span>
                     <span className="text-[10.5px] text-foreground/40">{b.strategy === "long_stock" ? "options" : b.shares ? (b.legs.some((l) => l.kind === "option") ? "shares + options" : "shares") : "options"}</span></span></td>
-                  <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}><SignalBadge signal={g} label={VERDICT[g.verdict].label} /></td>
+                  <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}><SignalBadge signal={g} label={VERDICT[g.verdict].label} symbol={b.symbol} /></td>
                   <td className={clsx("py-2 pr-3", (g.fear_score ?? 0) >= 0.283 ? "text-gain" : "text-foreground/70")}>{g.fear_score != null ? g.fear_score.toFixed(2) : "—"}</td>
                   <td className="py-2 pr-3">{g.plan?.buy_below != null ? usd(g.plan.buy_below) : g.verdict === "ADD" ? <span className="text-gain">now</span> : "—"}</td>
                   <td className="py-2 pr-3">{g.plan?.vix_trigger != null ? g.plan.vix_trigger.toFixed(1) : "—"}</td>
