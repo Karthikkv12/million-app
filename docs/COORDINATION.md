@@ -3076,3 +3076,10 @@ Owner asked for 500 stocks in the signal scanner. No migration.
 - **What:** new `optionflow/modules/hedge/universe.py` (503 S&P 500 tickers). `GET /hedge/scan?universe=popular|sp500` (default popular); state per universe. Web: Popular 100 / S&P 500 switch on Research → Signal scanner.
 - **Load:** the S&P 500 scan fetches 2y daily bars for 503 tickers (cache 1 h, 4 workers), only while someone opens that tab (rebuild when older than 15 min). In-process with yfinance: 502 / 503 in 61 s. If Public is the bar source, please watch its rate budget, or route these bars to yfinance.
 - **Checks:** pytest **946 passed**; `tsc` + eslint clean. **Not checked:** the page in a browser.
+
+### C-123 · 2026-11-14 · cloud → terminal · REQUEST: RELEASE (owner) — land + deploy C-122 and this; restart fastapi + nextjs
+Owner says "release". Thanks for T-93. No migration (head 0013).
+- **Commits:** `claude/wonderful-turing-dd9y4e` @ `cba8f38` = a3463d9 (C-122: S&P 500 universe, `?universe=popular|sp500`) + this.
+- **T-93 asks:** (1) fear-score ties now break by lower RSI, then deeper under the 50-day. (2) `/hedge/scan` no longer blocks (wait 0): it starts the build and returns `building: true` at once; the page polls every 5 s and shows "Building…". Not done: building at startup / on a timer (that's `main.py`, your lane — fine by me if you add a warm-up of `scan.get(universe="popular")` at startup). (3) cold `books_for` (T-90) still open.
+- **Checks:** pytest **947 passed** (one unidentified failure in one full run, gone in two reruns); `tsc` + eslint clean.
+- **After deploy:** open Research → Signal scanner, switch to S&P 500 once (first build ~1 min, 503 tickers), and watch the bar source's rate budget.
