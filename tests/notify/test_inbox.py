@@ -88,3 +88,36 @@ def test_only_the_last_7_days_are_kept(db_engine_and_session):
     s = get_session()
     assert s.query(N).filter(N.user_id == uid).count() == 1                # deleted, not just hidden
     s.close()
+
+
+def _sig_books(verdict, sym="NVDA"):
+    return {"books": [{"symbol": sym, "closes": [], "suggestion": {}, "signal": {"verdict": verdict, "headline": f"{verdict} because"}}]}
+
+
+def test_signal_alerts_only_for_actionable_verdicts():
+    assert service.signal_alerts(_sig_books("HOLD")) == [] and service.signal_alerts(_sig_books("CAUTION")) == []
+    (a,) = service.signal_alerts(_sig_books("EXIT"))
+    assert a["kind"] == "signals" and a["title"] == "NVDA signal: Exit" and a["url"] == "/stocks/NVDA"
+    assert service.signal_alerts(_sig_books("TRIM"))[0]["title"].endswith("Take profit")
+
+
+def test_a_signal_alerts_once_a_week_not_every_day(db_engine_and_session, keys):  # noqa: F811
+    uid = _user()
+    service.subscribe(uid, "https://push.example/1", "p", "a", "iPhone")
+    sent = []
+    sender = lambda *a, **k: (sent.append(a[3]), webpush.SendResult(201, False))[1]   # noqa: E731
+    books = lambda _u: _sig_books("ADD")                                                 # noqa: E731
+    assert service.run_for_user(uid, books_fn=books, sender=sender) == 1
+    service.SENT.__init__()                                                              # next day / a restart
+    assert service.run_for_user(uid, books_fn=books, sender=sender) == 0                 # still within 7 days
+    assert service.run_for_user(uid, books_fn=lambda _u: _sig_books("EXIT"), sender=sender) == 1   # a new verdict alerts
+    assert [p["title"] for p in sent] == ["NVDA signal: Add", "NVDA signal: Exit"]
+    assert {i["kind"] for i in service.inbox(uid)["items"]} == {"signals"}
+
+
+def test_signals_switch_off(db_engine_and_session, keys):  # noqa: F811
+    uid = _user()
+    service.subscribe(uid, "https://push.example/1", "p", "a", "iPhone")
+    service.set_prefs(uid, dict(service.DEFAULT_PREFS, signals=False))
+    sender = lambda *a, **k: pytest.fail("signals are off")                              # noqa: E731
+    assert service.run_for_user(uid, books_fn=lambda _u: _sig_books("ADD"), sender=sender) == 0

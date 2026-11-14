@@ -7340,6 +7340,12 @@
       "title": "Sell Put",
       "type": "boolean"
      },
+     "signals": {
+      "default": true,
+      "description": "A holding's backtested signal turns Add, Exit, Take profit or Roll (once per 7 days)",
+      "title": "Signals",
+      "type": "boolean"
+     },
      "symbols": {
       "default": [],
       "description": "Only these symbols; empty = every holding",
@@ -12128,6 +12134,16 @@
       "title": "Score Cut",
       "type": "number"
      },
+     "swing_stats": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStatsSetOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "universe": {
       "description": "Tickers in the universe",
       "title": "Universe",
@@ -12285,6 +12301,18 @@
       "title": "Price",
       "type": "number"
      },
+     "ret5": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "5-day change",
+      "title": "Ret5"
+     },
      "rsi": {
       "anyOf": [
        {
@@ -12306,6 +12334,57 @@
        }
       ],
       "title": "Support"
+     },
+     "swing": {
+      "anyOf": [
+       {
+        "enum": [
+         "BUY",
+         "WAIT"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Swing read (1 week \u2013 1 month); None without 200 days of history",
+      "title": "Swing"
+     },
+     "swing_buy_below": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "A close at or under this would make it a swing buy",
+      "title": "Swing Buy Below"
+     },
+     "swing_exit_above": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Swing exit: the first close above the 10-day average (this is today's)",
+      "title": "Swing Exit Above"
+     },
+     "swing_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Swing Reason"
      },
      "symbol": {
       "title": "Symbol",
@@ -12333,6 +12412,17 @@
       ],
       "description": "VIX close at or over this (today's price) makes it Buy",
       "title": "Vix Trigger"
+     },
+     "vs_200d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vs 200D"
      },
      "vs_50d": {
       "anyOf": [
@@ -14088,6 +14178,24 @@
     "title": "SuggestionOut",
     "type": "object"
    },
+   "SwingBaselineOut": {
+    "properties": {
+     "avg": {
+      "title": "Avg",
+      "type": "number"
+     },
+     "win": {
+      "title": "Win",
+      "type": "number"
+     }
+    },
+    "required": [
+     "avg",
+     "win"
+    ],
+    "title": "SwingBaselineOut",
+    "type": "object"
+   },
    "SwingPoint": {
     "properties": {
      "close": {
@@ -14196,6 +14304,70 @@
      "last_date"
     ],
     "title": "SwingStats",
+    "type": "object"
+   },
+   "SwingStatsOut": {
+    "properties": {
+     "avg": {
+      "title": "Avg",
+      "type": "number"
+     },
+     "days": {
+      "title": "Days",
+      "type": "number"
+     },
+     "median": {
+      "title": "Median",
+      "type": "number"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     },
+     "trades": {
+      "title": "Trades",
+      "type": "integer"
+     },
+     "win": {
+      "title": "Win",
+      "type": "number"
+     },
+     "worst5": {
+      "title": "Worst5",
+      "type": "number"
+     }
+    },
+    "required": [
+     "trades",
+     "avg",
+     "median",
+     "win",
+     "days",
+     "worst5",
+     "t"
+    ],
+    "title": "SwingStatsOut",
+    "type": "object"
+   },
+   "SwingStatsSetOut": {
+    "description": "Backtest of the swing rule (hedge.swing.STATS): IS 1995\u20132014 (chosen), OOS 2015\u20132026 (unseen).",
+    "properties": {
+     "baseline_oos_5d": {
+      "$ref": "#/components/schemas/SwingBaselineOut"
+     },
+     "is": {
+      "$ref": "#/components/schemas/SwingStatsOut"
+     },
+     "oos": {
+      "$ref": "#/components/schemas/SwingStatsOut"
+     }
+    },
+    "required": [
+     "is",
+     "oos",
+     "baseline_oos_5d"
+    ],
+    "title": "SwingStatsSetOut",
     "type": "object"
    },
    "SwingsOut": {

@@ -11,12 +11,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, BarChart3, BellRing, Check, FileText, Layers, NotebookPen, Settings2, Trash2, X } from "lucide-react";
+import { Activity, Bell, BarChart3, BellRing, Check, FileText, Layers, NotebookPen, Settings2, Trash2, X } from "lucide-react";
 import { clearInbox, fetchInbox, Inbox, InboxItem, markInboxRead } from "@/lib/api";
 
 const KEY = ["notify", "inbox"];
-type Group = "trades" | "levels" | "alerts" | "paper" | "reports" | "other";
+type Group = "signals" | "trades" | "levels" | "alerts" | "paper" | "reports" | "other";
 const GROUPS: { id: Group; label: string; icon: typeof Bell }[] = [
+  { id: "signals", label: "Signals", icon: Activity },
   { id: "trades", label: "Trades", icon: BarChart3 },
   { id: "levels", label: "Levels & IV", icon: Layers },
   { id: "alerts", label: "Price alerts", icon: BellRing },
@@ -25,7 +26,7 @@ const GROUPS: { id: Group; label: string; icon: typeof Bell }[] = [
   { id: "other", label: "Other", icon: Bell },
 ];
 const groupOf = (kind: string): Group =>
-  ["buyback", "sell_call", "sell_put", "buy_stock", "expiring_itm"].includes(kind) ? "trades"
+  kind === "signals" ? "signals" : ["buyback", "sell_call", "sell_put", "buy_stock", "expiring_itm"].includes(kind) ? "trades"
     : kind === "levels" || kind === "iv_spike" ? "levels"
     : kind === "price_alert" ? "alerts"
     : kind.startsWith("paper_") ? "paper"
@@ -144,7 +145,7 @@ function Drawer({ data, onClose }: { data?: Inbox; onClose: () => void }) {
               <Bell size={22} className="mx-auto text-foreground/30" />
               <p className="mt-3 text-[15px] font-medium text-foreground">No notifications yet</p>
               <p className="mx-auto mt-1.5 max-w-xs text-[13px] text-foreground/55">
-                Buy-backs, trade signals, dealer-level moves, price alerts, paper trades and daily reports collect here for 7 days.
+                Holding signals, buy-backs, trade suggestions, dealer-level moves, price alerts, paper trades and daily reports collect here for 7 days.
               </p>
             </div>
           ) : byDay.map(({ day, items: list }) => (
