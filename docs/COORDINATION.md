@@ -3044,3 +3044,16 @@ Owner asked (T-91 + a quant review of the backtest + "Wait for what?" on the sto
 - **Terminal-lane files I'll edit:** `optionflow/modules/hedge/{signal,service,suggest,schemas,router}.py`, tests under `tests/hedge/`, `scripts/backtest_signal/**` (new review scripts; `holdings_data.py` and the committed holdings snapshot go away, the repo is public).
 - **Rule changes from the re-test** (numbers in `docs/hedge-signal-review.md` with the DONE): the 1.2× IV gate is dropped (chosen on 1995–2014 it adds nothing), ADD becomes a fear score chosen on 1995–2014, the 180-day decay ROLL is withdrawn (rolls lost to holding at every days-left), adds go in thirds.
 - No migration, no new module. Branch `claude/wonderful-turing-dd9y4e`. DONE will follow with the commit.
+
+### C-121 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy; restart fastapi + nextjs)
+Re: T-91, C-120. Releases the C-120 claims. No migration (head stays 0013).
+- **Branch / commit:** `claude/wonderful-turing-dd9y4e` @ `de8f0b2` (on top of 9e263cb, already landed).
+- **What:**
+  1. **Rule re-test** (`docs/hedge-signal-review.md`, new scripts `review.py`, `rebuild.py`, `roll.py`, `holdsim_roll.py`, `compare.py`; `probs.py` rewritten). ADD = fear score ≥ 0.283 (IS-chosen); 1.2× IV gate dropped; decay-based ROLL withdrawn (ROLL only ≤ 30 days to expiry); adds in thirds; covered calls 0.15Δ on fear dips; new PROBS cases `ADD / LEAN / CAUTION / HOLD / TRIM` (`FEAR_IV_NORMAL` is gone from the schema).
+  2. **Prices in every call:** `SignalOut.plan` (`lines`, `buy_below`, `vix_trigger`, `upside`, `exit_below`, `clears_text`, `covered_call`) + `fear_score`. Not held → Buy / Wait / Don't buy yet; held → Add / Hold / Don't add.
+  3. **T-91:** `build_book` now builds the tape for **every** holding and `suggest.evaluate` attaches the signal to every book (strategy suggestions unchanged). `signal_for` uses the book path for any held form (`held`: stock / long_options / options / mixed). Desk: new "Signal · every holding" table + badge on every row. `holdings_data.py`, `data/holdings.json` and the report's holdings tables are deleted (public repo; still in git history).
+  4. **Scanner:** `GET /hedge/scan` (new `hedge/scan.py`): 100 popular tickers, 2y daily bars (cache 1 h), scan shared and rebuilt in the background every 15 min with 4 workers; per-user `held` marks only. Web: Research → Signal scanner (`/catalyst/signals`).
+- **Load note (T-90):** every held symbol now pulls 10y daily bars for the tape (was long-options books only), so the cold `books_for` cost grows with the book. The scanner adds ~100 `price_history(…, "2y", "1d")` calls per hour. In-process with yfinance: 99/100 tickers in 9.8 s.
+- **Checks:** pytest **945 passed**; `tsc --noEmit` clean; eslint clean on changed files; OpenAPI + `api-types.ts` regenerated. Signal plan checked on real Yahoo closes (GOOG not held: "Buy if GOOG closes ≤ 269.68 … or if the VIX closes ≥ 22.4"; NVDA: Buy, score 0.36).
+- **Not checked:** pages rendered in a browser (desk table, plan block in the pop-up, scanner page); the live owner books with the new tape on every holding.
+- **Please:** merge, deploy, restart fastapi + nextjs. Then open `/catalyst/signals` once so the first scan builds, and watch `books_for` cold time.
