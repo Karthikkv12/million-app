@@ -809,6 +809,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hedge/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Scan
+         * @description The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,
+         *     with the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your
+         *     holdings are marked.
+         */
+        get: operations["scan_api_v1_hedge_scan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hedge/signal/{symbol}": {
         parameters: {
             query?: never;
@@ -818,8 +840,8 @@ export interface paths {
         };
         /**
          * Signal
-         * @description The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /
-         *     Don't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal.
+         * @description The desk's backtested signal for any ticker: Buy / Wait / Don't buy yet when you don't hold it, Add / Hold /
+         *     Don't add / Roll when you do (any form: it is the Hedge desk's own book signal), with the prices behind it.
          */
         get: operations["signal_api_v1_hedge_signal__symbol__get"];
         put?: never;
@@ -5898,7 +5920,10 @@ export interface components {
             iv_source: "chain" | "model" | "atm";
             /** Label */
             label: string;
-            /** Roll */
+            /**
+             * Roll
+             * @description Within 30 days of expiry: roll or close (expiry mechanics; decay alone didn't pay)
+             */
             roll: boolean;
             /**
              * Theta Day
@@ -5910,7 +5935,10 @@ export interface components {
              * @description Model value per share at today's price and IV
              */
             value: number;
-            /** Warn */
+            /**
+             * Warn
+             * @description Within 60 days of expiry
+             */
             warn: boolean;
         };
         /** SignalLevelOut */
@@ -5934,7 +5962,7 @@ export interface components {
         };
         /**
          * SignalOut
-         * @description Levels and a directional read for a holding of long options only (hedge.signal).
+         * @description The tested read, levels and price plan for any holding or ticker (hedge.signal).
          */
         SignalOut: {
             /** Add At */
@@ -5951,6 +5979,11 @@ export interface components {
              */
             evidence: string;
             expected_move?: components["schemas"]["optionflow__modules__hedge__schemas__ExpectedMoveOut"] | null;
+            /**
+             * Fear Score
+             * @description 0–1: VIX percentile × how oversold; ADD at ≥ 0.283
+             */
+            fear_score?: number | null;
             /** Headline */
             headline: string;
             /**
@@ -5965,7 +5998,7 @@ export interface components {
             iv_normal?: number | null;
             /**
              * Iv Ratio
-             * @description Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2
+             * @description Stock IV ÷ its 5-year normal (the lower of the model's and the live ATM IV's); context only, no gate
              */
             iv_ratio?: number | null;
             /**
@@ -5978,6 +6011,7 @@ export interface components {
              * @default []
              */
             levels: components["schemas"]["SignalLevelOut"][];
+            plan?: components["schemas"]["SignalPlanOut"] | null;
             pnl?: components["schemas"]["SignalPnlOut"] | null;
             probability?: components["schemas"]["SignalProbOut"] | null;
             /**
@@ -6006,7 +6040,7 @@ export interface components {
             target?: number | null;
             /**
              * Verdict
-             * @description Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast
+             * @description Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry
              * @enum {string}
              */
             verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM" | "ROLL";
@@ -6015,6 +6049,60 @@ export interface components {
              * @description VIX percentile over the last year (0–1)
              */
             vix_pct?: number | null;
+        };
+        /**
+         * SignalPlanOut
+         * @description Prices for the decision (hedge.signal.plan).
+         */
+        SignalPlanOut: {
+            /**
+             * Buy Below
+             * @description Close at or under this (today's VIX) makes it Buy / Add
+             */
+            buy_below?: number | null;
+            /**
+             * Buy Rsi
+             * @description The RSI(14) that close means
+             */
+            buy_rsi?: number | null;
+            /**
+             * Clears Text
+             * @description What clears a Don't add / Don't buy yet
+             */
+            clears_text?: string | null;
+            /**
+             * Covered Call
+             * @description Covered-call delta to sell now (held shares)
+             */
+            covered_call?: ("0.15" | "0.30") | null;
+            /**
+             * Exit Below
+             * @description Held, calm market: the 200-day average (close under it → −1.65% vs holding over 60 days)
+             */
+            exit_below?: number | null;
+            /**
+             * Lines
+             * @description The plan in plain words: buy / add trigger, support, upside, exit line, covered calls
+             * @default []
+             */
+            lines: string[];
+            /**
+             * Trigger Text
+             * @description What would turn it into Buy / Add, e.g. 'if X closes ≤ 280.10 … or if the VIX closes ≥ 22.4 …'
+             */
+            trigger_text?: string | null;
+            /**
+             * Upside
+             * @description Nearest resistance (held): no tested sell price
+             */
+            upside?: number | null;
+            /** Vix Pct Needed */
+            vix_pct_needed?: number | null;
+            /**
+             * Vix Trigger
+             * @description VIX close at or over this (today's price) makes it Buy / Add
+             */
+            vix_trigger?: number | null;
         };
         /**
          * SignalPnlOut
@@ -6060,7 +6148,7 @@ export interface components {
              * Case
              * @enum {string}
              */
-            case: "ADD" | "FEAR_IV_NORMAL" | "LEAN" | "CAUTION" | "HOLD" | "TRIM";
+            case: "ADD" | "LEAN" | "CAUTION" | "HOLD" | "TRIM";
             /** Cases */
             cases: number;
             /**
@@ -6126,6 +6214,103 @@ export interface components {
             value: string;
             /** Weight */
             weight: number;
+        };
+        /**
+         * SignalScanOut
+         * @description The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan).
+         */
+        SignalScanOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Building
+             * @description A scan is being built; poll again
+             * @default false
+             */
+            building: boolean;
+            /**
+             * Failed
+             * @description Symbols with no history this scan
+             * @default []
+             */
+            failed: string[];
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["SignalScanRowOut"][];
+            /** Score Cut */
+            score_cut: number;
+            /** Universe */
+            universe: number;
+            /** Vix */
+            vix?: number | null;
+            /** Vix Pct */
+            vix_pct?: number | null;
+        };
+        /** SignalScanRowOut */
+        SignalScanRowOut: {
+            /**
+             * As Of
+             * @description Date of the last daily bar
+             */
+            as_of: string;
+            /**
+             * Buy Below
+             * @description Close at or under this (today's VIX) makes it Buy
+             */
+            buy_below?: number | null;
+            /** Case */
+            case?: ("ADD" | "LEAN" | "CAUTION" | "HOLD" | "TRIM") | null;
+            /** Day Change */
+            day_change?: number | null;
+            /** Edge 60 */
+            edge_60?: number | null;
+            /**
+             * Fear Score
+             * @description 0–1; Buy at ≥ 0.283
+             */
+            fear_score?: number | null;
+            /** Headline */
+            headline: string;
+            /**
+             * Held
+             * @description You hold it (any form)
+             * @default false
+             */
+            held: boolean;
+            /**
+             * Label
+             * @description Buy / Wait / Don't buy yet (read as not held)
+             */
+            label: string;
+            /**
+             * Off High
+             * @description vs the 52-week high
+             */
+            off_high?: number | null;
+            /** P Edge Positive */
+            p_edge_positive?: number | null;
+            /** Price */
+            price: number;
+            /** Rsi */
+            rsi?: number | null;
+            /** Support */
+            support?: number | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM" | "ROLL";
+            /**
+             * Vix Trigger
+             * @description VIX close at or over this (today's price) makes it Buy
+             */
+            vix_trigger?: number | null;
+            /** Vs 50D */
+            vs_50d?: number | null;
         };
         /** StatusOut */
         StatusOut: {
@@ -6334,13 +6519,13 @@ export interface components {
             error?: string | null;
             /**
              * Held
-             * @description long_options: the Hedge desk's own book signal
+             * @description Held in any form: the Hedge desk's own book signal
              * @enum {string}
              */
-            held: "none" | "stock" | "long_options";
+            held: "none" | "stock" | "long_options" | "options" | "mixed";
             /**
              * Label
-             * @description Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held
+             * @description Buy / Wait / Don't buy yet when not held; Add / Hold / Don't add / Roll / Take profit when held
              */
             label?: string | null;
             /**
@@ -9263,6 +9448,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokerPositionOut"][];
+                };
+            };
+        };
+    };
+    scan_api_v1_hedge_scan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignalScanOut"];
                 };
             };
         };

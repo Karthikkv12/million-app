@@ -11311,6 +11311,7 @@
       "type": "string"
      },
      "roll": {
+      "description": "Within 30 days of expiry: roll or close (expiry mechanics; decay alone didn't pay)",
       "title": "Roll",
       "type": "boolean"
      },
@@ -11325,6 +11326,7 @@
       "type": "number"
      },
      "warn": {
+      "description": "Within 60 days of expiry",
       "title": "Warn",
       "type": "boolean"
      }
@@ -11380,7 +11382,7 @@
     "type": "object"
    },
    "SignalOut": {
-    "description": "Levels and a directional read for a holding of long options only (hedge.signal).",
+    "description": "The tested read, levels and price plan for any holding or ticker (hedge.signal).",
     "properties": {
      "add_at": {
       "anyOf": [
@@ -11417,6 +11419,18 @@
         "type": "null"
        }
       ]
+     },
+     "fear_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "0\u20131: VIX percentile \u00d7 how oversold; ADD at \u2265 0.283",
+      "title": "Fear Score"
      },
      "headline": {
       "title": "Headline",
@@ -11455,7 +11469,7 @@
         "type": "null"
        }
       ],
-      "description": "Stock IV \u00f7 its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs \u2265 1.2",
+      "description": "Stock IV \u00f7 its 5-year normal (the lower of the model's and the live ATM IV's); context only, no gate",
       "title": "Iv Ratio"
      },
      "legs": {
@@ -11473,6 +11487,16 @@
       },
       "title": "Levels",
       "type": "array"
+     },
+     "plan": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SignalPlanOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "pnl": {
       "anyOf": [
@@ -11559,7 +11583,7 @@
       "title": "Target"
      },
      "verdict": {
-      "description": "Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast",
+      "description": "Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry",
       "enum": [
        "ADD",
        "HOLD",
@@ -11591,6 +11615,133 @@
      "headline"
     ],
     "title": "SignalOut",
+    "type": "object"
+   },
+   "SignalPlanOut": {
+    "description": "Prices for the decision (hedge.signal.plan).",
+    "properties": {
+     "buy_below": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close at or under this (today's VIX) makes it Buy / Add",
+      "title": "Buy Below"
+     },
+     "buy_rsi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The RSI(14) that close means",
+      "title": "Buy Rsi"
+     },
+     "clears_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What clears a Don't add / Don't buy yet",
+      "title": "Clears Text"
+     },
+     "covered_call": {
+      "anyOf": [
+       {
+        "enum": [
+         "0.15",
+         "0.30"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Covered-call delta to sell now (held shares)",
+      "title": "Covered Call"
+     },
+     "exit_below": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Held, calm market: the 200-day average (close under it \u2192 \u22121.65% vs holding over 60 days)",
+      "title": "Exit Below"
+     },
+     "lines": {
+      "default": [],
+      "description": "The plan in plain words: buy / add trigger, support, upside, exit line, covered calls",
+      "items": {
+       "type": "string"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "trigger_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What would turn it into Buy / Add, e.g. 'if X closes \u2264 280.10 \u2026 or if the VIX closes \u2265 22.4 \u2026'",
+      "title": "Trigger Text"
+     },
+     "upside": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Nearest resistance (held): no tested sell price",
+      "title": "Upside"
+     },
+     "vix_pct_needed": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vix Pct Needed"
+     },
+     "vix_trigger": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VIX close at or over this (today's price) makes it Buy / Add",
+      "title": "Vix Trigger"
+     }
+    },
+    "title": "SignalPlanOut",
     "type": "object"
    },
    "SignalPnlOut": {
@@ -11694,7 +11845,6 @@
      "case": {
       "enum": [
        "ADD",
-       "FEAR_IV_NORMAL",
        "LEAN",
        "CAUTION",
        "HOLD",
@@ -11825,6 +11975,266 @@
      "note"
     ],
     "title": "SignalReadOut",
+    "type": "object"
+   },
+   "SignalScanOut": {
+    "description": "The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan).",
+    "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
+     "building": {
+      "default": false,
+      "description": "A scan is being built; poll again",
+      "title": "Building",
+      "type": "boolean"
+     },
+     "failed": {
+      "default": [],
+      "description": "Symbols with no history this scan",
+      "items": {
+       "type": "string"
+      },
+      "title": "Failed",
+      "type": "array"
+     },
+     "rows": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/SignalScanRowOut"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "score_cut": {
+      "title": "Score Cut",
+      "type": "number"
+     },
+     "universe": {
+      "title": "Universe",
+      "type": "integer"
+     },
+     "vix": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vix"
+     },
+     "vix_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vix Pct"
+     }
+    },
+    "required": [
+     "universe",
+     "score_cut"
+    ],
+    "title": "SignalScanOut",
+    "type": "object"
+   },
+   "SignalScanRowOut": {
+    "properties": {
+     "as_of": {
+      "description": "Date of the last daily bar",
+      "title": "As Of",
+      "type": "string"
+     },
+     "buy_below": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Close at or under this (today's VIX) makes it Buy",
+      "title": "Buy Below"
+     },
+     "case": {
+      "anyOf": [
+       {
+        "enum": [
+         "ADD",
+         "LEAN",
+         "CAUTION",
+         "HOLD",
+         "TRIM"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Case"
+     },
+     "day_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day Change"
+     },
+     "edge_60": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edge 60"
+     },
+     "fear_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "0\u20131; Buy at \u2265 0.283",
+      "title": "Fear Score"
+     },
+     "headline": {
+      "title": "Headline",
+      "type": "string"
+     },
+     "held": {
+      "default": false,
+      "description": "You hold it (any form)",
+      "title": "Held",
+      "type": "boolean"
+     },
+     "label": {
+      "description": "Buy / Wait / Don't buy yet (read as not held)",
+      "title": "Label",
+      "type": "string"
+     },
+     "off_high": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "vs the 52-week high",
+      "title": "Off High"
+     },
+     "p_edge_positive": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P Edge Positive"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "rsi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rsi"
+     },
+     "support": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Support"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "verdict": {
+      "enum": [
+       "ADD",
+       "HOLD",
+       "CAUTION",
+       "TRIM",
+       "ROLL"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     },
+     "vix_trigger": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "VIX close at or over this (today's price) makes it Buy",
+      "title": "Vix Trigger"
+     },
+     "vs_50d": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vs 50D"
+     }
+    },
+    "required": [
+     "symbol",
+     "price",
+     "as_of",
+     "verdict",
+     "label",
+     "headline"
+    ],
+    "title": "SignalScanRowOut",
     "type": "object"
    },
    "StatusOut": {
@@ -12889,11 +13299,13 @@
       "title": "Error"
      },
      "held": {
-      "description": "long_options: the Hedge desk's own book signal",
+      "description": "Held in any form: the Hedge desk's own book signal",
       "enum": [
        "none",
        "stock",
-       "long_options"
+       "long_options",
+       "options",
+       "mixed"
       ],
       "title": "Held",
       "type": "string"
@@ -12907,7 +13319,7 @@
         "type": "null"
        }
       ],
-      "description": "Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held",
+      "description": "Buy / Wait / Don't buy yet when not held; Add / Hold / Don't add / Roll / Take profit when held",
       "title": "Label"
      },
      "reasons": {
@@ -19152,9 +19564,36 @@
     ]
    }
   },
+  "/api/v1/hedge/scan": {
+   "get": {
+    "description": "The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,\nwith the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your\nholdings are marked.",
+    "operationId": "scan_api_v1_hedge_scan_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SignalScanOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Scan",
+    "tags": [
+     "hedge"
+    ]
+   }
+  },
   "/api/v1/hedge/signal/{symbol}": {
    "get": {
-    "description": "The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /\nDon't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal.",
+    "description": "The desk's backtested signal for any ticker: Buy / Wait / Don't buy yet when you don't hold it, Add / Hold /\nDon't add / Roll when you do (any form: it is the Hedge desk's own book signal), with the prices behind it.",
     "operationId": "signal_api_v1_hedge_signal__symbol__get",
     "parameters": [
      {

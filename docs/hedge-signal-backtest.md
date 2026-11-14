@@ -1,5 +1,7 @@
 # Hedge signal backtest — 2026-11-13
 
+> **Re-tested 2026-11-14: see [hedge-signal-review.md](hedge-signal-review.md).** Withdrawn there: the 1.2× IV gate (hindsight), the 180-day ROLL (rolling lost to holding at every days-left), "Sharpe within ±0.03", "BABA / NBIS oversold"; counts reconciled; ADD is now a fear score; adds go in thirds.
+
 What drives the ADD / HOLD / CAUTION verdict on the Hedge desk for holdings of long calls (LEAPS) and long puts
 (`optionflow/modules/hedge/signal.py`). Code to reproduce: `scripts/backtest_signal/`.
 

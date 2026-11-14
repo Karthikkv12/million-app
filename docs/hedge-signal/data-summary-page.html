@@ -107,14 +107,6 @@
     <p class="muted">Exposure 1.5× for 20 days after Add, 0.5× after a cut, averaged over all symbols. Adding raised return and drawdown together; cutting lowered both.</p>
   </section>
 
-  <section id="holdings">
-    <h2>Your holdings at the last close</h2>
-    <div class="wrap"><table data-source="holdings" data-row-key="ticker">
-      <thead><tr><th data-field="ticker">Ticker</th><th data-field="price">Price</th><th data-field="rsi">RSI(14)</th><th data-field="vs_50day">vs 50-day %</th><th data-field="vix_pct">VIX pct</th><th data-field="iv_vs_normal">IV vs normal</th><th data-field="sample_leg_decay20">Decay / 20d % (400-day call)</th><th data-field="verdict">Verdict</th></tr></thead>
-      <tbody data-draw="holdRows"></tbody>
-    </table></div>
-    <p class="muted">Add needs RSI under 40, the VIX at its 80th percentile or higher, and the stock’s IV at 1.2× its normal or more. This is a snapshot, not live.</p>
-  </section>
 
   <section id="confidence">
     <h2>How far to trust it</h2>
@@ -199,7 +191,6 @@ dash.draw("setupRows", fdRows("setups", ["setup", "period"], [["setup", F.raw], 
 dash.draw("robRows", fdRows("robustness", ["check"], [["check", F.raw], ["value", (v) => v == null ? "—" : Number.isInteger(v) ? String(v) : F.pct(v), 0], ["unit", F.raw]]));
 dash.draw("optRows", fdRows("options", ["setup", "hold_days"], [["setup", F.raw], ["hold_days", F.raw], ["excess", F.pct, 1], ["absolute", F.pct, 1], ["made_money", F.one], ["cases", F.num]]));
 dash.draw("polRows", fdRows("policies", ["policy", "period"], [["policy", F.raw], ["period", F.raw], ["annual_return", F.one], ["sharpe", F.dec], ["worst_drawdown", F.one]]));
-dash.draw("holdRows", fdRows("holdings", ["ticker"], [["ticker", F.raw], ["price", F.dec], ["rsi", F.raw], ["vs_50day", F.one], ["vix_pct", F.raw], ["iv_vs_normal", F.dec], ["sample_leg_decay20", F.one], ["verdict", F.raw]]));
 </script>
 
 <script>

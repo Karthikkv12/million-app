@@ -153,10 +153,11 @@ def test_signal_for_a_ticker_not_held_is_an_entry_decision(client):
     assert r.status_code == 200
     d = r.json()
     assert d["symbol"] == "ABC" and d["held"] == "none" and d["error"] is None
-    assert d["label"] in {"Enter", "Wait", "Don't enter"}
-    assert not d["signal"]["headline"].startswith(("Hold", "Add", "Don't add"))
-    assert d["signal"]["probability"]["case"] in {"ADD", "FEAR_IV_NORMAL", "LEAN", "CAUTION", "HOLD"}
+    assert d["label"] in {"Buy", "Wait", "Don't buy yet"}
+    assert not d["signal"]["headline"].startswith(("Hold", "Add", "Don’t add"))
+    assert d["signal"]["probability"]["case"] in {"ADD", "LEAN", "CAUTION", "HOLD"}
     assert d["reasons"] and d["reasons"][0].startswith("Odds (2015–2026, unseen)")
+    assert "plan" in d["signal"] and isinstance(d["signal"]["plan"]["lines"], list)
     assert c.get("/api/v1/hedge/signal/abc").status_code == 401
     assert c.get("/api/v1/hedge/signal/a$b", headers=_login(c, "owner")).status_code == 400
 
@@ -175,6 +176,23 @@ def test_signal_for_a_leaps_holding_is_the_hedge_desk_signal(client):
     for k in ("verdict", "headline", "score", "probability", "legs"):           # the stock page reads the desk's own signal
         assert sig["signal"][k] == book["signal"][k]
     assert sig["label"] in {"Add", "Hold", "Don't add", "Roll"}
-    assert sig["reasons"] == book["suggestion"]["reasons"]
+    assert book["suggestion"]["reasons"][:len(sig["reasons"])] == sig["reasons"]
     other = c.get("/api/v1/hedge/signal/XYZ", headers=_login(c, "other")).json()  # another user doesn't hold it
-    assert other["held"] == "none" and other["label"] in {"Enter", "Wait", "Don't enter"}
+    assert other["held"] == "none" and other["label"] in {"Buy", "Wait", "Don't buy yet"}
+
+
+def test_signal_scan_ranks_by_fear_score_and_marks_holdings(client):
+    from optionflow.modules.hedge import scan as sc
+    c, fake = client
+    _signal_market(fake, 106.0)
+    out = sc.build(["AAA", "BBB", "CCC"])
+    assert {r["symbol"] for r in out["rows"]} == {"AAA", "BBB", "CCC"} and not out["failed"]
+    r = out["rows"][0]
+    assert r["label"] in {"Buy", "Wait", "Don't buy yet"} and r["case"] in {"ADD", "LEAN", "CAUTION", "HOLD"}
+    assert r["headline"].startswith(("Buy", "Wait", "Don’t buy yet"))
+    body = {"username": "owner", "positions": [{"account": "x", "symbol": "BBB", "kind": "stock", "quantity": 10, "avg_price": 90.0}]}
+    assert c.post("/api/v1/hedge/ingest", json=body, headers={"X-Hedge-Ingest-Token": TOKEN}).status_code == 200
+    d = c.get("/api/v1/hedge/scan", headers=_login(c, "owner")).json()
+    assert d["universe"] == 100 and d["score_cut"] == 0.283
+    assert [x["symbol"] for x in d["rows"] if x["held"]] == ["BBB"]
+    assert c.get("/api/v1/hedge/scan").status_code == 401

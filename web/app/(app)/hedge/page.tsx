@@ -69,7 +69,7 @@ const tradeShort = (s?: HedgeSuggestion | null) => !s || !TRADE.has(s.action) ? 
 const actionOf = (s?: HedgeSuggestion | null) => !s ? null
   : s.long_strike != null ? { ...ACTION.SELL_PUT, label: "Put spread" } : ACTION[s.action];
 
-// ── Long options tracked as stock: levels + reads (hedge.signal) ─────────────
+// ── The tested signal on every holding: levels, reads and the price plan (hedge.signal) ──
 type Signal = NonNullable<HedgeBook["signal"]>;
 const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neutral"; label: string; edge: "gain" | "loss" | "warn" | null }> = {
   ADD: { tag: "gain", label: "Add", edge: "gain" },
@@ -102,16 +102,28 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
   return (
     <div className="mt-4 space-y-5">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-[13px] sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
-        {[["Rebound score", <span key="s" className={tone(g.score)}>{g.score > 0 ? "+" : ""}{g.score}</span>],
+        {[["Fear score", g.fear_score != null ? <span key="f" className={g.fear_score >= 0.283 ? "text-gain" : undefined}>{g.fear_score.toFixed(2)} <span className="text-foreground/40">/ 0.28</span></span> : "—"],
           ["VIX percentile", g.vix_pct != null ? `${Math.round(g.vix_pct * 100)}%` : "—"],
-          ["Stock IV vs normal", g.iv_ratio != null ? <span key="iv" className={g.iv_ratio >= 1.2 ? "text-gain" : undefined}>{g.iv_ratio.toFixed(2)}× <span className="text-foreground/40">({vol(g.iv_model)} / {vol(g.iv_normal)})</span></span> : "—"],
+          ["Add if closes ≤", g.plan?.buy_below != null ? <span key="b" className="text-gain">{usd(g.plan.buy_below)}</span> : "—"],
+          ["or VIX ≥", g.plan?.vix_trigger != null ? g.plan.vix_trigger.toFixed(1) : "—"],
           ["Support", usd(g.support?.price)],
-          ["Risk line", g.stop != null ? <span key="st" className="text-loss">{usd(g.stop)}</span> : (g.vix_pct ?? 0) >= 0.8 ? "none in fear" : "—"],
+          ["Upside", usd(g.plan?.upside ?? g.resistance?.price)],
+          ["Exit line", g.plan?.exit_below != null ? <span key="st" className="text-loss">{usd(g.plan.exit_below)}</span> : (g.vix_pct ?? 0) >= 0.8 ? "none in fear" : "—"],
+          ["Stock IV vs normal", g.iv_ratio != null ? <span key="iv">{g.iv_ratio.toFixed(2)}× <span className="text-foreground/40">({vol(g.iv_model)} / {vol(g.iv_normal)})</span></span> : "—"],
           ...(g.expected_move ? [["Move ±1σ", `${usd(g.expected_move.day)} d · ${usd(g.expected_move.week)} wk`]] : []),
         ].map(([k, v]) => (
           <div key={k as string}><dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/45">{k}</dt><dd className="mt-0.5 tabular-nums text-foreground">{v}</dd></div>
         ))}
       </dl>
+
+      {(g.plan?.lines?.length ?? 0) > 0 && (
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-foreground/45">Plan</p>
+          <ul className="mt-2 space-y-1.5">
+            {g.plan!.lines.map((l) => <li key={l} className="text-[13px] leading-snug text-foreground/80">{l}</li>)}
+          </ul>
+        </div>
+      )}
 
       {g.legs.length > 0 && (
         <div>
@@ -129,14 +141,14 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
                     <td className="py-1 pr-3" title={l.iv_source === "model" ? "No quote: the backtest's IV model" : undefined}>{vol(l.iv)}{l.iv_source === "model" ? "*" : ""}</td>
                     <td className="py-1 pr-3">{l.delta.toFixed(2)}</td>
                     <td className="py-1 pr-3">{Math.round(l.extrinsic_pct * 100)}%</td>
-                    <td className={clsx("py-1 pr-3", l.roll ? "text-loss" : l.warn ? "text-warn" : "text-foreground/70")}>{(l.decay_20d * 100).toFixed(1)}%{l.roll ? " · roll" : l.warn ? " · soon" : ""}</td>
+                    <td className={clsx("py-1 pr-3", l.roll ? "text-loss" : l.warn ? "text-warn" : "text-foreground/70")}>{(l.decay_20d * 100).toFixed(1)}%{l.roll ? " · roll or close" : l.warn ? " · expiry < 60d" : ""}</td>
                     <td className="sensitive py-1 pr-3">{usd(l.theta_day, 0)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-1.5 text-[11.5px] text-foreground/45">Roll once a leg loses 4%+ per 20 trading days (≈180 days left at 0.80Δ). Add with 365+ days.{g.legs.some((l) => l.iv_source === "model") ? " * IV from the model: no live quote." : ""}</p>
+          <p className="mt-1.5 text-[11.5px] text-foreground/45">Decay alone isn&apos;t a reason to roll: same-delta rolls lost ~4% to costs at every days-left tested. Roll or close inside 30 days. Add with 365+ days.{g.legs.some((l) => l.iv_source === "model") ? " * IV from the model: no live quote." : ""}</p>
         </div>
       )}
       {g.probability && (
@@ -154,7 +166,6 @@ function SignalPanel({ g, spot }: { g: Signal; spot?: number | null }) {
           </dl>
           <p className="mt-1.5 text-[11.5px] text-foreground/45">
             Avg 60-day edge vs holding {pct(g.probability.edge_60)} (90% range {pct(g.probability.edge_lo)} to {pct(g.probability.edge_hi)}), {g.probability.cases.toLocaleString("en-US")} cases over {g.probability.months} months.
-            {g.probability.case === "ADD" ? " Conservative: the lower of the IV-gated and ungated results." : ""}
           </p>
         </div>
       )}
@@ -530,8 +541,9 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         {/* signal */}
         <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-3 xl:col-span-1">
           {(b.closes?.length ?? 0) > 0 && <Tag tone="solid">Buy back</Tag>}
-          {asStock && b.signal ? <SignalBadge signal={b.signal} label={a?.label} reasons={s?.reasons ?? []} />
+          {asStock && b.signal ? <SignalBadge signal={b.signal} label={a?.label} reasons={s?.reasons ?? []} align="right" />
             : a && <Tag tone={a.tag}>{a.label}</Tag>}
+          {!asStock && b.signal && <SignalBadge signal={b.signal} label={VERDICT[b.signal.verdict].label} align="right" />}
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/70">
             {s && TRADE.has(s.action) ? <>{tradeShort(s)} · <span className="sensitive">{usd(Math.abs(s.credit ?? 0), 0)}</span></> : s?.headline}
           </span>
@@ -540,6 +552,47 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
         <ChevronDown size={15} className={clsx("hidden text-foreground/40 transition xl:block", open && "rotate-180")} />
       </div>
     </DeskRow>
+  );
+}
+
+// ── The tested signal for every holding, from the live positions (T-91) ─────────
+function HoldingSignals({ books, onOpen }: { books: HedgeBook[]; onOpen: (sym: string) => void }) {
+  const rows = books.filter((b) => b.signal).sort((a, b) => (b.signal!.fear_score ?? -1) - (a.signal!.fear_score ?? -1));
+  if (!rows.length) return null;
+  const order: Signal["verdict"][] = ["ADD", "TRIM", "ROLL", "CAUTION", "HOLD"];
+  const count = (v: Signal["verdict"]) => rows.filter((b) => b.signal!.verdict === v).length;
+  return (
+    <DeskSection label="Signal · every holding" meta={<>The backtested read for each holding, whatever it is.<br />Follows your synced positions.</>}>
+      <p className="mb-2 font-mono text-[11px] text-foreground/50">
+        {order.filter((v) => count(v)).map((v) => `${VERDICT[v].label} ${count(v)}`).join(" · ")}
+      </p>
+      <div className="-mx-4 overflow-x-auto sm:mx-0">
+        <table className="w-full min-w-[640px] font-mono text-[12.5px] tabular-nums" data-testid="holding-signals">
+          <thead><tr className="border-b border-[var(--border-strong)] text-left text-[10px] uppercase tracking-[0.12em] text-foreground/45">
+            {["Holding", "Signal", "Fear score", "Add if ≤", "or VIX ≥", "Upside", "Exit line", "Calls"].map((h) => <th key={h} className="py-2 pl-4 pr-3 font-normal first:pl-4">{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((b) => {
+              const g = b.signal!;
+              return (
+                <tr key={b.symbol} className="cursor-pointer border-b border-[var(--border)] hover:bg-foreground/[0.03]" onClick={() => onOpen(b.symbol)}>
+                  <td className="py-2 pl-4 pr-3"><span className="flex items-center gap-2"><TickerLogo symbol={b.symbol} size={16} /><span className="font-semibold text-foreground">{b.symbol}</span>
+                    <span className="text-[10.5px] text-foreground/40">{b.strategy === "long_stock" ? "options" : b.shares ? (b.legs.some((l) => l.kind === "option") ? "shares + options" : "shares") : "options"}</span></span></td>
+                  <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}><SignalBadge signal={g} label={VERDICT[g.verdict].label} /></td>
+                  <td className={clsx("py-2 pr-3", (g.fear_score ?? 0) >= 0.283 ? "text-gain" : "text-foreground/70")}>{g.fear_score != null ? g.fear_score.toFixed(2) : "—"}</td>
+                  <td className="py-2 pr-3">{g.plan?.buy_below != null ? usd(g.plan.buy_below) : g.verdict === "ADD" ? <span className="text-gain">now</span> : "—"}</td>
+                  <td className="py-2 pr-3">{g.plan?.vix_trigger != null ? g.plan.vix_trigger.toFixed(1) : "—"}</td>
+                  <td className="py-2 pr-3">{usd(g.plan?.upside ?? g.resistance?.price)}</td>
+                  <td className="py-2 pr-3 text-loss/90">{g.plan?.exit_below != null ? usd(g.plan.exit_below) : "—"}</td>
+                  <td className="py-2 pr-3 text-foreground/70">{g.plan?.covered_call ? `${g.plan.covered_call}Δ` : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11.5px] text-foreground/45">Add in thirds, ≥10 trading days apart. Exit line counts only in a calm market. Calls: the covered-call delta to sell now (0.15Δ on fear dips).</p>
+    </DeskSection>
   );
 }
 
@@ -694,6 +747,8 @@ function DeltaDesk({ tabs }: { tabs: React.ReactNode }) {
               <DeskFigure label="Expiring ≤5d" value={expiring.length} tone={expiring.length ? "text-warn" : "text-foreground/40"} sub={expiring.map((l) => `${l.symbol} ${l.strike}${l.otype === "call" ? "C" : "P"}`).join(" · ") || "none"} />
             </DeskFigures>
           </div>
+
+          <HoldingSignals books={books} onOpen={(sym) => setOpen(sym)} />
 
           <DeskSection label="Book" meta={<>Δ in lots: 100 sh = +1.00.<br />Tap a row for the ticket, legs and levels.</>}>
             <div className="-mx-4 sm:mx-0">

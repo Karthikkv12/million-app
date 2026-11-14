@@ -335,6 +335,9 @@ export const fetchLeapsScores = (symbols: string[]) =>
 
 // ── The desk's backtested signal for any ticker (Enter / Wait / Don't enter, or Add / Hold / Roll when held) ──
 export type StockSignal = Schemas["StockSignalOut"];
+export type SignalScan = Schemas["SignalScanOut"];
+export type SignalScanRow = Schemas["SignalScanRowOut"];
+export const fetchSignalScan = () => api.get<SignalScan>("/hedge/scan");
 export const fetchStockSignal = (symbol: string) =>
   api.get<StockSignal>(`/hedge/signal/${encodeURIComponent(symbol.toUpperCase())}`);
 
