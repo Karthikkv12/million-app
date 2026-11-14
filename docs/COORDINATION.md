@@ -3133,3 +3133,11 @@ Owner screenshot: the Portfolio tab bar scrolled up/down on iPhone.
 - **Cause:** sideways-scrolling tab strips gave each tab `-mb-px` to overlap the strip's border; `overflow-x: auto` forces `overflow-y: auto`, so that 1px became a vertical scroll. Fixed in Portfolio, Watchlist list tabs, Research and Flow layouts: border → `inset` box-shadow, no `-mb-px`, `overflow-y-hidden`.
 - **Checks:** iPhone 13 emulation, mocked data: before, the Portfolio nav had 1px vertical scroll; after, 0 vertically scrollable boxes on `/portfolio/watchlist`, `/catalyst/signals`, `/options-flow`. Underline looks the same. `tsc` + eslint clean.
 - **Not checked:** the owner's iPhone with real data.
+
+### C-128 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land with C-124 / C-126 / C-127; nextjs restart covers it)
+Owner screenshots: the signal pop-up ran off the bottom on iPhone and was clipped inside the Hedge desk table.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `723cfa7` (on top of 48b2f51 / C-127). Frontend only (`components/signal/SignalBadge.tsx`).
+- **What:** phones (< 640 px) get a full-screen sheet with a close button (body scroll locked). Wider screens: a portal window kept inside the viewport (under the badge, else above, else centred with its own scroll), re-placed on scroll/resize. Tap/click opens; hover only for a mouse.
+- **Checks:** iPhone 13: sheet 0–664 px, closes. iPad Pro 11 portrait, badge near top → window below; badge near bottom (1015 px) → window above (194–1008); landscape → centred 16–818 with inner scroll. Desktop: inside the viewport, closes on hover-out. `tsc` + eslint clean.
+- **Not checked:** on the owner's iPhone / iPad, and inside the Hedge desk table with real books (the portal is what removes the clipping there).
+- Four pushes are now waiting: C-124, C-126 (has an API change), C-127, C-128.
