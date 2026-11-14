@@ -337,7 +337,8 @@ export const fetchLeapsScores = (symbols: string[]) =>
 export type StockSignal = Schemas["StockSignalOut"];
 export type SignalScan = Schemas["SignalScanOut"];
 export type SignalScanRow = Schemas["SignalScanRowOut"];
-export const fetchSignalScan = () => api.get<SignalScan>("/hedge/scan");
+export type ScanUniverse = SignalScan["universe_key"];
+export const fetchSignalScan = (universe: ScanUniverse = "popular") => api.get<SignalScan>(`/hedge/scan?universe=${universe}`);
 export const fetchStockSignal = (symbol: string) =>
   api.get<StockSignal>(`/hedge/signal/${encodeURIComponent(symbol.toUpperCase())}`);
 

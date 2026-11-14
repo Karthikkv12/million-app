@@ -449,10 +449,11 @@ class SignalScanRowOut(BaseModel):
 
 
 class SignalScanOut(BaseModel):
-    """The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan)."""
+    """The tested signal across a universe of US stocks and ETFs, by fear score (GET /hedge/scan)."""
     as_of: Optional[str] = None
     building: bool = Field(False, description="A scan is being built; poll again")
-    universe: int
+    universe: int = Field(..., description="Tickers in the universe")
+    universe_key: Literal["popular", "sp500"] = "popular"
     score_cut: float
     vix: Optional[float] = None
     vix_pct: Optional[float] = None

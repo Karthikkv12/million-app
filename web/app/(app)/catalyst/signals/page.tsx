@@ -1,13 +1,13 @@
 "use client";
 /**
- * Signal scanner: the desk's backtested Buy / Wait / Don't buy yet read across 100 popular US stocks and ETFs, ranked by
+ * Signal scanner: the desk's backtested Buy / Wait / Don't buy yet read across 100 popular names or the S&P 500, ranked by
  * fear score, with the close or VIX level that would turn each into Buy. Same code as the stock page's signal.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { fetchSignalScan, SignalScan, SignalScanRow } from "@/lib/api";
+import { fetchSignalScan, ScanUniverse, SignalScan, SignalScanRow } from "@/lib/api";
 import { stockHref } from "@/components/TickerLink";
 import { PageHeader, Panel, RefreshButton, Segmented } from "@/components/ui";
 import { Tag } from "@/components/desk";
@@ -32,9 +32,12 @@ function ScoreBar({ v, cut }: { v?: number | null; cut: number }) {
 }
 
 export default function SignalScannerPage() {
+  const [universe, setUniverse] = useState<ScanUniverse>("popular");
+  useEffect(() => { try { if (localStorage.getItem("signal_scan_universe") === "sp500") setUniverse("sp500"); } catch { /* private mode */ } }, []);
+  const pickUniverse = (u: ScanUniverse) => { setUniverse(u); try { localStorage.setItem("signal_scan_universe", u); } catch { /* private mode */ } };
   const { data, isLoading, isFetching, refetch, error } = useQuery<SignalScan>({
-    queryKey: ["signal-scan"],
-    queryFn: fetchSignalScan,
+    queryKey: ["signal-scan", universe],
+    queryFn: () => fetchSignalScan(universe),
     staleTime: 60_000,
     refetchInterval: (q) => (q.state.data?.building && !q.state.data.rows.length ? 5_000 : 5 * 60_000),
   });
@@ -64,7 +67,7 @@ export default function SignalScannerPage() {
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 pb-16 pt-8 sm:px-6">
       <PageHeader eyebrow="Research" title="Signal scanner"
-        sub="The desk's backtested buy read on 100 popular stocks and ETFs: who is a Buy now, and the close or VIX level that would make the rest one."
+        sub="The desk's backtested buy read on 100 popular names or the whole S&P 500: who is a Buy now, and the close or VIX level that would make the rest one."
         action={<RefreshButton onRefresh={() => refetch()} isRefreshing={isFetching} />} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -85,13 +88,15 @@ export default function SignalScannerPage() {
         title={data ? `${all.length} of ${data.universe} tickers` : "Scanning"}
         sub={data?.as_of ? `As of ${new Date(data.as_of).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · daily closes, refreshed every 15 min` : undefined}>
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] px-4 py-3">
+          <Segmented label="Universe" value={universe} onChange={pickUniverse} options={[
+            { value: "popular", label: "Popular 100" }, { value: "sp500", label: "S&P 500" }]} />
           <Segmented label="Show" value={filter} onChange={setFilter} options={[
             { value: "all", label: "All" }, { value: "buy", label: "Buy" }, { value: "near", label: "Near a buy" },
             { value: "avoid", label: "Don't buy yet" }, { value: "held", label: "You hold" }]} />
           <span className="font-mono text-[11px] text-foreground/45">Fear score = VIX percentile × how oversold. Buy at ≥ {cut.toFixed(2)}.</span>
         </div>
         {error && <p className="px-4 py-6 text-[14px] text-loss">{(error as Error).message || "Couldn't load the scan."}</p>}
-        {data?.building && !all.length && <p className="px-4 py-6 text-[14px] text-foreground/60">Building the first scan of 100 tickers… this takes a minute.</p>}
+        {data?.building && !all.length && <p className="px-4 py-6 text-[14px] text-foreground/60">Building the first scan of {data.universe} tickers… {data.universe > 200 ? "about a minute" : "a few seconds"}.</p>}
         {!!all.length && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] font-mono text-[12.5px] tabular-nums" data-testid="signal-scan">

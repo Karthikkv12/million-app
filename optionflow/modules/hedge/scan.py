@@ -1,8 +1,8 @@
-"""optionflow/modules/hedge/scan.py — the tested signal across 100 popular US stocks and ETFs, ranked by fear score.
+"""optionflow/modules/hedge/scan.py — the tested signal across a universe (100 popular names, or the S&P 500), by fear score.
 
 Same code path as the stock page's read for a ticker you don't hold (hedge.signal.evaluate with held=False): Buy /
 Wait / Don't buy yet, the fear score, and the prices that would turn it into Buy. Built in the background from daily
-bars (2 years, cached SCAN_BARS_TTL) and the VIX; one scan is shared by every user and kept SCAN_TTL. The user's own
+bars (2 years, cached SCAN_BARS_TTL) and the VIX; one scan per universe is shared by every user and kept SCAN_TTL. The user's own
 holdings are only marked per request, never stored.
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from optionflow.modules.hedge import service
 from optionflow.modules.hedge import signal as sg
+from optionflow.modules.hedge.universe import SP500
 
 logger = logging.getLogger("optionflow.hedge.scan")
 
@@ -26,19 +27,27 @@ BABA PDD JD BIDU NIO NBIS IONQ RGTI RIVN LCID F GM BA CAT DE GE LMT RTX DIS
 BAC WFC C GS MS SCHW KO PEP MCD SBUX NKE CVX OXY PFE MRK ABBV
 SPY QQQ IWM DIA SMH""".split()
 assert len(POPULAR_100) == 100 and len(set(POPULAR_100)) == 100
+UNIVERSES = {"popular": POPULAR_100, "sp500": SP500}
 
 SCAN_TTL = 15 * 60.0          # a scan is fresh for 15 minutes
 SCAN_BARS_TTL = 3600.0        # daily bars per symbol, hourly
 WORKERS = 4                   # parallel fetches (provider rate limits)
 
 _lock = threading.Lock()
-_state: Dict[str, Any] = {"at": 0.0, "as_of": None, "rows": [], "building": False, "failed": [], "vix": None, "vix_pct": None}
+def _blank() -> Dict[str, Any]:
+    return {"at": 0.0, "as_of": None, "rows": [], "building": False, "failed": [], "vix": None, "vix_pct": None}
+
+
+_states: Dict[str, Dict[str, Any]] = {u: _blank() for u in UNIVERSES}
 
 
 def _bars(sym: str) -> List[Dict[str, Any]]:
     def load():
         from optionflow.providers.market_data import bars_from_history, get_market_data
-        df = get_market_data().price_history(sym, "2y", "1d")
+        # Yahoo directly: a scan is 100-503 requests, and Public's single 8/s request queue is shared with the live
+        # flow / dealer-level refresh (a burst would delay it, and a 429 pauses every Public call for 60 s).
+        md = get_market_data()
+        df = getattr(md, "fallback", md).price_history(sym, "2y", "1d")
         return bars_from_history(df, intraday=False) if df is not None and not df.empty else []
     return service.CACHE.get("bars2y", sym, SCAN_BARS_TTL, load) or []
 
@@ -69,8 +78,9 @@ def row(sym: str, vix: List[float], vix_dates: List[str], today: str) -> Optiona
             "p_edge_positive": p.get("p_edge_positive"), "edge_60": p.get("edge_60")}
 
 
-def build(symbols: List[str] = POPULAR_100) -> Dict[str, Any]:
-    """Compute the scan now (blocking) and store it."""
+def build(symbols: Optional[List[str]] = None, universe: str = "popular") -> Dict[str, Any]:
+    """Compute the scan of `universe` (or of `symbols`, stored under `universe`) now, blocking, and store it."""
+    symbols = list(symbols or UNIVERSES[universe])
     vbars = service._daily_bars(service.VIX)
     vix, vix_dates = [b["close"] for b in vbars], [b["date"] for b in vbars]
     today = service._session_frac()[0].isoformat()
@@ -85,38 +95,42 @@ def build(symbols: List[str] = POPULAR_100) -> Dict[str, Any]:
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for sym, r in ex.map(one, symbols):
             (rows.append(r) if r else failed.append(sym))
-    rows.sort(key=lambda r: (-(r["fear_score"] or 0.0), r["symbol"]))
+    # fear score first; ties (the oversold term caps at RSI 20) break by lower RSI, then deeper under the 50-day
+    rows.sort(key=lambda r: (-round(r["fear_score"] or 0.0, 3), r["rsi"] if r["rsi"] is not None else 100.0,
+                             r["vs_50d"] if r["vs_50d"] is not None else 1.0, r["symbol"]))
     vp = sg.vix_percentile(vix) if vix else None
     out = {"at": time.time(), "as_of": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
            "rows": rows, "building": False, "failed": failed, "vix": vix[-1] if vix else None, "vix_pct": vp}
     with _lock:
-        _state.update(out)
+        _states[universe].update(out)
     return out
 
 
-def _refresh() -> None:
+def _refresh(universe: str) -> None:
     try:
-        build()
+        build(universe=universe)
     except Exception:
-        logger.exception("signal scan failed")
+        logger.exception("signal scan %s failed", universe)
     finally:
         with _lock:
-            _state["building"] = False
+            _states[universe]["building"] = False
 
 
-def get(held: Optional[set] = None, wait: float = 0.0) -> Dict[str, Any]:
-    """The latest scan; starts a background rebuild when it's stale. `wait`: seconds to block for a first scan."""
+def get(held: Optional[set] = None, wait: float = 0.0, universe: str = "popular") -> Dict[str, Any]:
+    """The latest scan of `universe`; starts a background rebuild when it's stale. `wait`: seconds to block for a first scan."""
+    _state = _states[universe]
     with _lock:
         stale = time.time() - _state["at"] > SCAN_TTL
         if stale and not _state["building"]:
             _state["building"] = True
-            threading.Thread(target=_refresh, name="signal-scan", daemon=True).start()
+            threading.Thread(target=_refresh, args=(universe,), name=f"signal-scan-{universe}", daemon=True).start()
     deadline = time.time() + wait
     while wait and not _state["rows"] and _state["building"] and time.time() < deadline:
         time.sleep(0.25)
     with _lock:
         snap = {k: v for k, v in _state.items() if k != "at"}
         snap["rows"] = [dict(r, held=bool(held and r["symbol"] in held)) for r in _state["rows"]]
-    snap["universe"] = len(POPULAR_100)
+    snap["universe"] = len(UNIVERSES[universe])
+    snap["universe_key"] = universe
     snap["score_cut"] = sg.SCORE_CUT
     return snap
