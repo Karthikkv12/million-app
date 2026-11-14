@@ -240,6 +240,26 @@ def test_default_provider_is_yahoo_without_secret(monkeypatch):
         assert market_data.get_market_data().name == "public+yfinance"
 
 
+def test_default_provider_is_built_once_when_threads_race(monkeypatch):
+    """Workers all ask for the provider at startup. They must get one fully built provider (one PublicClient, one
+    pacer), never a half-built Yahoo one or a Public-first wrapped around another Public-first."""
+    import threading
+    from optionflow.core.settings import Settings, override_settings
+    for _ in range(20):
+        monkeypatch.setattr(market_data, "_default", None)
+        got, barrier = [], threading.Barrier(8)
+
+        def go():
+            barrier.wait()
+            got.append(market_data.get_market_data())
+        with override_settings(Settings(_env_file=None, public_api_secret="s")):
+            threads = [threading.Thread(target=go) for _ in range(8)]
+            [t.start() for t in threads]
+            [t.join() for t in threads]
+        assert len({id(p) for p in got}) == 1
+        assert got[0].name == "public+yfinance" and got[0].fallback.name == "yfinance"
+
+
 # ── error messages and poll interval ─────────────────────────────────────────
 
 class LimitedYahoo(FakeYahoo):
