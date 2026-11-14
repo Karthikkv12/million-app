@@ -261,6 +261,20 @@ class SignalOut(BaseModel):
     plan: Optional[SignalPlanOut] = None
 
 
+class SwingReadOut(BaseModel):
+    """The swing read (hedge.swing): 1 week – 1 month, its own backtest."""
+    verdict: Literal["BUY", "WAIT"]
+    reason: str
+    buy_below: Optional[float] = Field(None, description="A close at or under this would make it a swing buy")
+    exit_above: float = Field(..., description="Sell at the first close above the 10-day average (today's value)")
+    max_days: int = Field(20, description="…or after this many trading days")
+    ret5: float = Field(..., description="5-day change")
+    vs_200d: float
+    fear: bool = Field(..., description="Fear dip (the 1–3 month Add)")
+    drop: bool = Field(..., description="≥ 5% down in 5 days above the 200-day")
+    stats: Optional["SwingStatsSetOut"] = None
+
+
 class StockSignalOut(BaseModel):
     """The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol})."""
     symbol: str
@@ -271,6 +285,7 @@ class StockSignalOut(BaseModel):
     signal: Optional[SignalOut] = None
     reasons: List[str] = Field([], description="Why: backtest odds, evidence, levels, IV, legs and the reads")
     error: Optional[str] = None
+    swing: Optional[SwingReadOut] = Field(None, description="Swing read, 1 week – 1 month (None without 200 days of history)")
 
 
 class BookOut(BaseModel):
@@ -490,3 +505,6 @@ class SignalScanOut(BaseModel):
     rows: List[SignalScanRowOut] = []
     failed: List[str] = Field([], description="Symbols with no history this scan")
     swing_stats: Optional[SwingStatsSetOut] = None
+
+
+SwingReadOut.model_rebuild()
