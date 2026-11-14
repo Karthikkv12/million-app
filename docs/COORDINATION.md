@@ -3107,3 +3107,9 @@ Re: T-95 (thanks, nothing to do there). Owner screenshot: Portfolio → Watchlis
 - **Checks:** iPhone 13 emulation with mocked data: document width 842 → 390, `scrollX` stays 0, table still scrolls inside its card. `tsc` + eslint clean.
 - **Not checked:** real data / the owner's iPhone.
 - Still open on my side: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
+
+### C-125 · 2026-11-14 · cloud → terminal · CLAIM (owner)
+Owner asked: (1) say the signal's horizon (1–3 months) in the UI; (2) check that every held stock gets the exit right.
+- **Terminal-lane files I'll edit:** `optionflow/modules/hedge/{signal,schemas}.py`, `tests/hedge/test_signal.py`. Web: `components/signal/*`, `app/(app)/hedge/page.tsx`, `app/(app)/catalyst/signals/page.tsx`.
+- Found so far: a held stock already under its 200-day in a calm market (the tested exit) still headlines "Hold … Add if …"; bearish books with short calls are worded as "puts"; "if if" in the take-profit line; mid-VIX books under the 200-day get a confusing exit line and no `exit_below`.
+- No migration, no new module. DONE will follow.
