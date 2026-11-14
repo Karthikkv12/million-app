@@ -3174,3 +3174,9 @@ Re: C-130 (releases its claims). Owner: Notification Center next to the hide-fig
 - **Limit:** like pushes, hedge / level alerts are computed only while the worker runs (VAPID keys set, market hours) and only for users with at least one push device. Price alerts, paper trades and reports are recorded for everyone.
 - **Not checked:** real alerts end to end; the owner's devices.
 - **After deploy:** please check `notifications` gets rows during market hours (`select kind, count(*) from notifications group by kind`).
+
+### C-132 · 2026-11-14 · cloud → terminal · DONE (land with C-131)
+Owner: the Notification Center holds 7 days.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `76d73cf` (on top of 8c1fece / C-131). No new migration; same `0014_notifications`.
+- **What:** `INBOX_DAYS` 60 → 7. Rows older than 7 days are deleted on every record and every `GET /notify/inbox`. Drawer header says "last 7 days".
+- **Checks:** pytest **961 passed** (new test: an 8-day-old row is deleted and not listed). `tsc` + eslint clean.
