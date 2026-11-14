@@ -171,7 +171,7 @@ class Book:
     units: List[Unit] = field(default_factory=list)
     closes: List[Close] = field(default_factory=list)
     strategy: str = "spike_wheel"           # the owner's strategy that produced `suggestion` (strategy module)
-    signal: Optional[dict] = None           # long options only: levels + directional read (hedge.signal)
+    signal: Optional[dict] = None           # every holding: the tested read, levels and the price plan (hedge.signal)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -221,8 +221,9 @@ def evaluate(ctx: Context, legs: List[Leg], weekly: List[Quote], strategy=None,
     warnings = _gamma_warnings(legs)
     key = getattr(strategy, "key", None) or "spike_wheel"
     sig = None
-    if is_long_options_only(legs):                    # long calls / puts held as stock: no strategy, just the exposure
+    if tape is not None or is_long_options_only(legs):   # every holding gets the tested signal (T-91), read for its net side
         sig = _stock_signal(ctx, net, tape, legs)
+    if is_long_options_only(legs):                    # long calls / puts held as stock: no strategy, just the exposure
         s, closes, key = _as_long_stock(legs, net, spot, warnings, sig), [], LONG_STOCK
     elif key == "spike_wheel":
         s = _decide(ctx, legs, weekly, net, shares, full_lots, regime, warnings)
@@ -267,6 +268,11 @@ def _stock_signal(ctx: Context, net: float, tape=None, legs: Optional[List[Leg]]
     if not t.legs and legs:
         t.legs = [{"otype": l.otype, "strike": l.strike, "expiry": l.expiry, "dte": l.dte, "iv": l.iv, "mark": l.mark,
                    "quantity": l.quantity, "avg_price": l.avg_price} for l in legs if l.kind == "option"]
+    if legs and not t.shares:
+        stock = [l for l in legs if l.kind == "stock" and l.quantity > 0]
+        if stock:
+            t.shares, t.avg_cost = sum(l.quantity for l in stock), ctx.avg_cost
+    t.symbol = t.symbol or ctx.symbol
     return sg.evaluate(t, net)
 
 

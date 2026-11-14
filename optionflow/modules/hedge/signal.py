@@ -1,50 +1,38 @@
-"""optionflow/modules/hedge/signal.py — levels and a tested ADD / HOLD / CAUTION read for a holding tracked as stock.
+"""optionflow/modules/hedge/signal.py — a tested Add / Hold / Don't add read for ANY holding (or none), with prices.
 
-Used for holdings of long calls / long puts only (owner, 2026-11-13): no option strategy, the position is stock
-exposure (calls long, puts short). Pure, no I/O.
+Every holding gets it (owner, T-91): shares, long calls / puts, covered calls, spreads, mixed books, read for the
+book's net side; a ticker you don't hold gets the same read as a buy decision (Buy / Wait / Don't buy yet). Pure, no I/O.
 
-What the verdict is built on (backtest 2026-11-13: 148 US stocks and ETFs, 1995-01 → 2026-11, 827,892 symbol-days;
-rules picked on 1995–2014, checked untouched on 2015–2026; see docs/hedge-signal-backtest.md):
+What it is built on (re-tested 2026-11-14, scripts/backtest_signal/{review,rebuild,compare,probs}.py, see
+docs/hedge-signal-review.md: 148 US stocks and ETFs, 1995-01 → 2026-11, 827,847 symbol-days; every threshold chosen on
+1995–2014, read once on 2015–2026):
 
-  The pattern: WHY a stock is down decides what comes next.
-  - Down while the whole market is scared (VIX in the top 20% of its year) → it rebounds: RSI(14) < 40 with VIX ≥ 80th
-    percentile beat simply holding by +1.2% over 20 days and +3.4% over 60 (2015–2026), up 60% of the time.
-  - Down while the market is calm (a stock-specific problem) → no rebound edge; 60-day excess −1.2%.
-  - Strength is NOT a sell: no bucket of trend / momentum / volume predicted a fall. Being above the averages,
-    RSI high, buying volume all predicted slightly LOWER returns for the same stock (mean reversion).
-  - A close under support during market fear came before a +1.8–2.7% rebound: a stop there sells the low.
+  The pattern: WHY a stock is down decides what comes next. Dips while the whole market is scared rebound; dips in a
+  calm market are about the stock and don't. Strength is not a sell (no trend / momentum / volume bucket predicted a fall).
 
-  Verdict (long side; long puts read it mirrored):
-    ADD      RSI(14) < ADD_RSI and VIX percentile ≥ ADD_VIX      (fear dip: the one tested buy edge)
-    CAUTION  VIX percentile < CALM_VIX and (≥ KNIFE_DD under the 52-week high, or 3–15% over the 50-day with RSI > 65)
-             → don't add here (stock-specific weakness, or stretched in a calm tape); not a sell signal
-    HOLD     otherwise (most days: no edge either way)
-  For long puts: the fear-dip is TRIM (take profit: the stock tends to rebound), everything else HOLD.
+  Fear score = clip((VIX percentile − 0.5) / 0.5, 0, 1)^1.5 × clip((50 − RSI14) / 30, 0, 1); cutoff SCORE_CUT (the
+  1995–2014 92.5th percentile, i.e. as often as the old RSI < 40 & VIX ≥ 80th rule). 2015–2026: +3.45% vs holding over
+  60 days (t 2.48), +1.22% over 20 (t 3.51); the old rule +3.41% (t 1.78).
+    ADD      fear score ≥ SCORE_CUT. Add in thirds: ≤ 3 tranches ≥ 10 trading days apart (cut the 2008 / 2022 hit from
+             −9.3% / −8.3% to −1.9% / −1.9% of the overlay; a "pause after 2 losses" rule made 2008 worse).
+    CAUTION  VIX percentile < CALM_VIX and (≥ 10% under the 52-week high, or 3–15% over the 50-day with RSI > 65):
+             don't add (−1.3% vs holding over 60 days, t −2.7); not a sell signal.
+    HOLD     otherwise. LEAN (oversold without enough fear) is a coin flip.
+  Long puts: on ADD days TRIM (take profit): held puts lost 7.9–11.1% of value vs an average day over 60 days.
+  The 1.2× IV gate is gone: re-chosen on 1995–2014 alone it picks no gate (it was hindsight). IV is shown as context.
 
-  score: the rebound score −100 … +100 = mean of [VIX percentile, oversold RSI, depth under the 50-day]; it ranked
-  60-day excess from −1.4% (bottom) to +3.0% (top) out of sample.
+Options: the edge survives theta, IV and costs on 365-day 0.80Δ calls over 20 days (t 3.2, passes a 28-test
+correction); the 60-day option result (t 1.9) does not pass it. Rolling to escape time decay did NOT pay: a
+delta-matched roll broke even before costs and lost ~4% of the position's value after costs at every days-left from 90
+to 365, so legs only flag ROLL inside EXPIRY_ROLL days (expiry mechanics, not an edge).
 
-Options (owner, 2026-11-13: "account for theta, IV and time left"). Backtested by pricing a long call with
-Black-Scholes on every symbol-day: the real price path, a modelled 30-day IV (fit on the VIX / VXN / VXD / GVZ / OVX
-histories, held-out error ~2 vol points on indexes, ~7 on single stocks vs live chains), a term structure for the
-long-dated IV (κ = 2.25/yr from VIX vs VIX3M), T-bill rates, and conservative costs (+5 vol points on entry, 2% of the
-option price each way):
-  - The fear-dip edge survives the option: 365-DTE 0.80Δ calls beat the same call bought on an average day by +3.5%
-    of premium over 20 trading days (t 3.2) and +7.5% over 60, out of sample. Rich IV did not hurt (long-dated IV
-    barely moves; the rebound outweighs the crush).
-  - Gate (conservative): ADD only when the stock's own IV is ≥ IV_GATE × its 5-year normal. Fear dips with normal
-    stock IV had a thin option edge after costs out of sample (+1.1% / 20 days, −0.3% / 60).
-  - Hold ≥ 60 trading days: after costs a 20-day hold of a LEAPS lost money on average even on ADD days.
-  - Theta is about time left, not IV: a 0.80Δ call loses ~2.2% of its value per 20 trading days at 365 DTE, ~3.1% at
-    240, ~4.0% at 180, ~7% at 90. The ADD edge (~3.5% / 20 days) only clears that above ~240 DTE → add with
-    ≥ ADD_MIN_DTE days; ROLL a leg once it loses ≥ ROLL_DECAY per 20 trading days (≈ 180 DTE for 0.80Δ).
-
-Reads that are shown for context but NOT in the verdict: options flow and dealer levels (no history to test them),
-trend and volume (tested: no edge, or the wrong sign), IV vs realised (per-stock IV history not available).
+Plan (prices, not just a stamp): the close that would make it ADD at today's VIX, the VIX close that would at today's
+price, support / resistance, the exit line (a calm-market close under the 200-day: −1.65% vs holding over 60 days,
+t −2.75), what clears a CAUTION, and the covered-call adjustment (fear dip: 0.15Δ beat 0.30Δ by +0.33% of the stock a
+month, t 3.9; calm weakness: going closer to the money did not pay).
 
 Levels: the dealer walls, max pain, the 20 / 50 / 200-day averages, the 20-day high and low, the 1-day / 1-week
-expected move. The risk line (calm markets only) is the 200-day average: a calm-market close under it came before a
-−1.2% 60-day excess; during fear there is no stop.
+expected move. Flow / dealer reads are context only (no history to test them).
 """
 from __future__ import annotations
 
@@ -56,43 +44,41 @@ WEIGHTS = {"fear": 1, "momentum": 1, "dip": 1, "flow": 0, "trend": 0, "dealers":
 TESTED = {"fear", "momentum", "dip"}       # the only reads in the verdict / score
 ADD_RSI, ADD_VIX = 40.0, 0.80
 CALM_VIX, KNIFE_DD = 0.60, -0.10
-IV_GATE = 1.20               # ADD needs the stock's modelled IV30 ≥ this × its 5-year normal
-ROLL_DECAY, ROLL_WARN = 0.04, 0.03   # share of a leg's value lost to time per 20 trading days
+SCORE_CUT = 0.283            # ADD: fear score ≥ this (chosen on 1995–2014)
+TRANCHES, TRANCHE_GAP = 3, 10       # add in thirds, ≥ 10 trading days apart
+EXPIRY_ROLL, EXPIRY_WARN = 30, 60   # days left: roll or close / heads-up (expiry mechanics; time decay alone didn't pay)
+EXIT_DROP_60 = -0.0165              # calm close under the 200-day → 60-day excess (2015–2026, t −2.75)
 ADD_MIN_DTE, ADD_DELTA, ADD_HOLD_DAYS = 365, 0.80, 60
 DECAY_DAYS = 28              # 20 trading days ≈ 28 calendar days
 # 30-day IV model: log IV30 = c0 + c1·log HV20 + c2·log HV60 + c3·log HV252 + c4·log(VIX / its 1-year median)
 IV_COEF = (-0.14097195906371088, 0.2540721934391069, 0.09742051640355423, 0.4790064141745925, 0.3558036079608121)
 IV_NORMAL_DAYS, IV_NORMAL_MIN = 1260, 252
 TERM_KAPPA = 2.25            # /yr: long-dated IV = normal + (IV30 − normal)·g(T)/g(1/12), g(T) = (1 − e^{−κT})/(κT)
-# Backtest evidence per verdict (2015–2026, out of sample): excess vs holding over 20 / 60 days, share up after 20.
+# Backtest evidence per case (2015–2026, unseen when the rules were set).
 EVIDENCE = {
-    "ADD": "Backtest on simulated 365-day 0.80Δ calls, with theta, IV and conservative costs (2015–2026, unseen): "
-           "+13.7% of premium vs an average day over 60 trading days, but up only 59% of the time: the edge is the big "
-           "rebounds. Held 20 days, the same calls lost money after costs. On the stock: +6.2% vs holding over 60 days. "
-           "Failed in long bear markets (2008, 2022): add in pieces.",
-    "FEAR_IV_NORMAL": "Backtest: fear dips where the stock's own IV was NOT elevated had a thin edge on the options "
-                      "after costs (2015–2026: +1.1% of premium over 20 days, −0.3% over 60). Conservative: no add.",
-    "ROLL": "Time decay: a 0.80Δ call loses ~4% of its value per 20 trading days at 180 days left and ~7% at 90, more "
-            "than the signal's edge (~3.5%). Rolling to 365+ days cuts that to ~2%.",
-    "CAUTION": "Backtest: −0.3% to −0.6% vs holding over 20 days, about −1.2% over 60; a weak edge (t ≈ −2): "
-               "don't add, but it is not a sell.",
+    "ADD": "Backtest (fear score, 2015–2026, unseen): +3.5% vs holding over 60 trading days (t 2.5), +1.2% over 20 "
+           "(t 3.5); 365-day 0.80Δ calls +3.5% of premium vs an average day over 20 days after costs (t 3.2). Up only "
+           "~6 times in 10: the edge is the big rebounds. Failed in long bear markets (2008, 2022): add in thirds.",
+    "LEAN": "Backtest: oversold WITHOUT enough market fear had no edge (2015–2026: −0.2% vs holding over 60 days, 90% "
+            "range −1.4% to +1.1%; 31,547 cases). The edge appears once the VIX joins in.",
+    "CAUTION": "Backtest: −0.4% vs holding over 20 days and −1.3% over 60 (t −2.7, 2015–2026): don't add, but it is "
+               "not a sell.",
     "HOLD": "Backtest: no edge either way on these days (most days).",
-    "LEAN": "Backtest: oversold WITHOUT market fear had no edge (2015–2026: +0.1% vs holding over 60 days, 90% range "
-            "−2.2% to +2.6%; 9,001 cases). The edge appears only once the VIX joins in.",
-    "TRIM": "Backtest (long side): the stock beat holding by +1.2% / 20 days after this setup: puts tend to give back.",
+    "TRIM": "Backtest: on fear-dip days held puts lost 7.9% (365-day) to 11.1% (180-day) of their value vs an average "
+            "day over 60 trading days (2015–2026): stocks tend to rebound.",
+    "ROLL": "Expiry, not decay: rolling early to escape time decay lost ~4% of the position to costs at every days-left "
+            "tested (90–365). Inside 30 days, decide: roll to 365+ days or close.",
 }
-# Probabilities per signal, 2015–2026 (unseen when the rules were set); scripts/backtest_signal/probs.py.
+# Probabilities per case, 2015–2026 (unseen when the rules were set); scripts/backtest_signal/probs.py.
 # p_up_N: stock up after N trading days · p_beat_N: beat simply holding it · p_option_profit_60: a 365-day 0.80Δ call
 # (stress costs) made money over 60 days · edge_60 / edge_lo / edge_hi: mean 60-day excess and its 90% range
 # (month-cluster bootstrap) · p_edge_positive: share of bootstrap draws with a positive mean edge.
-# ADD is conservative: the lower of the gated and the ungated fear-dip figures (the IV gate is partly hindsight).
 PROBS: Dict[str, Dict[str, Any]] = {
-    "ADD": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
-    "FEAR_IV_NORMAL": {"cases": 12717, "months": 67, "p_up_20": 0.571, "p_up_60": 0.603, "p_beat_20": 0.505, "p_beat_60": 0.489, "p_option_profit_60": 0.477, "edge_60": 0.0028, "edge_lo": -0.0176, "edge_hi": 0.0211, "p_edge_positive": 0.594},
-    "LEAN": {"cases": 9001, "months": 91, "p_up_20": 0.588, "p_up_60": 0.599, "p_beat_20": 0.522, "p_beat_60": 0.494, "p_option_profit_60": 0.484, "edge_60": 0.0014, "edge_lo": -0.0223, "edge_hi": 0.026, "p_edge_positive": 0.547},
-    "CAUTION": {"cases": 132692, "months": 117, "p_up_20": 0.549, "p_up_60": 0.579, "p_beat_20": 0.474, "p_beat_60": 0.461, "p_option_profit_60": 0.455, "edge_60": -0.0121, "edge_lo": -0.0253, "edge_hi": 0.0005, "p_edge_positive": 0.057},
-    "HOLD": {"cases": 200620, "months": 140, "p_up_20": 0.576, "p_up_60": 0.61, "p_beat_20": 0.496, "p_beat_60": 0.478, "p_option_profit_60": 0.475, "edge_60": 0.0028, "edge_lo": -0.009, "edge_hi": 0.0142, "p_edge_positive": 0.666},
-    "TRIM": {"cases": 28734, "months": 70, "p_up_20": 0.605, "p_up_60": 0.663, "p_beat_20": 0.542, "p_beat_60": 0.557, "p_option_profit_60": 0.54, "edge_60": 0.0358, "edge_lo": 0.0062, "edge_hi": 0.0658, "p_edge_positive": 0.977},
+    "ADD": {"cases": 28555, "months": 82, "p_up_20": 0.609, "p_up_60": 0.662, "p_beat_20": 0.546, "p_beat_60": 0.558, "p_option_profit_60": 0.542, "edge_60": 0.0363, "edge_lo": 0.0063, "edge_hi": 0.0663, "p_edge_positive": 0.98},
+    "LEAN": {"cases": 31547, "months": 139, "p_up_20": 0.579, "p_up_60": 0.608, "p_beat_20": 0.501, "p_beat_60": 0.483, "p_option_profit_60": 0.475, "edge_60": -0.0015, "edge_lo": -0.0143, "edge_hi": 0.0111, "p_edge_positive": 0.428},
+    "CAUTION": {"cases": 132653, "months": 117, "p_up_20": 0.549, "p_up_60": 0.579, "p_beat_20": 0.474, "p_beat_60": 0.461, "p_option_profit_60": 0.456, "edge_60": -0.0121, "edge_lo": -0.025, "edge_hi": 0.0005, "p_edge_positive": 0.057},
+    "HOLD": {"cases": 178248, "months": 140, "p_up_20": 0.576, "p_up_60": 0.61, "p_beat_20": 0.495, "p_beat_60": 0.478, "p_option_profit_60": 0.476, "edge_60": 0.0035, "edge_lo": -0.0087, "edge_hi": 0.0158, "p_edge_positive": 0.671},
+    "TRIM": {"cases": 28555, "months": 82, "p_up_20": 0.609, "p_up_60": 0.662, "p_beat_20": 0.546, "p_beat_60": 0.558, "p_option_profit_60": 0.542, "edge_60": 0.0363, "edge_lo": 0.0058, "edge_hi": 0.0652, "p_edge_positive": 0.977},
 }
 # Held 365-day 0.80Δ calls by their P&L (scripts/backtest_signal/holdsim.py + pnl_risk.py: 39,294 simulated positions,
 # checked monthly; this table is 2015–2026). Next 60 trading days, in shares of the ORIGINAL premium: p_lose_25_paid =
@@ -146,7 +132,9 @@ class Tape:
     dates: Sequence[str] = ()                # dates of `closes` (YYYY-MM-DD); aligns the VIX for the IV model
     vix_dates: Sequence[str] = ()
     legs: Sequence[Dict[str, Any]] = ()      # held options: otype, strike, expiry, dte, iv, mark, quantity, avg_price
-    shares: float = 0.0                      # shares held (stock page), with their average cost
+    shares: float = 0.0                      # shares held, with their average cost
+    held: bool = True                        # False: a ticker you don't hold (Buy / Wait / Don't buy yet)
+    symbol: str = ""
     avg_cost: Optional[float] = None
     rate: float = 0.045
 
@@ -182,6 +170,8 @@ class Signal:
     legs: List[Dict[str, Any]] = field(default_factory=list)   # per held option: dte, iv, theta, decay, roll
     probability: Optional[Dict[str, Any]] = None               # PROBS for this setup (`case`), from the backtest
     pnl: Optional[Dict[str, Any]] = None                       # the holding's P&L and its tested risk (never the verdict)
+    fear_score: Optional[float] = None                         # 0 … 1; ADD at ≥ SCORE_CUT
+    plan: Optional[Dict[str, Any]] = None                      # prices: buy / add trigger, VIX trigger, upside, exit line
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -431,7 +421,7 @@ def leg_decay(spot: float, leg: Dict[str, Any], iv_fallback: Optional[float], r:
     return {"label": f"{k:g}{'C' if ot == 'call' else 'P'} {leg.get('expiry') or ''}".strip(), "dte": round(dte),
             "iv": round(iv, 4), "delta": round(bs.delta(spot, k, T, iv, ot, r), 3), "value": round(p0, 2),
             "extrinsic_pct": round(max(p0 - intrinsic, 0.0) / p0, 3), "theta_day": round((p0 - p1) * 100 * q, 2),
-            "decay_20d": round(decay, 4), "roll": decay >= ROLL_DECAY, "warn": ROLL_WARN <= decay < ROLL_DECAY,
+            "decay_20d": round(decay, 4), "roll": dte <= EXPIRY_ROLL, "warn": EXPIRY_ROLL < dte <= EXPIRY_WARN,
             "iv_source": src}
 
 
@@ -531,77 +521,199 @@ def evaluate(t: Tape, exposure: float) -> Signal:
 
     vp = vix_percentile(t.vix)
     r14 = rsi(px)
-    m50 = sma(px, 50)
+    fs = fear_score(vp, r14)
+    m50, m200 = sma(px, 50), sma(px, 200)
     hi52 = max(px[-252:]) if px else None
     dd52 = t.spot / hi52 - 1.0 if hi52 else None
-    fear_dip = vp is not None and r14 is not None and r14 < ADD_RSI and vp >= ADD_VIX
+    fear_dip = fs is not None and fs >= SCORE_CUT
     calm = vp is not None and vp < CALM_VIX
     knife = calm and dd52 is not None and dd52 <= KNIFE_DD
     stretched = calm and m50 is not None and r14 is not None and 0.03 <= t.spot / m50 - 1.0 <= 0.15 and r14 > 65
     long = exposure >= 0
     iv_now, iv_norm, ivr = iv_model(px, t.vix, list(t.dates) + ([] if t.today_bar else ["9999-12-31"]) if t.dates else (),
                                     t.vix_dates)
-    # Conservative: with a live chain, the gate takes the lower of the model's ratio and the live ATM IV's ratio to
-    # the model's normal (the model reads realised vol, which a crash inflates; the chain may price less fear).
     live_ratio = (t.atm_iv / iv_norm) if (t.atm_iv and iv_norm) else None
-    gate_ratio = min(ivr, live_ratio) if (ivr is not None and live_ratio is not None) else ivr
-    iv_ok = gate_ratio is not None and gate_ratio >= IV_GATE
-    pairs = [(l, leg_decay(t.spot, l, t.atm_iv, t.rate, (iv_now, iv_norm))) for l in t.legs]
+    iv_ratio = min(ivr, live_ratio) if (ivr is not None and live_ratio is not None) else ivr      # context only
+    longs = [l for l in t.legs if (l.get("quantity") or 0) > 0]           # decay / P&L: only what you own
+    pairs = [(l, leg_decay(t.spot, l, t.atm_iv, t.rate, (iv_now, iv_norm))) for l in longs]
     legs = [d for _, d in pairs if d]
-    rolls = [d for d in legs if d["roll"]]
+    expiring = [d for d in legs if d["roll"]]
     if long:
-        verdict = "ADD" if (fear_dip and iv_ok) else "CAUTION" if (knife or stretched) else "HOLD"
+        verdict = "ADD" if fear_dip else "CAUTION" if (knife or stretched) else "HOLD"
     else:
         verdict = "TRIM" if fear_dip else "HOLD"
-    case = ("TRIM" if (not long and fear_dip) else "ADD" if verdict == "ADD" else
-            "FEAR_IV_NORMAL" if (long and fear_dip) else "CAUTION" if verdict == "CAUTION" else
-            "LEAN" if (long and score >= 50 and r14 is not None and r14 < ADD_RSI and vp is not None) else "HOLD")
-    if rolls and verdict != "TRIM":
+    lean = long and verdict == "HOLD" and r14 is not None and r14 < ADD_RSI and vp is not None
+    case = ("TRIM" if verdict == "TRIM" else "ADD" if verdict == "ADD" else "CAUTION" if verdict == "CAUTION"
+            else "LEAN" if lean else "HOLD")
+    if expiring and verdict != "TRIM":
         verdict = "ROLL"
 
     lv, em = levels(t, px)
     sup, res = _nearest(lv, t.spot, True), _nearest(lv, t.spot, False)
-    m200 = sma(px, 200)
-    stop = round(m200, 2) if (calm and m200 and long and t.spot > m200) else None
+    stop = round(m200, 2) if (calm and m200 and long and t.held and t.spot > m200) else None
     add_at, target = ((sup["price"] if sup else None), (res["price"] if res else None)) if long else \
                      ((res["price"] if res else None), (sup["price"] if sup else None))
+    pl = plan(t, px, vp, r14, fs, case, long, sup, res, m200, calm, hi52, knife, stretched, legs)
+    if pl.get("buy_below") is not None:
+        add_at = pl["buy_below"]
 
-    def at(x):
-        return f"{_px(x['price'])} ({x['label']})"
+    buy, held = (not t.held), t.held
+    trig = pl.get("trigger_text")
     if verdict == "ROLL":
-        worst = max(rolls, key=lambda d: d["decay_20d"])
-        head = (f"Roll the {worst['label']}: {worst['dte']} days left, losing {worst['decay_20d']:.1%} per 20 trading days "
-                f"to time; roll to {ADD_MIN_DTE}+ days")
-        if fear_dip and iv_ok:
+        worst = min(expiring, key=lambda d: d["dte"])
+        head = f"Roll or close the {worst['label']}: {worst['dte']} days left (expiry, not decay); roll to {ADD_MIN_DTE}+ days"
+        if fear_dip:
             head += " (fear dip: a good moment to roll and add)"
     elif verdict == "ADD":
-        head = (f"Add: fear dip with the stock's IV elevated ({gate_ratio:.2f}× normal); use {ADD_MIN_DTE}+ days, "
-                f"~{ADD_DELTA:.2f}Δ, plan to hold {ADD_HOLD_DAYS}+ trading days")
+        head = (f"{'Buy' if buy else 'Add'}: fear dip (score {fs:.2f} ≥ {SCORE_CUT:.2f}); a third now, the next ≥ {TRANCHE_GAP} "
+                f"trading days later if it holds; calls {ADD_MIN_DTE}+ days ~{ADD_DELTA:.2f}Δ, hold {ADD_HOLD_DAYS}+ trading days")
     elif verdict == "CAUTION":
-        head = ("Don't add: stock-specific weakness in a calm market" if knife else "Don't add: stretched in a calm market")
+        why = "stock-specific weakness in a calm market" if knife else "stretched in a calm market"
+        head = f"{'Don’t buy yet' if buy else 'Don’t add'}: {why}" + (f"; clears {pl['clears_text']}" if pl.get("clears_text") else "")
     elif verdict == "TRIM":
         head = "Take profit on the puts: fear dip, rebounds are likely"
-    elif long and fear_dip:
-        head = ("Hold: fear dip, but the stock's own IV isn't elevated" + (f" ({gate_ratio:.2f}× normal)" if gate_ratio else " (no IV history)")
-                + ": thin edge on the options after costs")
-    elif long and score >= 50 and r14 is not None and r14 < ADD_RSI and vp is not None:
-        lvl = vix_add_level(t.vix)
-        head = "Hold: oversold, but the market isn't scared" + (
-            f"; ADD if VIX closes ≥ {lvl:.1f}" if (lvl and iv_ok) else
-            f", and the stock's own IV isn't elevated ({gate_ratio:.2f}× normal, ADD needs {IV_GATE:.1f}×)" if gate_ratio else "")
+    elif lean:
+        head = (f"{'Wait' if buy else 'Hold'}: oversold (RSI {r14:.0f}) but the market isn't scared enough "
+                f"(VIX {vp:.0%} pct)") + (f". {'Buy' if buy else 'Add'} {trig}" if trig else "")
+    elif not long:
+        head = "Hold the puts: no fear dip" + (f" · take profit {trig}" if trig else "")
     else:
-        head = "Hold: no edge right now" + (f" · support {_px(sup['price'])}" if sup else "") + (f", resistance {_px(res['price'])}" if res else "")
+        head = (f"{'Wait' if buy else 'Hold'}: no edge right now") + (f". {'Buy' if buy else 'Add'} {trig}" if trig else "")
     if vp is None or r14 is None:
         head += " (no VIX / history: verdict not tested)"
 
     return Signal(score, bias, verdict, "long" if long else "short", head, sup, res, stop, add_at, target,
                   [{"key": r.key, "score": round(r.score, 2), "weight": WEIGHTS[r.key], "value": r.value, "note": r.note,
                     "tested": r.key in TESTED} for r in reads], lv, em, _r(vp),
-                  EVIDENCE["LEAN" if head.startswith("Hold: oversold") else
-                           "FEAR_IV_NORMAL" if head.startswith("Hold: fear dip") else verdict],
-                  _r(iv_now), _r(iv_norm), _r(gate_ratio), legs,
+                  EVIDENCE[case if verdict != "ROLL" else "ROLL"],
+                  _r(iv_now), _r(iv_norm), _r(iv_ratio), legs,
                   dict(PROBS[case], case=case) if (vp is not None and r14 is not None) else None,
-                  position_pnl(t, pairs))
+                  position_pnl(t, pairs), _r(fs), pl)
+
+
+def fear_score(vp: Optional[float], r14: Optional[float]) -> Optional[float]:
+    """0 … 1: market fear (VIX percentile over its median) × how oversold the stock is (RSI under 50)."""
+    if vp is None or r14 is None:
+        return None
+    return _clip((vp - 0.5) / 0.5, 0.0, 1.0) ** 1.5 * _clip((50.0 - r14) / 30.0, 0.0, 1.0)
+
+
+def vix_at_pct(vix: Sequence[float], p: float) -> Optional[float]:
+    """About the VIX close that would rank at percentile `p` of the last year."""
+    v = sorted(float(x) for x in list(vix)[-252:] if _ok(x))
+    if len(v) < 126 or not 0 < p <= 1:
+        return None
+    return v[min(len(v) - 1, max(0, math.ceil(p * len(v)) - 1))]
+
+
+def price_for_rsi(prior: Sequence[float], target: float, spot: float) -> Optional[float]:
+    """The highest close today that puts RSI(14) at or under `target` (`prior`: closes before today). None if out of reach."""
+    now = rsi(list(prior) + [spot])
+    if now is None:
+        return None
+    if now <= target:
+        return spot
+    lo, hi = spot * 0.3, spot
+    if (rsi(list(prior) + [lo]) or 100) > target:
+        return None
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if (rsi(list(prior) + [mid]) or 100) <= target:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def plan(t: Tape, px: List[float], vp: Optional[float], r14: Optional[float], fs: Optional[float], case: str, long: bool,
+         sup: Optional[Dict[str, Any]], res: Optional[Dict[str, Any]], m200: Optional[float], calm: bool,
+         hi52: Optional[float], knife: bool, stretched: bool, legs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Prices for the decision: when it would turn ADD (by price, by VIX), the upside, the exit line, what clears a
+    CAUTION, and the covered-call adjustment. `lines`: the plain-language plan, held or not."""
+    out: Dict[str, Any] = {"lines": []}
+    L = out["lines"]
+    buy = not t.held
+    verb = "Buy" if buy else "Add"
+    if vp is None or r14 is None or fs is None:
+        return out
+    fv = _clip((vp - 0.5) / 0.5, 0.0, 1.0) ** 1.5
+    fr = _clip((50.0 - r14) / 30.0, 0.0, 1.0)
+    parts = []
+    if case not in ("ADD", "TRIM"):
+        if fv >= SCORE_CUT:                                      # price alone can get there at today's VIX
+            need_rsi = 50.0 - 30.0 * (SCORE_CUT / fv)
+            p = price_for_rsi(px[:-1], need_rsi, t.spot)
+            if p and p < t.spot:
+                out.update(buy_below=round(p, 2), buy_rsi=round(need_rsi, 1))
+                parts.append(f"if {t.symbol or 'it'} closes ≤ {_px(p)} ({p / t.spot - 1:+.1%}, RSI ≤ {need_rsi:.0f}) with the VIX where it is")
+        if fr > 0:
+            need_p = 0.5 + 0.5 * (SCORE_CUT / fr) ** (2 / 3)
+            vx = vix_at_pct(t.vix, need_p) if need_p <= 1 else None
+            if vx and t.vix and vx > float(t.vix[-1]):
+                out.update(vix_trigger=round(vx, 2), vix_pct_needed=round(need_p, 3))
+                parts.append(f"if the VIX closes ≥ {vx:.1f} (now {float(t.vix[-1]):.1f}) with the price here")
+        if parts:
+            out["trigger_text"] = " or ".join(parts)
+        elif fr == 0:
+            out["trigger_text"] = f"once RSI is under 50 (now {r14:.0f}) and the VIX is above its median"
+    if not long:                                                 # long puts / net short
+        L.append("Take profit on the puts if " + (out.get("trigger_text") or "a fear dip comes") + ": on fear dips held puts lost "
+                 "7.9–11.1% of value vs an average day over 60 days (2015–2026).")
+        return out
+    if case == "ADD":
+        L.append(f"{verb} in thirds: one third now, the next ≥ {TRANCHE_GAP} trading days later only if the signal is still on, at most "
+                 f"{TRANCHES}. In 2008 and 2022 this kept the loss to about a fifth of going in all at once.")
+    elif out.get("trigger_text"):
+        L.append(f"{verb} signal {out['trigger_text']}.")
+    if sup:
+        L.append(f"Nearest support {_px(sup['price'])} ({sup['label']}, {sup['distance']:+.1%})"
+                 + (": a level, not a tested buy point." if case != "ADD" else "."))
+    if case == "CAUTION":
+        clears = []
+        if knife and hi52:
+            clears.append(f"above {_px(hi52 * (1 + KNIFE_DD))} (within 10% of the 52-week high)")
+        if stretched:
+            clears.append("once RSI cools under 65")
+        lvl = vix_at_pct(t.vix, CALM_VIX)
+        if lvl:
+            clears.append(f"or if the VIX closes ≥ {lvl:.1f} (market no longer calm)")
+        out["clears_text"] = " ".join(clears)
+        L.append(f"{'Don’t buy yet' if buy else 'Don’t add'}: clears {out['clears_text']}.")
+    if t.held:
+        if res:
+            out["upside"] = res["price"]
+            L.append(f"Upside: resistance {_px(res['price'])} ({res['label']}, {res['distance']:+.1%}). Hold through it: strength "
+                     "didn't predict falls in the backtest, so there is no tested sell price; trimming there is a risk choice.")
+        if m200 and calm and t.spot > m200:
+            out["exit_below"] = round(m200, 2)
+            L.append(f"Exit line: a close under the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) while the market is calm came "
+                     f"before {EXIT_DROP_60:+.1%} vs holding over 60 days (t −2.8). Weak edge: a reason to cut, not a crash call.")
+        elif m200 and calm:
+            out["exit_below"] = round(m200, 2)
+            L.append(f"Under the 200-day ({_px(m200)}) in a calm market: such days ran −1.5% vs holding over 60 days (t −2.5). "
+                     f"Reclaiming {_px(m200)} clears it.")
+        elif m200 and vp >= ADD_VIX:
+            L.append(f"No exit on breaks while the market is scared: closes under the 200-day ({_px(m200)}) during fear came "
+                     "before +3.6% vs holding over 60 days.")
+        elif m200:
+            L.append(f"Exit line: the 200-day ({_px(m200)}, {m200 / t.spot - 1:+.1%}) once the market calms (VIX under its 60th pct).")
+        shorts = [l for l in t.legs if (l.get("quantity") or 0) < 0 and l.get("otype") == "call"]
+        if t.shares > 0 or shorts:
+            if case == "ADD" or (vp >= ADD_VIX and r14 < ADD_RSI):
+                out["covered_call"] = "0.15"
+                L.append("Covered calls: on a fear dip sell 0.15Δ instead of 0.30Δ (+0.33% of the stock a month, t 3.9) or skip "
+                         "the month (+0.23%, t 2.8); 0.50Δ cost −0.85%.")
+            elif case == "CAUTION":
+                out["covered_call"] = "0.30"
+                L.append("Covered calls: keep 0.30Δ or further; going closer to the money (0.50Δ) paid −0.24% a month vs 0.30Δ "
+                         "in calm weakness (t −1.8).")
+            else:
+                out["covered_call"] = "0.30"
+                L.append("Covered calls: 0.30Δ as usual; 0.50Δ ran −0.39% of the stock a month vs 0.30Δ across all days.")
+        if legs:
+            L.append("Long calls: time decay alone is not a reason to roll (same-delta rolls lost ~4% of the position to costs "
+                     f"at every days-left 90–365); decide inside {EXPIRY_ROLL} days of expiry.")
+    return out
 
 
 def _r(x: Optional[float]) -> Optional[float]:
@@ -609,8 +721,10 @@ def _r(x: Optional[float]) -> Optional[float]:
 
 
 def reasons(sig: Signal) -> List[str]:
-    """Plain-language lines for the desk's ticket."""
-    out = [sig.evidence] if sig.evidence else []
+    """Plain-language lines for the desk's ticket: the plan (prices) first, then the odds and the reads."""
+    out = list((sig.plan or {}).get("lines") or [])
+    if sig.evidence:
+        out.append(sig.evidence)
     p = sig.probability
     if p:
         if sig.side == "long":
@@ -621,13 +735,15 @@ def reasons(sig: Signal) -> List[str]:
         else:
             out.insert(0, f"Odds (2015–2026, unseen): stock up in 60 days {p['p_up_60']:.0%} (bad for the puts); "
                           f"chance that tilt is real {p['p_edge_positive']:.0%}.")
+    if sig.fear_score is not None:
+        out.append(f"Fear score {sig.fear_score:.2f} (ADD at ≥ {SCORE_CUT:.2f}): VIX percentile × how oversold the stock is.")
     if sig.pnl:
         out.append(sig.pnl["note"])
     if sig.iv_ratio is not None:
-        out.append(f"Stock IV {sig.iv_ratio:.2f}× its 5-year normal ({sig.iv_normal:.0%}; model now {sig.iv_model:.0%}, "
-                   f"the lower of model and live chain counts); ADD needs ≥ {IV_GATE:.1f}×.")
+        out.append(f"Stock IV {sig.iv_ratio:.2f}× its 5-year normal ({sig.iv_normal:.0%}; model now {sig.iv_model:.0%}). "
+                   "Context only: an IV gate chosen on 1995–2014 data added nothing.")
     for d in sig.legs:
-        tag = " → roll" if d["roll"] else " → roll soon" if d["warn"] else ""
+        tag = " → roll or close" if d["roll"] else " → expiry within 60 days" if d["warn"] else ""
         out.append(f"{d['label']}: {d['dte']} days left, IV {d['iv']:.0%}{' (model: no quote)' if d['iv_source'] == 'model' else ''}, Δ {d['delta']:.2f}, "
                    f"{d['extrinsic_pct']:.0%} time value; loses {d['decay_20d']:.1%} per 20 trading days "
                    f"(${abs(d['theta_day']):,.0f}/day){tag}.")
@@ -638,10 +754,6 @@ def reasons(sig: Signal) -> List[str]:
         if sig.resistance:
             parts.append(f"resistance {_px(sig.resistance['price'])} ({sig.resistance['label']}, {sig.resistance['distance']:+.1%})")
         out.append("Levels: " + "; ".join(parts) + ".")
-    if sig.stop:
-        out.append(f"Risk line: a calm-market close under the 200-day average ({_px(sig.stop)}) has come before weaker returns.")
-    elif sig.vix_pct is not None and sig.vix_pct >= ADD_VIX:
-        out.append("No stop during market fear: closes under support in fear have rebounded (+1.8–2.7% vs holding over 20 days).")
     if sig.expected_move:
         out.append(f"Expected move from IV: ±{_px(sig.expected_move['day'])} today, ±{_px(sig.expected_move['week'])} this week.")
     out += [r["note"] for r in sig.reads if r["tested"]]

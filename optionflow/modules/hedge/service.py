@@ -432,7 +432,7 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
     gx = _gex(sym)
     ctx = Context(sym, spot, avg_cost, day_change, _track_high(sym, spot), ivs.atm_iv or atm_iv, hv.get("hv20"),
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
-    tape = _tape(sym, ivs, hv, gx) if is_long_options_only(legs) else None
+    tape = _tape(sym, ivs, hv, gx)                     # every holding gets the signal (T-91)
     book = evaluate(ctx, legs, quotes, rules, chain_quotes, tape).to_dict()
     book.update({
         "spot": round(spot, 4), **day, "day_high": ctx.day_high,
@@ -446,69 +446,78 @@ def build_book(sym: str, legs: List[Leg], avg_cost: Optional[float], accounts: L
 
 
 # ── The signal for any ticker (stock page) ───────────────────────────────────
-# Labels by what you hold: an entry decision when you hold nothing, an add decision when you hold it long.
+# Labels by what you hold: a buy decision when you hold nothing, an add / hold decision when you do.
 LABELS = {
-    "none": {"ADD": "Enter", "HOLD": "Wait", "CAUTION": "Don't enter", "TRIM": "Take profit", "ROLL": "Roll"},
+    "none": {"ADD": "Buy", "HOLD": "Wait", "CAUTION": "Don't buy yet", "TRIM": "Take profit", "ROLL": "Roll"},
     "long": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll"},
     "short": {"ADD": "Add", "HOLD": "Hold", "CAUTION": "Don't add", "TRIM": "Take profit", "ROLL": "Roll"},
 }
 
 
+def held_kind(legs: List[Leg]) -> str:
+    """none | stock | long_options | options (sold or mixed options, no shares) | mixed (shares + options)."""
+    shares = any(l.kind == "stock" and l.quantity > 0 for l in legs)
+    opts = [l for l in legs if l.kind == "option"]
+    if not shares and not opts:
+        return "none"
+    if is_long_options_only(legs):
+        return "long_options"
+    return ("mixed" if opts else "stock") if shares else "options"
+
+
 def signal_for(user_id: int, sym: str) -> Dict[str, Any]:
-    """The desk's signal for `sym`. If the user holds only long options in it, this is exactly the Hedge desk's book
-    signal (same code path, same legs). Otherwise the same signal on market data alone, read for a long position:
-    holding shares → Add / Hold / Don't add; holding nothing (or a strategy book) → Enter / Wait / Don't enter."""
+    """The desk's signal for `sym`. Held in any form: exactly the Hedge desk's book signal (same code path, same legs),
+    read for the book's net side. Not held: the same read as a buy decision (Buy / Wait / Don't buy yet) with prices."""
     sym = sym.strip().upper()
-    held, legs, avg = "none", [], None
     try:
         g = group_legs(list_positions(user_id)).get(sym)
     except Exception:
         logger.exception("signal %s: positions failed", sym)
         g = None
-    if g:
-        legs, avg = g["legs"], g["avg_cost"]
-        if is_long_options_only(legs):
-            book = build_book(sym, legs, avg, g["accounts"], _rules_for(user_id))
-            if book.get("error") or not book.get("signal"):
-                return {"symbol": sym, "held": "long_options", "error": book.get("error") or "No signal."}
-            side = book["signal"]["side"]
-            return {"symbol": sym, "held": "long_options", "spot": book.get("spot"), "day_change": book.get("day_change"),
-                    "label": LABELS[side][book["signal"]["verdict"]], "signal": book["signal"],
-                    "reasons": (book.get("suggestion") or {}).get("reasons") or [], "error": None}
-        held = "stock" if any(l.kind == "stock" and l.quantity > 0 for l in legs) else "none"
+    if g and g["legs"]:
+        kind = held_kind(g["legs"])
+        book = build_book(sym, g["legs"], g["avg_cost"], g["accounts"], _rules_for(user_id))
+        if book.get("error") or not book.get("signal"):
+            return {"symbol": sym, "held": kind, "error": book.get("error") or "No signal."}
+        side = book["signal"]["side"]
+        from optionflow.modules.hedge import signal as sg
+        sig = _signal_obj(book["signal"])
+        return {"symbol": sym, "held": kind, "spot": book.get("spot"), "day_change": book.get("day_change"),
+                "label": LABELS[side][book["signal"]["verdict"]], "signal": book["signal"],
+                "reasons": sg.reasons(sig) if sig else [], "error": None}
+    return signal_unheld(sym)
+
+
+def signal_unheld(sym: str) -> Dict[str, Any]:
+    """The read for a ticker you don't hold: Buy / Wait / Don't buy yet, with the prices that would change it."""
     spot = _spot(sym)
     if not spot:
-        return {"symbol": sym, "held": held, "error": f"No price for {sym} right now."}
+        return {"symbol": sym, "held": "none", "error": f"No price for {sym} right now."}
     chain = _chain(sym) or {}
     day = _day_fields(sym, spot)
     ivs = TRACKER.state(sym, day["day_change"])
     hv, gx = _hv(sym), _gex(sym)
-    ctx = Context(sym, spot, avg, day["day_change"], _track_high(sym, spot), ivs.atm_iv or chain.get("atm_iv"), hv.get("hv20"),
+    ctx = Context(sym, spot, None, day["day_change"], _track_high(sym, spot), ivs.atm_iv or chain.get("atm_iv"), hv.get("hv20"),
                   ivs.spike, ivs.cooling, gx.get("net_gex"), gx.get("king"), gx.get("put_wall"), gx.get("call_wall"))
     from optionflow.modules.hedge.suggest import stock_signal
     tape = _tape(sym, ivs, hv, gx)
-    if tape is not None and held == "stock":
-        tape.shares = sum(l.quantity for l in legs if l.kind == "stock" and l.quantity > 0)
-        tape.avg_cost = avg
+    if tape is not None:
+        tape.held = False
     sig = stock_signal(ctx, 1.0, tape, None)
     from dataclasses import asdict
     from optionflow.modules.hedge import signal as sg
     out = _clean(asdict(sig))
-    reasons = sg.reasons(sig)
-    if held == "none":                                 # say it as an entry decision
-        out["headline"] = entry_phrasing(out["headline"])
-        reasons = [entry_phrasing(r) for r in reasons]
-    return {"symbol": sym, "held": held, "spot": round(spot, 4), "day_change": day["day_change"],
-            "label": LABELS["long" if held == "stock" else "none"][out["verdict"]], "signal": out, "reasons": reasons,
-            "error": None}
+    return {"symbol": sym, "held": "none", "spot": round(spot, 4), "day_change": day["day_change"],
+            "label": LABELS["none"][out["verdict"]], "signal": out, "reasons": sg.reasons(sig), "error": None}
 
 
-def entry_phrasing(text: str) -> str:
-    """The desk's wording ("Add: …", "Hold: …", "Don't add: …") as an entry decision for a ticker not held."""
-    for a, b in (("Add: ", "Enter: "), ("Hold: ", "Wait: "), ("Don't add: ", "Don't enter: "), ("; ADD if VIX", "; ENTER if VIX"),
-                 ("ADD needs", "ENTER needs")):
-        text = text.replace(a, b) if a.startswith(";") or "needs" in a else (b + text[len(a):] if text.startswith(a) else text)
-    return text
+def _signal_obj(d: Dict[str, Any]) -> Any:
+    """A Signal back from its dict (for reasons())."""
+    from optionflow.modules.hedge import signal as sg
+    try:
+        return sg.Signal(**d)
+    except TypeError:
+        return None
 
 
 def _clean(x: Any) -> Any:

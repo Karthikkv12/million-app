@@ -1,5 +1,6 @@
 "use client";
-/** The desk's signal on the stock page, for any ticker: Enter / Wait / Don't enter, or Add / Hold / Roll when held. */
+/** The desk's signal on the stock page, for any ticker: Buy / Wait / Don't buy yet with the prices that would change it,
+ *  or Add / Hold / Don't add with the add trigger, upside and exit line when held (any form: shares, options, mixed). */
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { fetchStockSignal, StockSignal as StockSignalT } from "@/lib/api";
@@ -21,8 +22,8 @@ export function StockSignal({ symbol }: { symbol: string }) {
     <span className="flex min-w-0 flex-wrap items-center gap-2" data-testid="stock-signal">
       <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/45">Signal</span>
       <SignalBadge signal={g} label={data.label} reasons={data.reasons} />
-      <span className="min-w-0 truncate text-[12.5px] text-foreground/65">{g.headline}</span>
-      {data.held === "long_options" && <Link href="/hedge" className="text-[12px] text-accent hover:underline">On your Hedge desk</Link>}
+      <span className="min-w-0 text-[12.5px] leading-snug text-foreground/65">{g.headline}</span>
+      {data.held !== "none" && <Link href="/hedge" className="text-[12px] text-accent hover:underline">On your Hedge desk</Link>}
     </span>
   );
 }
