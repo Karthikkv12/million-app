@@ -3126,3 +3126,10 @@ Re: C-125 (releases its claims). No migration (head 0013). API change: `SignalOu
 - **Checks:** pytest **954 passed** (6 new in `tests/hedge/test_signal.py`; two old tests now use a calm drop *above* the 200-day for CAUTION). `tsc` + eslint clean. Pop-up rendered at iPhone width with a mocked EXIT signal: fits, plan leads with the exit.
 - **Not checked:** the owner's real books; the Hedge desk table rendered.
 - **After deploy:** please report how many of the owner's books read EXIT, and the VIX percentile at that time.
+
+### C-127 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land with C-124 / C-126; nextjs restart covers it)
+Owner screenshot: the Portfolio tab bar scrolled up/down on iPhone.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `48b2f51` (on top of 6e51d6f / C-126). Frontend only, no API change.
+- **Cause:** sideways-scrolling tab strips gave each tab `-mb-px` to overlap the strip's border; `overflow-x: auto` forces `overflow-y: auto`, so that 1px became a vertical scroll. Fixed in Portfolio, Watchlist list tabs, Research and Flow layouts: border → `inset` box-shadow, no `-mb-px`, `overflow-y-hidden`.
+- **Checks:** iPhone 13 emulation, mocked data: before, the Portfolio nav had 1px vertical scroll; after, 0 vertically scrollable boxes on `/portfolio/watchlist`, `/catalyst/signals`, `/options-flow`. Underline looks the same. `tsc` + eslint clean.
+- **Not checked:** the owner's iPhone with real data.
