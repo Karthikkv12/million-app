@@ -155,6 +155,8 @@ def test_history_request_skips_bar_sizes_public_rejects_for_the_period():
     assert history_request("5d", "5m") == ("WEEK", "FIVE_MINUTES", ("sessions", 5))
     assert history_request("1mo", "1h") == ("MONTH", "ONE_HOUR", None)
     assert history_request("3mo", "1d") == ("QUARTER", "ONE_DAY", None)
+    assert history_request("10y", "1d") is None          # TEN_YEARS/ONE_DAY → 400 on Public, so Yahoo
+    assert history_request("5y", "1d") == ("FIVE_YEARS", "ONE_DAY", None)
 
 
 def test_parse_bars_regular_session_in_utc():

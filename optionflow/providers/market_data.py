@@ -13,6 +13,8 @@ Tests install a fake with `use_market_data(fake)`.
 """
 from __future__ import annotations
 
+import threading
+
 from typing import Any, Dict, List, NamedTuple, Optional, Protocol
 
 import pandas as pd
@@ -81,26 +83,43 @@ class MarketDataProvider(Protocol):
 
 _override: Optional[MarketDataProvider] = None
 _default: Optional[MarketDataProvider] = None
+_default_lock = threading.Lock()
 
 
 def get_market_data() -> MarketDataProvider:
-    """The active market-data provider."""
-    global _default
+    """The active market-data provider: built once, under a lock, and published only when complete.
+
+    Without the lock, the workers' first calls at startup raced: a thread could see the half-built Yahoo provider,
+    or wrap another thread's Public-first provider as its "fallback" (Public-first inside Public-first), and each
+    racer made its own PublicClient with its own 8/s pacer, so together they could exceed Public's limit."""
     if _override is not None:
         return _override
-    if _default is None:
-        from optionflow.providers.yahoo import YahooMarketData
-        _default = YahooMarketData()
-        from optionflow.core.settings import get_settings
-        s = get_settings()
-        if s.public_api_secret:
-            from optionflow.providers.public import (
-                PublicClient, PublicHistory, PublicOptionChains, PublicQuotes,
-            )
-            client = PublicClient(s.public_api_secret, s.public_account_id)
-            _default = PublicFirstMarketData(PublicOptionChains(client), _default, PublicQuotes(client),
-                                             PublicHistory(client))
-    return _default
+    d = _default
+    if d is not None:
+        return d
+    with _default_lock:
+        if _default is None:
+            _set_default(_build_default())
+        return _default
+
+
+def _set_default(provider: MarketDataProvider) -> None:
+    global _default
+    _default = provider
+
+
+def _build_default() -> MarketDataProvider:
+    from optionflow.providers.yahoo import YahooMarketData
+    yahoo = YahooMarketData()
+    from optionflow.core.settings import get_settings
+    s = get_settings()
+    if not s.public_api_secret:
+        return yahoo
+    from optionflow.providers.public import (
+        PublicClient, PublicHistory, PublicOptionChains, PublicQuotes,
+    )
+    client = PublicClient(s.public_api_secret, s.public_account_id)
+    return PublicFirstMarketData(PublicOptionChains(client), yahoo, PublicQuotes(client), PublicHistory(client))
 
 
 class PublicFirstMarketData:
