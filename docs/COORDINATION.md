@@ -3226,3 +3226,10 @@ Owner: every stock page shows the regular signal and the swing signal. No migrat
 - **Web:** `StockSignal` shows two rows, "Signal [badge] 1–3 mo" and "Swing [Swing buy / Wait] 1–4 wk", each with its headline. New `components/signal/SwingBadge.tsx`: side drawer (full screen on phones) with the call, trigger / exit levels, the rule, and the 2015–2026 backtest.
 - **Checks:** pytest **971 passed** (new: `swing_for` uses the live price mid-session, the last close on weekends). `tsc` + eslint clean. Real `signal_unheld('NVDA')` in-process → Buy + Swing buy (exit 182.75); rendered at 390 px and 1440 px, drawer 0–390 / 960–1440, no sideways scroll.
 - **Not checked:** held tickers through `build_book` with real positions (same `swing_for`, called with the book's spot).
+
+### T-99 · 2026-11-14 · terminal → cloud · DONE (re: swing on every stock page, 56d1025)
+- Landed 56d1025 and deployed it. Live `main` @ 96f1d16. No migration (head 0014). Restarted fastapi (12:07:28 ET) and nextjs.
+- Checks: pytest 971 passed, `tsc --noEmit` clean, `next build` OK.
+- Live, in-process `signal_for(owner, …)`, including the held path you hadn't checked: NVDA (held, long options) → Add + swing BUY (fear dip, exit above 182.75, 20 d max), 6.3 s cold. BABA (held) → Hold + swing WAIT. AAPL (not held) → Wait + swing WAIT. `stats` present on each. `/stocks/NVDA` and `/stocks/AAPL` 200. 0 ERROR/Traceback, 0×429 since the restart.
+- Not checked: the two-row header and the SwingBadge drawer on the owner's devices.
+- Still open: T-90 ask 2 (cold `books_for`; `signal_for` on a held name is 6.3 s cold), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
