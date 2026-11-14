@@ -13562,6 +13562,17 @@
       ],
       "title": "Spot"
      },
+     "swing": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingReadOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Swing read, 1 week \u2013 1 month (None without 200 days of history)"
+     },
      "symbol": {
       "title": "Symbol",
       "type": "string"
@@ -14224,6 +14235,86 @@
      "spike"
     ],
     "title": "SwingPoint",
+    "type": "object"
+   },
+   "SwingReadOut": {
+    "description": "The swing read (hedge.swing): 1 week \u2013 1 month, its own backtest.",
+    "properties": {
+     "buy_below": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "A close at or under this would make it a swing buy",
+      "title": "Buy Below"
+     },
+     "drop": {
+      "description": "\u2265 5% down in 5 days above the 200-day",
+      "title": "Drop",
+      "type": "boolean"
+     },
+     "exit_above": {
+      "description": "Sell at the first close above the 10-day average (today's value)",
+      "title": "Exit Above",
+      "type": "number"
+     },
+     "fear": {
+      "description": "Fear dip (the 1\u20133 month Add)",
+      "title": "Fear",
+      "type": "boolean"
+     },
+     "max_days": {
+      "default": 20,
+      "description": "\u2026or after this many trading days",
+      "title": "Max Days",
+      "type": "integer"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "ret5": {
+      "description": "5-day change",
+      "title": "Ret5",
+      "type": "number"
+     },
+     "stats": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SwingStatsSetOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "verdict": {
+      "enum": [
+       "BUY",
+       "WAIT"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     },
+     "vs_200d": {
+      "title": "Vs 200D",
+      "type": "number"
+     }
+    },
+    "required": [
+     "verdict",
+     "reason",
+     "exit_above",
+     "ret5",
+     "vs_200d",
+     "fear",
+     "drop"
+    ],
+    "title": "SwingReadOut",
     "type": "object"
    },
    "SwingStats": {

@@ -6670,6 +6670,8 @@ export interface components {
             signal?: components["schemas"]["SignalOut"] | null;
             /** Spot */
             spot?: number | null;
+            /** @description Swing read, 1 week – 1 month (None without 200 days of history) */
+            swing?: components["schemas"]["SwingReadOut"] | null;
             /** Symbol */
             symbol: string;
         };
@@ -6969,6 +6971,53 @@ export interface components {
              * @description Close vs the lowest close of the last `lookback` sessions (≥ 0, decimal)
              */
             spike: number;
+        };
+        /**
+         * SwingReadOut
+         * @description The swing read (hedge.swing): 1 week – 1 month, its own backtest.
+         */
+        SwingReadOut: {
+            /**
+             * Buy Below
+             * @description A close at or under this would make it a swing buy
+             */
+            buy_below?: number | null;
+            /**
+             * Drop
+             * @description ≥ 5% down in 5 days above the 200-day
+             */
+            drop: boolean;
+            /**
+             * Exit Above
+             * @description Sell at the first close above the 10-day average (today's value)
+             */
+            exit_above: number;
+            /**
+             * Fear
+             * @description Fear dip (the 1–3 month Add)
+             */
+            fear: boolean;
+            /**
+             * Max Days
+             * @description …or after this many trading days
+             * @default 20
+             */
+            max_days: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Ret5
+             * @description 5-day change
+             */
+            ret5: number;
+            stats?: components["schemas"]["SwingStatsSetOut"] | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "BUY" | "WAIT";
+            /** Vs 200D */
+            vs_200d: number;
         };
         /** SwingStats */
         SwingStats: {

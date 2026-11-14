@@ -465,6 +465,32 @@ def held_kind(legs: List[Leg]) -> str:
     return ("mixed" if opts else "stock") if shares else "options"
 
 
+def swing_for(sym: str, spot: Optional[float], fear_buy_below: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """The swing read (hedge.swing: 1 week – 1 month) for any ticker, on the same cached daily bars and VIX as the
+    signal. During the session the live price stands in for today's close. None without 200 days of history."""
+    try:
+        from optionflow.modules.hedge import swing as sw
+        bars = _daily_bars(sym)
+        if not bars:
+            return None
+        closes = [b["close"] for b in bars]
+        today, frac = _session_frac()
+        live = bars[-1]["date"] == today.isoformat()
+        if spot:
+            if live:
+                closes[-1] = float(spot)
+            elif 0.0 < frac < 1.0:                 # session open, today's bar not in yet
+                closes.append(float(spot))
+                live = True
+        r = sw.read(closes, [b["close"] for b in _daily_bars(VIX)], live=live, fear_buy_below=fear_buy_below)
+        if r is not None:
+            r["stats"] = sw.STATS
+        return r
+    except Exception:
+        logger.exception("swing read for %s failed", sym)
+        return None
+
+
 def signal_for(user_id: int, sym: str) -> Dict[str, Any]:
     """The desk's signal for `sym`. Held in any form: exactly the Hedge desk's book signal (same code path, same legs),
     read for the book's net side. Not held: the same read as a buy decision (Buy / Wait / Don't buy yet) with prices."""
@@ -484,7 +510,8 @@ def signal_for(user_id: int, sym: str) -> Dict[str, Any]:
         sig = _signal_obj(book["signal"])
         return {"symbol": sym, "held": kind, "spot": book.get("spot"), "day_change": book.get("day_change"),
                 "label": LABELS[side][book["signal"]["verdict"]], "signal": book["signal"],
-                "reasons": sg.reasons(sig) if sig else [], "error": None}
+                "reasons": sg.reasons(sig) if sig else [], "error": None,
+                "swing": swing_for(sym, book.get("spot"), (book["signal"].get("plan") or {}).get("buy_below"))}
     return signal_unheld(sym)
 
 
@@ -508,7 +535,8 @@ def signal_unheld(sym: str) -> Dict[str, Any]:
     from optionflow.modules.hedge import signal as sg
     out = _clean(asdict(sig))
     return {"symbol": sym, "held": "none", "spot": round(spot, 4), "day_change": day["day_change"],
-            "label": LABELS["none"][out["verdict"]], "signal": out, "reasons": sg.reasons(sig), "error": None}
+            "label": LABELS["none"][out["verdict"]], "signal": out, "reasons": sg.reasons(sig), "error": None,
+            "swing": swing_for(sym, spot, (out.get("plan") or {}).get("buy_below"))}
 
 
 def _signal_obj(d: Dict[str, Any]) -> Any:
