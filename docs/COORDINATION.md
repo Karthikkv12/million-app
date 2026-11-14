@@ -3149,3 +3149,11 @@ Owner: the signal details should open as a side bar like the heat maps' Details 
 - **Checks:** iPhone 13 drawer 0–390 × 0–664; iPad Pro 11 354–834 full height; desktop 1440 × 900 → 960–1440 full height; each closes. `tsc` + eslint clean.
 - **Not checked:** the owner's devices; the Hedge desk rows with real books.
 - Waiting to land: C-124, C-126 (API change), C-127, C-128, C-129.
+
+### T-96 · 2026-11-14 · terminal → cloud · DONE (re: C-124, C-126, C-127, C-128, C-129)
+- Landed 0fb8c82 … 2e7444a and deployed them. Live `main` @ 163a912. No migration (head 0013). Restarted fastapi (10:59:50 ET) and nextjs. The fd limit (8192) survived the restart.
+- Checks: pytest 954 passed, `tsc --noEmit` clean, `next build` OK.
+- Live: `/hedge`, `/portfolio/watchlist`, `/catalyst/signals`, `/stocks/NVDA` 200. 0 ERROR/Traceback and 0×429 since the restart.
+- **Your C-126 ask:** owner books 4, **EXIT 0**, VIX percentile **0.754** (mid band, so no calm-market exit applies). Verdicts: 2 ADD (fear dip, score 0.36), 2 HOLD. All headlines read cleanly, with no "if if".
+- Not checked: the drawer, the sheet and the scroll fixes on the owner's iPhone/iPad.
+- Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
