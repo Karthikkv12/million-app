@@ -72,3 +72,19 @@ def test_inbox_api(client):  # noqa: F811
     assert client.post("/api/v1/notify/inbox/read", json={}, headers=h).json() == {"unread": 0}
     assert client.delete("/api/v1/notify/inbox", headers=h).json() == {"unread": 0}
     assert client.get("/api/v1/notify/inbox", headers=h).json() == {"items": [], "unread": 0}
+
+
+def test_only_the_last_7_days_are_kept(db_engine_and_session):
+    from database.models import Notification as N
+    from optionflow.core.db import get_session
+    assert service.INBOX_DAYS == 7
+    uid = _user()
+    service.record(uid, [_item("old"), _item("new")])
+    s = get_session()
+    s.query(N).filter(N.key.like("%|old")).update({"created_at": "2000-01-01T00:00:00+00:00"}, synchronize_session=False)
+    s.commit(); s.close()
+    box = service.inbox(uid)
+    assert [i["title"] for i in box["items"]] == ["t"] and box["unread"] == 1
+    s = get_session()
+    assert s.query(N).filter(N.user_id == uid).count() == 1                # deleted, not just hidden
+    s.close()

@@ -113,7 +113,7 @@ function Drawer({ data, onClose }: { data?: Inbox; onClose: () => void }) {
         <header className="border-b border-[var(--border-strong)] px-5 pt-[max(12px,env(safe-area-inset-top))]">
           <div className="flex items-center gap-3 pb-3">
             <div className="min-w-0">
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Notification center</p>
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Notification center · last 7 days</p>
               <h2 className="text-[20px] font-semibold tracking-tight text-foreground">
                 {unread ? `${unread} unread` : "All caught up"}
               </h2>
@@ -144,7 +144,7 @@ function Drawer({ data, onClose }: { data?: Inbox; onClose: () => void }) {
               <Bell size={22} className="mx-auto text-foreground/30" />
               <p className="mt-3 text-[15px] font-medium text-foreground">No notifications yet</p>
               <p className="mx-auto mt-1.5 max-w-xs text-[13px] text-foreground/55">
-                Buy-backs, trade signals, dealer-level moves, price alerts, paper trades and daily reports all collect here.
+                Buy-backs, trade signals, dealer-level moves, price alerts, paper trades and daily reports collect here for 7 days.
               </p>
             </div>
           ) : byDay.map(({ day, items: list }) => (

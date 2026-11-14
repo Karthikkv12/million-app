@@ -14,7 +14,7 @@ restart can repeat that day's alerts at most once.
 
 Notification Center (owner, 2026-11-14): every alert is also stored (`notifications` table, record() below) so the
 app's bell lists them, grouped, read or not. Sources: these hedge / level alerts (what at least one device allows),
-pulse price alerts and paper trades, and daily reports. Stored once per (user, ET day, key); kept INBOX_DAYS.
+pulse price alerts and paper trades, and daily reports. Stored once per (user, ET day, key); kept INBOX_DAYS (7).
 
 Config (server .env or process env; the module is a no-op without the keys):
 - PUSH_VAPID_PRIVATE_KEY, PUSH_VAPID_PUBLIC_KEY: base64url P-256 key pair
@@ -203,7 +203,7 @@ def push_user(user_id: int, payload: Dict[str, Any], sender=None, alert: Optiona
 
 
 # ── Notification Center ───────────────────────────────────────────────────────
-INBOX_DAYS = 60
+INBOX_DAYS = 7                                    # owner: the center holds the last 7 days
 INBOX_PAGE = 200
 
 
@@ -229,8 +229,7 @@ def record(user_id: int, items: List[Dict[str, Any]], day: Optional[str] = None)
                     title=str(i.get("title") or "")[:300], body=i.get("body"), url=i.get("url"), key=k, created_at=now))
             n += 1
         if n:
-            cutoff = datetime.fromtimestamp(time.time() - INBOX_DAYS * 86400, timezone.utc).isoformat()
-            s.query(N).filter(N.user_id == user_id, N.created_at < cutoff).delete(synchronize_session=False)
+            s.query(N).filter(N.user_id == user_id, N.created_at < _cutoff()).delete(synchronize_session=False)
         s.commit()
         return n
     except Exception:
@@ -241,16 +240,22 @@ def record(user_id: int, items: List[Dict[str, Any]], day: Optional[str] = None)
         s.close()
 
 
+def _cutoff() -> str:
+    return datetime.fromtimestamp(time.time() - INBOX_DAYS * 86400, timezone.utc).isoformat()
+
+
 def _row(n: Any) -> Dict[str, Any]:
     return {"id": n.id, "kind": n.kind, "symbol": n.symbol, "title": n.title, "body": n.body, "url": n.url,
             "created_at": n.created_at, "read": n.read_at is not None}
 
 
 def inbox(user_id: int, limit: int = INBOX_PAGE) -> Dict[str, Any]:
-    """The newest `limit` notifications and the unread count."""
+    """The newest `limit` notifications of the last INBOX_DAYS and the unread count (older ones are deleted)."""
     from database.models import Notification as N
     s = get_session()
     try:
+        s.query(N).filter(N.user_id == user_id, N.created_at < _cutoff()).delete(synchronize_session=False)
+        s.commit()
         q = s.query(N).filter(N.user_id == user_id)
         items = [_row(n) for n in q.order_by(N.created_at.desc(), N.id.desc()).limit(max(1, min(limit, 500)))]
         unread = q.filter(N.read_at.is_(None)).count()

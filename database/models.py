@@ -595,7 +595,7 @@ class Report(Base):
 
 class Notification(Base):
     """One entry in a user's Notification Center (notify module): every alert the app raises for them (hedge
-    trades, dealer levels, price alerts, paper trades, daily reports), whether or not a push reached a device.
+    trades, dealer levels, price alerts, paper trades, daily reports), whether or not a push reached a device, for 7 days.
     `key` dedupes an alert across worker cycles and restarts; `read_at` is set when the user opens or clears it."""
     __tablename__ = "notifications"
     __table_args__ = (UniqueConstraint("user_id", "key", name="uq_notifications_user_key"),)
