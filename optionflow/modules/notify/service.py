@@ -7,6 +7,8 @@ off, and alerts can be limited to some symbols (prefs, below; the same prefs on 
   the long call of the LEAPS / diagonal strategies)
 - iv_spike: ATM IV spikes on a holding (off by default)
 - expiring_itm: a short option is in the money with ≤ 1 day left, so assignment is likely (off by default)
+- signals: a holding's backtested signal (hedge.signal) turns actionable: Add, Exit, Take profit or Roll. Once per
+  symbol and verdict per 7 days (the Notification Center's window), so a fear dip that lasts a week alerts once
 - levels: a dealer level of a holding or of an extra `level_symbols` ticker moved (call wall, put wall, king, flip),
   or spot crossed the flip (LevelWatch, below)
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
@@ -39,9 +41,9 @@ from optionflow.modules.notify import webpush
 logger = logging.getLogger("optionflow.notify")
 ET = ZoneInfo("America/New_York")
 MAX_PER_CYCLE = 6                     # more than this in one minute → one summary instead
-KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm", "levels")
+KINDS = ("buyback", "sell_call", "sell_put", "buy_stock", "iv_spike", "expiring_itm", "levels", "signals")
 DEFAULT_PREFS: Dict[str, Any] = {"buyback": True, "sell_call": True, "sell_put": True, "buy_stock": True,
-                                 "iv_spike": False, "expiring_itm": False, "levels": True,
+                                 "iv_spike": False, "expiring_itm": False, "levels": True, "signals": True,
                                  "symbols": [],          # [] = every holding
                                  "level_symbols": []}    # watched for level alerts on top of the holdings
 MAX_LEVEL_SYMBOLS = 20
@@ -290,7 +292,51 @@ def clear(user_id: int) -> None:
         s.close()
 
 
+def recent_keys(user_id: int, keys: List[str], days: int = 0) -> Set[str]:
+    """Which of `keys` (unprefixed alert keys) the Notification Center already holds from the last `days` days
+    (0 = everything it holds, i.e. INBOX_DAYS)."""
+    if not keys:
+        return set()
+    from database.models import Notification as N
+    since = datetime.fromtimestamp(time.time() - (days or INBOX_DAYS) * 86400, timezone.utc).isoformat()
+    s = get_session()
+    try:
+        rows = s.query(N.key).filter(N.user_id == user_id, N.created_at >= since,
+                                     N.key.in_([f"{d}|{k}" for k in keys for d in _days(days or INBOX_DAYS)])).all()
+        return {k.split("|", 1)[1] for (k,) in rows}
+    except Exception:
+        logger.exception("notification center: recent keys for user %s failed", user_id)
+        return set()
+    finally:
+        s.close()
+
+
+def _days(n: int) -> List[str]:
+    today = datetime.now(ET).date()
+    from datetime import timedelta
+    return [(today - timedelta(days=i)).isoformat() for i in range(n + 1)]
+
+
 # ── Alerts from the hedge books ───────────────────────────────────────────────
+SIGNAL_ALERTS = {"ADD": "Add", "EXIT": "Exit", "TRIM": "Take profit", "ROLL": "Roll"}
+
+
+def signal_alerts(books: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """A holding whose signal is actionable now (Add / Exit / Take profit / Roll)."""
+    out: List[Dict[str, Any]] = []
+    for b in books.get("books", []):
+        g = b.get("signal") or {}
+        word = SIGNAL_ALERTS.get(g.get("verdict"))
+        if b.get("error") or not word:
+            continue
+        sym = b["symbol"]
+        head = str(g.get("headline") or "")
+        out.append({"key": f"sig:{sym}:{g['verdict']}", "kind": "signals", "symbol": sym,
+                    "title": f"{sym} signal: {word}",
+                    "body": (head[:220] + "…") if len(head) > 220 else head,
+                    "url": f"/stocks/{sym}"})
+    return out
+
 def alerts_for(books: Dict[str, Any]) -> List[Dict[str, Any]]:
     """[{key, kind, symbol, title, body, url}] for everything worth a push right now (before prefs)."""
     out: List[Dict[str, Any]] = []
@@ -535,6 +581,9 @@ def run_for_user(user_id: int, books_fn=None, sender=None,
         return 0
     books = books_fn(user_id)
     found = alerts_for(books)
+    sig = signal_alerts(books)                    # once per symbol + verdict per 7 days, not every day
+    seen = recent_keys(user_id, [a["key"] for a in sig])
+    found.extend(a for a in sig if a["key"] not in seen)
     if levels:
         for sym in level_symbols(books, [sub["prefs"] for sub in subs]):
             found.extend(levels.get(sym) or [])

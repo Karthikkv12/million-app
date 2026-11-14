@@ -4768,6 +4768,12 @@ export interface components {
              */
             sell_put: boolean;
             /**
+             * Signals
+             * @description A holding's backtested signal turns Add, Exit, Take profit or Roll (once per 7 days)
+             * @default true
+             */
+            signals: boolean;
+            /**
              * Symbols
              * @description Only these symbols; empty = every holding
              * @default []

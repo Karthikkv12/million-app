@@ -17,6 +17,7 @@ const KINDS: { key: keyof Omit<NotifyPrefs, "symbols" | "level_symbols">; label:
   { key: "buy_stock", label: "Buy stock", desc: "An odd lot at or below your average: round it up to 100 shares. Also the long call under LEAPS or Diagonals." },
   { key: "iv_spike", label: "IV spike", desc: "Implied volatility jumps on a stock you hold." },
   { key: "expiring_itm", label: "Expiring in the money", desc: "An option you sold is in the money with a day or less left." },
+  { key: "signals", label: "Signals", desc: "A holding's backtested signal turns Add (fear dip), Exit (under the 200-day in a calm market), Take profit or Roll. Once per stock and signal per week." },
   { key: "levels", label: "Dealer levels shift", desc: "The call wall, put wall, king or flip moves to a new strike, or the price crosses the flip. For your stocks and the tickers you add below." },
 ];
 

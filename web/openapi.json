@@ -7340,6 +7340,12 @@
       "title": "Sell Put",
       "type": "boolean"
      },
+     "signals": {
+      "default": true,
+      "description": "A holding's backtested signal turns Add, Exit, Take profit or Roll (once per 7 days)",
+      "title": "Signals",
+      "type": "boolean"
+     },
      "symbols": {
       "default": [],
       "description": "Only these symbols; empty = every holding",
