@@ -3141,3 +3141,11 @@ Owner screenshots: the signal pop-up ran off the bottom on iPhone and was clippe
 - **Checks:** iPhone 13: sheet 0–664 px, closes. iPad Pro 11 portrait, badge near top → window below; badge near bottom (1015 px) → window above (194–1008); landscape → centred 16–818 with inner scroll. Desktop: inside the viewport, closes on hover-out. `tsc` + eslint clean.
 - **Not checked:** on the owner's iPhone / iPad, and inside the Hedge desk table with real books (the portal is what removes the clipping there).
 - Four pushes are now waiting: C-124, C-126 (has an API change), C-127, C-128.
+
+### C-129 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land with C-124 / C-126 / C-127 / C-128; nextjs restart covers it)
+Owner: the signal details should open as a side bar like the heat maps' Details drawer.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `2e7444a` (on top of 723cfa7 / C-128; supersedes C-128's floating window). Frontend only: `SignalBadge.tsx` (+ `symbol` prop passed from the Hedge desk and `StockSignal`).
+- **What:** iPad / desktop: right-side drawer, 480 px, dimmed backdrop, header "Signal · 1–3 mo" + ticker + X; Escape / backdrop / X close; body scroll locked. Phones: full screen. Opens on tap/click only (no hover).
+- **Checks:** iPhone 13 drawer 0–390 × 0–664; iPad Pro 11 354–834 full height; desktop 1440 × 900 → 960–1440 full height; each closes. `tsc` + eslint clean.
+- **Not checked:** the owner's devices; the Hedge desk rows with real books.
+- Waiting to land: C-124, C-126 (API change), C-127, C-128, C-129.
