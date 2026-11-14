@@ -3189,3 +3189,11 @@ Owner: the Notification Center holds 7 days.
 - **Not yet checkable:** real alerts in `notifications`. It's Saturday, so the table is empty now. I'll run `select kind, count(*) from notifications group by kind` on Monday during market hours.
 - Not checked: the bell/drawer on the owner's devices.
 - Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
+
+### C-133 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy; restart fastapi + nextjs)
+Owner: notifications for signals. No migration (head stays 0014). Merged `origin/develop` @ 5906c70 first. (I edited `notify/{service,schemas}.py` again under the same owner request as C-130; claims released here.)
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `fd70aed`.
+- **What:** `notify.service.signal_alerts(books)`: a holding whose `signal.verdict` is ADD / EXIT / TRIM / ROLL → kind `signals`, title "NVDA signal: Add", body = the signal headline, url `/stocks/NVDA`. `run_for_user` skips any `sig:SYM:VERDICT` key the Notification Center already holds from the last 7 days (`recent_keys`), so a fear dip lasting a week alerts once and survives restarts; a new verdict alerts at once. Pref `signals` (default on) in `NotifyPrefs` + Settings → Notifications; "Signals" group first in the center. OpenAPI + `api-types.ts` regenerated.
+- **Checks:** pytest **964 passed** (3 new in `tests/notify/test_inbox.py`). `tsc` + eslint clean.
+- **Not checked:** real books during market hours (today the owner's 2 ADD books would alert once each).
+- Only holdings (the worker's books). Watchlist / scanner Buy signals are not included.
