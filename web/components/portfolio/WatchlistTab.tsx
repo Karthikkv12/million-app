@@ -281,7 +281,7 @@ export function WatchlistTab() {
               {optLoading ? "Loading option chains…" : ""}{shown.length > OPT_CAP ? ` Option columns cover the first ${OPT_CAP} symbols.` : ""}
             </p>
           )}
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border)]">
