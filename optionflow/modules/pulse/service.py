@@ -327,6 +327,13 @@ def _trade_event(t: PaperTrade, what: str, price: float, detail: str) -> Dict[st
 
 
 def _send(events: List[Dict[str, Any]], push: Optional[Callable[[int, Dict[str, Any]], Any]]) -> None:
+    try:                                          # the Notification Center keeps every event, pushed or not
+        from optionflow.modules.notify.service import record
+        for e in events:
+            record(e["user_id"], [{"key": f"{e['kind']}-{e['id']}", "kind": e["kind"], "symbol": e.get("symbol"),
+                                   "title": e["title"], "body": e["body"], "url": e["url"]}])
+    except Exception as exc:
+        logger.warning("pulse notification center record failed: %s", exc)
     if push is None:
         try:
             from optionflow.modules.notify.service import push_user

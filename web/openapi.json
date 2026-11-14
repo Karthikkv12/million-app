@@ -5550,6 +5550,25 @@
     "title": "IdOut",
     "type": "object"
    },
+   "InboxOut": {
+    "properties": {
+     "items": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/NotificationOut"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "unread": {
+      "default": 0,
+      "title": "Unread",
+      "type": "integer"
+     }
+    },
+    "title": "InboxOut",
+    "type": "object"
+   },
    "IngestAccount": {
     "properties": {
      "account": {
@@ -7199,6 +7218,75 @@
      "title"
     ],
     "title": "NewsItem",
+    "type": "object"
+   },
+   "NotificationOut": {
+    "properties": {
+     "body": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body"
+     },
+     "created_at": {
+      "description": "ISO UTC",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "description": "buyback \u00b7 sell_call \u00b7 sell_put \u00b7 buy_stock \u00b7 iv_spike \u00b7 expiring_itm \u00b7 levels \u00b7 price_alert \u00b7 paper_open / paper_stopped / paper_target \u00b7 report \u00b7 test",
+      "title": "Kind",
+      "type": "string"
+     },
+     "read": {
+      "title": "Read",
+      "type": "boolean"
+     },
+     "symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Symbol"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "In-app path to open",
+      "title": "Url"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "title",
+     "created_at",
+     "read"
+    ],
+    "title": "NotificationOut",
     "type": "object"
    },
    "NotifyPrefs": {
@@ -10275,6 +10363,27 @@
      }
     },
     "title": "RangeOut",
+    "type": "object"
+   },
+   "ReadIn": {
+    "properties": {
+     "ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "integer"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Mark these read; omit to mark everything read",
+      "title": "Ids"
+     }
+    },
+    "title": "ReadIn",
     "type": "object"
    },
    "RecalculateHoldingsOut": {
@@ -14580,6 +14689,19 @@
      "label"
     ],
     "title": "UnitOut",
+    "type": "object"
+   },
+   "UnreadOut": {
+    "properties": {
+     "unread": {
+      "title": "Unread",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "unread"
+    ],
+    "title": "UnreadOut",
     "type": "object"
    },
    "UnsubscribeIn": {
@@ -20250,6 +20372,127 @@
      }
     ],
     "summary": "Devices",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/inbox": {
+   "delete": {
+    "description": "Delete every notification.",
+    "operationId": "inbox_clear_api_v1_notify_inbox_delete",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UnreadOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Inbox Clear",
+    "tags": [
+     "notify"
+    ]
+   },
+   "get": {
+    "description": "The Notification Center: the newest notifications (all kinds) and how many are unread.",
+    "operationId": "inbox_api_v1_notify_inbox_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 200,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InboxOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Inbox",
+    "tags": [
+     "notify"
+    ]
+   }
+  },
+  "/api/v1/notify/inbox/read": {
+   "post": {
+    "description": "Mark some (ids) or all notifications read.",
+    "operationId": "inbox_read_api_v1_notify_inbox_read_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReadIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UnreadOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Inbox Read",
     "tags": [
      "notify"
     ]

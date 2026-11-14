@@ -593,6 +593,27 @@ class Report(Base):
     published_at = Column(String, nullable=False)                # ISO UTC
 
 
+class Notification(Base):
+    """One entry in a user's Notification Center (notify module): every alert the app raises for them (hedge
+    trades, dealer levels, price alerts, paper trades, daily reports), whether or not a push reached a device.
+    `key` dedupes an alert across worker cycles and restarts; `read_at` is set when the user opens or clears it."""
+    __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_notifications_user_key"),)
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    kind       = Column(String, nullable=False)                 # buyback, sell_call, levels, price_alert, report …
+    symbol     = Column(String, nullable=True)
+    title      = Column(String, nullable=False)
+    body       = Column(Text, nullable=True)
+    url        = Column(String, nullable=True)                  # where tapping it goes (an in-app path)
+    key        = Column(String, nullable=False)
+    created_at = Column(String, nullable=False)                 # ISO UTC
+    read_at    = Column(String, nullable=True)
+
+
+Index("ix_notifications_user_created", Notification.user_id, Notification.created_at)
+
+
 class WatchlistGroup(Base):
     """A named watchlist (watchlists module). Up to 20 per user. `kind` is "sector" for the lists seeded
     one per sector, "custom" for the user's own; `symbols` is a JSON array of tickers in display order;

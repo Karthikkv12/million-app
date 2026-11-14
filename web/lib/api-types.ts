@@ -1082,6 +1082,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notify/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inbox
+         * @description The Notification Center: the newest notifications (all kinds) and how many are unread.
+         */
+        get: operations["inbox_api_v1_notify_inbox_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Inbox Clear
+         * @description Delete every notification.
+         */
+        delete: operations["inbox_clear_api_v1_notify_inbox_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notify/inbox/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inbox Read
+         * @description Mark some (ids) or all notifications read.
+         */
+        post: operations["inbox_read_api_v1_notify_inbox_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notify/prefs": {
         parameters: {
             query?: never;
@@ -4110,6 +4154,19 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** InboxOut */
+        InboxOut: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["NotificationOut"][];
+            /**
+             * Unread
+             * @default 0
+             */
+            unread: number;
+        };
         /** IngestAccount */
         IngestAccount: {
             /**
@@ -4633,6 +4690,34 @@ export interface components {
             /** Title */
             title: string;
             /** Url */
+            url?: string | null;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /** Body */
+            body?: string | null;
+            /**
+             * Created At
+             * @description ISO UTC
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @description buyback · sell_call · sell_put · buy_stock · iv_spike · expiring_itm · levels · price_alert · paper_open / paper_stopped / paper_target · report · test
+             */
+            kind: string;
+            /** Read */
+            read: boolean;
+            /** Symbol */
+            symbol?: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @description In-app path to open
+             */
             url?: string | null;
         };
         /** NotifyPrefs */
@@ -5526,6 +5611,14 @@ export interface components {
             low?: number | null;
             /** Position Pct */
             position_pct?: number | null;
+        };
+        /** ReadIn */
+        ReadIn: {
+            /**
+             * Ids
+             * @description Mark these read; omit to mark everything read
+             */
+            ids?: number[] | null;
         };
         /** RecalculateHoldingsOut */
         RecalculateHoldingsOut: {
@@ -7080,6 +7173,11 @@ export interface components {
              * @default 0
              */
             shares: number;
+        };
+        /** UnreadOut */
+        UnreadOut: {
+            /** Unread */
+            unread: number;
         };
         /** UnsubscribeIn */
         UnsubscribeIn: {
@@ -9873,6 +9971,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    inbox_api_v1_notify_inbox_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inbox_clear_api_v1_notify_inbox_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadOut"];
+                };
+            };
+        };
+    };
+    inbox_read_api_v1_notify_inbox_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

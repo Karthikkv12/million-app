@@ -7,9 +7,29 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from optionflow.core.deps import get_current_user
 from optionflow.modules.notify import service
-from optionflow.modules.notify.schemas import DeviceOut, NotifyPrefs, PushConfigOut, SubscriptionIn, TestOut, UnsubscribeIn
+from optionflow.modules.notify.schemas import (DeviceOut, InboxOut, NotifyPrefs, PushConfigOut, ReadIn, SubscriptionIn, TestOut,
+                                               UnreadOut, UnsubscribeIn)
 
 router = APIRouter(prefix="/notify", tags=["notify"])
+
+
+@router.get("/inbox", response_model=InboxOut)
+def inbox(limit: int = 200, user=Depends(get_current_user)) -> InboxOut:
+    """The Notification Center: the newest notifications (all kinds) and how many are unread."""
+    return InboxOut(**service.inbox(int(user["sub"]), limit))
+
+
+@router.post("/inbox/read", response_model=UnreadOut)
+def inbox_read(body: ReadIn, user=Depends(get_current_user)) -> UnreadOut:
+    """Mark some (ids) or all notifications read."""
+    return UnreadOut(unread=service.mark_read(int(user["sub"]), body.ids))
+
+
+@router.delete("/inbox", response_model=UnreadOut)
+def inbox_clear(user=Depends(get_current_user)) -> UnreadOut:
+    """Delete every notification."""
+    service.clear(int(user["sub"]))
+    return UnreadOut(unread=0)
 
 
 @router.get("/config", response_model=PushConfigOut)
@@ -48,6 +68,8 @@ def test(user=Depends(get_current_user)) -> TestOut:
     uid = int(user["sub"])
     r = service.push_user(uid, {"title": "OptionFlow", "body": "Notifications are on. Buy-backs and trades will show here.",
                                 "url": "/dashboard", "tag": "test"})
+    service.record(uid, [{"key": f"test:{service.now_iso()}", "kind": "test", "title": "Test notification",
+                          "body": "Notifications are on. Buy-backs and trades will show here.", "url": "/dashboard"}])
     devs = service.subscriptions(uid)
     return TestOut(**r, devices=len(devs), devices_out=[DeviceOut(**d) for d in devs])
 

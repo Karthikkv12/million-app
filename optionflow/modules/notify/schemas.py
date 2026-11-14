@@ -6,6 +6,31 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class NotificationOut(BaseModel):
+    id: int
+    kind: str = Field(..., description="buyback · sell_call · sell_put · buy_stock · iv_spike · expiring_itm · levels · "
+                                        "price_alert · paper_open / paper_stopped / paper_target · report · test")
+    symbol: Optional[str] = None
+    title: str
+    body: Optional[str] = None
+    url: Optional[str] = Field(None, description="In-app path to open")
+    created_at: str = Field(..., description="ISO UTC")
+    read: bool
+
+
+class InboxOut(BaseModel):
+    items: List[NotificationOut] = []
+    unread: int = 0
+
+
+class ReadIn(BaseModel):
+    ids: Optional[List[int]] = Field(None, description="Mark these read; omit to mark everything read")
+
+
+class UnreadOut(BaseModel):
+    unread: int
+
+
 class PushConfigOut(BaseModel):
     enabled: bool = Field(..., description="Push is configured on the server (VAPID keys set)")
     public_key: Optional[str] = Field(None, description="VAPID public key, base64url; pass to pushManager.subscribe")

@@ -96,6 +96,13 @@ def ingest(body: ReportIngest, x_hedge_ingest_token: Optional[str] = Header(None
         session.query(Report).filter(Report.user_id == int(user.id), Report.day < cutoff_day(),
                                      Report.id != row.id).delete(synchronize_session=False)
         session.commit()
+        try:                                      # one "report ready" entry per report per day in the Notification Center
+            from optionflow.modules.notify.service import record
+            record(int(user.id), [{"key": f"report:{body.slug}:{day}", "kind": "report", "title": row.title,
+                                   "body": f"{body.slug.capitalize()} report for {day} is ready.",
+                                   "url": f"/catalyst/reports?r={body.slug}&d={day}"}])
+        except Exception:
+            pass
         return ReportMeta(**_meta(row))
     finally:
         session.close()

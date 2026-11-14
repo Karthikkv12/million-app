@@ -12,6 +12,10 @@ off, and alerts can be limited to some symbols (prefs, below; the same prefs on 
 Each alert is sent once per day per contract (key below); the set of sent keys lives in memory, so a server
 restart can repeat that day's alerts at most once.
 
+Notification Center (owner, 2026-11-14): every alert is also stored (`notifications` table, record() below) so the
+app's bell lists them, grouped, read or not. Sources: these hedge / level alerts (what at least one device allows),
+pulse price alerts and paper trades, and daily reports. Stored once per (user, ET day, key); kept INBOX_DAYS.
+
 Config (server .env or process env; the module is a no-op without the keys):
 - PUSH_VAPID_PRIVATE_KEY, PUSH_VAPID_PUBLIC_KEY: base64url P-256 key pair
   (`python -m optionflow.modules.notify.webpush` prints a fresh pair)
@@ -196,6 +200,89 @@ def push_user(user_id: int, payload: Dict[str, Any], sender=None, alert: Optiona
             logger.warning("push service answered %s for sub %s", r.status, sub["id"])
             out["failed"] += 1
     return out
+
+
+# ── Notification Center ───────────────────────────────────────────────────────
+INBOX_DAYS = 60
+INBOX_PAGE = 200
+
+
+def record(user_id: int, items: List[Dict[str, Any]], day: Optional[str] = None) -> int:
+    """Store alerts in the user's Notification Center: items are {key, kind, symbol?, title, body?, url?}. An alert
+    already stored for that key today (US Eastern) is skipped. Never raises; returns how many were added."""
+    if not items:
+        return 0
+    from database.models import Notification as N
+    day = day or datetime.now(ET).date().isoformat()
+    rows = {}
+    for i in items:
+        k = f"{day}|{i['key']}"[:300]
+        rows.setdefault(k, i)
+    s = get_session()
+    try:
+        have = {k for (k,) in s.query(N.key).filter(N.user_id == user_id, N.key.in_(list(rows)))}
+        now, n = now_iso(), 0
+        for k, i in rows.items():
+            if k in have:
+                continue
+            s.add(N(user_id=user_id, kind=str(i.get("kind") or "other")[:40], symbol=(i.get("symbol") or None),
+                    title=str(i.get("title") or "")[:300], body=i.get("body"), url=i.get("url"), key=k, created_at=now))
+            n += 1
+        if n:
+            cutoff = datetime.fromtimestamp(time.time() - INBOX_DAYS * 86400, timezone.utc).isoformat()
+            s.query(N).filter(N.user_id == user_id, N.created_at < cutoff).delete(synchronize_session=False)
+        s.commit()
+        return n
+    except Exception:
+        logger.exception("notification center: record for user %s failed", user_id)
+        s.rollback()
+        return 0
+    finally:
+        s.close()
+
+
+def _row(n: Any) -> Dict[str, Any]:
+    return {"id": n.id, "kind": n.kind, "symbol": n.symbol, "title": n.title, "body": n.body, "url": n.url,
+            "created_at": n.created_at, "read": n.read_at is not None}
+
+
+def inbox(user_id: int, limit: int = INBOX_PAGE) -> Dict[str, Any]:
+    """The newest `limit` notifications and the unread count."""
+    from database.models import Notification as N
+    s = get_session()
+    try:
+        q = s.query(N).filter(N.user_id == user_id)
+        items = [_row(n) for n in q.order_by(N.created_at.desc(), N.id.desc()).limit(max(1, min(limit, 500)))]
+        unread = q.filter(N.read_at.is_(None)).count()
+        return {"items": items, "unread": unread}
+    finally:
+        s.close()
+
+
+def mark_read(user_id: int, ids: Optional[List[int]] = None) -> int:
+    """Mark `ids` (or everything, when None) read. Returns the unread count left."""
+    from database.models import Notification as N
+    s = get_session()
+    try:
+        q = s.query(N).filter(N.user_id == user_id, N.read_at.is_(None))
+        if ids is not None:
+            q = q.filter(N.id.in_([int(i) for i in ids][:500]))
+        q.update({"read_at": now_iso()}, synchronize_session=False)
+        s.commit()
+        return s.query(N).filter(N.user_id == user_id, N.read_at.is_(None)).count()
+    finally:
+        s.close()
+
+
+def clear(user_id: int) -> None:
+    """Delete every notification of the user."""
+    from database.models import Notification as N
+    s = get_session()
+    try:
+        s.query(N).filter(N.user_id == user_id).delete(synchronize_session=False)
+        s.commit()
+    finally:
+        s.close()
 
 
 # ── Alerts from the hedge books ───────────────────────────────────────────────
@@ -447,6 +534,7 @@ def run_for_user(user_id: int, books_fn=None, sender=None,
         for sym in level_symbols(books, [sub["prefs"] for sub in subs]):
             found.extend(levels.get(sym) or [])
     wanted = [a for a in found if any(allows(sub["prefs"], a) for sub in subs)]
+    record(user_id, wanted)                       # the Notification Center keeps each one, even when pushes are summarised
     fresh = set(SENT.new(user_id, [a["key"] for a in wanted]))
     todo = [a for a in wanted if a["key"] in fresh]
     if not todo:
