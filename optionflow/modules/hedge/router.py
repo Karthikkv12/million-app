@@ -13,7 +13,7 @@ from optionflow.modules.auth import service as auth_service
 from optionflow.modules.hedge import portfolio as pf
 from optionflow.modules.hedge import service
 from optionflow.modules.hedge.schemas import (BrokerActivityOut, BooksOut, BrokerPositionOut, BrokerHistoryPoint, BrokerIncomeOut,
-                                              IngestOut, IngestRequest, BrokerPortfolioOut, StockSignalOut)
+                                              IngestOut, IngestRequest, BrokerPortfolioOut, SignalScanOut, StockSignalOut)
 
 router = APIRouter(prefix="/hedge", tags=["hedge"])
 stream_router = APIRouter(prefix="/hedge", tags=["hedge"])
@@ -55,10 +55,23 @@ def books(user=Depends(get_current_user)) -> BooksOut:
     return BooksOut(**service.books_for(int(user["sub"])))
 
 
+@router.get("/scan", response_model=SignalScanOut)
+def scan(user=Depends(get_current_user)) -> SignalScanOut:
+    """The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,
+    with the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your
+    holdings are marked."""
+    from optionflow.modules.hedge import scan as sc
+    try:
+        held = {p["symbol"].upper() for p in service.list_positions(int(user["sub"]))}
+    except Exception:
+        held = set()
+    return SignalScanOut(**sc.get(held, wait=20.0))
+
+
 @router.get("/signal/{symbol}", response_model=StockSignalOut)
 def signal(symbol: str, user=Depends(get_current_user)) -> StockSignalOut:
-    """The desk's backtested signal for any ticker: Enter / Wait / Don't enter when you don't hold it, Add / Hold /
-    Don't add / Roll when you do. For a holding of long options only it is the Hedge desk's own book signal."""
+    """The desk's backtested signal for any ticker: Buy / Wait / Don't buy yet when you don't hold it, Add / Hold /
+    Don't add / Roll when you do (any form: it is the Hedge desk's own book signal), with the prices behind it."""
     sym = symbol.strip().upper()
     if not sym or len(sym) > 12 or not all(c.isalnum() or c in ".-^" for c in sym):
         raise HTTPException(status_code=400, detail="Bad symbol")

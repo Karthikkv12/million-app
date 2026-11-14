@@ -62,6 +62,8 @@ rect.bar:hover { opacity: .75 }
     <p class="lede">I tested the Add / Hold / Trim signal for your LEAPS and long puts on 31.9 years of daily prices. The signal that was live had no edge. One pattern held up across every test, and the desk now runs on that pattern alone.</p>
   </header>
 
+  <section><p class="callout warn"><b>Re-tested 2026-11-14:</b> parts of this report are corrected or withdrawn &mdash; the 1.2&times; IV gate (hindsight; dropped), the 180-day roll (rolling lost to holding at every days-left), the &ldquo;Sharpe within 0.03&rdquo; line and several counts. See <code>docs/hedge-signal-review.md</code>. Holdings are no longer frozen here: the Hedge desk shows the signal for your live positions.</p></section>
+
   <section aria-label="What was tested">
     <div class="eyebrow">How much I looked at</div>
     <div class="tiles">
@@ -171,21 +173,6 @@ rect.bar:hover { opacity: .75 }
     <p class="callout warn">The 1.2&times; IV gate is partly hindsight: IV-normal fear dips were fine in 1995&ndash;2014 and weak only in 2015&ndash;2026. I kept it because it only removes adds. With a live chain the desk is stricter still and uses the lower of the model&rsquo;s IV and the market&rsquo;s.</p>
   </section>
 
-  <section>
-    <div class="eyebrow">Your holdings now</div>
-    <h2>All four read Hold: oversold, but the market isn’t scared enough</h2>
-    <p>On the close of 13 Nov the VIX was 19.3, at its 75th percentile for the year. The Add rule needs the 80th. Oversold without fear had no edge in the backtest.</p>
-    <div class="wrap"><table>
-      <thead><tr><th>Ticker</th><th>Price</th><th>RSI(14)</th><th>vs 50-day</th><th>Verdict</th></tr></thead>
-      <tbody>
-        <tr><td>NOW</td><td>102.25</td><td>13</td><td>−22.6%</td><td><span class="verdict hold">Hold</span></td></tr>
-        <tr><td>NVDA</td><td>162.85</td><td>19</td><td>−24.1%</td><td><span class="verdict hold">Hold</span></td></tr>
-        <tr><td>BABA</td><td>94.38</td><td>41</td><td>−11.7%</td><td><span class="verdict hold">Hold</span></td></tr>
-        <tr><td>NBIS</td><td>115.88</td><td>41</td><td>−40.5%</td><td><span class="verdict hold">Hold</span></td></tr>
-      </tbody>
-    </table></div>
-    <p class="muted" style="font-size:13.5px">With the IV gate, a VIX spike alone won&rsquo;t turn these into Add. NVDA&rsquo;s IV is 0.93&times; its normal and BABA&rsquo;s 0.93&times;. NOW reads 1.79&times; on the model but only about 1.07&times; on its live chain, and the desk takes the lower. NBIS is at 1.15&times;. Any leg with about 180 days or less left shows Roll. A 100-day call on these names loses 5&ndash;9% of its value per 20 trading days.</p>
-  </section>
 
   <section>
     <div class="eyebrow">Limits</div>

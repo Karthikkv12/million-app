@@ -14,6 +14,7 @@ type Tone = "gain" | "loss" | "warn" | "neutral";
 
 const TONE: Record<SignalData["verdict"], Tone> = { ADD: "gain", HOLD: "neutral", CAUTION: "warn", TRIM: "loss", ROLL: "warn" };
 const DEFAULT_LABEL: Record<SignalData["verdict"], string> = { ADD: "Add", HOLD: "Hold", CAUTION: "Don't add", TRIM: "Take profit", ROLL: "Roll" };
+export const SIGNAL_TONE = TONE;
 const pct = (v?: number | null, d = 0) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
 const sgn = (v?: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(1)}%`);
 
@@ -21,8 +22,8 @@ const sgn = (v?: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ?
 export function confidenceOf(g: SignalData): { word: string; tone: Tone; line: string } {
   const p = g.probability;
   if (g.verdict === "ROLL") {
-    const worst = [...g.legs].sort((a, b) => b.decay_20d - a.decay_20d)[0];
-    return { word: "High", tone: "gain", line: `Time decay is arithmetic: ${worst ? `the ${worst.label} loses ${pct(worst.decay_20d, 1)} of its value per 20 trading days` : "the leg is decaying fast"}. `
+    const near = [...g.legs].sort((a, b) => a.dte - b.dte)[0];
+    return { word: "Expiry", tone: "warn", line: `${near ? `The ${near.label} has ${near.dte} days left` : "A leg is close to expiry"}: roll or close. Not an edge: early rolls lost ~4% to costs. `
       + (p ? `The stock's own setup: ${pct(p.p_edge_positive)} chance its average edge is above zero.` : "") };
   }
   if (!p) return { word: "Untested", tone: "neutral", line: "No VIX or price history: the backtest doesn't cover this read." };
@@ -71,7 +72,9 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
   }, [open]);
   const tested = g.reads.filter((r) => r.tested);
   // why: the read notes, the IV line, then roll lines; the odds and evidence have their own blocks
-  const why = [...tested.map((r) => r.note), ...reasons.filter((r) => /^Stock IV|→ roll|^No stop|^Risk line/.test(r))].slice(0, 6);
+  const why = [...tested.map((r) => r.note), ...(g.fear_score != null ? [`Fear score ${g.fear_score.toFixed(2)} (Add at ≥ 0.28): VIX percentile × how oversold.`] : []),
+    ...reasons.filter((r) => /^Stock IV|→ roll|→ expiry/.test(r))].slice(0, 7);
+  const plan = g.plan?.lines ?? [];
   return (
     <span ref={box} className={clsx("relative inline-flex", className)}
       onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
@@ -123,6 +126,14 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
               )}
               <span className="mt-1 block text-[11.5px] leading-snug text-foreground/65">{g.pnl.note}</span>
             </span>
+          )}
+          {plan.length > 0 && (
+            <>
+              <span className="mt-3 block font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/45">Plan</span>
+              <span className="mt-1 block space-y-1" data-testid="signal-plan">
+                {plan.map((r) => <span key={r} className="block text-[12px] leading-snug text-foreground/80">{r}</span>)}
+              </span>
+            </>
           )}
           {why.length > 0 && (
             <>

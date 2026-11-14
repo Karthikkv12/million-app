@@ -19,3 +19,12 @@ Options (theta, IV, time left), 2026-11-13 second pass:
     PYTHONPATH=<repo> python parity_iv.py   # live signal.iv_model() vs the backtest's IV ratio on 1,000 random days
 
 Needs pandas, numpy, yfinance.
+
+Re-test, 2026-11-14 (docs/hedge-signal-review.md):
+
+    python review.py      # the 12 review points: counts, exclusive buckets, Sharpe/DD, LEAPS distribution, IS-only IV gate,
+                          # multiple testing (Bonferroni + max-t bootstrap), decay curve, long puts, regimes, streaks
+    python holdsim_roll.py && python roll.py   # the roll, tested directly by days left
+    python rebuild.py     # fear score (IS-chosen), tranche sizing, covered calls, survivorship estimate
+    python compare.py     # old rule vs new rule, both periods
+    python probs.py       # odds per desk case + the exit line

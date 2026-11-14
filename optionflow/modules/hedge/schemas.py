@@ -185,14 +185,14 @@ class SignalLegOut(BaseModel):
     extrinsic_pct: float = Field(..., description="Share of the value that is time value")
     theta_day: float = Field(..., description="$ lost per calendar day across the contracts held")
     decay_20d: float = Field(..., description="Share of the value lost to time over 20 trading days")
-    roll: bool
-    warn: bool
+    roll: bool = Field(..., description="Within 30 days of expiry: roll or close (expiry mechanics; decay alone didn't pay)")
+    warn: bool = Field(..., description="Within 60 days of expiry")
     iv_source: Literal["chain", "model", "atm"] = Field("chain", description="chain: the contract's quote; model: the backtest's IV model (no quote)")
 
 
 class SignalProbOut(BaseModel):
     """Backtest odds for this setup, 2015–2026 (unseen when the rules were set)."""
-    case: Literal["ADD", "FEAR_IV_NORMAL", "LEAN", "CAUTION", "HOLD", "TRIM"]
+    case: Literal["ADD", "LEAN", "CAUTION", "HOLD", "TRIM"]
     cases: int
     months: int
     p_up_20: float
@@ -220,11 +220,25 @@ class SignalPnlOut(BaseModel):
     note: str
 
 
+class SignalPlanOut(BaseModel):
+    """Prices for the decision (hedge.signal.plan)."""
+    lines: List[str] = Field([], description="The plan in plain words: buy / add trigger, support, upside, exit line, covered calls")
+    trigger_text: Optional[str] = Field(None, description="What would turn it into Buy / Add, e.g. 'if X closes ≤ 280.10 … or if the VIX closes ≥ 22.4 …'")
+    buy_below: Optional[float] = Field(None, description="Close at or under this (today's VIX) makes it Buy / Add")
+    buy_rsi: Optional[float] = Field(None, description="The RSI(14) that close means")
+    vix_trigger: Optional[float] = Field(None, description="VIX close at or over this (today's price) makes it Buy / Add")
+    vix_pct_needed: Optional[float] = None
+    clears_text: Optional[str] = Field(None, description="What clears a Don't add / Don't buy yet")
+    upside: Optional[float] = Field(None, description="Nearest resistance (held): no tested sell price")
+    exit_below: Optional[float] = Field(None, description="Held, calm market: the 200-day average (close under it → −1.65% vs holding over 60 days)")
+    covered_call: Optional[Literal["0.15", "0.30"]] = Field(None, description="Covered-call delta to sell now (held shares)")
+
+
 class SignalOut(BaseModel):
-    """Levels and a directional read for a holding of long options only (hedge.signal)."""
+    """The tested read, levels and price plan for any holding or ticker (hedge.signal)."""
     score: int = Field(..., description="Rebound score −100 … +100 (VIX percentile, oversold RSI, depth under the 50-day)")
     bias: Literal["bullish", "bearish", "neutral"]
-    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Long puts: TRIM (take profit) / HOLD. ROLL: a leg decays too fast")
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"] = Field(..., description="Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry")
     side: Literal["long", "short"]
     headline: str
     support: Optional[SignalLevelOut] = None
@@ -239,17 +253,19 @@ class SignalOut(BaseModel):
     evidence: str = Field("", description="Backtest result for this verdict")
     iv_model: Optional[float] = Field(None, description="Modelled 30-day IV now (the backtest's model)")
     iv_normal: Optional[float] = Field(None, description="Its 5-year average")
-    iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal: the lower of the model's and the live ATM IV's; ADD needs ≥ 1.2")
+    iv_ratio: Optional[float] = Field(None, description="Stock IV ÷ its 5-year normal (the lower of the model's and the live ATM IV's); context only, no gate")
     legs: List[SignalLegOut] = []
     probability: Optional[SignalProbOut] = None
     pnl: Optional[SignalPnlOut] = None
+    fear_score: Optional[float] = Field(None, description="0–1: VIX percentile × how oversold; ADD at ≥ 0.283")
+    plan: Optional[SignalPlanOut] = None
 
 
 class StockSignalOut(BaseModel):
     """The desk's signal for one ticker, held or not (GET /hedge/signal/{symbol})."""
     symbol: str
-    held: Literal["none", "stock", "long_options"] = Field(..., description="long_options: the Hedge desk's own book signal")
-    label: Optional[str] = Field(None, description="Enter / Wait / Don't enter when not held; Add / Hold / Don't add / Roll / Take profit when held")
+    held: Literal["none", "stock", "long_options", "options", "mixed"] = Field(..., description="Held in any form: the Hedge desk's own book signal")
+    label: Optional[str] = Field(None, description="Buy / Wait / Don't buy yet when not held; Add / Hold / Don't add / Roll / Take profit when held")
     spot: Optional[float] = None
     day_change: Optional[float] = None
     signal: Optional[SignalOut] = None
@@ -409,3 +425,36 @@ class BrokerIncomeOut(BaseModel):
 
 class BrokerActivityOut(IngestActivity):
     id: int
+
+
+class SignalScanRowOut(BaseModel):
+    symbol: str
+    price: float
+    day_change: Optional[float] = None
+    as_of: str = Field(..., description="Date of the last daily bar")
+    verdict: Literal["ADD", "HOLD", "CAUTION", "TRIM", "ROLL"]
+    label: str = Field(..., description="Buy / Wait / Don't buy yet (read as not held)")
+    case: Optional[Literal["ADD", "LEAN", "CAUTION", "HOLD", "TRIM"]] = None
+    fear_score: Optional[float] = Field(None, description="0–1; Buy at ≥ 0.283")
+    rsi: Optional[float] = None
+    vs_50d: Optional[float] = None
+    off_high: Optional[float] = Field(None, description="vs the 52-week high")
+    buy_below: Optional[float] = Field(None, description="Close at or under this (today's VIX) makes it Buy")
+    vix_trigger: Optional[float] = Field(None, description="VIX close at or over this (today's price) makes it Buy")
+    support: Optional[float] = None
+    headline: str
+    p_edge_positive: Optional[float] = None
+    edge_60: Optional[float] = None
+    held: bool = Field(False, description="You hold it (any form)")
+
+
+class SignalScanOut(BaseModel):
+    """The tested signal across 100 popular US stocks and ETFs, by fear score (GET /hedge/scan)."""
+    as_of: Optional[str] = None
+    building: bool = Field(False, description="A scan is being built; poll again")
+    universe: int
+    score_cut: float
+    vix: Optional[float] = None
+    vix_pct: Optional[float] = None
+    rows: List[SignalScanRowOut] = []
+    failed: List[str] = Field([], description="Symbols with no history this scan")

@@ -1,4 +1,4 @@
-"""hedge.signal: the backtested ADD / HOLD / CAUTION read for holdings tracked as stock (pure)."""
+"""hedge.signal: the backtested ADD / HOLD / CAUTION read and price plan for any holding or ticker (pure)."""
 from optionflow.modules.hedge import signal as sg
 from optionflow.modules.hedge.suggest import Context, Leg, evaluate
 
@@ -42,23 +42,26 @@ def long_history(n=1600, calm_vol=0.01, crash_days=15, seed=1):
     return px, vx
 
 
-def test_dip_during_market_fear_with_elevated_stock_iv_is_add():
+def test_fear_dip_is_add_whatever_the_stock_iv():
     px, vx = long_history()
     s = sg.evaluate(tape(px, vix=vx), exposure=0.7)
-    assert s.iv_ratio and s.iv_ratio >= sg.IV_GATE
-    assert s.verdict == "ADD" and s.side == "long" and s.vix_pct >= 0.8
-    assert s.headline.startswith("Add: fear dip with the stock's IV elevated") and "365+ days" in s.headline
-    assert "simulated 365-day" in s.evidence and s.stop is None        # no stop during fear
-    assert any(r.startswith("No stop during market fear") for r in sg.reasons(s))
-    assert any(r.startswith("Stock IV") for r in sg.reasons(s))
-    low_live = tape(px, vix=vx, atm_iv=s.iv_normal * 1.05)             # the chain prices little fear: no add
-    assert sg.evaluate(low_live, exposure=0.7).verdict == "HOLD"
+    assert s.verdict == "ADD" and s.side == "long" and s.vix_pct >= 0.8 and s.fear_score >= sg.SCORE_CUT
+    assert s.headline.startswith("Add: fear dip (score") and "a third now" in s.headline and "365+ days" in s.headline
+    assert s.stop is None and any(r.startswith("Add in thirds") for r in sg.reasons(s))
+    assert any(r.startswith("Stock IV") and "Context only" in r for r in sg.reasons(s))
+    low_live = tape(px, vix=vx, atm_iv=s.iv_normal * 0.9)              # no IV gate any more: still ADD
+    assert sg.evaluate(low_live, exposure=0.7).verdict == "ADD"
 
 
-def test_fear_dip_without_elevated_stock_iv_is_hold():
-    s = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)     # one year only: no IV history → no gate pass
-    assert s.verdict == "HOLD" and s.headline.startswith("Hold: fear dip, but the stock's own IV isn't elevated")
-    assert "thin edge" in s.evidence
+def test_not_held_reads_as_a_buy_decision_with_prices():
+    px, vx = long_history()
+    s = sg.evaluate(tape(px, vix=vx, held=False, symbol="ABC"), exposure=1.0)
+    assert s.verdict == "ADD" and s.headline.startswith("Buy: fear dip") and s.plan["lines"][0].startswith("Buy in thirds")
+    calm = vx[:-10] + [15.3] * 10                                      # VIX ~70th pct: oversold but not scared enough
+    w = sg.evaluate(tape(px, vix=calm, held=False, symbol="ABC"), exposure=1.0)
+    assert w.verdict == "HOLD" and w.headline.startswith("Wait: oversold") and "Buy if" in w.headline
+    assert w.plan.get("vix_trigger") or w.plan.get("buy_below")
+    assert not any(l.startswith(("Upside", "Exit line", "Covered calls")) for l in w.plan["lines"])   # nothing to exit
 
 
 def test_iv_model_needs_history_and_matches_a_calm_stock():
@@ -68,28 +71,35 @@ def test_iv_model_needs_history_and_matches_a_calm_stock():
     assert 0.08 < now < 0.4 and 0.7 < ratio < 1.3                     # ~16% realised vol, nothing unusual
 
 
-def test_leg_decay_grows_as_time_runs_out_and_triggers_roll():
+def test_leg_decay_grows_as_time_runs_out_and_roll_is_about_expiry():
     far = sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 400, "iv": 0.4, "quantity": 2}, None, 0.04)
-    near = sg.leg_decay(100.0, {"otype": "call", "strike": 85.0, "dte": 90, "iv": 0.4, "quantity": 2}, None, 0.04)
-    assert far["decay_20d"] < 0.03 and not far["roll"]
-    assert near["decay_20d"] >= sg.ROLL_DECAY and near["roll"] and near["theta_day"] > far["theta_day"]
+    mid = sg.leg_decay(100.0, {"otype": "call", "strike": 85.0, "dte": 90, "iv": 0.4, "quantity": 2}, None, 0.04)
+    near = sg.leg_decay(100.0, {"otype": "call", "strike": 85.0, "dte": 25, "iv": 0.4, "quantity": 2}, None, 0.04)
+    assert far["decay_20d"] < mid["decay_20d"] and not far["roll"] and not mid["roll"]   # decay alone: no roll
+    assert near["roll"] and sg.leg_decay(100.0, {"otype": "call", "strike": 85.0, "dte": 50, "iv": 0.4}, None, 0.04)["warn"]
     assert sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 100}, None, 0.04) is None   # no IV at all
     m = sg.leg_decay(100.0, {"otype": "call", "strike": 80.0, "dte": 400}, None, 0.04, (0.6, 0.4))  # no quote: model
     assert m["iv_source"] == "model" and 0.4 < m["iv"] < 0.6                 # long-dated IV sits between IV30 and normal
 
 
-def test_a_short_dated_leg_turns_the_verdict_into_roll():
-    legs = [{"otype": "call", "strike": 120.0, "expiry": "2027-02-19", "dte": 95, "iv": 0.45, "quantity": 1}]
+def test_a_leg_near_expiry_turns_the_verdict_into_roll():
+    legs = [{"otype": "call", "strike": 120.0, "expiry": "2026-12-11", "dte": 25, "iv": 0.45, "quantity": 1}]
     s = sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=legs), exposure=0.8)
-    assert s.verdict == "ROLL" and s.headline.startswith("Roll the 120C 2027-02-19") and s.legs[0]["roll"]
-    assert any("→ roll." in r for r in sg.reasons(s))
-    puts = [{"otype": "put", "strike": 150.0, "dte": 95, "iv": 0.5, "quantity": 1}]
+    assert s.verdict == "ROLL" and s.headline.startswith("Roll or close the 120C 2026-12-11") and s.legs[0]["roll"]
+    assert any("→ roll or close." in r for r in sg.reasons(s))
+    ok = [dict(legs[0], dte=95)]
+    assert sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=ok), exposure=0.8).verdict == "HOLD"   # 95 days: no roll
+    puts = [{"otype": "put", "strike": 150.0, "dte": 25, "iv": 0.5, "quantity": 1}]
     assert sg.evaluate(tape(selloff(), vix=vix(35.0), legs=puts), exposure=-0.5).verdict == "TRIM"   # take profit first
+    short = [{"otype": "call", "strike": 130.0, "dte": 10, "iv": 0.4, "quantity": -1}]                # sold calls: not ours to roll
+    assert sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=short, shares=100), exposure=0.7).verdict == "HOLD"
 
 
 def test_same_dip_in_a_calm_market_is_dont_add_not_a_sell():
     s = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
-    assert s.verdict == "CAUTION" and s.headline.startswith("Don't add: stock-specific weakness")
+    assert s.verdict == "CAUTION" and s.headline.startswith("Don’t add: stock-specific weakness") and "clears above" in s.headline
+    u = sg.evaluate(tape(selloff(), vix=vix(12.5), held=False), exposure=1.0)
+    assert u.headline.startswith("Don’t buy yet")
 
 
 def test_stretched_in_a_calm_market_is_dont_add():
@@ -103,15 +113,20 @@ def test_quiet_uptrend_with_normal_vix_is_hold():
     assert s.verdict == "HOLD" and s.headline.startswith("Hold: no edge")
 
 
-def test_oversold_without_enough_fear_is_hold_with_the_vix_trigger():  # noqa: D103
+def test_oversold_without_enough_fear_is_hold_with_price_and_vix_triggers():  # noqa: D103
     px, vx = long_history()
-    vx = vx[:-10] + [15.0] * 10                                      # VIX back to ~65th percentile
-    s = sg.evaluate(tape(px, vix=vx), exposure=1.0)
-    assert s.iv_ratio >= sg.IV_GATE and s.verdict == "HOLD"
-    assert s.headline.startswith("Hold: oversold, but the market isn't scared") and "ADD if VIX closes ≥" in s.headline
+    vx = vx[:-10] + [15.3] * 10                                      # VIX ~70th percentile
+    s = sg.evaluate(tape(px, vix=vx, symbol="ABC"), exposure=1.0)
+    assert s.verdict == "HOLD" and s.headline.startswith("Hold: oversold") and s.probability["case"] == "LEAN"
+    assert s.plan["vix_trigger"] > 15.3 and "VIX closes ≥" in s.headline
     assert "no edge" in s.evidence
-    short = sg.evaluate(tape(selloff(), vix=vix(25.0)), exposure=1.0)   # no IV history: no VIX trigger offered
-    assert "ADD if VIX" not in short.headline
+    hot = vx[:-1] + [15.7]                                            # high enough that price alone can trigger it
+    h = sg.evaluate(tape(px[:-15] + [px[-16] * (1 - 0.01 * i) for i in range(1, 16)], vix=hot, symbol="ABC"), exposure=1.0)
+    if h.verdict == "HOLD" and h.plan.get("buy_below"):
+        assert h.plan["buy_below"] < h.levels[0]["price"] and "closes ≤" in h.plan["trigger_text"]
+        nxt = sg.evaluate(tape(px[:-15] + [px[-16] * (1 - 0.01 * i) for i in range(1, 15)] + [h.plan["buy_below"] * 0.999],
+                               vix=hot), exposure=1.0)
+        assert nxt.verdict == "ADD"                                   # closing at the trigger price flips it
 
 
 def test_long_puts_take_profit_on_the_fear_dip():
@@ -148,33 +163,34 @@ def test_calm_market_above_the_200_day_has_a_risk_line():
     assert s.stop is not None and s.stop < s.levels[0]["price"]
 
 
-def test_desk_attaches_the_signal_to_long_option_holdings_only():
+def test_desk_attaches_the_signal_to_every_holding():
     ctx = Context("NVDA", 162.0, None, day_change=-2.0, atm_iv=0.45, hv20=0.40, put_wall=155.0, call_wall=175.0)
     legs = [Leg("option", 1, 40.0, "call", 130.0, "2028-01-21", 434, 0.45)]
     book = evaluate(ctx, legs, [], None, None, tape(ramp(120, 0.2), spot=162.0, vix=vix(20.0)))
     assert book.signal and book.signal["verdict"] in ("ADD", "HOLD", "CAUTION")
     assert book.suggestion.headline == book.signal["headline"]
-    assert book.suggestion.reasons[1] == book.signal["evidence"]
-    book = evaluate(ctx, [Leg("stock", 100, 150.0)], [], None)
-    assert book.signal is None
+    shares = [Leg("stock", 100, 150.0), Leg("option", -1, 2.0, "call", 175.0, "2026-12-18", 30, 0.4)]   # covered call
+    cc = evaluate(ctx, shares, [], None, None, tape(ramp(120, 0.2), spot=162.0, vix=vix(20.0)))
+    assert cc.signal and cc.signal["side"] == "long" and cc.strategy != "long_stock"   # its strategy still runs
+    assert any(l.startswith("Covered calls") for l in cc.signal["plan"]["lines"])
+    assert any(l.startswith("Upside") for l in cc.signal["plan"]["lines"])
+    assert evaluate(ctx, [Leg("stock", 100, 150.0)], [], None).signal is None              # no tape: nothing to read
 
 
 def test_each_setup_carries_its_backtest_odds():
     px, vx = long_history()
     add = sg.evaluate(tape(px, vix=vx), exposure=0.7)
     assert add.probability["case"] == "ADD" and add.probability["p_edge_positive"] >= 0.9
-    assert add.probability["p_up_60"] <= sg.PROBS["TRIM"]["p_up_60"] + 1e-9        # conservative: never above ungated
     assert sg.reasons(add)[0].startswith("Odds (2015–2026, unseen): stock up in 60 days")
     calm = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
     assert calm.probability["case"] == "CAUTION" and calm.probability["p_edge_positive"] < 0.1
-    fear_normal = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=0.7)
-    assert fear_normal.probability["case"] == "FEAR_IV_NORMAL"
     puts = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=-0.7)
     assert puts.probability["case"] == "TRIM" and "bad for the puts" in sg.reasons(puts)[0]
-    legs = [{"otype": "call", "strike": 120.0, "dte": 95, "iv": 0.45, "quantity": 1}]
+    legs = [{"otype": "call", "strike": 120.0, "dte": 20, "iv": 0.45, "quantity": 1}]
     roll = sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=legs), exposure=0.8)
-    assert roll.verdict == "ROLL" and roll.probability["case"] == "HOLD"   # odds are the stock's setup; roll is decay
+    assert roll.verdict == "ROLL" and roll.probability["case"] == "HOLD"   # odds are the stock's setup; roll is expiry
     assert sg.evaluate(tape(ramp(100, 0.1)), exposure=1.0).probability is None   # untested without VIX / history
+    assert set(sg.PROBS) == {"ADD", "LEAN", "CAUTION", "HOLD", "TRIM"}
 
 
 def test_pnl_is_a_risk_read_and_never_moves_the_verdict():
