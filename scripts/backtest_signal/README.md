@@ -35,6 +35,8 @@ Round 3, 2026-11-14 (200 symbols: fetch.py now lists 52 more; docs/swing-signal.
     python swing3.py      # can the swing drop leg be sharper? (vol-scaled, stock-only, trend filters) + new-52 hold-out
     python swing3b.py     # grade the swing buys: the STRONG tier (5-day drop ≥ 7%, above the 200-day)
     python signal3.py     # ADD / CAUTION / EXIT re-read on 200 names, and ADD filters
+    python accuracy.py    # the accuracy tracker: per round, each signal's edge, SE, 95% range, effective n, hold-out
+                          # → accuracy.json; append the round to docs/signal-accuracy.md (+ docs/signal-accuracy.json)
 
 Weekly: add names to fetch.py, re-run the four lines above, compare with the tables in the docs. A rule changes only
 when a candidate beats it on 1995–2014 (both the average and the t); the new names are a hold-out.
