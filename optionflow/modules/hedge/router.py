@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -56,16 +56,17 @@ def books(user=Depends(get_current_user)) -> BooksOut:
 
 
 @router.get("/scan", response_model=SignalScanOut)
-def scan(user=Depends(get_current_user)) -> SignalScanOut:
-    """The backtested signal across 100 popular US stocks and ETFs, ranked by fear score (Buy / Wait / Don't buy yet,
-    with the close or VIX level that would make it Buy). Shared, refreshed every 15 minutes in the background; your
-    holdings are marked."""
+def scan(universe: Literal["popular", "sp500"] = Query("popular", description="popular: 100 popular stocks and ETFs; sp500: the S&P 500"),
+         user=Depends(get_current_user)) -> SignalScanOut:
+    """The backtested signal across a universe, ranked by fear score (Buy / Wait / Don't buy yet, with the close or VIX
+    level that would make it Buy). Shared per universe, refreshed every 15 minutes in the background; your holdings are
+    marked."""
     from optionflow.modules.hedge import scan as sc
     try:
         held = {p["symbol"].upper() for p in service.list_positions(int(user["sub"]))}
     except Exception:
         held = set()
-    return SignalScanOut(**sc.get(held, wait=20.0))
+    return SignalScanOut(**sc.get(held, wait=20.0, universe=universe))
 
 
 @router.get("/signal/{symbol}", response_model=StockSignalOut)

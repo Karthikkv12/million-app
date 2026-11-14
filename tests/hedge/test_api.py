@@ -193,6 +193,18 @@ def test_signal_scan_ranks_by_fear_score_and_marks_holdings(client):
     body = {"username": "owner", "positions": [{"account": "x", "symbol": "BBB", "kind": "stock", "quantity": 10, "avg_price": 90.0}]}
     assert c.post("/api/v1/hedge/ingest", json=body, headers={"X-Hedge-Ingest-Token": TOKEN}).status_code == 200
     d = c.get("/api/v1/hedge/scan", headers=_login(c, "owner")).json()
-    assert d["universe"] == 100 and d["score_cut"] == 0.283
+    assert d["universe"] == 100 and d["score_cut"] == 0.283 and d["universe_key"] == "popular"
     assert [x["symbol"] for x in d["rows"] if x["held"]] == ["BBB"]
     assert c.get("/api/v1/hedge/scan").status_code == 401
+
+
+def test_signal_scan_has_an_sp500_universe(client):
+    from optionflow.modules.hedge import scan as sc
+    c, fake = client
+    _signal_market(fake, 106.0)
+    assert len(sc.UNIVERSES["sp500"]) >= 500 and "BRK-B" in sc.UNIVERSES["sp500"]
+    sc.build(["AAA", "BBB"], universe="sp500")
+    d = c.get("/api/v1/hedge/scan?universe=sp500", headers=_login(c, "owner")).json()
+    assert d["universe_key"] == "sp500" and d["universe"] == len(sc.UNIVERSES["sp500"])
+    assert {r["symbol"] for r in d["rows"]} == {"AAA", "BBB"}
+    assert c.get("/api/v1/hedge/scan?universe=nope", headers=_login(c, "owner")).status_code == 422
