@@ -1102,6 +1102,12 @@ export const sendTestPush = () => api.post<PushTest>("/notify/test");
 export type NotifyPrefs = Schemas["NotifyPrefs"];
 export const fetchNotifyPrefs = () => api.get<NotifyPrefs>("/notify/prefs");
 export const saveNotifyPrefs = (p: NotifyPrefs) => api.put<NotifyPrefs>("/notify/prefs", p);
+// Notification Center: every alert (trades, levels, price alerts, paper trades, reports), read or not
+export type Inbox = Schemas["InboxOut"];
+export type InboxItem = Schemas["NotificationOut"];
+export const fetchInbox = () => api.get<Inbox>("/notify/inbox");
+export const markInboxRead = (ids?: number[]) => api.post<Schemas["UnreadOut"]>("/notify/inbox/read", ids ? { ids } : {});
+export const clearInbox = () => api.del<Schemas["UnreadOut"]>("/notify/inbox");
 
 // ── Daily report pages (morning / evening / weekend) ─────────────────────────
 export type ReportMeta = Schemas["ReportSummary"];
