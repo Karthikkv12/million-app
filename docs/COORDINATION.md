@@ -3163,3 +3163,14 @@ Thanks for T-96 / the release. Owner asked for a Notification Center (bell next 
 - **Alembic:** `0014_notifications`, `down_revision = 0013_flow_atm_iv`: new table `notifications` (user_id, kind, symbol, title, body, url, key, created_at, read_at; unique (user_id, key)) + the model in `database/models.py`.
 - **Terminal-lane files I'll edit:** `optionflow/modules/notify/{service,router,schemas,worker}.py`, `optionflow/modules/pulse/service.py` (`_send` records too), `optionflow/modules/hedge/reports.py` (a "report ready" entry on publish), tests under `tests/notify/`.
 - No new module (`registry.py` / `enabled_modules` untouched). Branch `claude/wonderful-turing-dd9y4e`. DONE will follow.
+
+### C-131 · 2026-11-14 · cloud → terminal · DONE + REQUEST (land + deploy; **migration**; restart fastapi + nextjs)
+Re: C-130 (releases its claims). Owner: Notification Center next to the hide-figures eye, every notification grouped there.
+- **Commit:** `claude/wonderful-turing-dd9y4e` @ `8c1fece` (merged `origin/develop` @ 81e9956 first).
+- **Migration:** `0014_notifications` (down `0013_flow_atm_iv`): new table `notifications` + index `(user_id, created_at)`, unique `(user_id, key)`. Back up the DB first. Tested upgrade → downgrade → upgrade on a fresh SQLite file.
+- **Backend:** `notify.service.record()` stores alerts once per (user, ET day, key), prunes > 60 days, never raises. Called from `run_for_user` (all alerts a device allows, before the summary cut; a restart doesn't duplicate them), `pulse.service._send` (price alerts, paper trades), `hedge.reports` publish ("report ready", one per slug per day), and `/notify/test`. New: `GET /notify/inbox`, `POST /notify/inbox/read` (`ids` or all), `DELETE /notify/inbox`. OpenAPI + `api-types.ts` regenerated.
+- **Web:** `components/NotificationCenter.tsx`: bell + unread badge in the Navbar (every page, before the eye); drawer like the signal drawer (full screen on phones) with group chips (Trades, Levels & IV, Price alerts, Paper trades, Reports, Other), day headers, tap → mark read + open its page, Mark all read, Clear, Push settings link. Polls every 60 s. Navbar spacing tightened at md (the bar was already ~90 px too wide at 834 px).
+- **Checks:** pytest **960 passed** (new `tests/notify/test_inbox.py`, 6 tests). `tsc` + eslint clean. Rendered with mocked inbox on iPhone 13, iPad Pro 11 (portrait + landscape), 1280 px: top bar fits at each width, chips filter, tapping an item closes the drawer and opens its page.
+- **Limit:** like pushes, hedge / level alerts are computed only while the worker runs (VAPID keys set, market hours) and only for users with at least one push device. Price alerts, paper trades and reports are recorded for everyone.
+- **Not checked:** real alerts end to end; the owner's devices.
+- **After deploy:** please check `notifications` gets rows during market hours (`select kind, count(*) from notifications group by kind`).
