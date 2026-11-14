@@ -1,7 +1,8 @@
 """optionflow/modules/hedge/scan.py — the tested signal across a universe (100 popular names, or the S&P 500), by fear score.
 
 Same code path as the stock page's read for a ticker you don't hold (hedge.signal.evaluate with held=False): Buy /
-Wait / Don't buy yet, the fear score, and the prices that would turn it into Buy. Built in the background from daily
+Wait / Don't buy yet, the fear score, and the prices that would turn it into Buy. Each row also carries the swing read
+(hedge.swing: 1 week – 1 month, its own backtest). Built in the background from daily
 bars (2 years, cached SCAN_BARS_TTL) and the VIX; one scan per universe is shared by every user and kept SCAN_TTL. The user's own
 holdings are only marked per request, never stored.
 """
@@ -16,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from optionflow.modules.hedge import service
 from optionflow.modules.hedge import signal as sg
+from optionflow.modules.hedge import swing as sw
 from optionflow.modules.hedge.universe import SP500
 
 logger = logging.getLogger("optionflow.hedge.scan")
@@ -69,13 +71,16 @@ def row(sym: str, vix: List[float], vix_dates: List[str], today: str) -> Optiona
     prev = closes[-2] if len(closes) > 1 else None
     p = g.probability or {}
     plan = g.plan or {}
+    s = sw.read(px, vix, live=t.today_bar, fear_buy_below=plan.get("buy_below")) or {}
     return {"symbol": sym, "price": round(spot, 2), "day_change": (spot / prev - 1.0) if prev else None,
             "as_of": bars[-1]["date"], "verdict": g.verdict, "label": service.LABELS["none"][g.verdict],
             "case": p.get("case"), "fear_score": g.fear_score, "rsi": sg.rsi(px),
             "vs_50d": (spot / m50 - 1.0) if m50 else None, "off_high": spot / hi52 - 1.0,
             "buy_below": plan.get("buy_below"), "vix_trigger": plan.get("vix_trigger"),
             "support": (g.support or {}).get("price"), "headline": g.headline,
-            "p_edge_positive": p.get("p_edge_positive"), "edge_60": p.get("edge_60")}
+            "p_edge_positive": p.get("p_edge_positive"), "edge_60": p.get("edge_60"),
+            "swing": s.get("verdict"), "swing_reason": s.get("reason"), "swing_buy_below": s.get("buy_below"),
+            "swing_exit_above": s.get("exit_above"), "ret5": s.get("ret5"), "vs_200d": s.get("vs_200d")}
 
 
 def build(symbols: Optional[List[str]] = None, universe: str = "popular") -> Dict[str, Any]:
@@ -133,4 +138,5 @@ def get(held: Optional[set] = None, wait: float = 0.0, universe: str = "popular"
     snap["universe"] = len(UNIVERSES[universe])
     snap["universe_key"] = universe
     snap["score_cut"] = sg.SCORE_CUT
+    snap["swing_stats"] = sw.STATS
     return snap

@@ -446,6 +446,36 @@ class SignalScanRowOut(BaseModel):
     p_edge_positive: Optional[float] = None
     edge_60: Optional[float] = None
     held: bool = Field(False, description="You hold it (any form)")
+    swing: Optional[Literal["BUY", "WAIT"]] = Field(None, description="Swing read (1 week – 1 month); None without 200 days of history")
+    swing_reason: Optional[str] = None
+    swing_buy_below: Optional[float] = Field(None, description="A close at or under this would make it a swing buy")
+    swing_exit_above: Optional[float] = Field(None, description="Swing exit: the first close above the 10-day average (this is today's)")
+    ret5: Optional[float] = Field(None, description="5-day change")
+    vs_200d: Optional[float] = None
+
+
+class SwingStatsOut(BaseModel):
+    trades: int
+    avg: float
+    median: float
+    win: float
+    days: float
+    worst5: float
+    t: float
+
+
+class SwingBaselineOut(BaseModel):
+    avg: float
+    win: float
+
+
+class SwingStatsSetOut(BaseModel):
+    """Backtest of the swing rule (hedge.swing.STATS): IS 1995–2014 (chosen), OOS 2015–2026 (unseen)."""
+    is_: SwingStatsOut = Field(..., alias="is")
+    oos: SwingStatsOut
+    baseline_oos_5d: SwingBaselineOut
+
+    model_config = {"populate_by_name": True}
 
 
 class SignalScanOut(BaseModel):
@@ -459,3 +489,4 @@ class SignalScanOut(BaseModel):
     vix_pct: Optional[float] = None
     rows: List[SignalScanRowOut] = []
     failed: List[str] = Field([], description="Symbols with no history this scan")
+    swing_stats: Optional[SwingStatsSetOut] = None

@@ -6340,6 +6340,7 @@ export interface components {
             rows: components["schemas"]["SignalScanRowOut"][];
             /** Score Cut */
             score_cut: number;
+            swing_stats?: components["schemas"]["SwingStatsSetOut"] | null;
             /**
              * Universe
              * @description Tickers in the universe
@@ -6401,10 +6402,32 @@ export interface components {
             p_edge_positive?: number | null;
             /** Price */
             price: number;
+            /**
+             * Ret5
+             * @description 5-day change
+             */
+            ret5?: number | null;
             /** Rsi */
             rsi?: number | null;
             /** Support */
             support?: number | null;
+            /**
+             * Swing
+             * @description Swing read (1 week – 1 month); None without 200 days of history
+             */
+            swing?: ("BUY" | "WAIT") | null;
+            /**
+             * Swing Buy Below
+             * @description A close at or under this would make it a swing buy
+             */
+            swing_buy_below?: number | null;
+            /**
+             * Swing Exit Above
+             * @description Swing exit: the first close above the 10-day average (this is today's)
+             */
+            swing_exit_above?: number | null;
+            /** Swing Reason */
+            swing_reason?: string | null;
             /** Symbol */
             symbol: string;
             /**
@@ -6417,6 +6440,8 @@ export interface components {
              * @description VIX close at or over this (today's price) makes it Buy
              */
             vix_trigger?: number | null;
+            /** Vs 200D */
+            vs_200d?: number | null;
             /** Vs 50D */
             vs_50d?: number | null;
         };
@@ -6921,6 +6946,13 @@ export interface components {
              */
             yield_ann?: number | null;
         };
+        /** SwingBaselineOut */
+        SwingBaselineOut: {
+            /** Avg */
+            avg: number;
+            /** Win */
+            win: number;
+        };
         /** SwingPoint */
         SwingPoint: {
             /** Close */
@@ -6974,6 +7006,32 @@ export interface components {
              * @description Share of sessions whose spike was at or below today's
              */
             spike_percentile: number;
+        };
+        /** SwingStatsOut */
+        SwingStatsOut: {
+            /** Avg */
+            avg: number;
+            /** Days */
+            days: number;
+            /** Median */
+            median: number;
+            /** T */
+            t: number;
+            /** Trades */
+            trades: number;
+            /** Win */
+            win: number;
+            /** Worst5 */
+            worst5: number;
+        };
+        /**
+         * SwingStatsSetOut
+         * @description Backtest of the swing rule (hedge.swing.STATS): IS 1995–2014 (chosen), OOS 2015–2026 (unseen).
+         */
+        SwingStatsSetOut: {
+            baseline_oos_5d: components["schemas"]["SwingBaselineOut"];
+            is: components["schemas"]["SwingStatsOut"];
+            oos: components["schemas"]["SwingStatsOut"];
         };
         /** SwingsOut */
         SwingsOut: {
