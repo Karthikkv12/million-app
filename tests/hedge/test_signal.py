@@ -95,9 +95,16 @@ def test_a_leg_near_expiry_turns_the_verdict_into_roll():
     assert sg.evaluate(tape(ramp(100, 0.1), vix=vix(20.0), legs=short, shares=100), exposure=0.7).verdict == "HOLD"
 
 
+def calm_drop():
+    """A strong climb, then 13% off the high while still above the 200-day."""
+    return ramp(100, 0.4, 245) + [197.6 - 1.7 * i for i in range(1, 16)]
+
+
 def test_same_dip_in_a_calm_market_is_dont_add_not_a_sell():
-    s = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
+    s = sg.evaluate(tape(calm_drop(), vix=vix(12.5)), exposure=0.7)
     assert s.verdict == "CAUTION" and s.headline.startswith("Don’t add: stock-specific weakness") and "clears above" in s.headline
+    deeper = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)          # held and under the 200-day: the tested exit
+    assert deeper.verdict == "EXIT"
     u = sg.evaluate(tape(selloff(), vix=vix(12.5), held=False), exposure=1.0)
     assert u.headline.startswith("Don’t buy yet")
 
@@ -182,7 +189,7 @@ def test_each_setup_carries_its_backtest_odds():
     add = sg.evaluate(tape(px, vix=vx), exposure=0.7)
     assert add.probability["case"] == "ADD" and add.probability["p_edge_positive"] >= 0.9
     assert sg.reasons(add)[0].startswith("Odds (2015–2026, unseen): stock up in 60 days")
-    calm = sg.evaluate(tape(selloff(), vix=vix(12.5)), exposure=0.7)
+    calm = sg.evaluate(tape(calm_drop(), vix=vix(12.5)), exposure=0.7)
     assert calm.probability["case"] == "CAUTION" and calm.probability["p_edge_positive"] < 0.1
     puts = sg.evaluate(tape(selloff(), vix=vix(35.0)), exposure=-0.7)
     assert puts.probability["case"] == "TRIM" and "bad for the puts" in sg.reasons(puts)[0]
@@ -211,3 +218,56 @@ def test_pnl_is_a_risk_read_and_never_moves_the_verdict():
     assert shares.pnl["kind"] == "shares" and shares.pnl["p5_paid"] is None and "didn't predict" in shares.pnl["note"]
     assert sg.evaluate(tape(ramp(100, 0.05), vix=vix(20.0)), exposure=1.0).pnl is None
 
+
+
+def _under_200(n_up=230, drop=30):
+    """A slow climb, then a slide that ends just under the 200-day but within 10% of the 52-week high."""
+    return ramp(100, 0.05, n_up) + [111.5 - 0.15 * i for i in range(drop)] + [106.5]
+
+
+def test_held_under_200_day_in_calm_market_is_exit_for_every_long_form():
+    px = _under_200()
+    legs_call = [{"otype": "call", "strike": 90, "expiry": "2027-12-17", "dte": 400, "iv": 0.3, "mark": 20, "quantity": 1, "avg_price": 15}]
+    legs_sp = [{"otype": "put", "strike": 95, "expiry": "2027-01-15", "dte": 60, "iv": 0.3, "mark": 1, "quantity": -1, "avg_price": 2}]
+    for kw, ex in ((dict(shares=100, avg_cost=100), 1.0), (dict(legs=legs_call), 0.9), (dict(legs=legs_sp), 0.3)):
+        s = sg.evaluate(tape(px, vix=vix(13.0), **kw), ex)
+        assert s.verdict == "EXIT" and s.headline.startswith("Exit or cut")
+        assert s.stop == s.plan["exit_below"] == round(sg.sma(px, 200), 2)
+        assert s.probability is None and "200-day" in s.evidence
+        assert "Add if" not in s.headline
+
+
+def test_exit_only_when_calm_and_never_for_unheld():
+    px = _under_200()
+    mid = sg.evaluate(tape(px, vix=vix(24.0), shares=100, avg_cost=100), 1.0)
+    assert mid.verdict != "EXIT" and mid.plan["exit_below"] is not None
+    assert any("no exit yet" in l for l in mid.plan["lines"])
+    fear = sg.evaluate(tape(selloff(), vix=vix(29.5), shares=100, avg_cost=100), 1.0)
+    assert fear.verdict == "ADD" and "exit_below" not in fear.plan
+    unheld = sg.evaluate(tape(px, vix=vix(13.0), held=False), 1.0)
+    assert unheld.verdict != "EXIT"
+
+
+def test_exit_beats_roll_and_says_close():
+    leg = [{"otype": "call", "strike": 90, "expiry": "2026-12-04", "dte": 20, "iv": 0.3, "mark": 17, "quantity": 1, "avg_price": 15}]
+    s = sg.evaluate(tape(_under_200(), vix=vix(13.0), legs=leg), 0.9)
+    assert s.verdict == "EXIT" and "close it rather than roll" in s.headline
+
+
+def test_short_calls_are_not_called_puts():
+    leg = [{"otype": "call", "strike": 160, "expiry": "2027-01-15", "dte": 60, "iv": 0.3, "mark": 2, "quantity": -2, "avg_price": 3}]
+    s = sg.evaluate(tape(ramp(100, 0.2), vix=vix(29.5), legs=leg), -0.4)
+    assert "puts" not in s.headline and "short calls" in s.headline
+    assert not any("if if" in l for l in s.plan["lines"])
+    t = sg.evaluate(tape(selloff(), vix=vix(29.5), legs=leg), -0.4)
+    assert t.verdict == "TRIM" and t.headline.startswith("Buy back the short calls")
+
+
+def test_no_200_day_history_says_so():
+    s = sg.evaluate(tape(ramp(100, 0.2, 150), vix=vix(13.0), shares=100, avg_cost=100), 1.0)
+    assert any("no tested exit line yet" in l for l in s.plan["lines"]) and s.verdict != "EXIT"
+
+
+def test_exit_leads_the_plan():
+    s = sg.evaluate(tape(_under_200(), vix=vix(13.0), shares=100, avg_cost=100), 1.0)
+    assert s.plan["lines"][0].startswith("Exit:") and not any(l.startswith("Add signal") for l in s.plan["lines"])

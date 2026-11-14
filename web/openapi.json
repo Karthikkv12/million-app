@@ -11558,7 +11558,7 @@
         "type": "null"
        }
       ],
-      "description": "Risk line, calm markets only: the 200-day average",
+      "description": "Held, calm market: the 200-day average (under it = EXIT)",
       "title": "Stop"
      },
      "support": {
@@ -11583,13 +11583,14 @@
       "title": "Target"
      },
      "verdict": {
-      "description": "Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry",
+      "description": "Long: ADD / HOLD / CAUTION (don't add) / EXIT (held, under the 200-day in a calm market). Net short (puts, short calls): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry. Horizon: the next 20\u201360 trading days (1\u20133 months)",
       "enum": [
        "ADD",
        "HOLD",
        "CAUTION",
        "TRIM",
-       "ROLL"
+       "ROLL",
+       "EXIT"
       ],
       "title": "Verdict",
       "type": "string"
@@ -11681,7 +11682,7 @@
         "type": "null"
        }
       ],
-      "description": "Held, calm market: the 200-day average (close under it \u2192 \u22121.65% vs holding over 60 days)",
+      "description": "Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (\u22121.5% to \u22121.65% vs holding over 60 days); not in fear",
       "title": "Exit Below"
      },
      "lines": {

@@ -77,6 +77,7 @@ const VERDICT: Record<Signal["verdict"], { tag: "gain" | "loss" | "warn" | "neut
   CAUTION: { tag: "warn", label: "Don't add", edge: "warn" },
   TRIM: { tag: "loss", label: "Take profit", edge: "loss" },
   ROLL: { tag: "warn", label: "Roll", edge: "warn" },
+  EXIT: { tag: "loss", label: "Exit", edge: "loss" },
 };
 const READ_LABEL: Record<Signal["reads"][number]["key"], string> = {
   fear: "Market fear", momentum: "RSI", dip: "Dip", flow: "Options flow", trend: "Trend", dealers: "Dealers",
@@ -559,10 +560,10 @@ function BookRow({ b, open, onToggle }: { b: HedgeBook; open: boolean; onToggle:
 function HoldingSignals({ books, onOpen }: { books: HedgeBook[]; onOpen: (sym: string) => void }) {
   const rows = books.filter((b) => b.signal).sort((a, b) => (b.signal!.fear_score ?? -1) - (a.signal!.fear_score ?? -1));
   if (!rows.length) return null;
-  const order: Signal["verdict"][] = ["ADD", "TRIM", "ROLL", "CAUTION", "HOLD"];
+  const order: Signal["verdict"][] = ["EXIT", "ADD", "TRIM", "ROLL", "CAUTION", "HOLD"];
   const count = (v: Signal["verdict"]) => rows.filter((b) => b.signal!.verdict === v).length;
   return (
-    <DeskSection label="Signal · every holding" meta={<>The backtested read for each holding, whatever it is.<br />Follows your synced positions.</>}>
+    <DeskSection label="Signal · every holding" meta={<>The backtested read for each holding, whatever it is: a timing call for the next 1–3 months.<br />Follows your synced positions.</>}>
       <p className="mb-2 font-mono text-[11px] text-foreground/50">
         {order.filter((v) => count(v)).map((v) => `${VERDICT[v].label} ${count(v)}`).join(" · ")}
       </p>

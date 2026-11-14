@@ -12,8 +12,11 @@ import type { HedgeBook } from "@/lib/api";
 export type SignalData = NonNullable<HedgeBook["signal"]>;
 type Tone = "gain" | "loss" | "warn" | "neutral";
 
-const TONE: Record<SignalData["verdict"], Tone> = { ADD: "gain", HOLD: "neutral", CAUTION: "warn", TRIM: "loss", ROLL: "warn" };
-const DEFAULT_LABEL: Record<SignalData["verdict"], string> = { ADD: "Add", HOLD: "Hold", CAUTION: "Don't add", TRIM: "Take profit", ROLL: "Roll" };
+const TONE: Record<SignalData["verdict"], Tone> = { ADD: "gain", HOLD: "neutral", CAUTION: "warn", TRIM: "loss", ROLL: "warn", EXIT: "loss" };
+const DEFAULT_LABEL: Record<SignalData["verdict"], string> = { ADD: "Add", HOLD: "Hold", CAUTION: "Don't add", TRIM: "Take profit", ROLL: "Roll", EXIT: "Exit" };
+/** Every verdict is a timing call for the next 20–60 trading days, measured against simply holding (hedge.signal). */
+export const SIGNAL_HORIZON = "1–3 mo";
+export const SIGNAL_HORIZON_LINE = "Horizon: the next 1–3 months (20–60 trading days), measured against simply holding. Not a day trade, and not a call on the company for years.";
 export const SIGNAL_TONE = TONE;
 const pct = (v?: number | null, d = 0) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
 const sgn = (v?: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(1)}%`);
@@ -26,6 +29,7 @@ export function confidenceOf(g: SignalData): { word: string; tone: Tone; line: s
     return { word: "Expiry", tone: "warn", line: `${near ? `The ${near.label} has ${near.dte} days left` : "A leg is close to expiry"}: roll or close. Not an edge: early rolls lost ~4% to costs. `
       + (p ? `The stock's own setup: ${pct(p.p_edge_positive)} chance its average edge is above zero.` : "") };
   }
+  if (g.verdict === "EXIT") return { word: "Weak (negative)", tone: "loss", line: "Tested exit: such days ran −1.5% vs holding over the next 60 trading days (t −2.5). A reason to cut, not a crash call." };
   if (!p) return { word: "Untested", tone: "neutral", line: "No VIX or price history: the backtest doesn't cover this read." };
   const pe = p.p_edge_positive;
   if (pe >= 0.95) return { word: "High", tone: "gain", line: `${pct(pe)} chance the average edge is above zero.` };
@@ -80,8 +84,9 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
       onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button type="button" data-testid="signal-badge" aria-describedby={open ? id : undefined} aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
-        className="rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        className="inline-flex items-center rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
         <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
+        <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] text-foreground/45" title={SIGNAL_HORIZON_LINE}>{SIGNAL_HORIZON}</span>
       </button>
       {open && (
         <span id={id} ref={pop} role="tooltip" onClick={(e) => e.stopPropagation()}
@@ -95,6 +100,7 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
           </span>
           <span className="mt-2 block text-[13.5px] font-medium leading-snug text-foreground">{g.headline}</span>
           <span className="mt-1 block text-[12px] text-foreground/60">{c.line}</span>
+          <span className="mt-1 block text-[12px] text-foreground/60">{SIGNAL_HORIZON_LINE}</span>
           {p && (
             <span className="mt-3 grid grid-cols-3 gap-2 font-mono">
               {[["Stock up 60d", p.p_up_60], ...(g.side === "long" ? [["Beats holding", p.p_beat_60], ["365d call profits", p.p_option_profit_60]] : [])]

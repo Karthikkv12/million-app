@@ -67,7 +67,7 @@ export default function SignalScannerPage() {
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 pb-16 pt-8 sm:px-6">
       <PageHeader eyebrow="Research" title="Signal scanner"
-        sub="The desk's backtested buy read on 100 popular names or the whole S&P 500: who is a Buy now, and the close or VIX level that would make the rest one."
+        sub="The desk's backtested buy read on 100 popular names or the whole S&P 500: who is a Buy now, and the close or VIX level that would make the rest one. A timing call for the next 1–3 months, not a long-term pick."
         action={<RefreshButton onRefresh={() => refetch()} isRefreshing={isFetching} />} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
