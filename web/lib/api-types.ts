@@ -6032,7 +6032,7 @@ export interface components {
             side: "long" | "short";
             /**
              * Stop
-             * @description Risk line, calm markets only: the 200-day average
+             * @description Held, calm market: the 200-day average (under it = EXIT)
              */
             stop?: number | null;
             support?: components["schemas"]["SignalLevelOut"] | null;
@@ -6040,10 +6040,10 @@ export interface components {
             target?: number | null;
             /**
              * Verdict
-             * @description Long: ADD / HOLD / CAUTION (don't add). Net short (puts): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry
+             * @description Long: ADD / HOLD / CAUTION (don't add) / EXIT (held, under the 200-day in a calm market). Net short (puts, short calls): TRIM (take profit) / HOLD. ROLL: a long leg within 30 days of expiry. Horizon: the next 20–60 trading days (1–3 months)
              * @enum {string}
              */
-            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM" | "ROLL";
+            verdict: "ADD" | "HOLD" | "CAUTION" | "TRIM" | "ROLL" | "EXIT";
             /**
              * Vix Pct
              * @description VIX percentile over the last year (0–1)
@@ -6077,7 +6077,7 @@ export interface components {
             covered_call?: ("0.15" | "0.30") | null;
             /**
              * Exit Below
-             * @description Held, calm market: the 200-day average (close under it → −1.65% vs holding over 60 days)
+             * @description Held, long: the 200-day average. Under it while the market is calm (VIX < 60th pct) is the exit (−1.5% to −1.65% vs holding over 60 days); not in fear
              */
             exit_below?: number | null;
             /**

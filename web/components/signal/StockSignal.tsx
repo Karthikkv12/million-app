@@ -21,7 +21,7 @@ export function StockSignal({ symbol }: { symbol: string }) {
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-2" data-testid="stock-signal">
       <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/45">Signal</span>
-      <SignalBadge signal={g} label={data.label} reasons={data.reasons} />
+      <SignalBadge signal={g} label={data.label} reasons={data.reasons} symbol={data.symbol} />
       <span className="min-w-0 text-[12.5px] leading-snug text-foreground/65">{g.headline}</span>
       {data.held !== "none" && <Link href="/hedge" className="text-[12px] text-accent hover:underline">On your Hedge desk</Link>}
     </span>

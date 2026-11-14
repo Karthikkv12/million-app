@@ -4,7 +4,9 @@
  * the backtest is (hedge.signal). Used on the stock page (any ticker) and on the Hedge desk rows, so both read
  * the same verdict, words and odds.
  */
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { clsx } from "clsx";
 import { Tag } from "@/components/desk";
 import type { HedgeBook } from "@/lib/api";
@@ -12,8 +14,11 @@ import type { HedgeBook } from "@/lib/api";
 export type SignalData = NonNullable<HedgeBook["signal"]>;
 type Tone = "gain" | "loss" | "warn" | "neutral";
 
-const TONE: Record<SignalData["verdict"], Tone> = { ADD: "gain", HOLD: "neutral", CAUTION: "warn", TRIM: "loss", ROLL: "warn" };
-const DEFAULT_LABEL: Record<SignalData["verdict"], string> = { ADD: "Add", HOLD: "Hold", CAUTION: "Don't add", TRIM: "Take profit", ROLL: "Roll" };
+const TONE: Record<SignalData["verdict"], Tone> = { ADD: "gain", HOLD: "neutral", CAUTION: "warn", TRIM: "loss", ROLL: "warn", EXIT: "loss" };
+const DEFAULT_LABEL: Record<SignalData["verdict"], string> = { ADD: "Add", HOLD: "Hold", CAUTION: "Don't add", TRIM: "Take profit", ROLL: "Roll", EXIT: "Exit" };
+/** Every verdict is a timing call for the next 20–60 trading days, measured against simply holding (hedge.signal). */
+export const SIGNAL_HORIZON = "1–3 mo";
+export const SIGNAL_HORIZON_LINE = "Horizon: the next 1–3 months (20–60 trading days), measured against simply holding. Not a day trade, and not a call on the company for years.";
 export const SIGNAL_TONE = TONE;
 const pct = (v?: number | null, d = 0) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
 const sgn = (v?: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(1)}%`);
@@ -26,6 +31,7 @@ export function confidenceOf(g: SignalData): { word: string; tone: Tone; line: s
     return { word: "Expiry", tone: "warn", line: `${near ? `The ${near.label} has ${near.dte} days left` : "A leg is close to expiry"}: roll or close. Not an edge: early rolls lost ~4% to costs. `
       + (p ? `The stock's own setup: ${pct(p.p_edge_positive)} chance its average edge is above zero.` : "") };
   }
+  if (g.verdict === "EXIT") return { word: "Weak (negative)", tone: "loss", line: "Tested exit: such days ran −1.5% vs holding over the next 60 trading days (t −2.5). A reason to cut, not a crash call." };
   if (!p) return { word: "Untested", tone: "neutral", line: "No VIX or price history: the backtest doesn't cover this read." };
   const pe = p.p_edge_positive;
   if (pe >= 0.95) return { word: "High", tone: "gain", line: `${pct(pe)} chance the average edge is above zero.` };
@@ -34,60 +40,29 @@ export function confidenceOf(g: SignalData): { word: string; tone: Tone; line: s
   return { word: "No edge", tone: "neutral", line: `${pct(pe)} chance the average edge is above zero: a coin flip.` };
 }
 
-export function SignalBadge({ signal: g, label, reasons = [], align = "left", className }: {
-  signal: SignalData; label?: string | null; reasons?: string[]; align?: "left" | "right"; className?: string;
+export function SignalBadge({ signal: g, label, reasons = [], symbol, className }: {
+  signal: SignalData; label?: string | null; reasons?: string[]; symbol?: string; align?: "left" | "right"; className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement>(null);
-  const pop = useRef<HTMLSpanElement>(null);
-  const [shift, setShift] = useState(0);
   const id = useId();
   const c = confidenceOf(g);
   const p = g.probability;
+  // A side drawer like the heat maps' Details (full screen on phones): Escape closes, the page behind doesn't scroll.
   useEffect(() => {
     if (!open) return;
-    const off = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", off);
     document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("pointerdown", off); document.removeEventListener("keydown", esc); };
-  }, [open]);
-  // keep the window on screen: anchored to the badge, then nudged left/right so it never runs past a 16px gutter
-  // (on the Hedge desk the badge sits in the last column, so a left-anchored window ran off the right edge)
-  useLayoutEffect(() => {
-    if (!open) { setShift(0); return; }
-    const fit = () => {
-      const el = pop.current;
-      if (!el) return;
-      const prev = Number(el.dataset.shift ?? 0);
-      const r = el.getBoundingClientRect();
-      const left = r.left - prev, right = r.right - prev, vw = document.documentElement.clientWidth, gap = 16;
-      const dx = right > vw - gap ? vw - gap - right : left < gap ? gap - left : 0;
-      el.dataset.shift = String(dx);
-      setShift(dx);
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
   }, [open]);
   const tested = g.reads.filter((r) => r.tested);
   // why: the read notes, the IV line, then roll lines; the odds and evidence have their own blocks
   const why = [...tested.map((r) => r.note), ...(g.fear_score != null ? [`Fear score ${g.fear_score.toFixed(2)} (Add at ≥ 0.28): VIX percentile × how oversold.`] : []),
     ...reasons.filter((r) => /^Stock IV|→ roll|→ expiry/.test(r))].slice(0, 7);
   const plan = g.plan?.lines ?? [];
-  return (
-    <span ref={box} className={clsx("relative inline-flex", className)}
-      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button type="button" data-testid="signal-badge" aria-describedby={open ? id : undefined} aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
-        className="rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-        <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
-      </button>
-      {open && (
-        <span id={id} ref={pop} role="tooltip" onClick={(e) => e.stopPropagation()}
-          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
-          className={clsx("absolute top-full z-50 mt-2 block w-[min(380px,calc(100vw-32px))] cursor-default rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-left shadow-xl",
-            align === "right" ? "right-0" : "left-0")}>
+  const body = (
+        <>
           <span className="flex items-center justify-between gap-3">
             <Tag tone={TONE[g.verdict]}>{label ?? DEFAULT_LABEL[g.verdict]}</Tag>
             <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/45">Confidence · <span className={clsx(
@@ -95,6 +70,7 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
           </span>
           <span className="mt-2 block text-[13.5px] font-medium leading-snug text-foreground">{g.headline}</span>
           <span className="mt-1 block text-[12px] text-foreground/60">{c.line}</span>
+          <span className="mt-1 block text-[12px] text-foreground/60">{SIGNAL_HORIZON_LINE}</span>
           {p && (
             <span className="mt-3 grid grid-cols-3 gap-2 font-mono">
               {[["Stock up 60d", p.p_up_60], ...(g.side === "long" ? [["Beats holding", p.p_beat_60], ["365d call profits", p.p_option_profit_60]] : [])]
@@ -145,8 +121,33 @@ export function SignalBadge({ signal: g, label, reasons = [], align = "left", cl
           )}
           {g.evidence && <span className="mt-3 block border-l-2 border-[var(--border-strong)] pl-2 text-[11.5px] leading-snug text-foreground/55">{g.evidence}</span>}
           <span className="mt-2 block text-[10.5px] text-foreground/40">Averages for this setup, not a forecast for one trade. Not financial advice.</span>
-        </span>
-      )}
+        </>
+  );
+  const name = label ?? DEFAULT_LABEL[g.verdict];
+  return (
+    <span className={clsx("inline-flex", className)}>
+      <button type="button" data-testid="signal-badge" aria-haspopup="dialog" aria-controls={open ? id : undefined} aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="inline-flex items-center rounded-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        <Tag tone={TONE[g.verdict]}>{name}</Tag>
+        <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] text-foreground/45" title={SIGNAL_HORIZON_LINE}>{SIGNAL_HORIZON}</span>
+      </button>
+      {open && typeof document !== "undefined" && createPortal(
+        <div id={id} className="fixed inset-0 z-[100] flex justify-end" role="dialog" aria-modal="true" data-testid="signal-pop"
+          aria-label={`${symbol ? `${symbol} ` : ""}signal: ${name}`} onClick={(e) => e.stopPropagation()}>
+          <button className="absolute inset-0 hidden bg-black/50 backdrop-blur-[2px] sm:block" onClick={() => setOpen(false)} aria-label="Close signal" tabIndex={-1} />
+          <aside className="relative flex h-[100dvh] w-full flex-col bg-[var(--background)] text-left sm:max-w-[480px] sm:border-l sm:border-[var(--border-strong)]">
+            <header className="flex items-center gap-3 border-b border-[var(--border-strong)] px-5 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
+              <div className="min-w-0">
+                <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-foreground/45">Signal · {SIGNAL_HORIZON}</p>
+                {symbol && <h2 className="font-mono text-[22px] font-semibold tracking-tight text-foreground">{symbol}</h2>}
+              </div>
+              <button type="button" autoFocus onClick={() => setOpen(false)} aria-label="Close"
+                className="ml-auto grid h-9 w-9 place-items-center rounded-full border border-[var(--border)] text-foreground/70 hover:text-foreground"><X size={16} /></button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-4">{body}</div>
+          </aside>
+        </div>, document.body)}
     </span>
   );
 }

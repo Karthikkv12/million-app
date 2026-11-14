@@ -37,13 +37,13 @@ function Shell({ children }: { children: React.ReactNode }) {
           <SyncStatus />
         </div>
       </div>
-      <nav aria-label="Portfolio" className="-mx-4 mb-6 overflow-x-auto border-b border-[var(--border)] px-4 sm:mx-0 sm:px-0">
+      <nav aria-label="Portfolio" className="-mx-4 mb-6 overflow-x-auto overflow-y-hidden px-4 shadow-[inset_0_-1px_0_var(--border)] sm:mx-0 sm:px-0">
         <div className="flex min-w-max gap-1">
           {PORTFOLIO_TABS.map((t) => {
             const on = active?.id === t.id;
             return (
               <Link key={t.id} href={`/portfolio/${t.id}`} aria-current={on ? "page" : undefined}
-                className={clsx("-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm transition",
+                className={clsx("flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm transition",
                   on ? "border-foreground font-medium text-foreground" : "border-transparent text-foreground/55 hover:text-foreground")}>
                 <t.icon size={15} className="shrink-0" />{t.label}
               </Link>
