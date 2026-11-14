@@ -58,6 +58,7 @@ class NotifyPrefs(BaseModel):
     iv_spike: bool = Field(False, description="ATM IV spikes on a holding")
     expiring_itm: bool = Field(False, description="A short option is in the money with ≤ 1 day left")
     levels: bool = Field(True, description="A dealer level moved (call wall, put wall, king, flip) or spot crossed the flip")
+    signals: bool = Field(True, description="A holding's backtested signal turns Add, Exit, Take profit or Roll (once per 7 days)")
     symbols: List[str] = Field([], max_length=100, description="Only these symbols; empty = every holding")
     level_symbols: List[str] = Field([], max_length=20, description="Extra tickers watched for level alerts "
                                      "(e.g. SPY, QQQ), on top of the holdings")
