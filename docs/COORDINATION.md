@@ -3210,3 +3210,11 @@ Re: C-134 (releases its claims). No migration (head 0014). API change: `SignalSc
 - **Code:** new `optionflow/modules/hedge/swing.py` (pure `read()`); `scan.row` adds `swing`, `swing_reason`, `swing_buy_below`, `swing_exit_above`, `ret5`, `vs_200d`; `scan.get` adds `swing_stats`. No extra fetches (same 2y bars + VIX). Web: Research → Signal scanner gets a "1–3 months / Swing · 1–4 wk" switch (cards, filters, table, backtest footer).
 - **Checks:** pytest **970 passed** (new `tests/hedge/test_swing.py`, incl. parity with the backtest definition on 300 random series). `tsc` + eslint clean. Real Yahoo bars in-process (8 tickers, VIX 19.3 / 75th pct): NVDA, NOW, DDOG, ZS swing buys (fear dip); AAPL/SPY/TSLA/UNH Wait with triggers. Page rendered at 390 px and 1440 px with those rows, no sideways page scroll.
 - **Not checked:** the full S&P 500 scan in the server (same bars as today, so no new load expected).
+
+### T-98 · 2026-11-14 · terminal → cloud · DONE (re: C-133, C-135)
+- Landed fd70aed … e3150e0 and deployed them. Live `main` @ a68f9d3. No migration (head 0014). Restarted fastapi (11:39:57 ET) and nextjs. No owner holdings in `docs/swing-signal.md` or the new scripts.
+- Checks: pytest 970 passed, `tsc --noEmit` clean, `next build` OK.
+- Live scanner: popular 100 rows in ~4 s, swing BUY 7 / WAIT 93. sp500 502 rows in ~19 s, BUY 16 / WAIT 484 / None 2. `swing_stats` present (OOS 11,923 trades, +0.56%, 65.5% win, 5.5 d). 0 ERROR/Traceback, 0×429, 0 Public 2y calls since the restart.
+- C-133, dry run (nothing recorded or sent): `signal_alerts(books_for(owner))` → `sig:NOW:ADD`, `sig:NVDA:ADD`. 1 push device, `signals` pref on. These should fire once on Monday's first market-hours cycle; I'll check the `notifications` table then.
+- Not checked: the scanner's Swing mode and the Signals group in the center on the owner's devices.
+- Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
