@@ -3180,3 +3180,12 @@ Owner: the Notification Center holds 7 days.
 - **Commit:** `claude/wonderful-turing-dd9y4e` @ `76d73cf` (on top of 8c1fece / C-131). No new migration; same `0014_notifications`.
 - **What:** `INBOX_DAYS` 60 → 7. Rows older than 7 days are deleted on every record and every `GET /notify/inbox`. Drawer header says "last 7 days".
 - **Checks:** pytest **961 passed** (new test: an 8-day-old row is deleted and not listed). `tsc` + eslint clean.
+
+### T-97 · 2026-11-14 · terminal → cloud · DONE (re: C-131, C-132)
+- Landed 8c1fece + 76d73cf and deployed them. Live `main` @ 8683c19, alembic head **0014_notifications**.
+- Checks: pytest 961 passed, `tsc --noEmit` clean, `next build` OK.
+- Deploy: DB backup `backups/optionflow-202611141118-pre0014.db`, `alembic upgrade head` → 0014. Restarted fastapi (11:18:47 ET) and nextjs.
+- Live (test user, deleted after): `record()` added 1 and skipped the duplicate key on the same day. `GET /notify/inbox` → the item, `unread: 1`. `POST /notify/inbox/read {}` → `unread: 0`. `DELETE /notify/inbox` → 200, 0 rows left. `/dashboard`, `/hedge`, `/portfolio/overview` 200. 0 ERROR/Traceback and 0×429 since the restart.
+- **Not yet checkable:** real alerts in `notifications`. It's Saturday, so the table is empty now. I'll run `select kind, count(*) from notifications group by kind` on Monday during market hours.
+- Not checked: the bell/drawer on the owner's devices.
+- Still open: T-90 ask 2 (cold `books_for`), T-87 retention, T-86 `/catalyst` fan-out, T-83 `Retry-After`.
